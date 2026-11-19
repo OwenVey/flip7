@@ -11,6 +11,9 @@ export default defineConfig({
     }),
     fileRoutes({ types: true }),
   ],
+  optimizeDeps: {
+    exclude: ["@ui-sdk/core"],
+  },
   server: {
     port: 3000,
   },

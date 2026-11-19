@@ -213,3 +213,7 @@ Oxlint + Oxfmt will catch most mechanical issues automatically. Focus your atten
 ---
 
 Most formatting and common issues are automatically fixed by Oxlint + Oxfmt. Run `pnpm exec ultracite fix` before committing to ensure compliance.
+
+# ui-sdk
+
+Before using ui-sdk, follow the `ui-sdk` skill if it's installed, and read `node_modules/@ui-sdk/solid/docs/llms.txt`. To build a new component, also search `node_modules/@ui-sdk/solid/docs/core.md` by heading, and read `rendering.md` next to it.

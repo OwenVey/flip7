@@ -3,6 +3,7 @@ import { Loading } from "solid-js";
 
 import { paths, Router } from "./router";
 
+import "@ui-sdk/core/web.css";
 import "./app.css";
 
 export default function App() {

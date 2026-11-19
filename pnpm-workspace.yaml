@@ -5,3 +5,15 @@ allowBuilds:
   lefthook: true
 
 minimumReleaseAge: 0
+
+permissions:
+  "@solidjs/diagnostics":
+    skills: true
+  "@solidjs/web":
+    skills: true
+  "@ui-sdk/core":
+    skills: true
+  solid-js:
+    skills: true
+  ultracite:
+    skills: true

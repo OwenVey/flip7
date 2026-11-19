@@ -17,6 +17,8 @@
     "@solidjs/meta": "^2.0.0",
     "@solidjs/router": "^2.0.0",
     "@solidjs/web": "^2.0.0",
+    "@ui-sdk/core": "0.1.0-beta.12",
+    "@ui-sdk/solid": "0.1.0-beta.12",
     "solid-js": "^2.0.0"
   },
   "devDependencies": {
