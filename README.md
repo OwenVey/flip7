@@ -8,12 +8,12 @@
 
 There is no `index.html` and no mount file. `@solidjs/vite-plugin`'s turnkey mode (`start: true` in `vite.config.ts`) generates the entries around two conventions:
 
-- **`src/App.tsx`** — the app, router included. The `<Router>` wraps a shared nav and a `<Loading>` boundary; its routes come from the file system (below).
-- **`src/Document.tsx`** — the document shell, the new `index.html`. Site-wide head tags go here; it is compiled only into the prerendered static shell and adds **zero client-side JS**. Per-page head tags (`<Title>` from `@solidjs/meta`) live in the route modules.
+- **`src/app.tsx`** — the app, router included. The `<Router>` wraps a shared nav and a `<Loading>` boundary; its routes come from the file system (below).
+- **`src/document.tsx`** — the document shell, the new `index.html`. Site-wide head tags go here; it is compiled only into the prerendered static shell and adds **zero client-side JS**. Per-page head tags (`<Title>` from `@solidjs/meta`) live in the route modules.
 
 ## File-system routing
 
-The `fileRoutes()` plugin (from `filesystem-routing/vite`) scans `src/routes` and exposes the result as the `virtual:file-routes` module, which `@solidjs/router/fs` turns into router routes inside `src/App.tsx`. You edit files under `src/routes`; the route table follows:
+The `fileRoutes()` plugin (from `filesystem-routing/vite`) scans `src/routes` and exposes the result as the `virtual:file-routes` module, which `@solidjs/router/fs` turns into router routes inside `src/app.tsx`. You edit files under `src/routes`; the route table follows:
 
 - `index.tsx` is `/`, `users/index.tsx` is `/users`, `users/[id].tsx` is `/users/:id`, `[...404].tsx` catches everything else.
 - Pairing `users.tsx` with the `users/` directory makes it a layout wrapping every page inside; `users/index.tsx` is what the layout shows at `/users` itself.
@@ -23,11 +23,11 @@ Every route is code-split automatically; navigating loads only that page's modul
 
 ## Data loading
 
-`src/routes/users/[id].tsx` shows the data pattern: an async `query()` (from `@solidjs/router`) read through a memo. The surrounding `<Loading>` boundary in `App.tsx` shows its fallback until the promise settles, and `query()` caches by key so preload and render share one request. The data is a local JSON module (`src/data/users.json`); swap the query body for any API call. Two things to keep in mind once SSR is on: use absolute URLs, and don't `fetch` your own origin from the server — behind a proxy (most PaaS hosts) the incoming `Host` header rarely routes back to the container. Data that lives with the app belongs in a server function (the `fullstack` template shows this).
+`src/routes/users/[id].tsx` shows the data pattern: an async `query()` (from `@solidjs/router`) read through a memo. The surrounding `<Loading>` boundary in `app.tsx` shows its fallback until the promise settles, and `query()` caches by key so preload and render share one request. The data is a local JSON module (`src/data/users.json`); swap the query body for any API call. Two things to keep in mind once SSR is on: use absolute URLs, and don't `fetch` your own origin from the server — behind a proxy (most PaaS hosts) the incoming `Host` header rarely routes back to the container. Data that lives with the app belongs in a server function (the `fullstack` template shows this).
 
 ## Testing
 
-`vitest` runs component tests in jsdom via `@solidjs/testing-library` — add `*.test.tsx` files next to what they test. See `src/components/Counter.test.tsx` for the pattern; note Solid 2.0 batches DOM updates, so tests call `flush()` after firing events before asserting on the DOM.
+`vitest` runs component tests in jsdom via `@solidjs/testing-library` — add `*.test.tsx` files next to what they test. See `src/components/counter.test.tsx` for the pattern; note Solid 2.0 batches DOM updates, so tests call `flush()` after firing events before asserting on the DOM.
 
 ## Usage
 
@@ -47,8 +47,7 @@ In the project directory, you can run:
 
 ### `npm run dev`
 
-Runs the app in the development mode.<br>
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+Runs the app in the development mode.<br> Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 
 The page will reload if you make edits.<br>
 
@@ -66,7 +65,7 @@ Runs the test suite.
 
 ## The `ssr` flip
 
-Streaming SSR is one boolean: add `ssr: true` next to `start: true` in `vite.config.ts`. `src/App.tsx`, `src/Document.tsx`, and the routes carry over unchanged: `<HydrationScript />` is already in place in the Document (in client mode it is stripped from the static shell). The build then emits a request handler to `dist/server`; to run it on Node, use `start: { nodeServer: true }` so the build also emits a ready-to-run `dist/server/node.js` (`fullstack`'s README covers deployment).
+Streaming SSR is one boolean: add `ssr: true` next to `start: true` in `vite.config.ts`. `src/app.tsx`, `src/document.tsx`, and the routes carry over unchanged: `<HydrationScript />` is already in place in the Document (in client mode it is stripped from the static shell). The build then emits a request handler to `dist/server`; to run it on Node, use `start: { nodeServer: true }` so the build also emits a ready-to-run `dist/server/node.js` (`fullstack`'s README covers deployment).
 
 ## Growing out of `basic`
 

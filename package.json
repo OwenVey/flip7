@@ -2,33 +2,41 @@
   "name": "example-basic",
   "version": "0.0.0",
   "description": "",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "serve": "vite preview",
     "test": "vitest",
-    "lint": "oxlint src"
-  },
-  "license": "MIT",
-  "devDependencies": {
-    "@solidjs/diagnostics": "^2.0.0",
-    "@solidjs/start-devtools": "^1.0.0-next.4",
-    "@solidjs/testing-library": "^1.0.0-rc.2",
-    "@solidjs/vite-plugin": "^3.0.0",
-    "@testing-library/jest-dom": "^7.0.0",
-    "eslint-plugin-solid": "~0.20.0",
-    "filesystem-routing": "0.5.0",
-    "jsdom": "^31.0.0",
-    "oxlint": "~1.92.0",
-    "typescript": "^7.0.2",
-    "vite": "^8.1.5",
-    "vitest": "^5.0.0"
+    "check": "ultracite check",
+    "fix": "ultracite fix",
+    "prepare": "lefthook install"
   },
   "dependencies": {
     "@solidjs/meta": "^2.0.0",
     "@solidjs/router": "^2.0.0",
     "@solidjs/web": "^2.0.0",
     "solid-js": "^2.0.0"
+  },
+  "devDependencies": {
+    "@interfere/landmines": "^0.1.1",
+    "@solidjs/diagnostics": "^2.0.0",
+    "@solidjs/start-devtools": "^1.0.0-next.4",
+    "@solidjs/testing-library": "^1.0.0-rc.2",
+    "@solidjs/vite-plugin": "^3.0.0",
+    "@testing-library/jest-dom": "^7.0.0",
+    "eslint-plugin-solid": "^0.20.0",
+    "filesystem-routing": "0.5.0",
+    "jsdom": "^31.0.0",
+    "lefthook": "^2.2.2",
+    "oxfmt": "^0.79.0",
+    "oxlint": "^1.94.0",
+    "oxlint-plugin-react-doctor": "^0.9.23",
+    "tsrs": "7.1.0-beta.tsrs3",
+    "typescript": "^7.0.2",
+    "ultracite": "8.3.1",
+    "vite": "^8.1.5",
+    "vitest": "^5.0.0"
   }
 }

@@ -1,6 +1,7 @@
-import { Title } from '@solidjs/meta';
-import Counter from '../components/Counter';
-import logo from '../logo.svg';
+import { Title } from "@solidjs/meta";
+
+import Counter from "../components/counter";
+import logo from "../logo.svg";
 
 export default function Home() {
   return (
