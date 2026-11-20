@@ -1,3 +1,7 @@
+@import "@fontsource-variable/big-shoulders-display";
+@import "@fontsource-variable/inter";
+@import "@fontsource/bungee/400.css";
+
 @layer ui-sdk;
 
 :root {
@@ -18,8 +22,9 @@
   --shadow-print: 3px 3px 0 var(--ink);
 
   --font-display: "Bungee", ui-sans-serif, system-ui, sans-serif;
-  --font-numeral: "Big Shoulders Display", "Bungee", ui-sans-serif, sans-serif;
-  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-numeral:
+    "Big Shoulders Display Variable", "Bungee", ui-sans-serif, sans-serif;
+  --font-body: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
 
   --ui-background: var(--paper);
   --ui-foreground: var(--ink);
