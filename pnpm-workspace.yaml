@@ -2,7 +2,9 @@ packages:
   - "."
 
 allowBuilds:
+  esbuild: true
   lefthook: true
+  workerd: true
 
 minimumReleaseAge: 0
 

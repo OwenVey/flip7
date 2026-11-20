@@ -2,6 +2,8 @@ import { Title } from "@solidjs/meta";
 import type { RouteDefinition } from "@solidjs/router";
 import { httpStatus } from "@solidjs/web";
 
+import SiteNav from "../components/site-nav";
+
 /**
  * The catch-all route. `httpStatus()` is a no-op in the browser and takes
  * effect when SSR is enabled; it runs in preload so the status code is set
@@ -15,16 +17,15 @@ export const route = {
 
 export default function NotFound() {
   return (
-    <main>
-      <Title>Not Found - Solid App</Title>
-      <h1>Page Not Found</h1>
-      <p>
-        Visit{" "}
-        <a href="https://docs.solidjs.com" target="_blank" rel="noreferrer">
-          docs.solidjs.com
-        </a>{" "}
-        to learn how to build Solid apps.
-      </p>
-    </main>
+    <>
+      <SiteNav />
+      <main>
+        <Title>Not Found · Hot Streak</Title>
+        <h1>Page Not Found</h1>
+        <p>
+          <a href="/">Back to Hot Streak</a>
+        </p>
+      </main>
+    </>
   );
 }

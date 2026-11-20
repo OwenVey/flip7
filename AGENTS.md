@@ -217,3 +217,7 @@ Most formatting and common issues are automatically fixed by Oxlint + Oxfmt. Run
 # ui-sdk
 
 Before using ui-sdk, follow the `ui-sdk` skill if it's installed, and read `node_modules/@ui-sdk/solid/docs/llms.txt`. To build a new component, also search `node_modules/@ui-sdk/solid/docs/core.md` by heading, and read `rendering.md` next to it.
+
+## Buttons in this app
+
+Every button-like ui-sdk part (`Button`, `AlertDialogTrigger`, `AlertDialogClose`, and any other trigger or close part you add) shares one base rule in `src/app.css`. Never give one its own `class` for size, padding, border or font. Change how it looks with `data-variant` (`solid`, `quiet`, `destructive`) and its size with `data-size="sm"`. When you add a new trigger or close part, add its `data-slot` to that base rule's `:is(...)` list.
