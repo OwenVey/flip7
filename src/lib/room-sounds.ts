@@ -185,6 +185,8 @@ export const createRoomSounds = () => {
     };
   });
 
+  const effectsEnabled = () => !muted() && effectsVolume() > 0;
+
   return {
     changeEffectsVolume: (volume: number) => {
       setEffectsVolume(volume);
@@ -197,26 +199,25 @@ export const createRoomSounds = () => {
     },
     changeMusicVolume: (volume: number) => {
       setMusicVolume(volume);
-      syncMusic(volume, muted());
       saveSetting(MUSIC_VOLUME_KEY, volume);
     },
+    effectsEnabled,
     effectsVolume,
     musicVolume,
     muted,
-    play: (cue: Sound) => {
-      if (unlocked && !muted() && effectsVolume() > 0) {
+    play: (cue: Sound, enabled = effectsEnabled()) => {
+      if (unlocked && enabled) {
         sounds.get(cue)?.play();
       }
     },
-    setSeated: (joined: boolean) => {
+    setSeated: (joined: boolean, volume: number, silent: boolean) => {
       seated = joined;
-      syncMusic(musicVolume(), muted());
+      syncMusic(volume, silent);
     },
     toggle: () => {
       const next = !muted();
       setMuted(next);
       mixer?.mute(next);
-      syncMusic(musicVolume(), next);
 
       if (next) {
         for (const sound of sounds.values()) {

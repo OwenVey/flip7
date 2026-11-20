@@ -41,14 +41,29 @@ const Room = (props: { code: string }) => {
 
   const toast = createToaster();
 
-  createEffect(() => connection.playerId() !== null, sounds.setSeated);
+  createEffect(
+    () =>
+      [
+        connection.playerId() !== null,
+        sounds.musicVolume(),
+        sounds.muted(),
+      ] as const,
+    ([seated, volume, muted]) => {
+      sounds.setSeated(seated, volume, muted);
+    }
+  );
 
   createEffect(
-    () => connection.notice(),
-    (notice) => {
-      if (notice) {
+    () => {
+      const notice = connection.notice();
+
+      return notice && { notice, effectsEnabled: sounds.effectsEnabled() };
+    },
+    (current, previous) => {
+      if (current && current.notice !== previous?.notice) {
+        const { notice, effectsEnabled } = current;
         toast.error(notice.message);
-        sounds.play("error");
+        sounds.play("error", effectsEnabled);
       }
     }
   );
