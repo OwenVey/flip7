@@ -9,7 +9,6 @@ import type { Card } from "./cards";
 import {
   addPlayer,
   backToLobby,
-  blockingPlayerId,
   CHAT_MAX_LENGTH,
   chat,
   choose,
@@ -27,6 +26,7 @@ import {
   TARGET_SCORE,
 } from "./engine";
 import type { GameState } from "./engine";
+import { waitingOn } from "./moves";
 import { parseServerMessage, toRoomView } from "./protocol";
 
 const random = () => 0.5;
@@ -454,7 +454,7 @@ describe("evicting a player", () => {
 describe("an offline player", () => {
   it("stays when the game is waiting on their turn", () => {
     const state = setup(["a", "b"], [num(5), num(3)]);
-    expect(blockingPlayerId(state)).toBe("a");
+    expect(waitingOn(state)?.playerId ?? null).toBe("a");
     expect(playForAbsent(state, random)).toBeFalsy();
 
     player(state, "a").connected = false;
@@ -470,7 +470,7 @@ describe("an offline player", () => {
 
     rig(state, [freeze()]);
     hit(state, "a", random);
-    expect(blockingPlayerId(state)).toBe("a");
+    expect(waitingOn(state)?.playerId ?? null).toBe("a");
 
     player(state, "a").connected = false;
     expect(playForAbsent(state, random)).toBeTruthy();
@@ -486,7 +486,7 @@ describe("an offline player", () => {
     stay(state, "a", random);
     stay(state, "b", random);
     expect(state.phase).toBe("roundOver");
-    expect(blockingPlayerId(state)).toBeNull();
+    expect(waitingOn(state)?.playerId ?? null).toBeNull();
   });
 });
 

@@ -24,18 +24,15 @@ import {
 
 import { cardLabel, calculateRoundScore } from "../game/cards";
 import type { Card } from "../game/cards";
-import {
-  blockingPlayerId,
-  canStay,
-  FLIP_SEVEN_STATUS,
-  FLIP_THREE_COUNT,
-} from "../game/engine";
+import { FLIP_SEVEN_STATUS, FLIP_THREE_COUNT } from "../game/engine";
 import type {
   ActionCardChoice,
   HeldCard,
   LogEntry,
   RoundStatus,
 } from "../game/engine";
+import { availableMoves } from "../game/moves";
+import type { AvailableMoves } from "../game/moves";
 import type { PlayerView, RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
@@ -168,32 +165,6 @@ const currentRoundPoints = (player: PlayerView) =>
 const nameOf = (room: RoomView, id: string | null) =>
   room.players.find((player) => player.id === id)?.name ?? "Someone";
 
-const isOffline = (room: RoomView, id: string) =>
-  room.players.find((player) => player.id === id)?.connected === false;
-
-const canStayById = (room: RoomView, id: string) => {
-  const player = room.players.find((candidate) => candidate.id === id);
-
-  return player ? canStay(player) : false;
-};
-
-const hostCanPlayFor = (room: RoomView, playerId: string, id: string) =>
-  room.hostId === playerId && id !== playerId && isOffline(room, id);
-
-const choiceToMake = (room: RoomView, playerId: string) => {
-  const { choice } = room;
-
-  if (
-    choice &&
-    (choice.chooserId === playerId ||
-      hostCanPlayFor(room, playerId, choice.chooserId))
-  ) {
-    return choice;
-  }
-
-  return null;
-};
-
 const choiceVerb = (choice: ActionCardChoice) => {
   if (choice.card.kind === "freeze") {
     return "Freeze";
@@ -291,15 +262,17 @@ const RoundPlayer = (
   );
 
   const isMe = () => props.player.id === props.playerId;
-  const isHost = () => props.room.hostId === props.playerId;
-  const hasDecision = () => blockingPlayerId(props.room) === props.player.id;
+  const moves = createMemo(() => availableMoves(props.room, props.playerId));
+  const canKick = () => moves().host.kick.includes(props.player.id);
+
+  const hasDecision = () => moves().waitingOn?.playerId === props.player.id;
+
   const isFrozen = () => props.player.status === "frozen";
 
-  const pickChoice = () => {
-    const choice = choiceToMake(props.room, props.playerId);
-
-    return choice?.options.includes(props.player.id) === true ? choice : null;
-  };
+  const pickChoice = () =>
+    moves().choice?.targets.includes(props.player.id) === true
+      ? props.room.choice
+      : null;
 
   const roundResult = () =>
     props.room.phase === "playing" ? null : props.player.lastRound;
@@ -433,7 +406,7 @@ const RoundPlayer = (
             </span>
           </Show>
         </div>
-        <Show when={isHost() && !isMe()}>
+        <Show when={canKick()}>
           <RemovePlayer
             disabled={props.actionsDisabled}
             name={props.player.name}
@@ -576,7 +549,9 @@ const ChoiceButtons = (props: TableProps & { choice: ActionCardChoice }) => (
   </div>
 );
 
-const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => (
+const ActionCardPrompt = (
+  props: TableProps & { choice: ActionCardChoice; moves: AvailableMoves }
+) => (
   <>
     <ul class="dealt-action-card" data-choice-card="" aria-hidden="true">
       <PlayingCard card={props.choice.card} />
@@ -586,7 +561,7 @@ const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => (
         <p class="headline">
           {nameOf(props.room, props.choice.chooserId)} is choosing who receives{" "}
           {cardLabel(props.choice.card)}.
-          <Show when={isOffline(props.room, props.choice.chooserId)}>
+          <Show when={props.moves.waitingOn?.offline}>
             <span class="muted">
               {" "}
               · Offline, so it will be played for them soon.
@@ -595,7 +570,11 @@ const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => (
         </p>
       }
     >
-      <Match when={props.choice.chooserId === props.playerId}>
+      <Match
+        when={
+          props.moves.choice !== null && props.moves.choice.forId === undefined
+        }
+      >
         <p class="headline">
           {choiceVerb(props.choice)}… <span class="muted">· Pick a player</span>
         </p>
@@ -607,13 +586,7 @@ const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => (
           actionsDisabled={props.actionsDisabled}
         />
       </Match>
-      <Match
-        when={hostCanPlayFor(
-          props.room,
-          props.playerId,
-          props.choice.chooserId
-        )}
-      >
+      <Match when={props.moves.choice?.forId !== undefined}>
         <p class="headline">
           {nameOf(props.room, props.choice.chooserId)} is offline.{" "}
           <span class="muted">
@@ -829,18 +802,13 @@ const Confetti = () => (
 const OfflineTurn = (
   props: Pick<TableProps, "room" | "send" | "actionsDisabled"> & {
     playerId: string;
+    canStay: boolean;
   }
 ) => {
   const player = () =>
     props.room.players.find((candidate) => candidate.id === props.playerId);
 
   const name = () => player()?.name ?? "Someone";
-
-  const canStayFor = () => {
-    const current = player();
-
-    return current ? canStay(current) : false;
-  };
 
   const points = () => {
     const current = player();
@@ -853,7 +821,7 @@ const OfflineTurn = (
       <p class="headline">
         {name()} is offline.{" "}
         <span class="muted">
-          · Move for them, or they'll {canStayFor() ? "stay" : "hit"} soon.
+          · Move for them, or they'll {props.canStay ? "stay" : "hit"} soon.
         </span>
       </p>
       <div class="action-buttons">
@@ -868,7 +836,7 @@ const OfflineTurn = (
           <SquarePlus size={16} />
           <FitLabel long={`Hit for ${name()}`} short="Hit" />
         </Button>
-        <Show when={canStayFor()}>
+        <Show when={props.canStay}>
           <Button
             disabled={props.actionsDisabled}
             aria-label={`Stay with ${points()} points`}
@@ -889,15 +857,16 @@ const OfflineTurn = (
 };
 
 const ActionBar = (props: TableProps & DealProps) => {
-  const isHost = () => props.room.hostId === props.playerId;
+  const moves = createMemo(() => availableMoves(props.room, props.playerId));
 
   const me = () =>
     props.room.players.find((player) => player.id === props.playerId);
 
-  const myTurn = () =>
-    props.room.turnId === props.playerId &&
-    props.room.choice === null &&
-    props.dealing !== true;
+  const myTurn = () => {
+    const { turn } = moves();
+
+    return turn !== null && turn.forId === undefined && props.dealing !== true;
+  };
 
   const dealingLabel = () => {
     const step = props.dealStep ?? null;
@@ -929,11 +898,7 @@ const ActionBar = (props: TableProps & DealProps) => {
     return isMe ? "Dealing to you…" : `Dealing to ${name}…`;
   };
 
-  const iCanStay = () => {
-    const player = me();
-
-    return player ? canStay(player) : false;
-  };
+  const iCanStay = () => moves().turn?.canStay === true;
 
   const myRound = () => {
     const player = me();
@@ -944,14 +909,12 @@ const ActionBar = (props: TableProps & DealProps) => {
   const winners = () =>
     props.room.winnerIds.map((id) => nameOf(props.room, id)).join(" and ");
 
-  const offlineTurnId = () => {
-    const { turnId } = props.room;
+  const offlineTurn = () => {
+    const { turn } = moves();
 
-    return turnId !== null &&
-      props.room.choice === null &&
-      hostCanPlayFor(props.room, props.playerId, turnId)
-      ? turnId
-      : null;
+    return turn?.forId === undefined
+      ? null
+      : { canStay: turn.canStay, playerId: turn.forId };
   };
 
   return (
@@ -966,7 +929,7 @@ const ActionBar = (props: TableProps & DealProps) => {
         <Match when={props.room.phase === "gameOver"}>
           <p class="headline">{winners()} wins!</p>
           <Show
-            when={isHost()}
+            when={moves().host.lobby}
             fallback={<p class="muted">Waiting for the host.</p>}
           >
             <div class="action-buttons">
@@ -984,7 +947,7 @@ const ActionBar = (props: TableProps & DealProps) => {
         <Match when={props.room.phase === "roundOver"}>
           <p class="headline">End of round {props.room.round}</p>
           <Show
-            when={isHost()}
+            when={moves().host.nextRound}
             fallback={
               <p class="muted">Waiting for the host to start the next round.</p>
             }
@@ -1005,6 +968,7 @@ const ActionBar = (props: TableProps & DealProps) => {
           {(choice) => (
             <ActionCardPrompt
               choice={choice()}
+              moves={moves()}
               room={props.room}
               playerId={props.playerId}
               send={props.send}
@@ -1049,10 +1013,11 @@ const ActionBar = (props: TableProps & DealProps) => {
             </Show>
           </div>
         </Match>
-        <Match when={offlineTurnId()}>
-          {(turnId) => (
+        <Match when={offlineTurn()}>
+          {(turn) => (
             <OfflineTurn
-              playerId={turnId()}
+              playerId={turn().playerId}
+              canStay={turn().canStay}
               room={props.room}
               send={props.send}
               actionsDisabled={props.actionsDisabled}
@@ -1063,11 +1028,11 @@ const ActionBar = (props: TableProps & DealProps) => {
           {(turnId) => (
             <p class="headline">
               {nameOf(props.room, turnId())} is deciding…
-              <Show when={isOffline(props.room, turnId())}>
+              <Show when={moves().waitingOn?.offline}>
                 <span class="muted">
                   {" "}
                   · Offline, so they'll{" "}
-                  {canStayById(props.room, turnId()) ? "stay" : "hit"} soon.
+                  {moves().waitingOn?.canStay === true ? "stay" : "hit"} soon.
                 </span>
               </Show>
             </p>

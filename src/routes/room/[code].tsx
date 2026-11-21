@@ -20,6 +20,7 @@ import Lobby from "../../components/lobby";
 import SiteNav from "../../components/site-nav";
 import SoundControls from "../../components/sound-controls";
 import Table from "../../components/table";
+import { waitingOn } from "../../game/moves";
 import { normalizeCode } from "../../game/protocol";
 import { createDealPlayback } from "../../lib/deal-playback";
 import { createRoomConnection } from "../../lib/room-connection";
@@ -122,13 +123,7 @@ const Room = (props: { code: string }) => {
   const myMove = () => {
     const view = seated();
 
-    if (view?.room.phase !== "playing") {
-      return false;
-    }
-
-    const waitingOn = view.room.choice?.chooserId ?? view.room.turnId;
-
-    return waitingOn === view.playerId;
+    return view ? waitingOn(view.room)?.playerId === view.playerId : false;
   };
 
   createEffect(myMove, (mine) => {

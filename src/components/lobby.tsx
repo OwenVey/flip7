@@ -3,7 +3,8 @@ import Play from "@lucide/solid/icons/play";
 import { Button } from "@ui-sdk/solid/button";
 import { createMemo, For, Repeat, Show } from "solid-js";
 
-import { MAX_PLAYERS, MIN_PLAYERS } from "../game/engine";
+import { MAX_PLAYERS } from "../game/engine";
+import { availableMoves, MIN_PLAYERS } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
 import InviteButton from "./invite-button";
@@ -18,6 +19,7 @@ export default function Lobby(props: {
   send: RoomConnection["send"];
   actionsDisabled?: boolean;
 }) {
+  const moves = createMemo(() => availableMoves(props.room, props.playerId));
   const isHost = () => props.room.hostId === props.playerId;
 
   const missing = () => Math.max(0, MIN_PLAYERS - props.room.players.length);
@@ -81,7 +83,7 @@ export default function Lobby(props: {
                       Offline
                     </span>
                   </Show>
-                  <Show when={isHost() && player().id !== props.playerId}>
+                  <Show when={moves().host.kick.includes(player().id)}>
                     <RemovePlayer
                       disabled={props.actionsDisabled}
                       name={player().name}
@@ -111,7 +113,7 @@ export default function Lobby(props: {
             }
           >
             <Show
-              when={missing() === 0}
+              when={moves().host.start}
               fallback={
                 <p class="muted">
                   Waiting for {missing()} more{" "}

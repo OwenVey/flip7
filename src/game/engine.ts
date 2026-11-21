@@ -8,9 +8,10 @@ import {
   countUniqueNumberCards,
 } from "./cards";
 import type { ActionCard, Card, NumberCard, Random, RoundScore } from "./cards";
+import { MIN_PLAYERS, rejectMove, waitingOn } from "./moves";
+import type { Move } from "./moves";
 
 export const TARGET_SCORE = 200;
-export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 12;
 export const FLIP_THREE_COUNT = 3;
 
@@ -787,9 +788,11 @@ const advance = (state: GameState, random: Random) => {
   }
 };
 
-const assertHost = (state: GameState, playerId: string) => {
-  if (state.hostId !== playerId) {
-    throw new GameError("Only the host can do that.");
+const assertMove = (state: GameState, playerId: string, move: Move) => {
+  const reason = rejectMove(state, playerId, move);
+
+  if (reason !== null) {
+    throw new GameError(reason);
   }
 };
 
@@ -861,15 +864,7 @@ export const startGame = (
   playerId: string,
   random: Random
 ) => {
-  assertHost(state, playerId);
-
-  if (state.phase === "playing" || state.phase === "roundOver") {
-    throw new GameError("A game is already running.");
-  }
-
-  if (state.players.length < MIN_PLAYERS) {
-    throw new GameError(`You need at least ${MIN_PLAYERS} players to start.`);
-  }
+  assertMove(state, playerId, { type: "start" });
 
   for (const player of state.players) {
     player.score = 0;
@@ -893,27 +888,9 @@ export const nextRound = (
   playerId: string,
   random: Random
 ) => {
-  assertHost(state, playerId);
-
-  if (state.phase !== "roundOver") {
-    throw new GameError("The round isn't over yet.");
-  }
+  assertMove(state, playerId, { type: "nextRound" });
 
   startRound(state, random);
-};
-
-const assertTurn = (state: GameState, playerId: string) => {
-  if (state.phase !== "playing") {
-    throw new GameError("No round is being played.");
-  }
-
-  if (state.choice) {
-    throw new GameError("Waiting for a choice to be made.");
-  }
-
-  if (state.turnId !== playerId) {
-    throw new GameError("It isn't your turn.");
-  }
 };
 
 const endTurn = (state: GameState, player: Player) => {
@@ -927,7 +904,7 @@ const endTurn = (state: GameState, player: Player) => {
 };
 
 export const hit = (state: GameState, playerId: string, random: Random) => {
-  assertTurn(state, playerId);
+  assertMove(state, playerId, { type: "hit" });
   const player = getPlayer(state, playerId);
   endTurn(state, player);
   const card = draw(state, random);
@@ -955,18 +932,9 @@ const stayAndBankPoints = (
   advance(state, random);
 };
 
-/** A player may stay only once they have at least one card in front of them. */
-export const canStay = (player: { hand: readonly Card[] }) =>
-  player.hand.length > 0;
-
 export const stay = (state: GameState, playerId: string, random: Random) => {
-  assertTurn(state, playerId);
+  assertMove(state, playerId, { type: "stay" });
   const player = getPlayer(state, playerId);
-
-  if (!canStay(player)) {
-    throw new GameError("You need a card in front of you before you can stay.");
-  }
-
   stayAndBankPoints(state, player, random);
 };
 
@@ -976,14 +944,11 @@ export const choose = (
   targetId: string,
   random: Random
 ) => {
+  assertMove(state, playerId, { targetId, type: "choose" });
   const { choice } = state;
 
-  if (!choice || choice.chooserId !== playerId) {
-    throw new GameError("There's nothing for you to choose.");
-  }
-
-  if (!choice.options.includes(targetId)) {
-    throw new GameError("You can't choose that player.");
+  if (!choice) {
+    return;
   }
 
   state.choice = null;
@@ -1119,14 +1084,7 @@ export const kick = (
   playerId: string,
   random: Random
 ) => {
-  if (state.hostId !== hostId) {
-    throw new GameError("Only the host can remove players.");
-  }
-
-  if (playerId === hostId) {
-    throw new GameError("Use Leave to leave the room.");
-  }
-
+  assertMove(state, hostId, { playerId, type: "kick" });
   evict(state, playerId, random, (name) => `${name} was removed by the host.`);
 };
 
@@ -1136,11 +1094,7 @@ export const leave = (state: GameState, playerId: string, random: Random) => {
 };
 
 export const backToLobby = (state: GameState, playerId: string) => {
-  assertHost(state, playerId);
-
-  if (state.phase !== "gameOver") {
-    throw new GameError("Finish the game first.");
-  }
+  assertMove(state, playerId, { type: "lobby" });
 
   state.phase = "lobby";
   state.round = 0;
@@ -1171,29 +1125,19 @@ export const transferHost = (state: GameState) => {
   return true;
 };
 
-/** The player the game is waiting on, if any: whoever must choose a target, or whoever's turn it is. */
-export const blockingPlayerId = (
-  state: Pick<GameState, "phase" | "choice" | "turnId">
-) => {
-  if (state.phase !== "playing") {
-    return null;
-  }
-
-  return state.choice?.chooserId ?? state.turnId;
-};
-
 /**
  * Moves the game on for a player who went offline while it waited on them:
  * Plays their Action card on another active player when possible.
  * On a regular turn, chooses Stay if they have a card in front of them and Hit otherwise.
  */
 export const playForAbsent = (state: GameState, random: Random) => {
-  const id = blockingPlayerId(state);
-  const player = id === null ? undefined : findPlayer(state, id);
+  const waiting = waitingOn(state);
 
-  if (!player || player.connected) {
+  if (waiting?.offline !== true) {
     return false;
   }
+
+  const player = getPlayer(state, waiting.playerId);
 
   const { choice } = state;
 
@@ -1212,7 +1156,7 @@ export const playForAbsent = (state: GameState, random: Random) => {
     return true;
   }
 
-  if (!canStay(player)) {
+  if (!waiting.canStay) {
     say(state, `${player.name} is offline and has no cards, so they hit.`);
     hit(state, player.id, random);
 
@@ -1247,42 +1191,22 @@ export const playFor = (
   move: MoveForOffline,
   random: Random
 ) => {
-  assertHost(state, hostId);
+  assertMove(state, hostId, { ...move, forId: playerId });
   const host = getPlayer(state, hostId);
   const player = getPlayer(state, playerId);
 
-  if (player.connected) {
-    throw new GameError(`${player.name} is back online, so it's their move.`);
-  }
-
-  if (blockingPlayerId(state) !== player.id) {
-    throw new GameError(`The game isn't waiting on ${player.name}.`);
-  }
-
   if (move.type === "choose") {
-    if (state.choice?.options.includes(move.targetId) !== true) {
-      throw new GameError("You can't choose that player.");
-    }
-
     say(state, `${host.name} chose for ${player.name}, who is offline.`);
     choose(state, player.id, move.targetId, random);
 
     return;
   }
 
-  assertTurn(state, player.id);
-
   if (move.type === "hit") {
     say(state, `${host.name} hit for ${player.name}, who is offline.`);
     hit(state, player.id, random);
 
     return;
-  }
-
-  if (!canStay(player)) {
-    throw new GameError(
-      `${player.name} needs a card in front of them before they can stay.`
-    );
   }
 
   stayAndBankPoints(

@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { createGame } from "../game/engine";
+import { addPlayer, createGame } from "../game/engine";
 import { toRoomView } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 import { roomCues } from "./room-sounds";
 
+const game = createGame();
+
+addPlayer(game, "me", "Me");
+
+addPlayer(game, "opponent", "Opp");
+
 const before: RoomView = {
-  ...toRoomView("ABCDE", createGame()),
+  ...toRoomView("ABCDE", game),
   drawSeq: 10,
   log: [{ cue: "bank", id: 7, text: "Banked." }],
   phase: "playing",
