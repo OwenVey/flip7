@@ -45,6 +45,7 @@ export default function PlayingCard(props: { card: Card; bust?: boolean }) {
   return (
     <li
       class="card"
+      data-card-id={props.card.id}
       data-kind={props.card.kind}
       data-number={props.card.kind === "number" ? props.card.value : undefined}
       data-score-modifier={isScoreModifierCard(props.card) ? "" : undefined}

@@ -2,16 +2,24 @@ import ArrowLeft from "@lucide/solid/icons/arrow-left";
 import ArrowRight from "@lucide/solid/icons/arrow-right";
 import Coins from "@lucide/solid/icons/coins";
 import Flame from "@lucide/solid/icons/flame";
+import PlayingCardsFan from "@lucide/solid/icons/playing-cards-fan";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import SquarePlus from "@lucide/solid/icons/square-plus";
+import WifiOff from "@lucide/solid/icons/wifi-off";
 import { Button } from "@ui-sdk/solid/button";
 import { Meter, MeterIndicator, MeterTrack } from "@ui-sdk/solid/meter";
-import { createMemo, For, Match, Show, Switch } from "solid-js";
+import { createMemo, For, Match, Repeat, Show, Switch } from "solid-js";
 
 import { cardLabel, calculateRoundScore } from "../game/cards";
-import { blockingPlayerId, canStay, FLIP_SEVEN_STATUS } from "../game/engine";
-import type { ActionCardChoice, RoundStatus } from "../game/engine";
+import {
+  blockingPlayerId,
+  canStay,
+  FLIP_SEVEN_STATUS,
+  FLIP_THREE_COUNT,
+} from "../game/engine";
+import type { ActionCardChoice, HeldCard, RoundStatus } from "../game/engine";
 import type { PlayerView, RoomView } from "../game/protocol";
+import type { DealStep } from "../lib/deal-plan";
 import type { RoomConnection } from "../lib/room-connection";
 import GameLog from "./game-log";
 import InviteButton from "./invite-button";
@@ -35,6 +43,101 @@ interface TableProps {
   actionsDisabled?: boolean;
 }
 
+interface DealProps {
+  /** True while cards are still flying from the deck. */
+  dealing?: boolean;
+  /** The card being dealt, and where it's going. */
+  dealStep?: DealStep | null;
+  /** The card in flight, which doesn't count until it lands. */
+  incomingCardId?: number | null;
+}
+
+interface FlipProgress {
+  flipped: number;
+  total: number;
+  waiting: boolean;
+}
+
+const stepPlayerId = (step: DealStep | null | undefined) =>
+  step && step.to.kind !== "choice" ? step.to.playerId : null;
+
+const flipProgress = (
+  room: RoomView,
+  step: DealStep | null | undefined,
+  playerId: string
+) => {
+  if (step?.to.kind === "played" && step.to.playerId === playerId) {
+    const progress: FlipProgress = {
+      flipped: 0,
+      total: FLIP_THREE_COUNT,
+      waiting: false,
+    };
+
+    return progress;
+  }
+
+  if (step?.flip && stepPlayerId(step) === playerId) {
+    const progress: FlipProgress = {
+      flipped: step.flip.index,
+      total: step.flip.total,
+      waiting: false,
+    };
+
+    return progress;
+  }
+
+  const run = room.flips.findLast((flip) => flip.targetId === playerId);
+
+  if (!run) {
+    return null;
+  }
+
+  const progress: FlipProgress = {
+    flipped: FLIP_THREE_COUNT - run.remaining,
+    total: FLIP_THREE_COUNT,
+    waiting: true,
+  };
+
+  return progress;
+};
+
+const sameProgress = (a: FlipProgress | null, b: FlipProgress | null) =>
+  a === b ||
+  (a !== null &&
+    b !== null &&
+    a.flipped === b.flipped &&
+    a.total === b.total &&
+    a.waiting === b.waiting);
+
+const sameHeldCards = (a: HeldCard[], b: HeldCard[]) =>
+  a.length === b.length &&
+  a.every((entry, index) => entry.card.id === b[index]?.card.id);
+
+const FlipTracker = (props: { progress: FlipProgress }) => (
+  <span class="flip-run" data-waiting={props.progress.waiting ? "" : undefined}>
+    <PlayingCardsFan size={12} aria-hidden="true" />
+    Flip Three
+    <span class="flip-pips" aria-hidden="true">
+      <Repeat count={props.progress.total}>
+        {(index) => (
+          <span
+            class="flip-pip"
+            data-filled={index < props.progress.flipped ? "" : undefined}
+            data-current={
+              !props.progress.waiting && index === props.progress.flipped - 1
+                ? ""
+                : undefined
+            }
+          />
+        )}
+      </Repeat>
+    </span>
+    <span class="sr-only">
+      {`, ${props.progress.flipped} of ${props.progress.total} flipped`}
+    </span>
+  </span>
+);
+
 const currentRoundPoints = (player: PlayerView) =>
   player.status === "busted" ? 0 : calculateRoundScore(player.hand).total;
 
@@ -50,7 +153,26 @@ const canStayById = (room: RoomView, id: string) => {
   return player ? canStay(player) : false;
 };
 
-const RoundPlayer = (props: TableProps & { player: PlayerView }) => {
+const RoundPlayer = (
+  props: TableProps &
+    Pick<DealProps, "incomingCardId" | "dealStep"> & {
+      player: PlayerView;
+    }
+) => {
+  const held = createMemo(
+    () => props.room.held.filter((entry) => entry.ownerId === props.player.id),
+    { equals: sameHeldCards }
+  );
+
+  const bustCard = createMemo(() => props.player.bustCard, {
+    equals: (a, b) => a?.id === b?.id,
+  });
+
+  const flip = createMemo(
+    () => flipProgress(props.room, props.dealStep, props.player.id),
+    { equals: sameProgress }
+  );
+
   const isMe = () => props.player.id === props.playerId;
   const isHost = () => props.room.hostId === props.playerId;
   const hasDecision = () => blockingPlayerId(props.room) === props.player.id;
@@ -61,14 +183,24 @@ const RoundPlayer = (props: TableProps & { player: PlayerView }) => {
 
   const pendingPoints = createMemo(() =>
     props.room.phase === "playing" && props.player.status !== "out"
-      ? currentRoundPoints(props.player)
+      ? currentRoundPoints({
+          ...props.player,
+          hand: props.player.hand.filter(
+            (card) => card.id !== props.incomingCardId
+          ),
+        })
       : 0
   );
 
-  const projectedScore = () => props.player.score + pendingPoints();
+  const roundPoints = () => roundResult()?.total ?? pendingPoints();
 
-  const projectedPercent = () =>
-    Math.min(100, (projectedScore() / props.room.targetScore) * 100);
+  const baseScore = () =>
+    props.room.phase === "playing"
+      ? props.player.score
+      : props.player.score - (roundResult()?.total ?? 0);
+
+  const scorePercent = (score: number) =>
+    `${Math.min(100, (score / props.room.targetScore) * 100)}%`;
 
   const decisionLabel = () => {
     if (props.room.choice) {
@@ -86,8 +218,11 @@ const RoundPlayer = (props: TableProps & { player: PlayerView }) => {
           ? "flipSeven"
           : props.player.status
       }
+      data-seat={props.player.id}
+      data-flipping={flip()?.waiting === false ? "" : undefined}
       data-turn={hasDecision() ? "" : undefined}
       data-me={isMe() ? "" : undefined}
+      data-offline={props.player.connected ? undefined : ""}
       aria-label={`${props.player.name}, ${props.player.score} points`}
     >
       <header class="seat-header">
@@ -97,22 +232,14 @@ const RoundPlayer = (props: TableProps & { player: PlayerView }) => {
             <span class="badge">You</span>
           </Show>
           <Show when={props.room.dealerId === props.player.id}>
-            <span class="badge" data-tone="muted">
-              Dealer
-            </span>
-          </Show>
-          <Show when={props.player.status === "active"}>
-            <span class="active-indicator" title={STATUS_LABELS.active}>
-              <span class="sr-only">{STATUS_LABELS.active}</span>
-            </span>
-          </Show>
-          <Show when={hasDecision()}>
-            <span class="badge" data-tone="turn">
-              {decisionLabel()}
+            <span class="dealer-chip" title="Dealer">
+              <span aria-hidden="true">D</span>
+              <span class="sr-only">Dealer</span>
             </span>
           </Show>
           <Show when={!props.player.connected}>
-            <span class="badge" data-tone="muted">
+            <span class="badge" data-tone="danger">
+              <WifiOff size={12} aria-hidden="true" />
               Offline
             </span>
           </Show>
@@ -128,6 +255,11 @@ const RoundPlayer = (props: TableProps & { player: PlayerView }) => {
         </Show>
       </header>
       <div class="seat-meta">
+        <Show when={hasDecision()}>
+          <span class="badge" data-tone="turn">
+            {decisionLabel()}
+          </span>
+        </Show>
         <Show when={props.player.status !== "active"}>
           <span class="status-pill">
             <Show when={isFrozen()}>
@@ -136,26 +268,34 @@ const RoundPlayer = (props: TableProps & { player: PlayerView }) => {
             {STATUS_LABELS[props.player.status]}
           </span>
         </Show>
-        <span class="muted">
-          <Show
-            when={props.player.status !== "out"}
-            fallback="Joins next round"
-          >
-            <strong class="round-points">
-              {roundResult()?.total ?? pendingPoints()}
-            </strong>{" "}
-            {roundResult() ? "points scored this round" : "points this round"}
-          </Show>
-        </span>
+        <Show when={props.player.status === "out"}>
+          <span class="muted">Joins next round</span>
+        </Show>
+        <Show when={flip()}>
+          {(progress) => <FlipTracker progress={progress()} />}
+        </Show>
       </div>
       <ul class="hand" aria-label={`${props.player.name}'s cards`}>
         <For each={props.player.hand} keyed={(card) => card.id}>
           {(card) => <PlayingCard card={card()} />}
         </For>
-        <Show when={props.player.bustCard}>
+        <Show when={bustCard()}>
           {(card) => <PlayingCard card={card()} bust />}
         </Show>
       </ul>
+      <Show when={held().length > 0}>
+        <div class="held" data-held="">
+          <p class="held-label">Waiting to play</p>
+          <ul
+            class="held-cards"
+            aria-label={`${props.player.name}'s held action cards`}
+          >
+            <For each={held()} keyed={(entry) => entry.card.id}>
+              {(entry) => <PlayingCard card={entry().card} />}
+            </For>
+          </ul>
+        </div>
+      </Show>
       <Show when={isFrozen()}>
         <div class="frost" aria-hidden="true">
           <Snowflake class="frost-burst" />
@@ -169,20 +309,23 @@ const RoundPlayer = (props: TableProps & { player: PlayerView }) => {
         class="seat-meter"
         value={props.player.score}
         max={props.room.targetScore}
-        style={{ "--projected-score": `${projectedPercent()}%` }}
+        style={{
+          "--round-start": scorePercent(baseScore()),
+          "--projected-score": scorePercent(baseScore() + roundPoints()),
+        }}
         getValueLabel={(value, details) =>
-          pendingPoints() > 0
-            ? `${value} of ${details.max} points, ${projectedScore()} projected`
+          roundPoints() > 0
+            ? `${value} of ${details.max} points, ${roundPoints()} this round`
             : `${value} of ${details.max} points`
         }
       >
         <div class="seat-scores" aria-hidden="true">
           <span class="seat-score" data-banked="">
-            {props.player.score}
+            {baseScore()}
           </span>
-          <Show when={pendingPoints() > 0}>
+          <Show when={roundPoints() > 0}>
             <span class="seat-score" data-projected="">
-              {projectedScore()}
+              +{roundPoints()}
             </span>
           </Show>
           <span class="seat-score" data-goal="">
@@ -219,42 +362,44 @@ const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => {
   };
 
   return (
-    <Show
-      when={props.choice.chooserId === props.playerId}
-      fallback={
-        <p class="headline">
-          {nameOf(props.room, props.choice.chooserId)} is choosing who receives{" "}
-          {cardLabel(props.choice.card)}.
-          <Show when={isOffline(props.room, props.choice.chooserId)}>
-            <span class="muted">
-              {" "}
-              · Offline, so it will be played for them soon.
-            </span>
-          </Show>
-        </p>
-      }
-    >
-      <ul class="dealt-action-card" aria-hidden="true">
+    <>
+      <ul class="dealt-action-card" data-choice-card="" aria-hidden="true">
         <PlayingCard card={props.choice.card} />
       </ul>
-      <p class="headline">{verb()}…</p>
-      <div class="action-buttons">
-        <For each={props.choice.options}>
-          {(targetId) => (
-            <Button
-              disabled={props.actionsDisabled}
-              data-variant={targetId === props.playerId ? undefined : "solid"}
-              aria-label={`${verb()} ${targetLabel(targetId)}`}
-              onClick={async () =>
-                await props.send({ targetId, type: "choose" })
-              }
-            >
-              {targetLabel(targetId, true)}
-            </Button>
-          )}
-        </For>
-      </div>
-    </Show>
+      <Show
+        when={props.choice.chooserId === props.playerId}
+        fallback={
+          <p class="headline">
+            {nameOf(props.room, props.choice.chooserId)} is choosing who
+            receives {cardLabel(props.choice.card)}.
+            <Show when={isOffline(props.room, props.choice.chooserId)}>
+              <span class="muted">
+                {" "}
+                · Offline, so it will be played for them soon.
+              </span>
+            </Show>
+          </p>
+        }
+      >
+        <p class="headline">{verb()}…</p>
+        <div class="action-buttons">
+          <For each={props.choice.options}>
+            {(targetId) => (
+              <Button
+                disabled={props.actionsDisabled}
+                data-variant={targetId === props.playerId ? undefined : "solid"}
+                aria-label={`${verb()} ${targetLabel(targetId)}`}
+                onClick={async () =>
+                  await props.send({ targetId, type: "choose" })
+                }
+              >
+                {targetLabel(targetId, true)}
+              </Button>
+            )}
+          </For>
+        </div>
+      </Show>
+    </>
   );
 };
 
@@ -320,14 +465,82 @@ const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
   );
 };
 
-const ActionBar = (props: TableProps) => {
+const flipLabel = (
+  flip: NonNullable<DealStep["flip"]>,
+  isMe: boolean,
+  name: string
+) => {
+  if (flip.index === 0) {
+    return isMe ? "Flip Three on you!" : `Flip Three on ${name}!`;
+  }
+
+  return `Flip Three · ${isMe ? "you flip" : `${name} flips`} ${flip.index} of ${flip.total}`;
+};
+
+const discardLabel = (step: DealStep, isMe: boolean, name: string) => {
+  if (step.partnerId !== null) {
+    return isMe ? "Second Chance saves you!" : `Second Chance saves ${name}!`;
+  }
+
+  return `${cardLabel(step.card)} is discarded`;
+};
+
+const Deck = (props: { count: number }) => (
+  <div class="deck" data-deck="">
+    <span
+      class="card-back"
+      data-empty={props.count === 0 ? "" : undefined}
+      aria-hidden="true"
+    >
+      <Flame />
+    </span>
+    <span class="deck-count">
+      {props.count}
+      <span class="sr-only"> cards left in the deck</span>
+    </span>
+  </div>
+);
+
+const ActionBar = (props: TableProps & DealProps) => {
   const isHost = () => props.room.hostId === props.playerId;
 
   const me = () =>
     props.room.players.find((player) => player.id === props.playerId);
 
   const myTurn = () =>
-    props.room.turnId === props.playerId && props.room.choice === null;
+    props.room.turnId === props.playerId &&
+    props.room.choice === null &&
+    props.dealing !== true;
+
+  const dealingLabel = () => {
+    const step = props.dealStep ?? null;
+    const target = stepPlayerId(step);
+
+    if (step === null || target === null) {
+      return "Dealing…";
+    }
+
+    const isMe = target === props.playerId;
+    const name = nameOf(props.room, target);
+
+    if (step.flip) {
+      return flipLabel(step.flip, isMe, name);
+    }
+
+    if (step.to.kind === "played") {
+      return flipLabel({ index: 0, total: FLIP_THREE_COUNT }, isMe, name);
+    }
+
+    if (step.to.kind === "discard") {
+      return discardLabel(step, isMe, name);
+    }
+
+    if (step.from === "held") {
+      return `${cardLabel(step.card)} comes into play…`;
+    }
+
+    return isMe ? "Dealing to you…" : `Dealing to ${name}…`;
+  };
 
   const iCanStay = () => {
     const player = me();
@@ -350,6 +563,7 @@ const ActionBar = (props: TableProps) => {
       aria-label="Your move"
       data-turn={myTurn() ? "" : undefined}
     >
+      <Deck count={props.room.deckCount} />
       <Switch>
         <Match when={props.room.phase === "gameOver"}>
           <p class="headline">{winners()} wins!</p>
@@ -399,6 +613,9 @@ const ActionBar = (props: TableProps) => {
               actionsDisabled={props.actionsDisabled}
             />
           )}
+        </Match>
+        <Match when={props.dealing}>
+          <p class="headline">{dealingLabel()}</p>
         </Match>
         <Match when={myTurn()}>
           <p class="headline">
@@ -450,26 +667,13 @@ const ActionBar = (props: TableProps) => {
 };
 
 export default function Table(
-  props: TableProps & { chat: RoomConnection["chat"] }
+  props: TableProps & DealProps & { chat: RoomConnection["chat"] }
 ) {
   return (
     <div class="table">
       <header class="table-header">
         <h1>Round {props.room.round}</h1>
         <dl class="table-stats">
-          <div class="deck-stat">
-            <dt>Deck</dt>
-            <dd>
-              {props.room.deckCount}
-              <span
-                class="card-back"
-                data-empty={props.room.deckCount === 0 ? "" : undefined}
-                aria-hidden="true"
-              >
-                <Flame />
-              </span>
-            </dd>
-          </div>
           <div>
             <dt>Goal</dt>
             <dd>{props.room.targetScore}</dd>
@@ -491,6 +695,8 @@ export default function Table(
         playerId={props.playerId}
         send={props.send}
         actionsDisabled={props.actionsDisabled}
+        dealing={props.dealing}
+        dealStep={props.dealStep}
       />
 
       <div class="table-body">
@@ -503,6 +709,8 @@ export default function Table(
                 playerId={props.playerId}
                 send={props.send}
                 actionsDisabled={props.actionsDisabled}
+                incomingCardId={props.incomingCardId}
+                dealStep={props.dealStep}
               />
             )}
           </For>
@@ -517,6 +725,7 @@ export default function Table(
           />
         </div>
       </div>
+      <div class="flight-layer" data-flight-layer="" aria-hidden="true" />
     </div>
   );
 }

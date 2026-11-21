@@ -21,8 +21,10 @@ import {
 import type { GameState } from "../src/game/engine";
 import {
   cleanName,
+  HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_PING,
   HEARTBEAT_PONG,
+  HEARTBEAT_STALE_MS,
   toRoomView,
 } from "../src/game/protocol";
 import type { ServerMessage } from "../src/game/protocol";
@@ -54,7 +56,17 @@ const send = (ws: WebSocket, message: ServerMessage) => {
   }
 };
 
-const AttachmentSchema = v.object({ playerId: v.string() });
+const AttachmentSchema = v.object({
+  playerId: v.string(),
+  seatedAt: v.optional(v.number()),
+});
+
+const seatSocket = (ws: WebSocket, playerId: string) => {
+  ws.serializeAttachment({
+    playerId,
+    seatedAt: Date.now(),
+  } satisfies Attachment);
+};
 
 const attachmentOf = (ws: WebSocket) => {
   const result = v.safeParse(AttachmentSchema, ws.deserializeAttachment());
@@ -114,7 +126,7 @@ const joinRoom = (
 
   if (knownPlayer && token !== null) {
     knownPlayer.connected = true;
-    ws.serializeAttachment({ playerId: knownPlayer.id } satisfies Attachment);
+    seatSocket(ws, knownPlayer.id);
     sendWelcome(ws, room, knownPlayer.id, token);
 
     return;
@@ -130,7 +142,7 @@ const joinRoom = (
   const newToken = crypto.randomUUID();
   addPlayer(room.game, playerId, name);
   room.tokens.set(playerId, newToken);
-  ws.serializeAttachment({ playerId } satisfies Attachment);
+  seatSocket(ws, playerId);
   sendWelcome(ws, room, playerId, newToken);
 };
 
@@ -250,6 +262,8 @@ export class GameRoom extends DurableObject<Env> {
     if (!room) {
       return;
     }
+
+    await this.dropSilentSockets();
 
     const { changed, expired } = runTimers(
       room,
@@ -387,6 +401,61 @@ export class GameRoom extends DurableObject<Env> {
     };
   }
 
+  // WARNING: a dropped network never sends a close, so silent sockets look open until TCP gives up.
+  private async dropSilentSockets() {
+    const { room } = this;
+
+    if (!room) {
+      return;
+    }
+
+    const now = Date.now();
+    const silentIds = new Set<string>();
+
+    for (const socket of this.ctx.getWebSockets()) {
+      const attachment = attachmentOf(socket);
+
+      if (attachment?.seatedAt === undefined) {
+        continue;
+      }
+
+      const pingedAt =
+        this.ctx.getWebSocketAutoResponseTimestamp(socket)?.getTime() ?? 0;
+
+      if (now - Math.max(attachment.seatedAt, pingedAt) < HEARTBEAT_STALE_MS) {
+        continue;
+      }
+
+      silentIds.add(attachment.playerId);
+      socket.serializeAttachment(null);
+
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.close(1001, "Heartbeat timed out");
+      }
+    }
+
+    let changed = false;
+
+    for (const id of silentIds) {
+      const player = findPlayer(room.game, id);
+
+      if (player?.connected === true && this.socketsFor(id).length === 0) {
+        player.connected = false;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await this.commit();
+    }
+  }
+
+  private hasSeatedSockets() {
+    return this.ctx
+      .getWebSockets()
+      .some((socket) => attachmentOf(socket) !== null);
+  }
+
   private socketsFor(playerId: string) {
     return this.ctx
       .getWebSockets()
@@ -439,10 +508,16 @@ export class GameRoom extends DurableObject<Env> {
       return;
     }
 
-    syncTimers(room, Date.now());
+    const now = Date.now();
+    syncTimers(room, now);
+
+    const alarmAt = this.hasSeatedSockets()
+      ? Math.min(nextAlarmAt(room), now + HEARTBEAT_INTERVAL_MS)
+      : nextAlarmAt(room);
+
     await Promise.all([
       this.ctx.storage.put("room", room),
-      this.ctx.storage.setAlarm(nextAlarmAt(room)),
+      this.ctx.storage.setAlarm(alarmAt),
     ]);
   }
 }

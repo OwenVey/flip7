@@ -45,7 +45,7 @@ const waitingOn = (room: RoomView) =>
 const isChatFromOthers = (entry: LogEntry, playerId: string) =>
   entry.from !== undefined && entry.from.id !== playerId;
 
-const roundStarted = (previous: RoomView, current: RoomView) =>
+export const roundStarted = (previous: RoomView, current: RoomView) =>
   current.phase !== "lobby" &&
   (previous.phase === "lobby" || current.round !== previous.round);
 

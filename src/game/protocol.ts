@@ -1,9 +1,15 @@
 import { TARGET_SCORE } from "./engine";
-import type { GameState, Player } from "./engine";
+import type { DrawEvent, GameState, HeldCard, Player } from "./engine";
 
 export const NAME_MAX_LENGTH = 20;
 export const HEARTBEAT_PING = "ping";
 export const HEARTBEAT_PONG = "pong";
+
+/** How often a client pings the room to show it's still there. */
+export const HEARTBEAT_INTERVAL_MS = 10_000;
+
+/** A socket that hasn't pinged for this long is treated as gone. */
+export const HEARTBEAT_STALE_MS = 25_000;
 export const CODE_LENGTH = 5;
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 const CODE_PATTERN = new RegExp(`^[${CODE_ALPHABET}]{${CODE_LENGTH}}$`, "u");
@@ -34,6 +40,10 @@ export interface RoomView extends Pick<
   dealerId: string | null;
   deckCount: number;
   discardCount: number;
+  draws: DrawEvent[];
+  /** Flip Threes still under way, waiting on a choice. */
+  flips: { targetId: string; remaining: number }[];
+  held: HeldCard[];
   players: PlayerView[];
   targetScore: number;
 }
@@ -51,6 +61,32 @@ export type ServerMessage =
   | { message: string; type: "error" }
   | { reason: "kicked" | "left"; type: "removed" };
 
+const heldCards = (state: GameState) => {
+  const assignment = state.assignment ?? null;
+
+  const held: HeldCard[] = state.flipRuns.flatMap((run) =>
+    run.deferred.map((card) => ({ card, ownerId: run.targetId }))
+  );
+
+  if (assignment) {
+    for (const card of assignment.cards) {
+      if (card.id !== state.choice?.card.id) {
+        held.push({ card, ownerId: assignment.chooserId });
+      }
+    }
+
+    for (const { card, ownerId, targetId } of assignment.assigned) {
+      held.push({ card, ownerId: targetId ?? ownerId });
+    }
+  }
+
+  for (const { card, ownerId, targetId } of state.actionQueue) {
+    held.push({ card, ownerId: targetId ?? ownerId });
+  }
+
+  return held;
+};
+
 export const toRoomView = (code: string, state: GameState) => {
   const view: RoomView = {
     choice: state.choice,
@@ -61,7 +97,13 @@ export const toRoomView = (code: string, state: GameState) => {
         : (state.players[state.dealerIndex]?.id ?? null),
     deckCount: state.deck.length,
     discardCount: state.discard.length,
+    draws: state.draws ?? [],
     drawSeq: state.drawSeq ?? 0,
+    flips: state.flipRuns.map(({ remaining, targetId }) => ({
+      remaining,
+      targetId,
+    })),
+    held: heldCards(state),
     hostId: state.hostId,
     log: state.log,
     phase: state.phase,

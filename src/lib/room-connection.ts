@@ -16,7 +16,11 @@ import {
 } from "solid-js";
 
 import type { ClientMessage, GameCommand } from "../game/client-message";
-import { HEARTBEAT_PING, parseServerMessage } from "../game/protocol";
+import {
+  HEARTBEAT_INTERVAL_MS,
+  HEARTBEAT_PING,
+  parseServerMessage,
+} from "../game/protocol";
 import type { RoomView, ServerMessage } from "../game/protocol";
 import { roomExists } from "./room-functions";
 
@@ -42,7 +46,13 @@ interface PendingMove {
 const RETRY_DELAY_MS = 1500;
 const FAILURES_BEFORE_RECHECK = 3;
 const REPLY_TIMEOUT_MS = 6000;
-const HEARTBEAT = { interval: 20_000, message: HEARTBEAT_PING, wait: 5000 };
+
+const HEARTBEAT = {
+  interval: HEARTBEAT_INTERVAL_MS,
+  message: HEARTBEAT_PING,
+  wait: 5000,
+};
+
 const NAME_KEY = "hot-streak:name";
 const STORAGE_PROBE = "hot-streak:probe";
 
@@ -74,7 +84,7 @@ const socketUrl = (code: string) => {
 
 export const createRoomConnection = (
   code: string,
-  onUpdate: (previous: RoomView, current: RoomView, playerId: string) => void
+  onUpdate?: (previous: RoomView, current: RoomView, playerId: string) => void
 ) => {
   const [room, setRoom] = createSignal<RoomView | null>(null);
   const [playerId, setPlayerId] = createSignal<string | null>(null);
@@ -170,7 +180,7 @@ export const createRoomConnection = (
 
         if (seatedPlayerId !== null) {
           if (previous) {
-            onUpdate(previous, message.room, seatedPlayerId);
+            onUpdate?.(previous, message.room, seatedPlayerId);
           } else {
             if (pendingMove) {
               const accepted = pendingMove.requestId === lastRequestId;

@@ -56,7 +56,7 @@ const player = (state: GameState, playerId: string) => {
   return found;
 };
 
-const setup = (names: string[], draws: Card[]) => {
+const finishedRound = (names: string[]) => {
   const state = createGame();
 
   for (const name of names) {
@@ -67,8 +67,14 @@ const setup = (names: string[], draws: Card[]) => {
   state.phase = "roundOver";
   state.round = 0;
   state.dealerIndex = names.length - 2;
-  state.deck = [...draws].toReversed();
   state.discard = [];
+
+  return state;
+};
+
+const setup = (names: string[], draws: Card[]) => {
+  const state = finishedRound(names);
+  state.deck = [...draws].toReversed();
   nextRound(state, "a", random);
 
   return state;
@@ -169,6 +175,26 @@ describe("a round", () => {
     expect(state.choice?.card.kind).toBe("freeze");
     choose(state, "b", "a", random);
     expect(player(state, "a").status).toBe("frozen");
+  });
+
+  it("records each flip of a Flip Three and what became of it", () => {
+    const state = setup(["a", "b"], [num(5), num(3)]);
+    rig(state, [flipThree(), num(1), freeze(), num(3)]);
+    hit(state, "a", random);
+    choose(state, "a", "b", random);
+
+    expect(
+      state.draws?.slice(-4).map(({ flip, outcome, playerId }) => ({
+        flip: flip?.index ?? null,
+        outcome,
+        playerId,
+      }))
+    ).toStrictEqual([
+      { flip: null, outcome: "action", playerId: "a" },
+      { flip: 1, outcome: "kept", playerId: "b" },
+      { flip: 2, outcome: "held", playerId: "b" },
+      { flip: 3, outcome: "bust", playerId: "b" },
+    ]);
   });
 
   it("ends a Flip Three early when the target busts", () => {
@@ -288,17 +314,19 @@ describe("rules from the FAQ", () => {
     expect(state.choice?.options).toStrictEqual(["a", "b", "c"]);
   });
 
-  it("still plays deferred actions after freezing yourself with one", () => {
+  it("has the target assign every set-aside card before any takes effect", () => {
     const state = setup(["a", "b", "c"], [num(5), num(3), num(8)]);
 
     rig(state, [flipThree(), freeze(), flipThree(), num(2)]);
     hit(state, "a", random);
     choose(state, "a", "b", random);
     choose(state, "b", "b", random);
-    expect(player(state, "b").status).toBe("frozen");
-    expect(state.choice?.chooserId).toBe("b");
-    expect(state.choice?.card.kind).toBe("flipThree");
-    expect(state.choice?.options).toStrictEqual(["a", "c"]);
+    expect(player(state, "b").status).toBe("active");
+    expect(state.choice).toMatchObject({
+      card: { kind: "flipThree" },
+      chooserId: "b",
+      options: ["a", "b", "c"],
+    });
   });
 
   it("drops deferred actions when the Flip Three target busts", () => {
@@ -447,5 +475,245 @@ describe(chat, () => {
     expect(() => {
       chat(state, "ghost", "hi");
     }).toThrow(GameError);
+  });
+});
+
+const ids = (cards: readonly Card[]) => cards.map((card) => card.id);
+
+const table = (state: GameState, discardMark: number) => ({
+  deck: ids(state.deck),
+  discarded: ids(state.discard.slice(discardMark)),
+  phase: state.phase,
+  players: Object.fromEntries(
+    state.players.map((seat) => [
+      seat.id,
+      {
+        hand: ids(seat.hand),
+        played: ids(seat.played ?? []),
+        score: seat.score,
+        status: seat.status,
+      },
+    ])
+  ),
+  turnId: state.turnId,
+});
+
+describe("Flip Three", () => {
+  it("busts on an uncanceled duplicate, discards the held Freeze and leaves the third card", () => {
+    const bThree = num(3);
+    const state = setup(["a", "b"], [num(5), bThree]);
+    const trigger = flipThree();
+    const held = freeze();
+    const duplicate = num(3);
+    const unflipped = num(9);
+    rig(state, [trigger, held, duplicate, unflipped]);
+    const mark = state.discard.length;
+
+    hit(state, "a", random);
+    choose(state, "a", "b", random);
+
+    expect(player(state, "b").bustCard).toBe(duplicate);
+    expect(table(state, mark)).toMatchObject({
+      deck: [unflipped.id],
+      discarded: [held.id],
+      players: {
+        b: { hand: [bThree.id], played: [trigger.id], status: "busted" },
+      },
+      turnId: "a",
+    });
+
+    stay(state, "a", random);
+
+    expect(table(state, mark)).toMatchObject({
+      phase: "roundOver",
+      players: { a: { score: 5 }, b: { score: 0 } },
+    });
+  });
+
+  it("cancels a duplicate with a Second Chance drawn earlier in the run and counts the modifier as flip three", () => {
+    const bThree = num(3);
+    const state = setup(["a", "b"], [num(5), bThree]);
+    const trigger = flipThree();
+    const chance = secondChance();
+    const duplicate = num(3);
+    const modifier = additiveModifier(4);
+    const untouched = num(9);
+    rig(state, [trigger, chance, duplicate, modifier, untouched]);
+    const mark = state.discard.length;
+
+    hit(state, "a", random);
+    choose(state, "a", "b", random);
+
+    expect(table(state, mark)).toMatchObject({
+      deck: [untouched.id],
+      discarded: [chance.id, duplicate.id],
+      players: {
+        b: {
+          hand: [bThree.id, modifier.id],
+          played: [trigger.id],
+          status: "active",
+        },
+      },
+      turnId: "b",
+    });
+  });
+
+  it("ends the round on a seventh unique Number, awards the bonus and discards the nested Flip Three", () => {
+    const state = setup(["a", "b"], [num(5), num(1)]);
+    player(state, "b").hand.push(num(2), num(3), num(4), num(5), num(6));
+    const nested = flipThree();
+    const unflipped = num(9);
+    rig(state, [flipThree(), nested, num(7), unflipped]);
+    const mark = state.discard.length;
+
+    hit(state, "a", random);
+    choose(state, "a", "b", random);
+
+    expect(player(state, "b").lastRound?.streak).toBeTruthy();
+    expect(table(state, mark)).toMatchObject({
+      deck: [unflipped.id],
+      discarded: [nested.id],
+      phase: "roundOver",
+      players: { a: { score: 5 }, b: { score: 28 + 15, status: "streak" } },
+      turnId: null,
+    });
+  });
+
+  it("collects both assignments first, so a Flip Three assigned after a Freeze is discarded", () => {
+    const cEight = num(8);
+    const state = setup(["a", "b", "c"], [num(5), num(3), cEight]);
+    const held = freeze();
+    const nested = flipThree();
+    const untouched = num(9);
+    rig(state, [flipThree(), num(1), held, nested, untouched]);
+    const mark = state.discard.length;
+
+    hit(state, "a", random);
+    choose(state, "a", "b", random);
+    choose(state, "b", "c", random);
+
+    expect(table(state, mark).players.c?.status).toBe("active");
+    expect(state.choice).toMatchObject({ card: nested, chooserId: "b" });
+
+    choose(state, "b", "c", random);
+
+    expect(table(state, mark)).toMatchObject({
+      deck: [untouched.id],
+      discarded: [nested.id],
+      players: {
+        b: { status: "active" },
+        c: { hand: [cEight.id, held.id], status: "frozen" },
+      },
+      turnId: "b",
+    });
+  });
+
+  it("runs a chain across players and resumes left of the original drawer", () => {
+    const cEight = num(8);
+    const dNine = num(9);
+    const state = setup(["a", "b", "c", "d"], [num(5), num(3), cEight, dNine]);
+    stay(state, "a", random);
+    const trigger = flipThree();
+    const nested = flipThree();
+    const [one, two, four, six, ten] = [1, 2, 4, 6, 10].map(num);
+    const untouched = num(11);
+    rig(state, [trigger, one, nested, two, four, six, ten, untouched]);
+    const mark = state.discard.length;
+
+    hit(state, "b", random);
+    choose(state, "b", "c", random);
+    choose(state, "c", "d", random);
+
+    expect(table(state, mark)).toStrictEqual({
+      deck: [untouched.id],
+      discarded: [],
+      phase: "playing",
+      players: {
+        a: {
+          hand: [expect.any(Number)],
+          played: [],
+          score: 0,
+          status: "stayed",
+        },
+        b: {
+          hand: [expect.any(Number)],
+          played: [],
+          score: 0,
+          status: "active",
+        },
+        c: {
+          hand: [cEight.id, one?.id, two?.id],
+          played: [trigger.id],
+          score: 0,
+          status: "active",
+        },
+        d: {
+          hand: [dNine.id, four?.id, six?.id, ten?.id],
+          played: [nested.id],
+          score: 0,
+          status: "active",
+        },
+      },
+      turnId: "c",
+    });
+  });
+});
+
+describe("Flip Three during the opening deal", () => {
+  it("resolves the chain, then offers Hit or Stay at a flipped player's slot", () => {
+    const trigger = flipThree();
+    const flips = [num(1), num(2), num(3)];
+    const cCard = num(4);
+    const dCard = num(5);
+    const untouched = num(9);
+    const state = finishedRound(["a", "b", "c", "d"]);
+    rig(state, [trigger, ...flips, cCard, dCard, untouched]);
+    nextRound(state, "a", random);
+
+    choose(state, "a", "b", random);
+
+    expect(table(state, 0)).toMatchObject({
+      deck: [untouched.id, dCard.id, cCard.id],
+      players: {
+        a: { hand: [] },
+        b: { hand: ids(flips), played: [trigger.id], status: "active" },
+        c: { hand: [] },
+      },
+      turnId: "b",
+    });
+
+    stay(state, "b", random);
+
+    expect(table(state, 0)).toMatchObject({
+      deck: [untouched.id],
+      players: {
+        b: { status: "stayed" },
+        c: { hand: [cCard.id] },
+        d: { hand: [dCard.id] },
+      },
+      turnId: "a",
+    });
+  });
+
+  it("skips the slot of a player the chain already knocked out", () => {
+    const state = finishedRound(["a", "b", "c"]);
+    const trigger = flipThree();
+    const one = num(1);
+    const duplicate = num(1);
+    const bCard = num(4);
+    const untouched = num(9);
+    rig(state, [trigger, one, duplicate, bCard, untouched]);
+    nextRound(state, "a", random);
+
+    choose(state, "a", "c", random);
+
+    expect(table(state, 0)).toMatchObject({
+      deck: [untouched.id],
+      players: {
+        b: { hand: [bCard.id] },
+        c: { hand: [one.id], played: [trigger.id], status: "busted" },
+      },
+      turnId: "a",
+    });
   });
 });

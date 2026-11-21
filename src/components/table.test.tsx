@@ -22,6 +22,9 @@ const room = (overrides: Partial<RoomView> = {}) => {
     dealerId: "b",
     deckCount: 80,
     discardCount: 0,
+    draws: [],
+    flips: [],
+    held: [],
     hostId: "a",
     log: [{ id: 1, text: "Round 1 begins. Ben deals." }],
     phase: "playing",
@@ -86,11 +89,11 @@ describe("<Table />", () => {
         banked.parentElement?.children ?? [],
         (label) => label.textContent
       )
-    ).toStrictEqual(["40", "47", "200"]);
+    ).toStrictEqual(["40", "+7", "200"]);
     expect(meter).toHaveAttribute("aria-valuenow", "40");
     expect(meter).toHaveAttribute(
       "aria-valuetext",
-      "40 of 200 points, 47 projected"
+      "40 of 200 points, 7 this round"
     );
   });
 
@@ -125,7 +128,7 @@ describe("<Table />", () => {
     flush();
 
     expect(projectedScore()).toBe("20%");
-    expect(within(meter).queryByText("47")).toBeNull();
+    expect(within(meter).queryByText("+7")).toBeNull();
 
     setView(initial);
     flush();
@@ -135,7 +138,18 @@ describe("<Table />", () => {
         phase: "roundOver",
         players: initial.players.map((player) =>
           player.id === "a"
-            ? { ...player, score: 47, status: "stayed" }
+            ? {
+                ...player,
+                lastRound: {
+                  bonus: 0,
+                  doubled: false,
+                  numbers: 7,
+                  streak: false,
+                  total: 7,
+                },
+                score: 47,
+                status: "stayed",
+              }
             : player
         ),
       })
@@ -143,7 +157,50 @@ describe("<Table />", () => {
     flush();
 
     expect(projectedScore()).toBe("23.5%");
-    expect(meter).toHaveAttribute("aria-valuetext", "47 of 200 points");
+    expect(meter).toHaveAttribute(
+      "aria-valuetext",
+      "47 of 200 points, 7 this round"
+    );
+  });
+
+  it("keeps the scored round's points on the meter until the next round", () => {
+    const initial = room();
+
+    render(() => (
+      <Table
+        room={room({
+          phase: "roundOver",
+          players: initial.players.map((player) =>
+            player.id === "a"
+              ? {
+                  ...player,
+                  lastRound: {
+                    bonus: 0,
+                    doubled: false,
+                    numbers: 7,
+                    streak: false,
+                    total: 7,
+                  },
+                  score: 47,
+                  status: "stayed",
+                }
+              : player
+          ),
+        })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const seat = screen.getByRole("article", { name: "Ana, 47 points" });
+    const meter = within(seat).getByRole("meter", { name: "Total score" });
+
+    expect(meter.style.getPropertyValue("--round-start")).toBe("20%");
+    expect(meter.style.getPropertyValue("--projected-score")).toBe("23.5%");
+    expect(within(meter).getByText("40")).toBeVisible();
+    expect(within(meter).getByText("+7")).toBeVisible();
+    expect(within(seat).queryByText(/points this round/u)).toBeNull();
   });
 
   it("ranks banked scores, shares tied ranks, and updates after scoring", async () => {

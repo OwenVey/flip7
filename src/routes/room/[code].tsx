@@ -21,8 +21,13 @@ import SiteNav from "../../components/site-nav";
 import SoundControls from "../../components/sound-controls";
 import Table from "../../components/table";
 import { normalizeCode } from "../../game/protocol";
+import { createDealPlayback } from "../../lib/deal-playback";
 import { createRoomConnection } from "../../lib/room-connection";
-import { createRoomSounds, roomCues } from "../../lib/room-sounds";
+import {
+  createRoomSounds,
+  roomCues,
+  roundStarted,
+} from "../../lib/room-sounds";
 import { paths } from "../../router";
 
 const TURN_VIBRATION_MS = 200;
@@ -30,14 +35,31 @@ const TURN_VIBRATION_MS = 200;
 const Room = (props: { code: string }) => {
   const sounds = createRoomSounds();
 
-  const connection = createRoomConnection(
-    untrack(() => props.code),
-    (previous, current, playerId) => {
-      for (const cue of roomCues(previous, current, playerId)) {
-        sounds.play(cue);
+  const connection = createRoomConnection(untrack(() => props.code));
+
+  const playback = createDealPlayback(() => connection.room(), {
+    onCardLanded: () => {
+      sounds.play("reveal");
+    },
+    onDealStart: (previous, current) => {
+      if (roundStarted(previous, current)) {
+        sounds.play("deal");
       }
-    }
-  );
+    },
+    onSettled: (previous, current, dealt) => {
+      const playerId = untrack(connection.playerId);
+
+      if (playerId === null) {
+        return;
+      }
+
+      for (const cue of roomCues(previous, current, playerId)) {
+        if (dealt === 0 || (cue !== "reveal" && cue !== "deal")) {
+          sounds.play(cue);
+        }
+      }
+    },
+  });
 
   const toast = createToaster();
 
@@ -90,7 +112,7 @@ const Room = (props: { code: string }) => {
   };
 
   const seated = () => {
-    const room = connection.room();
+    const room = playback.room();
     const playerId = connection.playerId();
 
     return room && playerId !== null ? { playerId, room } : null;
@@ -175,7 +197,10 @@ const Room = (props: { code: string }) => {
                     playerId={view().playerId}
                     send={connection.send}
                     chat={connection.chat}
-                    actionsDisabled={!connection.canAct()}
+                    actionsDisabled={!connection.canAct() || playback.dealing()}
+                    dealing={playback.dealing()}
+                    dealStep={playback.step()}
+                    incomingCardId={playback.incoming()}
                   />
                 }
               >
