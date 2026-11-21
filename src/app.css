@@ -299,6 +299,16 @@ p {
     }
   }
 
+  /* A solid printed red, so it reads as a warning on paper and on felt. */
+  &[data-variant="destructive"] {
+    background: var(--danger);
+    color: var(--paper);
+
+    &:hover:not([data-disabled]) {
+      background: color-mix(in srgb, var(--danger) 85%, black);
+    }
+  }
+
   &[data-size="sm"] {
     --button-height: 2rem;
     padding-inline: 0.75rem;
@@ -330,13 +340,25 @@ p {
     inset 0 1px 0 rgb(255 225 180 / 0.3),
     0 3px 8px rgb(0 0 0 / 0.35);
 
+  /* Icon buttons on the rail look carved into the wood, not printed on it. */
   & > [data-slot="popover-trigger"][data-variant="quiet"] {
-    background: transparent;
+    inline-size: var(--button-height);
+    padding-inline: 0;
+    border-color: rgb(0 0 0 / 0.35);
+    background: rgb(0 0 0 / 0.22);
+    box-shadow:
+      inset 0 1px 2px rgb(0 0 0 / 0.4),
+      0 1px 0 rgb(255 225 180 / 0.18);
     color: var(--gold);
 
     &:is(:hover, [data-open]):not([data-disabled]) {
-      background: rgb(0 0 0 / 0.25);
+      background: rgb(0 0 0 / 0.38);
       color: var(--gold);
+    }
+
+    &:active:not([data-disabled]) {
+      transform: none;
+      box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.5);
     }
   }
 }
@@ -351,22 +373,6 @@ main > :is(h1, p),
 
 main > p a {
   color: var(--gold);
-}
-
-:is(.page-header, .table-header)
-  :is(
-    [data-slot="button"],
-    [data-slot="alert-dialog-trigger"]
-  )[data-variant="quiet"] {
-  background: rgb(0 0 0 / 0.2);
-  border-color: rgb(255 246 223 / 0.6);
-  box-shadow: none;
-  color: var(--on-felt-soft);
-
-  &:hover:not([data-disabled]) {
-    background: rgb(0 0 0 / 0.35);
-    color: var(--on-felt);
-  }
 }
 
 .nav-brand {
