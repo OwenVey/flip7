@@ -16,7 +16,7 @@ import { CHAT_MAX_LENGTH } from "../game/engine";
 import type { LogEntry } from "../game/engine";
 import Tooltip from "./tooltip";
 
-export const CHAT_AND_GAME_LOG_TITLE = "Chat and game log";
+export const CHAT_AND_GAME_LOG_TITLE = "Chat & Log";
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;

@@ -479,7 +479,7 @@ describe("<Table />", () => {
       />
     ));
 
-    const log = screen.getByRole("log", { name: "Chat and game log" });
+    const log = screen.getByRole("log", { name: "Chat & Log" });
     expect(within(log).getByText("Ben")).toBeTruthy();
     expect(within(log).getByText("gl")).toBeTruthy();
 
@@ -601,7 +601,7 @@ describe("<Table />", () => {
       />
     ));
 
-    const toggle = screen.getByRole("button", { name: "Chat and game log" });
+    const toggle = screen.getByRole("button", { name: "Chat & Log" });
     expect(toggle).toHaveAttribute("aria-haspopup", "dialog");
 
     setView(
@@ -615,22 +615,20 @@ describe("<Table />", () => {
     );
     flush();
 
-    expect(toggle).toHaveAccessibleName("Chat and game log, 1 new message");
+    expect(toggle).toHaveAccessibleName("Chat & Log, 1 new message");
 
     toggle.focus();
     toggle.click();
     flush();
 
     const sheet = await screen.findByRole("dialog", {
-      name: "Chat and game log",
+      name: "Chat & Log",
     });
 
-    expect(toggle).toHaveAccessibleName("Chat and game log");
+    expect(toggle).toHaveAccessibleName("Chat & Log");
     within(sheet).getByRole("button", { name: "Close" }).click();
     flush();
-    expect(
-      screen.queryByRole("dialog", { name: "Chat and game log" })
-    ).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Chat & Log" })).toBeNull();
     expect(toggle).toHaveFocus();
   });
 
@@ -644,12 +642,12 @@ describe("<Table />", () => {
       />
     ));
 
-    const toggle = screen.getByRole("button", { name: "Chat and game log" });
+    const toggle = screen.getByRole("button", { name: "Chat & Log" });
     toggle.focus();
     toggle.click();
 
     const sheet = await screen.findByRole("dialog", {
-      name: "Chat and game log",
+      name: "Chat & Log",
     });
 
     const input = within(sheet).getByRole("textbox", { name: "Chat message" });
@@ -663,7 +661,7 @@ describe("<Table />", () => {
     toggle.click();
 
     const reopened = await screen.findByRole("dialog", {
-      name: "Chat and game log",
+      name: "Chat & Log",
     });
 
     expect(
