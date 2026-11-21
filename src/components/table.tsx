@@ -1,6 +1,7 @@
 import ArrowLeft from "@lucide/solid/icons/arrow-left";
 import ArrowRight from "@lucide/solid/icons/arrow-right";
 import Coins from "@lucide/solid/icons/coins";
+import Flame from "@lucide/solid/icons/flame";
 import SquarePlus from "@lucide/solid/icons/square-plus";
 import { Button } from "@ui-sdk/solid/button";
 import { Meter, MeterIndicator, MeterTrack } from "@ui-sdk/solid/meter";
@@ -91,22 +92,22 @@ const RoundPlayer = (props: TableProps & { player: PlayerView }) => {
       <header class="seat-header">
         <div class="seat-name">
           <strong>{props.player.name}</strong>
+          <Show when={isMe()}>
+            <span class="badge">You</span>
+          </Show>
+          <Show when={props.room.dealerId === props.player.id}>
+            <span class="badge" data-tone="muted">
+              Dealer
+            </span>
+          </Show>
           <Show when={props.player.status === "active"}>
             <span class="active-indicator" title={STATUS_LABELS.active}>
               <span class="sr-only">{STATUS_LABELS.active}</span>
             </span>
           </Show>
-          <Show when={isMe()}>
-            <span class="badge">You</span>
-          </Show>
           <Show when={hasDecision()}>
             <span class="badge" data-tone="turn">
               {decisionLabel()}
-            </span>
-          </Show>
-          <Show when={props.room.dealerId === props.player.id}>
-            <span class="badge" data-tone="muted">
-              Dealer
             </span>
           </Show>
           <Show when={!props.player.connected}>
@@ -195,6 +196,14 @@ const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => {
     return "Give Second Chance to";
   };
 
+  const targetLabel = (targetId: string, capitalized = false) => {
+    if (targetId !== props.playerId) {
+      return nameOf(props.room, targetId);
+    }
+
+    return capitalized ? "Yourself" : "yourself";
+  };
+
   return (
     <Show
       when={props.choice.chooserId === props.playerId}
@@ -214,23 +223,19 @@ const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => {
       <ul class="dealt-action-card" aria-hidden="true">
         <PlayingCard card={props.choice.card} />
       </ul>
-      <p class="headline">
-        You were dealt {cardLabel(props.choice.card)}. Choose an active player.
-      </p>
+      <p class="headline">{verb()}…</p>
       <div class="action-buttons">
         <For each={props.choice.options}>
           {(targetId) => (
             <Button
               disabled={props.actionsDisabled}
               data-variant={targetId === props.playerId ? undefined : "solid"}
+              aria-label={`${verb()} ${targetLabel(targetId)}`}
               onClick={async () =>
                 await props.send({ targetId, type: "choose" })
               }
             >
-              {verb()}{" "}
-              {targetId === props.playerId
-                ? "yourself"
-                : nameOf(props.room, targetId)}
+              {targetLabel(targetId, true)}
             </Button>
           )}
         </For>
@@ -383,7 +388,13 @@ const ActionBar = (props: TableProps) => {
         </Match>
         <Match when={myTurn()}>
           <p class="headline">
-            Your turn <span class="muted">· {myRound()} points this round</span>
+            Your turn{" "}
+            <span class="muted">
+              ·{" "}
+              {iCanStay()
+                ? `${myRound()} points this round`
+                : "Hit for a card before you can stay"}
+            </span>
           </p>
           <div class="action-buttons">
             <Button
@@ -404,11 +415,6 @@ const ActionBar = (props: TableProps) => {
               </Button>
             </Show>
           </div>
-          <Show when={!iCanStay()}>
-            <p class="muted">
-              You need a card in front of you before you can stay.
-            </p>
-          </Show>
         </Match>
         <Match when={props.room.turnId}>
           {(turnId) => (
@@ -439,9 +445,18 @@ export default function Table(props: TableProps) {
       <header class="table-header">
         <h1>Round {props.room.round}</h1>
         <dl class="table-stats">
-          <div>
+          <div class="deck-stat">
             <dt>Deck</dt>
-            <dd>{props.room.deckCount}</dd>
+            <dd>
+              {props.room.deckCount}
+              <span
+                class="card-back"
+                data-empty={props.room.deckCount === 0 ? "" : undefined}
+                aria-hidden="true"
+              >
+                <Flame />
+              </span>
+            </dd>
           </div>
           <div>
             <dt>Goal</dt>
