@@ -221,3 +221,17 @@ Before using ui-sdk, follow the `ui-sdk` skill if it's installed, and read `node
 ## Buttons in this app
 
 Every button-like ui-sdk part (`Button`, `AlertDialogTrigger`, `AlertDialogClose`, and any other trigger or close part you add) shares one base rule in `src/app.css`. Never give one its own `class` for size, padding, border or font. Change how it looks with `data-variant` (`solid`, `quiet`, `destructive`) and its size with `data-size="sm"`. When you add a new trigger or close part, add its `data-slot` to that base rule's `:is(...)` list.
+
+## Agent skills
+
+### Issue tracker
+
+For issues and specs in `OwenVey/hot-streak`, see `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+When triaging issues, use the default Matt Pocock label mapping in `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repo uses a single-context layout. Before exploring the domain, see `docs/agents/domain.md`.
