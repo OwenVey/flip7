@@ -13,15 +13,22 @@
   --accent: #34327a;
   --gold: #ffd45f;
   --rule: #a37b2d;
-  --frost: #a9def0;
-  --violet: #d4c3f0;
+  --danger: #a42d43;
+  --good: #176356;
+
+  /* One family per action card: base, soft panel, ink, glow. */
+  --freeze: #4f9fd0;
+  --freeze-soft: #e3f4fb;
+  --freeze-ink: #22577a;
+  --freeze-glow: #a9def0;
   --flip: #8a68c8;
   --flip-soft: #efe7fb;
   --flip-ink: #4b2f86;
-  --mint: #9edbcb;
-  --danger: #a42d43;
-  --good: #176356;
-  --cool: #22577a;
+  --flip-glow: #d4c3f0;
+  --second-chance: #2f9a7d;
+  --second-chance-soft: #e2f5ee;
+  --second-chance-ink: #176356;
+  --second-chance-glow: #9edbcb;
   --shadow-print: 3px 3px 0 var(--ink);
 
   /* The table: baize felt inside a walnut rail. */
@@ -1369,7 +1376,7 @@ main {
     outline-offset: 2px;
     box-shadow:
       4px 4px 0 var(--flip-ink),
-      0 0 1.5rem rgb(138 104 200 / 0.5);
+      0 0 1.5rem color-mix(in srgb, var(--flip) 50%, transparent);
   }
 
   &[data-status="flipSeven"] .hand {
@@ -1392,11 +1399,16 @@ main {
 
   /* Frozen: the seat ices over with a shiver, so the whole room sees it. */
   &[data-status="frozen"] {
-    border-color: var(--cool);
-    background: linear-gradient(170deg, #dff2fa, #eef8fb 45%, var(--paper));
+    border-color: var(--freeze-ink);
+    background: linear-gradient(
+      170deg,
+      var(--freeze-soft),
+      #eef8fb 45%,
+      var(--paper)
+    );
     box-shadow:
-      3px 3px 0 var(--cool),
-      0 0 1.25rem rgb(169 222 240 / 0.55),
+      3px 3px 0 var(--freeze-ink),
+      0 0 1.25rem color-mix(in srgb, var(--freeze-glow) 55%, transparent),
       var(--shadow-table);
     animation: freeze-shiver 520ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
   }
@@ -1408,8 +1420,8 @@ main {
       radial-gradient(ellipse at 50% 0%, #5f9fbb, #24546b);
     box-shadow:
       inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.35),
-      inset 0 0 0 2px rgb(169 222 240 / 0.75),
-      inset 0 0 1.5rem rgb(223 244 251 / 0.5);
+      inset 0 0 0 2px color-mix(in srgb, var(--freeze-glow) 75%, transparent),
+      inset 0 0 1.5rem color-mix(in srgb, var(--freeze-soft) 50%, transparent);
   }
 
   &[data-status="frozen"] :is(.hand, .seat-extras) .card {
@@ -1432,18 +1444,18 @@ main {
     box-shadow 160ms ease;
 
   &[data-pickable="freeze"] {
-    --pick-color: #2f7fb0;
-    --pick-glow: rgb(169 222 240 / 0.7);
+    --pick-color: var(--freeze);
+    --pick-glow: color-mix(in srgb, var(--freeze-glow) 70%, transparent);
   }
 
   &[data-pickable="flipThree"] {
     --pick-color: var(--flip);
-    --pick-glow: rgb(212 195 240 / 0.7);
+    --pick-glow: color-mix(in srgb, var(--flip-glow) 70%, transparent);
   }
 
   &[data-pickable="secondChance"] {
-    --pick-color: var(--good);
-    --pick-glow: rgb(158 219 203 / 0.7);
+    --pick-color: var(--second-chance);
+    --pick-glow: color-mix(in srgb, var(--second-chance-glow) 70%, transparent);
   }
 
   &:has(.seat-pick:is(:hover, :focus-visible):not(:disabled)) {
@@ -1508,10 +1520,11 @@ main {
     ),
     radial-gradient(
       circle at 100% 100%,
-      rgb(223 244 251 / 0.85),
+      color-mix(in srgb, var(--freeze-soft) 85%, transparent),
       transparent 5.5rem
     );
-  box-shadow: inset 0 0 1.25rem rgb(169 222 240 / 0.9);
+  box-shadow: inset 0 0 1.25rem
+    color-mix(in srgb, var(--freeze-glow) 90%, transparent);
   pointer-events: none;
   animation: frost-spread 700ms ease-out both;
 }
@@ -1524,7 +1537,8 @@ main {
   height: 6rem;
   margin: -3rem 0 0 -3rem;
   color: #fff;
-  filter: drop-shadow(0 0 0.5rem var(--frost)) drop-shadow(0 0 1px var(--cool));
+  filter: drop-shadow(0 0 0.5rem var(--freeze-glow))
+    drop-shadow(0 0 1px var(--freeze-ink));
   animation: frost-burst 1100ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
@@ -1532,7 +1546,7 @@ main {
   position: absolute;
   width: 1.125rem;
   height: 1.125rem;
-  color: var(--cool);
+  color: var(--freeze-ink);
   opacity: 0.45;
   animation: flake-drift 5s ease-in-out infinite alternate;
 
@@ -1723,7 +1737,7 @@ main {
   }
 
   &[data-current] {
-    box-shadow: 0 0 0 3px rgb(138 104 200 / 0.3);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--flip) 30%, transparent);
     transform: scale(1.3);
   }
 }
@@ -1793,7 +1807,7 @@ main {
   }
 
   [data-status="frozen"] & {
-    color: var(--cool);
+    color: var(--freeze-ink);
   }
 
   [data-status="flipSeven"] &,
@@ -2008,18 +2022,18 @@ main {
   }
 
   &[data-kind="freeze"] {
-    --card-color: #4f9fd0;
-    --card-panel: #e3f4fb;
+    --card-color: var(--freeze);
+    --card-panel: var(--freeze-soft);
   }
 
   &[data-kind="flipThree"] {
-    --card-color: #8a68c8;
-    --card-panel: #efe7fb;
+    --card-color: var(--flip);
+    --card-panel: var(--flip-soft);
   }
 
   &[data-kind="secondChance"] {
-    --card-color: #2f9a7d;
-    --card-panel: #e2f5ee;
+    --card-color: var(--second-chance);
+    --card-panel: var(--second-chance-soft);
   }
 
   &[data-bust] {
@@ -2402,7 +2416,7 @@ main {
   }
 
   & li[data-cue="freeze"] {
-    --cue: var(--cool);
+    --cue: var(--freeze-ink);
   }
 
   & li[data-cue="streak"] {

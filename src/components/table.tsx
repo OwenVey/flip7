@@ -689,7 +689,7 @@ const CONFETTI_COLORS = [
   "var(--flip)",
   "var(--good)",
   "var(--danger)",
-  "var(--cool)",
+  "var(--freeze-ink)",
 ] as const;
 
 const GOLDEN_RATIO = 0.618034;
