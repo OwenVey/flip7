@@ -1,14 +1,8 @@
 import ArrowDown from "@lucide/solid/icons/arrow-down";
+import { createPolled } from "@solid-primitives/timer";
 import { Button } from "@ui-sdk/solid/button";
 import { Input } from "@ui-sdk/solid/input";
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  onSettled,
-  Show,
-} from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 
 import { CHAT_MAX_LENGTH } from "../game/engine";
 import type { LogEntry } from "../game/engine";
@@ -118,7 +112,7 @@ export default function GameLog(props: {
   const groups = createMemo(() => groupLogByRound(props.log));
   const latestId = createMemo(() => props.log.at(-1)?.id ?? 0);
 
-  const [now, setNow] = createSignal(Date.now());
+  const now = createPolled(Date.now, SECOND);
   const [atBottom, setAtBottom] = createSignal(true);
   const [seenId, setSeenId] = createSignal(0);
   const hasUnseen = () => !atBottom() && latestId() > seenId();
@@ -133,16 +127,6 @@ export default function GameLog(props: {
       scroller.scrollTop = scroller.scrollHeight;
     }
   };
-
-  onSettled(() => {
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, SECOND);
-
-    return () => {
-      clearInterval(timer);
-    };
-  });
 
   createEffect(
     () => latestId(),

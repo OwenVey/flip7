@@ -1,5 +1,6 @@
 import { createAudio } from "@nkzw/audio";
 import type { Audio, Sound as AudioSound } from "@nkzw/audio";
+import { makePersisted } from "@solid-primitives/storage";
 import { createSignal, onSettled } from "solid-js";
 
 import type { GameCue, LogEntry } from "../game/engine";
@@ -115,35 +116,62 @@ export const roomCues = (
   return cues;
 };
 
-const readSetting = (key: string) => {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
+const preferenceStorage = {
+  getItem(key: string) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  setItem(key: string, value: string) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // WARNING: Browsers can deny preference writes even after a successful read.
+    }
+  },
+  removeItem(key: string) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // WARNING: Browsers can deny storage removal in private sessions.
+    }
+  },
 };
 
-const readVolume = (key: string, fallback: number) => {
-  const stored = readSetting(key);
-  const volume = stored === null ? fallback : Number(stored);
+const persistedVolume = (name: string, fallback: number) =>
+  makePersisted(createSignal(fallback, { ownedWrite: true }), {
+    name,
+    storage: preferenceStorage,
+    deserialize: (stored) => {
+      const volume = Number(stored);
 
-  return Number.isInteger(volume) && volume >= 0 && volume <= MAX_PERCENT
-    ? volume
-    : fallback;
-};
-
-const saveSetting = (key: string, value: boolean | number) => {
-  try {
-    localStorage.setItem(key, String(value));
-  } catch {
-    // WARNING: Browser privacy settings can deny access to local storage.
-  }
-};
+      return Number.isInteger(volume) && volume >= 0 && volume <= MAX_PERCENT
+        ? volume
+        : fallback;
+    },
+  });
 
 export const createRoomSounds = () => {
-  const [muted, setMuted] = createSignal(false);
-  const [effectsVolume, setEffectsVolume] = createSignal(MAX_PERCENT);
-  const [musicVolume, setMusicVolume] = createSignal(DEFAULT_MUSIC_VOLUME);
+  const [muted, setMuted] = makePersisted(
+    createSignal(false, { ownedWrite: true }),
+    {
+      name: MUTE_KEY,
+      storage: preferenceStorage,
+      deserialize: (stored) => stored === "true",
+    }
+  );
+
+  const [effectsVolume, setEffectsVolume] = persistedVolume(
+    EFFECTS_VOLUME_KEY,
+    MAX_PERCENT
+  );
+
+  const [musicVolume, setMusicVolume] = persistedVolume(
+    MUSIC_VOLUME_KEY,
+    DEFAULT_MUSIC_VOLUME
+  );
 
   let mixer: Audio | undefined;
   let track: AudioSound | undefined;
@@ -201,9 +229,6 @@ export const createRoomSounds = () => {
   };
 
   onSettled(() => {
-    setMuted(readSetting(MUTE_KEY) === "true");
-    setEffectsVolume(readVolume(EFFECTS_VOLUME_KEY, MAX_PERCENT));
-    setMusicVolume(readVolume(MUSIC_VOLUME_KEY, DEFAULT_MUSIC_VOLUME));
     const preloadTimer = setTimeout(preloadSounds, 0);
 
     return () => {
@@ -224,12 +249,9 @@ export const createRoomSounds = () => {
       for (const [name, gain] of SOUND_VOLUMES) {
         sounds.get(name)?.volume((volume / MAX_PERCENT) * gain);
       }
-
-      saveSetting(EFFECTS_VOLUME_KEY, volume);
     },
     changeMusicVolume: (volume: number) => {
       setMusicVolume(volume);
-      saveSetting(MUSIC_VOLUME_KEY, volume);
     },
     effectsEnabled,
     effectsVolume,
@@ -256,8 +278,6 @@ export const createRoomSounds = () => {
       } else if (effectsVolume() > 0) {
         sounds.get("turn")?.play();
       }
-
-      saveSetting(MUTE_KEY, next);
     },
   };
 };
