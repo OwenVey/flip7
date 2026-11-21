@@ -25,8 +25,24 @@ const PINNED_SLACK_PX = 24;
 
 const clockTime = new Intl.DateTimeFormat(undefined, { timeStyle: "medium" });
 
+const shortClockTime = new Intl.DateTimeFormat(undefined, {
+  timeStyle: "short",
+});
+
 const relativeTime = new Intl.RelativeTimeFormat(undefined, {
   numeric: "auto",
+});
+
+const narrowSeconds = new Intl.NumberFormat(undefined, {
+  style: "unit",
+  unit: "second",
+  unitDisplay: "narrow",
+});
+
+const narrowMinutes = new Intl.NumberFormat(undefined, {
+  style: "unit",
+  unit: "minute",
+  unitDisplay: "narrow",
 });
 
 interface LogGroup {
@@ -73,14 +89,25 @@ const logTimeLabel = (at: number, now: number) => {
   const elapsed = Math.max(0, now - at);
 
   if (elapsed < MINUTE) {
-    return relativeTime.format(-Math.floor(elapsed / SECOND), "second");
+    const seconds = Math.floor(elapsed / SECOND);
+    const long = relativeTime.format(-seconds, "second");
+
+    return {
+      long,
+      short: seconds === 0 ? long : narrowSeconds.format(seconds),
+    };
   }
 
   if (elapsed < HOUR) {
-    return relativeTime.format(-Math.floor(elapsed / MINUTE), "minute");
+    const minutes = Math.floor(elapsed / MINUTE);
+
+    return {
+      long: relativeTime.format(-minutes, "minute"),
+      short: narrowMinutes.format(minutes),
+    };
   }
 
-  return clockTime.format(at);
+  return { long: clockTime.format(at), short: shortClockTime.format(at) };
 };
 
 const LogTime = (props: {
@@ -102,12 +129,12 @@ const LogTime = (props: {
       trigger={(hint) => (
         <time
           {...hint}
-          aria-label={label()}
+          aria-label={label().long}
           datetime={new Date(props.at).toISOString()}
         />
       )}
     >
-      {label()}
+      {label().short}
     </Tooltip>
   );
 };

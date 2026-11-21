@@ -61,6 +61,12 @@ const STATUS_LABELS = {
 
 const SCORES_TITLE = "Scores";
 
+const STAMPED_STATUSES: ReadonlySet<RoundStatus> = new Set([
+  "busted",
+  "frozen",
+  "stayed",
+]);
+
 interface TableProps {
   room: RoomView;
   playerId: string;
@@ -393,6 +399,15 @@ const RoundPlayer = (
             </Tooltip>
           </Show>
           <strong>{props.player.name}</strong>
+          <Show when={isDealer()}>
+            <Tooltip
+              content="Dealer"
+              type="label"
+              trigger={(hint) => <span {...hint} class="dealer-chip" />}
+            >
+              <PlayingCards size={14} strokeWidth={2.25} aria-hidden="true" />
+            </Tooltip>
+          </Show>
           <Show when={isMe()}>
             <span class="badge">You</span>
           </Show>
@@ -403,70 +418,70 @@ const RoundPlayer = (
             </span>
           </Show>
         </div>
-        <Show when={isDealer() || canKick()}>
-          <div class="seat-end">
-            <Show when={isDealer()}>
-              <Tooltip
-                content="Dealer"
-                type="label"
-                trigger={(hint) => <span {...hint} class="dealer-chip" />}
-              >
-                <PlayingCards size={14} strokeWidth={2.25} aria-hidden="true" />
-              </Tooltip>
-            </Show>
-            <Show when={canKick()}>
-              <RemovePlayer
-                bot={props.player.bot}
-                disabled={props.actionsDisabled}
-                name={props.player.name}
-                onRemove={() => {
-                  void props.send({ playerId: props.player.id, type: "kick" });
-                }}
-              />
-            </Show>
-          </div>
+        <div class="seat-meta">
+          <Show when={hasDecision()}>
+            <span class="badge" data-tone="turn">
+              {decisionLabel()}
+            </span>
+          </Show>
+          <Show when={props.player.status !== "active"}>
+            <span
+              class={[
+                "status-pill",
+                { "sr-only": STAMPED_STATUSES.has(props.player.status) },
+              ]}
+            >
+              <Show when={isFrozen()}>
+                <Snowflake size={12} aria-hidden="true" />
+              </Show>
+              {STATUS_LABELS[props.player.status]}
+            </span>
+          </Show>
+          <Show when={props.player.status === "out"}>
+            <span class="muted">
+              {props.room.phase === "gameOver"
+                ? "Plays next game"
+                : "Plays next round"}
+            </span>
+          </Show>
+          <Show when={flip()}>
+            {(progress) => <FlipTracker progress={progress()} />}
+          </Show>
+        </div>
+        <ul
+          class="seat-extras"
+          aria-label={`${props.player.name}'s modifier and Second Chance cards`}
+        >
+          <For each={extraCards()} keyed={(card) => card.id}>
+            {(card) => <PlayingCard card={card()} />}
+          </For>
+        </ul>
+        <Show when={canKick()}>
+          <RemovePlayer
+            bot={props.player.bot}
+            disabled={props.actionsDisabled}
+            name={props.player.name}
+            onRemove={() => {
+              void props.send({ playerId: props.player.id, type: "kick" });
+            }}
+          />
         </Show>
       </header>
-      <div class="seat-meta">
-        <Show when={hasDecision()}>
-          <span class="badge" data-tone="turn">
-            {decisionLabel()}
-          </span>
-        </Show>
-        <Show when={props.player.status !== "active"}>
-          <span class="status-pill">
-            <Show when={isFrozen()}>
-              <Snowflake size={12} aria-hidden="true" />
-            </Show>
-            {STATUS_LABELS[props.player.status]}
-          </span>
-        </Show>
-        <Show when={props.player.status === "out"}>
-          <span class="muted">
-            {props.room.phase === "gameOver"
-              ? "Plays next game"
-              : "Plays next round"}
-          </span>
-        </Show>
-        <Show when={flip()}>
-          {(progress) => <FlipTracker progress={progress()} />}
-        </Show>
-      </div>
-      <ul class="hand" aria-label={`${props.player.name}'s cards`}>
+      <ul
+        class="hand"
+        aria-label={`${props.player.name}'s cards`}
+        data-banked={
+          props.player.status === "stayed" || props.player.status === "frozen"
+            ? roundPoints()
+            : undefined
+        }
+      >
         <For each={numberCards()} keyed={(card) => card.id}>
           {(card) => <PlayingCard card={card()} dupe={isDupe(card())} />}
         </For>
         <Show when={bustCard()}>
           {(card) => <PlayingCard card={card()} bust />}
         </Show>
-      </ul>
-      <ul
-        class="seat-extras"
-        aria-label={`${props.player.name}'s modifier and Second Chance cards`}
-      >
-        <For each={extraCards()} keyed={(card) => card.id}>
-          {(card) => <PlayingCard card={card()} />}
-        </For>
       </ul>
       <Show when={held().length > 0}>
         <div class="held" data-held="">
@@ -505,25 +520,16 @@ const RoundPlayer = (
           [`${value} of ${details.max} points`, ...scoreDetails()].join(", ")
         }
       >
-        <div class="seat-scores" aria-hidden="true">
-          <span
-            class="seat-score"
-            data-banked=""
-            ref={(element) => {
-              bankedLabel = element;
-            }}
-          >
-            {shownBaseScore()}
-          </span>
-          <Show when={roundPoints() > 0}>
-            <span class="seat-score" data-projected="">
-              +{roundPoints()}
-            </span>
-          </Show>
-          <span class="seat-score" data-goal="">
-            {props.room.targetScore}
-          </span>
-        </div>
+        <span
+          class="seat-score"
+          data-banked=""
+          aria-hidden="true"
+          ref={(element) => {
+            bankedLabel = element;
+          }}
+        >
+          {shownBaseScore()}
+        </span>
         <MeterTrack>
           <MeterIndicator />
           <span class="meter-round" />
@@ -531,6 +537,9 @@ const RoundPlayer = (
             <span class="meter-lost" />
           </Show>
         </MeterTrack>
+        <span class="seat-score" data-projected="" aria-hidden="true">
+          +{roundPoints()}
+        </span>
       </Meter>
     </article>
   );

@@ -109,7 +109,7 @@ describe("<Table />", () => {
     expect(scores).toHaveFocus();
   });
 
-  it("shows both score totals and the goal in the same label row", () => {
+  it("shows the banked and round scores in the same label row", () => {
     render(() => (
       <Table
         room={room()}
@@ -123,14 +123,13 @@ describe("<Table />", () => {
     expect(within(seat).getByText("Your turn")).toBeVisible();
 
     const meter = within(seat).getByRole("meter", { name: "Total score" });
-    const banked = within(meter).getByText("40");
-    expect(banked).toBeVisible();
+    expect(within(meter).getByText("40")).toBeVisible();
     expect(
       Array.from(
-        banked.parentElement?.children ?? [],
+        meter.querySelectorAll(".seat-score"),
         (label) => label.textContent
       )
-    ).toStrictEqual(["40", "+7", "200"]);
+    ).toStrictEqual(["40", "+7"]);
     expect(meter).toHaveAttribute("aria-valuenow", "40");
     expect(meter).toHaveAttribute(
       "aria-valuetext",
