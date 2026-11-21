@@ -1,0 +1,74 @@
+import { Link, Meta } from "@solidjs/meta";
+import { getRequestEvent, isServer } from "@solidjs/web";
+import { Show } from "solid-js";
+
+export const SITE_NAME = "Hot Streak";
+
+export const SITE_DESCRIPTION =
+  "A multiplayer push-your-luck card game for 2 to 12 players. Hit or Stay, dodge duplicates, and flip 7 for a bonus. Share a room code and play in your browser, no accounts.";
+
+const OG_IMAGE = {
+  alt: "Hot Streak wordmark beside a fan of playing cards on green felt",
+  height: "630",
+  path: "/og-image.jpg",
+  type: "image/jpeg",
+  width: "1200",
+} as const;
+
+const siteOrigin = () => {
+  if (isServer) {
+    const event = getRequestEvent();
+
+    return event ? new URL(event.request.url).origin : "";
+  }
+
+  return window.location.origin;
+};
+
+/**
+ * Search and link-preview metadata for one page. Tags deduplicate by name, so
+ * a page's tags replace the defaults set higher up the tree.
+ */
+export default function PageMeta(props: {
+  title: string;
+  description?: string;
+  /** The page's path, used for its canonical and share URL. */
+  path: string;
+  /** Keep the page out of search results (it still gets link previews). */
+  noindex?: boolean;
+}) {
+  const origin = siteOrigin();
+  const url = () => `${origin}${props.path}`;
+  const description = () => props.description ?? SITE_DESCRIPTION;
+
+  return (
+    <>
+      <Meta name="description" content={description()} />
+      <Meta
+        name="robots"
+        content={props.noindex === true ? "noindex, follow" : "index, follow"}
+      />
+      <Show when={props.noindex !== true}>
+        <Link rel="canonical" href={url()} />
+      </Show>
+
+      <Meta property="og:site_name" content={SITE_NAME} />
+      <Meta property="og:type" content="website" />
+      <Meta property="og:locale" content="en_US" />
+      <Meta property="og:title" content={props.title} />
+      <Meta property="og:description" content={description()} />
+      <Meta property="og:url" content={url()} />
+      <Meta property="og:image" content={`${origin}${OG_IMAGE.path}`} />
+      <Meta property="og:image:type" content={OG_IMAGE.type} />
+      <Meta property="og:image:width" content={OG_IMAGE.width} />
+      <Meta property="og:image:height" content={OG_IMAGE.height} />
+      <Meta property="og:image:alt" content={OG_IMAGE.alt} />
+
+      <Meta name="twitter:card" content="summary_large_image" />
+      <Meta name="twitter:title" content={props.title} />
+      <Meta name="twitter:description" content={description()} />
+      <Meta name="twitter:image" content={`${origin}${OG_IMAGE.path}`} />
+      <Meta name="twitter:image:alt" content={OG_IMAGE.alt} />
+    </>
+  );
+}

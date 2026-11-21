@@ -19,6 +19,7 @@ import {
 
 import JoinForm from "../../components/join-form";
 import Lobby from "../../components/lobby";
+import PageMeta from "../../components/page-meta";
 import SiteNav from "../../components/site-nav";
 import SoundControls from "../../components/sound-controls";
 import Table from "../../components/table";
@@ -150,6 +151,12 @@ const Room = (props: { code: string }) => {
       <Title>
         {`${table().myMove ? "Your move · " : ""}Room ${props.code} · Hot Streak`}
       </Title>
+      <PageMeta
+        title={`Join room ${props.code} · Hot Streak`}
+        description={`You're invited to a game of Hot Streak. Open the link to join room ${props.code}, pick a name and play. No accounts needed.`}
+        path={paths.room(props.code)()}
+        noindex
+      />
       <SiteNav>
         <SoundControls
           muted={sounds.muted()}
@@ -247,6 +254,11 @@ export default function RoomPage(props: RouteProps<"/room/:code">) {
       keyed
       fallback={
         <>
+          <PageMeta
+            title="Room not found · Hot Streak"
+            path={paths()}
+            noindex
+          />
           <SiteNav />
           <main class="room-page">
             <section class="panel">

@@ -7,6 +7,7 @@ import { Field, FieldError, FieldLabel } from "@ui-sdk/solid/field";
 import { OTPInput, OTPInputGroup, OTPInputSlot } from "@ui-sdk/solid/otp-input";
 import { createSignal, For, Repeat } from "solid-js";
 
+import PageMeta, { SITE_DESCRIPTION, SITE_NAME } from "../components/page-meta";
 import PlayingCard from "../components/playing-card";
 import { ADDITIVE_MODIFIER_KIND } from "../game/cards";
 import type { Card } from "../game/cards";
@@ -21,6 +22,22 @@ const HERO_CARDS: Card[] = [
   { id: 4, kind: ADDITIVE_MODIFIER_KIND, value: 4 },
   { id: 5, kind: "number", value: 12 },
 ];
+
+const HOME_TITLE = `${SITE_NAME} · A push-your-luck card game`;
+
+const GAME_STRUCTURED_DATA = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "VideoGame",
+  applicationCategory: "Game",
+  description: SITE_DESCRIPTION,
+  gamePlatform: "Web browser",
+  genre: ["Card game", "Party game"],
+  name: SITE_NAME,
+  numberOfPlayers: { "@type": "QuantitativeValue", maxValue: 12, minValue: 2 },
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  operatingSystem: "Any",
+  playMode: "MultiPlayer",
+});
 
 const CODE_CHARACTER_PATTERN = new RegExp(
   `[${CODE_ALPHABET}${CODE_ALPHABET.toLowerCase()}]`,
@@ -45,7 +62,9 @@ export default function Home() {
 
   return (
     <main class="home">
-      <Title>Hot Streak</Title>
+      <Title>{HOME_TITLE}</Title>
+      <PageMeta title={HOME_TITLE} path={paths()} />
+      <script type="application/ld+json" innerHTML={GAME_STRUCTURED_DATA} />
       <section class="hero">
         <div class="hero-copy">
           <h1 class="wordmark">Hot Streak</h1>

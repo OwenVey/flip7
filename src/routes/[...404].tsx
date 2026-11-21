@@ -2,6 +2,7 @@ import { Title } from "@solidjs/meta";
 import type { RouteDefinition } from "@solidjs/router";
 import { httpStatus } from "@solidjs/web";
 
+import PageMeta from "../components/page-meta";
 import SiteNav from "../components/site-nav";
 
 /**
@@ -21,6 +22,7 @@ export default function NotFound() {
       <SiteNav />
       <main>
         <Title>Not Found · Hot Streak</Title>
+        <PageMeta title="Not Found · Hot Streak" path="/" noindex />
         <h1>Page Not Found</h1>
         <p>
           <a href="/">Back to Hot Streak</a>
