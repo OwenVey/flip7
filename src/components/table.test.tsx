@@ -102,6 +102,49 @@ describe("<Table />", () => {
     );
   });
 
+  it("keeps only Number cards on the mat and sets the rest beside it", () => {
+    const view = room();
+    const [ana, ben] = view.players;
+    view.players = [
+      {
+        ...ana,
+        hand: [
+          { id: 1, kind: "number", value: 7 },
+          { id: 90, kind: "bonus", value: 4 },
+          { id: 91, kind: "secondChance" },
+          { id: 3, kind: "number", value: 2 },
+        ],
+      },
+      ben,
+    ];
+
+    render(() => (
+      <Table
+        room={view}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const mat = screen.getByRole("list", { name: "Ana's cards" });
+
+    const extras = screen.getByRole("list", {
+      name: "Ana's modifier and Second Chance cards",
+    });
+
+    expect(
+      within(mat)
+        .getAllByRole("listitem")
+        .map((card) => card.dataset.cardId)
+    ).toStrictEqual(["1", "3"]);
+    expect(
+      within(extras)
+        .getAllByRole("listitem")
+        .map((card) => card.dataset.cardId)
+    ).toStrictEqual(["90", "91"]);
+  });
+
   it("updates the score preview on a bust and when the round is scored", () => {
     const initial = room();
     const [view, setView] = createSignal(initial);

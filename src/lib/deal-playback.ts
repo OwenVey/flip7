@@ -38,7 +38,7 @@ const handCard = (playerId: string, cardId: number | null) =>
   cardId === null
     ? null
     : document.querySelector(
-        `[data-seat="${playerId}"] .hand${cardAt(cardId)}`
+        `[data-seat="${playerId}"] :is(.hand, .seat-extras)${cardAt(cardId)}`
       );
 
 const destination = (step: DealStep) => {

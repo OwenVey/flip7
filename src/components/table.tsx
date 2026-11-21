@@ -165,6 +165,14 @@ const RoundPlayer = (
     { equals: sameHeldCards }
   );
 
+  const numberCards = createMemo(() =>
+    props.player.hand.filter((card) => card.kind === "number")
+  );
+
+  const extraCards = createMemo(() =>
+    props.player.hand.filter((card) => card.kind !== "number")
+  );
+
   const bustCard = createMemo(() => props.player.bustCard, {
     equals: (a, b) => a?.id === b?.id,
   });
@@ -312,12 +320,20 @@ const RoundPlayer = (
         </Show>
       </div>
       <ul class="hand" aria-label={`${props.player.name}'s cards`}>
-        <For each={props.player.hand} keyed={(card) => card.id}>
+        <For each={numberCards()} keyed={(card) => card.id}>
           {(card) => <PlayingCard card={card()} />}
         </For>
         <Show when={bustCard()}>
           {(card) => <PlayingCard card={card()} bust />}
         </Show>
+      </ul>
+      <ul
+        class="seat-extras"
+        aria-label={`${props.player.name}'s modifier and Second Chance cards`}
+      >
+        <For each={extraCards()} keyed={(card) => card.id}>
+          {(card) => <PlayingCard card={card()} />}
+        </For>
       </ul>
       <Show when={held().length > 0}>
         <div class="held" data-held="">
