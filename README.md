@@ -14,7 +14,7 @@ A multiplayer push-your-luck card game for **2–16 players**. Share a room link
 
 ### Rounds and scoring
 
-The dealer rotates each round and deals an opening card to each active player in order. Action cards can interrupt the deal. The round ends when everyone is out or a player **Flips 7** by collecting seven unique Number cards. A Flip 7 adds 15 bonus points and ends the round for everyone.
+The dealer rotates each round and deals an opening card to each active player in order, starting on the dealer's left. Action cards interrupt the deal and resolve as soon as they appear. A player who already took cards from a Flip Three before their opening card chooses Hit or Stay instead. The round ends when everyone is out or a player **Flips 7** by collecting seven unique Number cards. A Flip 7 adds 15 bonus points and ends the round for everyone. Everyone who hasn't busted scores what they already have.
 
 Add up your Number cards, apply the ×2 multiplier if you have it, then add any other Score Modifier points and the Flip 7 bonus. At the end of a round, the sole leader wins if they have at least 200 points. Play continues on a tie for first.
 
@@ -23,10 +23,10 @@ Add up your Number cards, apply the ×2 multiplier if you have it, then add any 
 When assigning **Freeze** or **Flip Three**, you can choose any eligible active player, including yourself.
 
 - **Freeze** makes the receiving player bank their points and exit the round.
-- **Flip Three** makes the receiving player take up to three cards in a row. A Freeze or Flip Three drawn during that sequence is held for resolution after the sequence ends.
+- **Flip Three** makes the receiving player take up to three cards in a row. A Freeze or Flip Three drawn during that sequence is held. If the player survives all three cards, they assign each held card in the order it was drawn. The cards then take effect in that order, after any effects already waiting. A held card whose target is no longer active is discarded.
 - **Second Chance** saves you from the next duplicate Number card. Discard both cards and keep playing. If you already have a Second Chance, give the extra card to an active player without one, or discard it if nobody can take it.
 
-When the deck runs out, the discard pile is shuffled into a new deck. The in-game **Rules** button has a quick reference.
+When the deck runs out, the discard pile is shuffled into a new deck. Cards in front of players stay put. If the deck and the discard pile are both empty, the round ends and everyone who hasn't busted scores what they hold. The in-game **Rules** button has a quick reference.
 
 <details>
 <summary>See all 94 cards in the deck</summary>

@@ -15,6 +15,11 @@ export interface HeldCard {
 }
 
 interface FlipThreeSequence {
+  /**
+   * The Flip Three card being resolved. It goes to the discard pile once its
+   * draws end. Missing on rooms saved before the card was tracked here.
+   */
+  card?: ActionCard;
   targetId: string;
   remaining: number;
   deferred: ActionCard[];
@@ -95,6 +100,10 @@ export const resetActionCards = (state: ActionCardState) => {
 
 export const discardActionCards = (state: ResolutionState) => {
   for (const sequence of state.flipRuns) {
+    if (sequence.card) {
+      state.discard.push(sequence.card);
+    }
+
     state.discard.push(...sequence.deferred);
   }
 
@@ -109,8 +118,17 @@ export const discardActionCards = (state: ResolutionState) => {
   resetActionCards(state);
 };
 
-export const startFlipThree = (state: ActionCardState, targetId: string) => {
-  state.flipRuns.push({ deferred: [], remaining: FLIP_THREE_COUNT, targetId });
+export const startFlipThree = (
+  state: ActionCardState,
+  targetId: string,
+  card: ActionCard
+) => {
+  state.flipRuns.push({
+    card,
+    deferred: [],
+    remaining: FLIP_THREE_COUNT,
+    targetId,
+  });
 };
 
 export const offerActionCardChoice = (
@@ -199,7 +217,7 @@ const stepAssignment = (state: ResolutionState, say: Say) => {
   const [card] = assignment.cards;
 
   if (card === undefined) {
-    state.actionQueue = [...assignment.assigned, ...state.actionQueue];
+    state.actionQueue = [...state.actionQueue, ...assignment.assigned];
     state.assignment = null;
 
     return true;
@@ -233,6 +251,11 @@ const stepFlipThree = (state: ResolutionState, effects: ResolutionEffects) => {
 
   if (sequence.remaining === 0 || target?.status !== "active") {
     state.flipRuns.pop();
+
+    if (sequence.card) {
+      state.discard.push(sequence.card);
+    }
+
     finishFlipThree(state, sequence, effects.say);
 
     return true;

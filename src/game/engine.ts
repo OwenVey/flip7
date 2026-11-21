@@ -55,8 +55,9 @@ export interface Player {
   bustCard: Card | null;
   lastRound: RoundScore | null;
   /**
-   * Flip Three cards played on this player. They aren't part of the hand, but
-   * stay out of the deck until the round ends. Missing on rooms saved earlier.
+   * Flip Three cards played on this player, kept by rooms saved before a
+   * Flip Three went to the discard pile once its draws ended. They're
+   * discarded when the round ends.
    */
   played?: ActionCard[];
 }
@@ -122,6 +123,11 @@ export interface GameState extends ActionCardState {
   flippedIds?: string[];
   /** The current turn is an opening deal slot, so it doesn't move where play resumes. */
   dealSlotTurn?: boolean;
+  /**
+   * A draw found both the deck and the discard pile empty, so the round ends
+   * and every player who hasn't busted scores what they hold.
+   */
+  outOfCards?: boolean;
 }
 
 export class GameError extends Error {
@@ -234,6 +240,9 @@ const draw = (state: GameState, random: Random) => {
 
   if (card) {
     state.drawSeq = (state.drawSeq ?? 0) + 1;
+  } else if (state.outOfCards !== true) {
+    state.outOfCards = true;
+    say(state, "No cards are left to draw, so the round ends.");
   }
 
   return card;
@@ -306,8 +315,7 @@ const applyAction = (
   }
 
   if (card.kind === "flipThree") {
-    target.played = [...(target.played ?? []), card];
-    startFlipThree(state, target.id);
+    startFlipThree(state, target.id, card);
     say(
       state,
       target.id === owner.id
@@ -425,11 +433,13 @@ const nextActiveAfter = (state: GameState, index: number) => {
 };
 
 const roundIsOver = (state: GameState) =>
+  state.outOfCards === true ||
   state.players.some((player) => player.status === FLIP_SEVEN_STATUS) ||
   activePlayers(state).length === 0;
 
 const finishRound = (state: GameState) => {
   discardActionCards(state);
+  state.outOfCards = false;
   state.turnId = null;
   state.dealQueue = [];
   state.dealSlotTurn = false;
@@ -573,6 +583,7 @@ const startRound = (state: GameState, random: Random) => {
   resetActionCards(state);
   state.flippedIds = [];
   state.dealSlotTurn = false;
+  state.outOfCards = false;
   state.phase = "playing";
   state.dealQueue = state.players.map(
     (_, offset) =>

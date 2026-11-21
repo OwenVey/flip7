@@ -627,7 +627,6 @@ const table = (state: GameState, discardMark: number) => ({
       seat.id,
       {
         hand: ids(seat.hand),
-        played: ids(seat.played ?? []),
         score: seat.score,
         status: seat.status,
       },
@@ -653,9 +652,9 @@ describe("Flip Three", () => {
     expect(player(state, "b").bustCard).toBe(duplicate);
     expect(table(state, mark)).toMatchObject({
       deck: [unflipped.id],
-      discarded: [held.id],
+      discarded: [trigger.id, held.id],
       players: {
-        b: { hand: [bThree.id], played: [trigger.id], status: "busted" },
+        b: { hand: [bThree.id], status: "busted" },
       },
       turnId: "a",
     });
@@ -684,11 +683,10 @@ describe("Flip Three", () => {
 
     expect(table(state, mark)).toMatchObject({
       deck: [untouched.id],
-      discarded: [chance.id, duplicate.id],
+      discarded: [chance.id, duplicate.id, trigger.id],
       players: {
         b: {
           hand: [bThree.id, modifier.id],
-          played: [trigger.id],
           status: "active",
         },
       },
@@ -699,9 +697,10 @@ describe("Flip Three", () => {
   it("ends the round on a seventh unique Number, awards the bonus and discards the nested Flip Three", () => {
     const state = setup(["a", "b"], [num(5), num(1)]);
     player(state, "b").hand.push(num(2), num(3), num(4), num(5), num(6));
+    const trigger = flipThree();
     const nested = flipThree();
     const unflipped = num(9);
-    rig(state, [flipThree(), nested, num(7), unflipped]);
+    rig(state, [trigger, nested, num(7), unflipped]);
     const mark = state.discard.length;
 
     hit(state, "a", random);
@@ -710,7 +709,7 @@ describe("Flip Three", () => {
     expect(player(state, "b").lastRound?.streak).toBeTruthy();
     expect(table(state, mark)).toMatchObject({
       deck: [unflipped.id],
-      discarded: [nested.id],
+      discarded: [trigger.id, nested.id],
       phase: "roundOver",
       players: { a: { score: 5 }, b: { score: 28 + 15, status: "streak" } },
       turnId: null,
@@ -720,10 +719,11 @@ describe("Flip Three", () => {
   it("collects both assignments first, so a Flip Three assigned after a Freeze is discarded", () => {
     const cEight = num(8);
     const state = setup(["a", "b", "c"], [num(5), num(3), cEight]);
+    const trigger = flipThree();
     const held = freeze();
     const nested = flipThree();
     const untouched = num(9);
-    rig(state, [flipThree(), num(1), held, nested, untouched]);
+    rig(state, [trigger, num(1), held, nested, untouched]);
     const mark = state.discard.length;
 
     hit(state, "a", random);
@@ -737,7 +737,7 @@ describe("Flip Three", () => {
 
     expect(table(state, mark)).toMatchObject({
       deck: [untouched.id],
-      discarded: [nested.id],
+      discarded: [trigger.id, nested.id],
       players: {
         b: { status: "active" },
         c: { hand: [cEight.id, held.id], status: "frozen" },
@@ -764,30 +764,26 @@ describe("Flip Three", () => {
 
     expect(table(state, mark)).toStrictEqual({
       deck: [untouched.id],
-      discarded: [],
+      discarded: [trigger.id, nested.id],
       phase: "playing",
       players: {
         a: {
           hand: [expect.any(Number)],
-          played: [],
           score: 0,
           status: "stayed",
         },
         b: {
           hand: [expect.any(Number)],
-          played: [],
           score: 0,
           status: "active",
         },
         c: {
           hand: [cEight.id, one?.id, two?.id],
-          played: [trigger.id],
           score: 0,
           status: "active",
         },
         d: {
           hand: [dNine.id, four?.id, six?.id, ten?.id],
-          played: [nested.id],
           score: 0,
           status: "active",
         },
@@ -931,11 +927,12 @@ describe("Flip Three during the opening deal", () => {
 
     choose(state, "a", "b", random);
 
+    expect(state.discard.at(-1)).toBe(trigger);
     expect(table(state, 0)).toMatchObject({
       deck: [untouched.id, dCard.id, cCard.id],
       players: {
         a: { hand: [] },
-        b: { hand: ids(flips), played: [trigger.id], status: "active" },
+        b: { hand: ids(flips), status: "active" },
         c: { hand: [] },
       },
       turnId: "b",
@@ -966,11 +963,12 @@ describe("Flip Three during the opening deal", () => {
 
     choose(state, "a", "c", random);
 
+    expect(state.discard.at(-1)).toBe(trigger);
     expect(table(state, 0)).toMatchObject({
       deck: [untouched.id],
       players: {
         b: { hand: [bCard.id] },
-        c: { hand: [one.id], played: [trigger.id], status: "busted" },
+        c: { hand: [one.id], status: "busted" },
       },
       turnId: "a",
     });

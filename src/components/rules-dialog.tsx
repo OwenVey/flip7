@@ -38,8 +38,10 @@ export default function RulesDialog(props: { targetScore: number }) {
               <strong>Action cards</strong> are played on active players.{" "}
               <strong>Freeze</strong> banks the receiving player's points and
               ends their round. <strong>Flip Three</strong> makes them take the
-              next three cards, one at a time. <strong>Second Chance</strong> is
-              discarded along with your next duplicate Number card.
+              next three cards, one at a time. Any Freeze or Flip Three they
+              reveal waits until all three cards are done.{" "}
+              <strong>Second Chance</strong> is discarded along with your next
+              duplicate Number card.
             </li>
             <li>
               Add up your Number cards, apply the ×2 multiplier if you have it,
@@ -49,6 +51,10 @@ export default function RulesDialog(props: { targetScore: number }) {
             <li>
               When a round ends with someone at {props.targetScore} or more, the
               highest score wins. A tie for first plays on.
+            </li>
+            <li>
+              If the deck and the discard pile both run out, the round ends and
+              everyone who hasn't busted scores what they hold.
             </li>
           </ul>
         </div>
