@@ -516,12 +516,9 @@ const countChatsAfter = (log: LogEntry[], playerId: string, seenId: number) =>
       entry.from.id !== playerId
   ).length;
 
-const targetButtonLabel = (room: RoomView, playerId: string, id: string) =>
-  id === playerId ? "You" : nameOf(room, id);
-
 const ActionCardPrompt = (
-  props: Pick<TableProps, "room" | "playerId" | "actionsDisabled"> &
-    MoveControls & { choice: ActionCardChoice }
+  props: Pick<TableProps, "room"> &
+    Pick<MoveControls, "moves"> & { choice: ActionCardChoice }
 ) => (
   <>
     <ul class="dealt-action-card" data-choice-card="" aria-hidden="true">
@@ -543,39 +540,23 @@ const ActionCardPrompt = (
       }
     >
       {(move) => (
-        <>
-          <Show
-            when={move().forId === undefined}
-            fallback={
-              <p class="headline">
-                {nameOf(props.room, props.choice.chooserId)} is offline.{" "}
-                <span class="muted">
-                  · Pick who gets their {cardLabel(props.choice.card)}, or it
-                  will be played for them soon.
-                </span>
-              </p>
-            }
-          >
+        <Show
+          when={move().forId === undefined}
+          fallback={
             <p class="headline">
-              {choiceVerb(props.choice)}…{" "}
-              <span class="muted">· Pick a player</span>
+              {nameOf(props.room, props.choice.chooserId)} is offline.{" "}
+              <span class="muted">
+                · Pick who gets their {cardLabel(props.choice.card)}, or it will
+                be played for them soon.
+              </span>
             </p>
-          </Show>
-          <div class="action-buttons" data-choice-buttons="">
-            <For each={move().targets}>
-              {(targetId) => (
-                <Button
-                  disabled={props.actionsDisabled}
-                  onClick={() => {
-                    props.onChoose(targetId);
-                  }}
-                >
-                  {targetButtonLabel(props.room, props.playerId, targetId)}
-                </Button>
-              )}
-            </For>
-          </div>
-        </>
+          }
+        >
+          <p class="headline">
+            {choiceVerb(props.choice)}…{" "}
+            <span class="muted">· Pick a player</span>
+          </p>
+        </Show>
       )}
     </Show>
   </>
@@ -828,7 +809,9 @@ const OfflineTurn = (
   );
 };
 
-const ActionBar = (props: TableProps & DealProps & MoveControls) => {
+const ActionBar = (
+  props: TableProps & DealProps & Pick<MoveControls, "moves">
+) => {
   const me = () =>
     props.room.players.find((player) => player.id === props.playerId);
 
@@ -940,9 +923,6 @@ const ActionBar = (props: TableProps & DealProps & MoveControls) => {
               choice={choice()}
               moves={props.moves}
               room={props.room}
-              playerId={props.playerId}
-              onChoose={props.onChoose}
-              actionsDisabled={props.actionsDisabled}
             />
           )}
         </Match>
@@ -1127,7 +1107,6 @@ export default function Table(
         dealing={props.dealing}
         dealStep={props.dealStep}
         moves={moves()}
-        onChoose={chooseTarget}
       />
 
       <div class="table-body">

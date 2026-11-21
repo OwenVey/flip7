@@ -1179,12 +1179,6 @@ main {
         white-space: normal;
       }
     }
-
-    /* Three targets to a row, so a full table's choices stay a few rows tall. */
-    & [data-choice-buttons] [data-slot="button"] {
-      flex-basis: 30%;
-      min-width: 6rem;
-    }
   }
 
   .deck {
@@ -2834,23 +2828,8 @@ main {
     min-height: 2rem;
   }
 
-  .seat-meta {
-    height: auto;
-  }
-
-  .seat-meta:empty,
-  .seat-extras:empty,
-  .seat[data-me] .seat-meta:not(:has(> :not([data-tone="turn"]))) {
-    display: none;
-  }
-
-  /* The action bar already says it's your move. */
+  /* The action bar already says it's your move. The row keeps its height so the seat doesn't shift. */
   .seat[data-me] .seat-meta > [data-tone="turn"] {
-    display: none;
-  }
-
-  /* Targets are picked from buttons in the action bar, so a tap that meant to scroll can't play a card. */
-  .seat-pick {
     display: none;
   }
 

@@ -592,31 +592,6 @@ describe("<Table />", () => {
     ).toBeInTheDocument();
   });
 
-  it("the chooser can also pick a target from the action bar", () => {
-    const send = vi.fn<RoomConnection["send"]>();
-
-    render(() => (
-      <Table
-        room={room({
-          choice: {
-            card: { id: 9, kind: "freeze" },
-            chooserId: "a",
-            options: ["a", "b"],
-          },
-        })}
-        playerId="a"
-        send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
-    ));
-
-    const bar = screen.getByRole("region", { name: "Your move" });
-    expect(within(bar).getByRole("button", { name: "You" })).toBeEnabled();
-    within(bar).getByRole("button", { name: "Ben" }).click();
-    flush();
-    expect(send).toHaveBeenCalledWith({ targetId: "b", type: "choose" });
-  });
-
   it("clears the unread count when the chat sheet opens and returns focus on close", async () => {
     const [view, setView] = createSignal(room());
 
@@ -739,7 +714,7 @@ describe("<Table />", () => {
     expect(screen.queryByRole("button", { name: "Hit for Ben" })).toBeNull();
   });
 
-  it("sends the same choice for an offline player from a seat or the action bar", () => {
+  it("sends the choice for an offline player from their seat", () => {
     const send = vi.fn<RoomConnection["send"]>();
 
     const view = room({
@@ -767,23 +742,17 @@ describe("<Table />", () => {
     screen.getByRole("button", { name: "Freeze themselves for Ben" }).click();
     flush();
 
-    const bar = screen.getByRole("region", { name: "Your move" });
-    within(bar).getByRole("button", { name: "Ben" }).click();
-    flush();
-
-    const move = {
+    expect(send).toHaveBeenCalledWith({
       forId: "b",
       targetId: "b",
       type: "choose",
-    };
-
-    expect(send.mock.calls).toStrictEqual([[move], [move]]);
+    });
     expect(
       screen.getByRole("button", { name: "Freeze yourself for Ben" })
     ).toBeInTheDocument();
   });
 
-  it("updates eligible targets on both controls during a Room sync", async () => {
+  it("updates eligible seat targets during a Room sync", async () => {
     const send = vi.fn<RoomConnection["send"]>();
 
     const choice = {
@@ -805,9 +774,7 @@ describe("<Table />", () => {
       />
     ));
 
-    const bar = within(screen.getByRole("region", { name: "Your move" }));
     expect(screen.getByRole("button", { name: "Freeze Ben" })).toBeDisabled();
-    expect(bar.getByRole("button", { name: "Ben" })).toBeDisabled();
 
     const { artifact } = await captureArtifact(
       () => {
@@ -819,14 +786,10 @@ describe("<Table />", () => {
     );
 
     expectNoDiagnostics(artifact);
-    expect([
-      screen.queryByRole("button", { name: "Freeze Ben" }),
-      bar.queryByRole("button", { name: "Ben" }),
-    ]).toStrictEqual([null, null]);
+    expect(screen.queryByRole("button", { name: "Freeze Ben" })).toBeNull();
     expect(
       screen.getByRole("button", { name: "Freeze yourself" })
     ).toBeEnabled();
-    expect(bar.getByRole("button", { name: "You" })).toBeEnabled();
   });
 
   it("names later games in the log's round headings", () => {
