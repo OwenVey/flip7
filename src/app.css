@@ -478,7 +478,6 @@ main {
 .status-message {
   display: block;
   padding: 3rem 0;
-  color: var(--ink-soft);
   font-weight: 600;
   text-align: center;
 }
