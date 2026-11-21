@@ -37,15 +37,15 @@ export default function LeaveRoom(props: {
       </AlertDialogTrigger>
       <AlertDialogBackdrop />
       <AlertDialogContent>
-        <div data-slot="stack">
+        <div class="alert-dialog-copy">
           <AlertDialogTitle>Leave this room?</AlertDialogTitle>
           <AlertDialogDescription>
-            You give up your seat and your points. If you're the host, the next
-            player takes over.
+            You give up your seat and your points. If you're the host, another
+            player takes over if anyone remains.
           </AlertDialogDescription>
         </div>
         <div data-slot="row">
-          <AlertDialogClose>Stay</AlertDialogClose>
+          <AlertDialogClose>Cancel</AlertDialogClose>
           <AlertDialogClose
             disabled={props.disabled}
             value="confirm"

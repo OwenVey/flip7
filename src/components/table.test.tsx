@@ -98,7 +98,7 @@ describe("<Table />", () => {
 
     expect(result.error).toBeUndefined();
     const sheet = await screen.findByRole("dialog", { name: "Scores" });
-    const standings = within(sheet).getByRole("table", { name: "Leaderboard" });
+    const standings = within(sheet).getByRole("table", { name: "Scores" });
     expect(
       within(standings).getByRole("row", { name: /Ana.*40/u })
     ).toBeVisible();
@@ -323,7 +323,7 @@ describe("<Table />", () => {
     expect(ana).toHaveAttribute("data-winning");
     expect(ana).toHaveAttribute(
       "aria-valuetext",
-      "195 of 200 points, 7 this round, enough to win"
+      "195 of 200 points, 7 this round, at the target"
     );
   });
 
@@ -376,9 +376,7 @@ describe("<Table />", () => {
       />
     ));
 
-    const leaderboard = within(
-      screen.getByRole("table", { name: "Leaderboard" })
-    );
+    const leaderboard = within(screen.getByRole("table", { name: "Scores" }));
 
     const rows = () =>
       leaderboard
@@ -482,7 +480,7 @@ describe("<Table />", () => {
       />
     ));
 
-    const log = screen.getByRole("log", { name: "Game log" });
+    const log = screen.getByRole("log", { name: "Chat and game log" });
     expect(within(log).getByText("Ben")).toBeTruthy();
     expect(within(log).getByText("gl")).toBeTruthy();
 
@@ -624,11 +622,16 @@ describe("<Table />", () => {
     toggle.click();
     flush();
 
-    const sheet = await screen.findByRole("dialog", { name: "Game log" });
+    const sheet = await screen.findByRole("dialog", {
+      name: "Chat and game log",
+    });
+
     expect(toggle).toHaveAccessibleName("Chat and game log");
     within(sheet).getByRole("button", { name: "Close" }).click();
     flush();
-    expect(screen.queryByRole("dialog", { name: "Game log" })).toBeNull();
+    expect(
+      screen.queryByRole("dialog", { name: "Chat and game log" })
+    ).toBeNull();
     expect(toggle).toHaveFocus();
   });
 
@@ -645,7 +648,11 @@ describe("<Table />", () => {
     const toggle = screen.getByRole("button", { name: "Chat and game log" });
     toggle.focus();
     toggle.click();
-    const sheet = await screen.findByRole("dialog", { name: "Game log" });
+
+    const sheet = await screen.findByRole("dialog", {
+      name: "Chat and game log",
+    });
+
     const input = within(sheet).getByRole("textbox", { name: "Chat message" });
     fireEvent.input(input, { target: { value: "See you next round" } });
     flush();
@@ -655,7 +662,11 @@ describe("<Table />", () => {
     expect(toggle).toHaveFocus();
 
     toggle.click();
-    const reopened = await screen.findByRole("dialog", { name: "Game log" });
+
+    const reopened = await screen.findByRole("dialog", {
+      name: "Chat and game log",
+    });
+
     expect(
       within(reopened).getByRole("textbox", { name: "Chat message" })
     ).toHaveValue("See you next round");
@@ -693,12 +704,12 @@ describe("<Table />", () => {
       />
     ));
     expect(
-      screen.getByText(/Move for them, or they'll stay soon/u)
+      screen.getByText(/Move for them now. The game will Stay for them soon/u)
     ).toBeVisible();
     screen.getByRole("button", { name: "Hit for Ben" }).click();
     flush();
     expect(send).toHaveBeenCalledWith({ forId: "b", type: "hit" });
-    screen.getByRole("button", { name: "Stay with 3 points" }).click();
+    screen.getByRole("button", { name: "Stay for Ben with 3 points" }).click();
     flush();
     expect(send).toHaveBeenCalledWith({ forId: "b", type: "stay" });
     cleanup();
@@ -830,7 +841,7 @@ describe("<Table />", () => {
       />
     ));
     expect(
-      screen.getByText(/Offline, so they'll stay soon/u)
+      screen.getByText(/The game will Stay for them soon/u)
     ).toBeInTheDocument();
   });
 });

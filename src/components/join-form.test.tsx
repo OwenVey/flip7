@@ -87,6 +87,28 @@ describe("<JoinForm />", () => {
     expect(screen.queryByRole("textbox", { name: "Your name" })).toBeNull();
   });
 
+  it("tells players whether they will join the next round or the next game", () => {
+    const [phase, setPhase] = createSignal<RoomView["phase"]>("playing");
+    const room = roomWith(["Ana"]);
+
+    render(() => (
+      <JoinForm
+        room={{ ...room, phase: phase() }}
+        savedName=""
+        onJoin={vi.fn<(name: string) => void>()}
+      />
+    ));
+
+    expect(
+      screen.getByText("A game is in progress. You'll be dealt in next round.")
+    ).toBeVisible();
+
+    setPhase("gameOver");
+    flush();
+
+    expect(screen.getByText("You'll play in the next game.")).toBeVisible();
+  });
+
   it("keeps the name and shows the rejection at the field", () => {
     const [joining, setJoining] = createSignal(false);
     const [error, setError] = createSignal("");
@@ -108,7 +130,7 @@ describe("<JoinForm />", () => {
       />
     ));
     const name = screen.getByRole("textbox", { name: "Your name" });
-    screen.getByRole("button", { name: "Join the table" }).click();
+    screen.getByRole("button", { name: "Join room" }).click();
     flush();
 
     expect(submittedName).toBe("Ben");
@@ -122,8 +144,6 @@ describe("<JoinForm />", () => {
     expect(name).toHaveAccessibleDescription(
       /Someone here is already called Ben/u
     );
-    expect(
-      screen.getByRole("button", { name: "Join the table" })
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Join room" })).toBeEnabled();
   });
 });

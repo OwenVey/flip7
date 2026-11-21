@@ -39,7 +39,7 @@ import type { DealStep } from "../lib/deal-plan";
 import type { RoomConnection } from "../lib/room-connection";
 import { passDealerChip, pop, slideRows } from "../lib/table-motion";
 import type { ChipSpot } from "../lib/table-motion";
-import GameLog from "./game-log";
+import GameLog, { CHAT_AND_GAME_LOG_TITLE } from "./game-log";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
 import PlayingCard from "./playing-card";
@@ -54,6 +54,8 @@ const STATUS_LABELS = {
   stayed: "Stayed",
   [FLIP_SEVEN_STATUS]: "Flip 7!",
 } as const satisfies Record<RoundStatus, string>;
+
+const SCORES_TITLE = "Scores";
 
 interface TableProps {
   room: RoomView;
@@ -312,7 +314,7 @@ const RoundPlayer = (
       : "locked";
   };
 
-  const wouldWin = () => projectedScore() >= props.room.targetScore;
+  const atTarget = () => projectedScore() >= props.room.targetScore;
 
   const scorePercent = (score: number) =>
     `${Math.min(100, (score / props.room.targetScore) * 100)}%`;
@@ -324,8 +326,8 @@ const RoundPlayer = (
       details.push(`${roundPoints()} this round`);
     }
 
-    if (wouldWin()) {
-      details.push("enough to win");
+    if (atTarget()) {
+      details.push("at the target");
     }
 
     return details;
@@ -418,7 +420,11 @@ const RoundPlayer = (
           </span>
         </Show>
         <Show when={props.player.status === "out"}>
-          <span class="muted">Joins next round</span>
+          <span class="muted">
+            {props.room.phase === "gameOver"
+              ? "Plays next game"
+              : "Plays next round"}
+          </span>
         </Show>
         <Show when={flip()}>
           {(progress) => <FlipTracker progress={progress()} />}
@@ -467,7 +473,7 @@ const RoundPlayer = (
         value={props.player.score}
         max={props.room.targetScore}
         data-round={roundRisk()}
-        data-winning={wouldWin() ? "" : undefined}
+        data-winning={atTarget() ? "" : undefined}
         style={{
           "--lost-end": scorePercent(baseScore() + lostPoints()),
           "--projected-score": scorePercent(projectedScore()),
@@ -528,12 +534,14 @@ const ActionCardPrompt = (
       when={props.moves.choice}
       fallback={
         <p class="headline">
-          {nameOf(props.room, props.choice.chooserId)} is choosing who receives{" "}
-          {cardLabel(props.choice.card)}.
-          <Show when={props.moves.waitingOn?.offline}>
+          {nameOf(props.room, props.choice.chooserId)}{" "}
+          <Show
+            when={props.moves.waitingOn?.offline}
+            fallback={`is choosing who receives ${cardLabel(props.choice.card)}.`}
+          >
+            is offline.{" "}
             <span class="muted">
-              {" "}
-              · Offline, so it will be played for them soon.
+              · The game will play {cardLabel(props.choice.card)} for them soon.
             </span>
           </Show>
         </p>
@@ -546,8 +554,8 @@ const ActionCardPrompt = (
             <p class="headline">
               {nameOf(props.room, props.choice.chooserId)} is offline.{" "}
               <span class="muted">
-                · Pick who gets their {cardLabel(props.choice.card)}, or it will
-                be played for them soon.
+                · Pick who gets their {cardLabel(props.choice.card)}, or the
+                game will play it for them soon.
               </span>
             </p>
           }
@@ -599,7 +607,7 @@ const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
   );
 
   return (
-    <table class="leaderboard" aria-label="Leaderboard">
+    <table class="leaderboard" aria-label={SCORES_TITLE}>
       <thead>
         <tr>
           <th scope="col">Rank</th>
@@ -697,6 +705,9 @@ const deckStack = (count: number) => {
   return count <= LOW_DECK ? "low" : "full";
 };
 
+const automaticTurnLabel = (canStay: boolean) =>
+  `The game will ${canStay ? "Stay" : "Hit"} for them soon.`;
+
 const Deck = (props: { count: number }) => {
   let counter: HTMLSpanElement | undefined;
 
@@ -763,10 +774,11 @@ const OfflineTurn = (
 
   const name = () => player()?.name ?? "Someone";
 
-  const points = () => {
+  const bankedPoints = () => {
     const current = player();
+    const points = current ? currentRoundPoints(current) : 0;
 
-    return current ? currentRoundPoints(current) : 0;
+    return points === 1 ? "1 point" : `${points} points`;
   };
 
   return (
@@ -774,11 +786,12 @@ const OfflineTurn = (
       <p class="headline">
         {name()} is offline.{" "}
         <span class="muted">
-          · Move for them, or they'll {props.canStay ? "stay" : "hit"} soon.
+          · Move for them now. {automaticTurnLabel(props.canStay)}
         </span>
       </p>
       <div class="action-buttons">
         <Button
+          data-size="lg"
           disabled={props.actionsDisabled}
           data-variant="solid"
           aria-label={`Hit for ${name()}`}
@@ -787,20 +800,21 @@ const OfflineTurn = (
           }
         >
           <SquarePlus size={16} />
-          <FitLabel long={`Hit for ${name()}`} short="Hit" />
+          Hit for {name()}
         </Button>
         <Show when={props.canStay}>
           <Button
+            data-size="lg"
             disabled={props.actionsDisabled}
-            aria-label={`Stay with ${points()} points`}
+            aria-label={`Stay for ${name()} with ${bankedPoints()}`}
             onClick={async () =>
               await props.send({ forId: props.playerId, type: "stay" })
             }
           >
             <Coins size={16} />
             <FitLabel
-              long={`Stay with ${points()} points`}
-              short={`Stay · ${points()}`}
+              long={`Stay for ${name()} · ${bankedPoints()}`}
+              short={`Stay for ${name()}`}
             />
           </Button>
         </Show>
@@ -887,6 +901,7 @@ const ActionBar = (
           >
             <div class="action-buttons">
               <Button
+                data-size="lg"
                 disabled={props.actionsDisabled}
                 data-variant="solid"
                 onClick={async () => await props.send({ type: "lobby" })}
@@ -907,6 +922,7 @@ const ActionBar = (
           >
             <div class="action-buttons">
               <Button
+                data-size="lg"
                 disabled={props.actionsDisabled}
                 data-variant="solid"
                 onClick={async () => await props.send({ type: "nextRound" })}
@@ -941,6 +957,7 @@ const ActionBar = (
           </p>
           <div class="action-buttons">
             <Button
+              data-size="lg"
               disabled={props.actionsDisabled}
               data-variant="solid"
               onClick={async () => await props.send({ type: "hit" })}
@@ -950,6 +967,7 @@ const ActionBar = (
             </Button>
             <Show when={iCanStay()}>
               <Button
+                data-size="lg"
                 disabled={props.actionsDisabled}
                 aria-label={`Stay with ${myRound()} points`}
                 onClick={async () => await props.send({ type: "stay" })}
@@ -977,15 +995,15 @@ const ActionBar = (
         <Match when={props.room.turnId}>
           {(turnId) => (
             <p class="headline">
-              {nameOf(props.room, turnId())} is deciding…
-              <Show when={props.moves.waitingOn?.offline}>
+              {nameOf(props.room, turnId())}{" "}
+              <Show
+                when={props.moves.waitingOn?.offline}
+                fallback="is deciding…"
+              >
+                is offline.{" "}
                 <span class="muted">
-                  {" "}
-                  · Offline, so they'll{" "}
-                  {props.moves.waitingOn?.canStay === true
-                    ? "stay"
-                    : "hit"}{" "}
-                  soon.
+                  ·{" "}
+                  {automaticTurnLabel(props.moves.waitingOn?.canStay === true)}
                 </span>
               </Show>
             </p>
@@ -1042,8 +1060,8 @@ export default function Table(
     const unread = unreadChats();
 
     return unread > 0
-      ? `Chat and game log, ${unread} new ${unread === 1 ? "message" : "messages"}`
-      : "Chat and game log";
+      ? `${CHAT_AND_GAME_LOG_TITLE}, ${unread} new ${unread === 1 ? "message" : "messages"}`
+      : CHAT_AND_GAME_LOG_TITLE;
   };
 
   const onLogOpenChange = (open: boolean) => {
@@ -1058,15 +1076,15 @@ export default function Table(
         <div class="row">
           <Show when={props.room.phase === "playing"}>
             <TableSheet
-              title="Scores"
-              triggerLabel="Scores"
+              title={SCORES_TITLE}
+              triggerLabel={SCORES_TITLE}
               trigger={<Trophy size={16} aria-hidden="true" />}
             >
               <Leaderboard room={props.room} playerId={props.playerId} />
             </TableSheet>
           </Show>
           <TableSheet
-            title="Game log"
+            title={CHAT_AND_GAME_LOG_TITLE}
             triggerLabel={toggleLabel()}
             keepMounted
             open={logOpen()}
@@ -1133,7 +1151,7 @@ export default function Table(
             class="panel leaderboard-panel"
             aria-labelledby="leaderboard-title"
           >
-            <h2 id="leaderboard-title">Leaderboard</h2>
+            <h2 id="leaderboard-title">{SCORES_TITLE}</h2>
             <Leaderboard room={props.room} playerId={props.playerId} />
           </section>
           <GameLog

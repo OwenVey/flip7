@@ -43,7 +43,7 @@ export default function RemovePlayer(props: {
       </AlertDialogTrigger>
       <AlertDialogBackdrop />
       <AlertDialogContent>
-        <div data-slot="stack">
+        <div class="alert-dialog-copy">
           <AlertDialogTitle>Remove {props.name}?</AlertDialogTitle>
           <AlertDialogDescription>
             They lose their seat and points. They can come back with the room

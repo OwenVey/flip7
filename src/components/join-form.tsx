@@ -67,7 +67,9 @@ export default function JoinForm(props: {
         when={!full() && props.room !== null && props.room.phase !== "lobby"}
       >
         <p class="muted">
-          A game is in progress. You'll be dealt in from the next round.
+          {props.room?.phase === "gameOver"
+            ? "You'll play in the next game."
+            : "A game is in progress. You'll be dealt in next round."}
         </p>
       </Show>
       <Show
@@ -130,7 +132,7 @@ export default function JoinForm(props: {
             <FieldError role="alert">{error()}</FieldError>
           </Field>
           <Button type="submit" data-variant="solid" disabled={unavailable()}>
-            {props.joining === true ? "Joining…" : "Join the table"}
+            {props.joining === true ? "Joining…" : "Join room"}
           </Button>
         </form>
       </Show>

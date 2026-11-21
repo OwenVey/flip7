@@ -611,11 +611,13 @@ export const addPlayer = (state: GameState, id: string, name: string) => {
     status: "out",
   });
   state.hostId ??= id;
+
+  const next = state.phase === "gameOver" ? "game" : "round";
   say(
     state,
     state.phase === "lobby"
       ? `${name} joined.`
-      : `${name} joined and will play from the next round.`,
+      : `${name} joined and will play in the next ${next}.`,
     "join"
   );
 };
@@ -873,14 +875,17 @@ export const playForAbsent = (state: GameState, random: Random) => {
       return false;
     }
 
-    say(state, `${player.name} is offline, so their card was played for them.`);
+    say(state, `${player.name} is offline, so the game played their card.`);
     choose(state, player.id, target, random);
 
     return true;
   }
 
   if (!waiting.canStay) {
-    say(state, `${player.name} is offline and has no cards, so they hit.`);
+    say(
+      state,
+      `${player.name} is offline and has no cards, so the game hit for them.`
+    );
     hit(state, player.id, random);
 
     return true;
@@ -891,7 +896,7 @@ export const playForAbsent = (state: GameState, random: Random) => {
     player,
     random,
     (banked) =>
-      `${player.name} is offline, so they stayed and banked ${banked}.`
+      `${player.name} is offline, so the game stayed for them and banked ${banked}.`
   );
 
   return true;

@@ -461,7 +461,7 @@ describe("an offline player", () => {
     expect(playForAbsent(state, random)).toBeTruthy();
     expect(state.turnId).toBe("b");
     expect(state.log.at(-1)?.text).toBe(
-      "a is offline, so they stayed and banked 5 points."
+      "a is offline, so the game stayed for them and banked 5 points."
     );
   });
 

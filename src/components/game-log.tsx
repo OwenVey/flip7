@@ -15,6 +15,8 @@ import {
 import { CHAT_MAX_LENGTH } from "../game/engine";
 import type { LogEntry } from "../game/engine";
 
+export const CHAT_AND_GAME_LOG_TITLE = "Chat and game log";
+
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
@@ -127,6 +129,7 @@ const ChatForm = (props: { onSend: (text: string) => boolean }) => {
       }}
     >
       <Input
+        data-size="sm"
         aria-label="Chat message"
         placeholder="Say something…"
         value={text()}
@@ -212,13 +215,13 @@ export default function GameLog(props: {
   return (
     <section class={props.inSheet === true ? "stack" : "panel log"}>
       <Show when={props.inSheet !== true}>
-        <h2>Game log</h2>
+        <h2>{CHAT_AND_GAME_LOG_TITLE}</h2>
       </Show>
       <div class="log-body">
         <div
           class="log-scroll"
           role="log"
-          aria-label="Game log"
+          aria-label={CHAT_AND_GAME_LOG_TITLE}
           ref={(element) => {
             scroller = element;
           }}

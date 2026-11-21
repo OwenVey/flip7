@@ -74,6 +74,11 @@
   --ui-radius: 0.25rem;
   --ui-font-size: 0.9375rem;
   --ui-font-sans: var(--font-body);
+  --control-height-sm: 2rem;
+  --control-height: 2.5rem;
+  --control-height-lg: 2.75rem;
+  --dialog-inset: 1rem;
+  --dialog-radius: 0.875rem;
 }
 
 *,
@@ -157,8 +162,21 @@ p {
   }
 }
 
-[data-slot="input"]::placeholder {
-  color: var(--ink-soft);
+[data-slot="input"] {
+  height: var(--control-height);
+
+  &:where([data-size="sm"]) {
+    height: var(--control-height-sm);
+  }
+
+  &::placeholder {
+    color: var(--ink-soft);
+  }
+
+  @media (pointer: coarse) {
+    height: var(--control-height-lg);
+    font-size: 1rem;
+  }
 }
 
 /* The room code: five separate printed tiles that span the form, like the button below. */
@@ -200,6 +218,14 @@ p {
     &[data-fake-caret]:empty::after {
       height: 0.9em;
       width: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+
+      &[data-active] {
+        transform: none;
+      }
     }
   }
 }
@@ -257,8 +283,7 @@ p {
   align-items: center;
 }
 
-.stack,
-[data-slot="alert-dialog-content"] > [data-slot="stack"] {
+.stack {
   display: grid;
   gap: 1rem;
 }
@@ -363,13 +388,13 @@ p {
   [data-slot="dialog-close"],
   [data-slot="popover-trigger"]
 ) {
-  --button-height: 2.5rem;
+  --button-height: var(--control-height);
   height: auto;
   min-height: var(--button-height);
   padding-inline: 1.125rem;
   border: 1px solid var(--ink);
   box-shadow: 2px 2px 0 var(--ink);
-  font-size: 0.9375rem;
+  font-size: var(--ui-font-size);
   font-weight: 700;
   transition:
     transform 80ms ease,
@@ -398,21 +423,59 @@ p {
     }
   }
 
-  &[data-size="sm"] {
-    --button-height: 2rem;
+  &:where([data-size="sm"]) {
+    --button-height: var(--control-height-sm);
     padding-inline: 0.75rem;
     font-size: 0.8125rem;
+  }
+
+  &:where([data-size="lg"]) {
+    --button-height: var(--control-height-lg);
   }
 
   &[data-icon] {
     inline-size: var(--button-height);
     padding-inline: 0;
   }
+
+  @media (pointer: coarse) {
+    --button-height: var(--control-height-lg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:active:not([data-disabled], [aria-disabled="true"]) {
+      transform: none;
+    }
+  }
+}
+
+:is(
+  [data-slot="alert-dialog-content"],
+  [data-slot="dialog-content"][data-presentation="dialog"]
+) {
+  border: 2px solid var(--ink);
+  border-radius: var(--dialog-radius);
 }
 
 [data-slot="alert-dialog-content"] {
-  border: 2px solid var(--ink);
-  border-radius: 0.875rem;
+  gap: var(--dialog-inset);
+  padding: var(--dialog-inset);
+}
+
+.alert-dialog-copy {
+  display: grid;
+  gap: 0.5rem;
+  overflow-wrap: anywhere;
+
+  & [data-slot="alert-dialog-description"] {
+    margin: 0;
+  }
+}
+
+:is([data-slot="alert-dialog-title"], [data-slot="dialog-title"]) {
+  font-size: 1.125rem;
 }
 
 /* Sheets slide and dim through ui-sdk so their motion follows the swipe gesture. */
@@ -431,7 +494,7 @@ p {
     scale: 0.97;
   }
 
-  &[data-ending-style] {
+  &:where([data-ending-style]) {
     transition-duration: 140ms;
     transition-timing-function: ease-in;
   }
@@ -489,7 +552,7 @@ p {
     scale: 0.94;
   }
 
-  &[data-ending-style] {
+  &:where([data-ending-style]) {
     transition-duration: 110ms;
     transition-timing-function: ease-in;
   }
@@ -921,7 +984,6 @@ main {
 
   & [data-slot="button"] {
     min-width: 7rem;
-    min-height: 2.75rem;
   }
 }
 
@@ -976,7 +1038,6 @@ main {
 
 [data-slot="dialog-content"].rules-dialog[data-presentation="dialog"] {
   width: min(38rem, calc(100% - 2rem));
-  border: 2px solid var(--ink);
 }
 
 .rules-dialog ul {
@@ -999,7 +1060,7 @@ main {
   .table-sheet,
   .rules-dialog[data-presentation="sheet"]
 ) {
-  --sheet-backdrop: rgb(10 16 28 / 0.52);
+  --sheet-backdrop: var(--ui-overlay);
   width: 100%;
   padding-bottom: env(safe-area-inset-bottom);
   border: 0;
@@ -1014,11 +1075,11 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.25rem 1rem 0.625rem;
+  padding: 1.25rem var(--dialog-inset) 0.625rem;
   border-bottom: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
 
   .rules-dialog[data-presentation="dialog"] & {
-    padding-top: 0.75rem;
+    padding-top: var(--dialog-inset);
   }
 
   [data-presentation="sheet"] &::before {
@@ -1031,15 +1092,11 @@ main {
     content: "";
     translate: -50% 0;
   }
-
-  & h2 {
-    font-size: 1.125rem;
-  }
 }
 
 .table-sheet-body {
   min-height: 0;
-  padding: 0.75rem 1rem 1rem;
+  padding: 0.75rem var(--dialog-inset) var(--dialog-inset);
   overflow-y: auto;
   overscroll-behavior: contain;
 
@@ -2960,30 +3017,9 @@ main {
   }
 }
 
-/* Touch: every control is at least 44px, and text fields are 16px so iOS doesn't zoom in on focus. */
 @media (pointer: coarse) {
-  :is(
-    [data-slot="button"],
-    [data-slot="alert-dialog-trigger"],
-    [data-slot="alert-dialog-close"],
-    [data-slot="dialog-trigger"],
-    [data-slot="dialog-close"],
-    [data-slot="popover-trigger"]
-  ) {
-    --button-height: 2.75rem;
-
-    &[data-size="sm"] {
-      --button-height: 2.75rem;
-    }
-  }
-
-  [data-slot="input"] {
-    height: 2.75rem;
-    font-size: 1rem;
-  }
-
   .seat-header {
     height: auto;
-    min-height: 2.75rem;
+    min-height: var(--control-height-lg);
   }
 }
