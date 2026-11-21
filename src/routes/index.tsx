@@ -34,7 +34,7 @@ const HERO_CARDS: Card[] = [
   { id: 5, kind: "number", value: 12 },
 ];
 
-const HERO_FACTS = ["2–12 players", "No accounts", "Free to play"];
+const HERO_FACTS = ["2–16 players", "No accounts", "Free to play"];
 
 const HOME_TITLE = `${SITE_NAME} · A push-your-luck card game`;
 
@@ -46,7 +46,7 @@ const GAME_STRUCTURED_DATA = JSON.stringify({
   gamePlatform: "Web browser",
   genre: ["Card game", "Party game"],
   name: SITE_NAME,
-  numberOfPlayers: { "@type": "QuantitativeValue", maxValue: 12, minValue: 2 },
+  numberOfPlayers: { "@type": "QuantitativeValue", maxValue: 16, minValue: 2 },
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   operatingSystem: "Any",
   playMode: "MultiPlayer",

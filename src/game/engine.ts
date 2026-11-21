@@ -22,7 +22,7 @@ import { MIN_PLAYERS, rejectMove, waitingOn } from "./moves";
 import type { Move } from "./moves";
 
 export const TARGET_SCORE = 200;
-export const MAX_PLAYERS = 12;
+export const MAX_PLAYERS = 16;
 
 export { FLIP_THREE_COUNT } from "./action-card-resolution";
 

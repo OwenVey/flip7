@@ -6,7 +6,7 @@ export const SITE_NAME = "Hot Streak";
 export const SITE_ORIGIN = "https://hotstreak.owenvey.com";
 
 export const SITE_DESCRIPTION =
-  "A multiplayer push-your-luck card game for 2 to 12 players. Hit or Stay, dodge duplicates, and flip 7 for a bonus. Share a room code and play in your browser, no accounts.";
+  "A multiplayer push-your-luck card game for 2 to 16 players. Hit or Stay, dodge duplicates, and flip 7 for a bonus. Share a room code and play in your browser, no accounts.";
 
 const OG_IMAGE = {
   alt: "Hot Streak wordmark beside a fan of playing cards on green felt",

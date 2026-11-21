@@ -5,7 +5,7 @@ import { roundStarted } from "../game/protocol";
 import type { PlayerView, RoomView } from "../game/protocol";
 
 /** Beyond this many cards in one update, show the result without dealing it out. */
-export const MAX_DEALT_CARDS = 16;
+export const MAX_DEALT_CARDS = 20;
 
 export type DealSpot =
   | { kind: "hand"; playerId: string }
