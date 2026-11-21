@@ -100,13 +100,15 @@ export default function Home() {
     setPending("join");
 
     try {
-      if (await roomExists(normalized)) {
-        navigate(paths.room(normalized));
-      } else {
+      const exists = await roomExists(normalized).catch(() => null);
+
+      if (exists === false) {
         setCodeError("Room not found. Check the code and try again.");
+
+        return;
       }
-    } catch {
-      setCodeError("Couldn't check that room. Try again.");
+
+      navigate(paths.room(normalized));
     } finally {
       setPending(null);
     }

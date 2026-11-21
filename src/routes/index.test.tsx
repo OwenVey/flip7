@@ -106,6 +106,24 @@ describe(Home, () => {
     expect(code).toBeValid();
   });
 
+  it("opens the room page when the room check fails", async () => {
+    configureServerFunctionsClient({
+      fetch: () => new Response(null, { status: 503 }),
+    });
+    const history = renderHome();
+    const code = screen.getByRole("textbox", { name: "Room code" });
+
+    fireEvent.input(code, { target: { value: "abcde" } });
+    flush();
+    screen.getByRole("button", { name: "Join room" }).click();
+    await waitFor(() => {
+      expect(code).not.toHaveAccessibleDescription(
+        "Couldn't check that room. Try again."
+      );
+      expect(history.get()).toBe("/room/ABCDE");
+    });
+  });
+
   it("prevents another room creation while the first is pending", async () => {
     const history = renderHome();
     const reply = Promise.withResolvers<Response>();
