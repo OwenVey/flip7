@@ -1,6 +1,9 @@
 pre-commit:
   jobs:
     - run: pnpm exec ultracite fix {staged_files}
+      exclude:
+        - ".agents/*"
+        - ".agents/**/*"
       glob:
         - "*.js"
         - "*.jsx"

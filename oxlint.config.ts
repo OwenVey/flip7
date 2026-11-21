@@ -11,7 +11,13 @@ const jsPlugins = selectJsPlugins(["react-doctor"]);
 export default defineConfig({
   env: core.env,
   extends: [core, solid, vitest, jsPlugins, landmines, antiSlop],
-  ignorePatterns: ["**/*.gen.*", "dist", "file-routes.d.ts"],
+  ignorePatterns: [
+    "/.agents/",
+    "/.claude/skills/",
+    "**/*.gen.*",
+    "dist",
+    "file-routes.d.ts",
+  ],
   jsPlugins: ["eslint-plugin-solid"],
   settings: jsPluginSettings,
   options: { typeAware: true, typeCheck: true },
