@@ -224,13 +224,50 @@ p {
   box-shadow: var(--shadow-print), var(--shadow-table);
 }
 
+/* Panel titles are ribbons: the gold rule closes around a notched tail at each end. */
 .panel > h2,
 .panel-title {
+  --tail: 0.75rem;
+  --edge: 1px;
+  /*
+   * Where the fill's notch line sits so the slanted rule is as thick as the flat one,
+   * worked out for a one-line title (about 1.85rem tall): at the point of the notch, and at the
+   * corners, which also slide along the slant by the rule's depth.
+   */
+  --inset-x: calc(var(--edge) * 1.29);
+  --inset-corner: calc(var(--edge) * 2.1);
+
+  position: relative;
+  isolation: isolate;
   justify-self: stretch;
-  padding: 0.375rem 0.5rem;
-  border-block: 1px solid var(--rule);
-  background: var(--paper-deep);
+  padding: 0.375rem calc(var(--tail) + 0.5rem);
+  background: var(--rule);
   color: var(--accent);
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    calc(100% - var(--tail)) 50%,
+    100% 100%,
+    0 100%,
+    var(--tail) 50%
+  );
+
+  /* The paper fill, set in from the rule so the rule shows as the outline. */
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--paper-deep);
+    clip-path: polygon(
+      var(--inset-corner) var(--edge),
+      calc(100% - var(--inset-corner)) var(--edge),
+      calc(100% - var(--tail) - var(--inset-x)) 50%,
+      calc(100% - var(--inset-corner)) calc(100% - var(--edge)),
+      var(--inset-corner) calc(100% - var(--edge)),
+      calc(var(--tail) + var(--inset-x)) 50%
+    );
+  }
 }
 
 .panel > h2,
