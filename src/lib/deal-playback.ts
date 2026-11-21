@@ -1,7 +1,8 @@
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 
 import type { RoomView } from "../game/protocol";
-import { dealFrame, leavesTable, planDeal, startsNewRound } from "./deal-plan";
+import { roundStarted } from "../game/protocol";
+import { dealFrame, leavesTable, planDeal } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
 import { discardCards, flyCard, riffleDeck, sweepCards } from "./fly-card";
 import { motionAllowed } from "./motion";
@@ -127,7 +128,7 @@ const sweepLastRound = async (
   current: RoomView,
   deck: Element
 ) => {
-  if (previous.phase === "lobby" || !startsNewRound(previous, current)) {
+  if (previous.phase === "lobby" || !roundStarted(previous, current)) {
     return;
   }
 

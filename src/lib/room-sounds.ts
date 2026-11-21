@@ -5,6 +5,7 @@ import { createSignal, onSettled } from "solid-js";
 
 import type { GameCue, LogEntry } from "../game/engine";
 import { waitingOn } from "../game/moves";
+import { roundStarted } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 
 const GAME_CUE_PRIORITY = [
@@ -45,10 +46,6 @@ const waitingOnId = (room: RoomView) => waitingOn(room)?.playerId ?? null;
 
 const isChatFromOthers = (entry: LogEntry, playerId: string) =>
   entry.from !== undefined && entry.from.id !== playerId;
-
-export const roundStarted = (previous: RoomView, current: RoomView) =>
-  current.phase !== "lobby" &&
-  (previous.phase === "lobby" || current.round !== previous.round);
 
 const tableCue = (
   previous: RoomView,

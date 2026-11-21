@@ -1,6 +1,7 @@
 import { isActionCard } from "../game/cards";
 import type { Card } from "../game/cards";
 import type { DrawEvent, HeldCard } from "../game/engine";
+import { roundStarted } from "../game/protocol";
 import type { PlayerView, RoomView } from "../game/protocol";
 
 /** Beyond this many cards in one update, show the result without dealing it out. */
@@ -34,9 +35,6 @@ interface Table {
   hands: Map<string, Card[]>;
   held: HeldCard[];
 }
-
-export const startsNewRound = (previous: RoomView, current: RoomView) =>
-  previous.phase === "lobby" || previous.round !== current.round;
 
 const locate = (room: RoomView, cardId: number) => {
   if (room.choice?.card.id === cardId) {
@@ -231,7 +229,7 @@ export const planDeal = (previous: RoomView, current: RoomView) => {
     return [];
   }
 
-  const newRound = startsNewRound(previous, current);
+  const newRound = roundStarted(previous, current);
 
   const table: Table = {
     hands: new Map(
@@ -339,7 +337,7 @@ export const dealFrame = (
   steps: DealStep[],
   shown: number
 ) => {
-  const newRound = startsNewRound(previous, current);
+  const newRound = roundStarted(previous, current);
   const before = new Map(previous.players.map((seat) => [seat.id, seat]));
   const remaining = steps.slice(shown);
   const waiting = new Set(remaining.map(stepPlayerId));
