@@ -1,7 +1,7 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
 import solid from "@solidjs/vite-plugin";
 import { fileRoutes } from "filesystem-routing/vite";
-import fontaine from "fontaine/postcss";
+import { FontaineTransform } from "fontaine";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -15,12 +15,8 @@ export default defineConfig({
       diagnostics: true,
     }),
     fileRoutes({ types: true }),
+    FontaineTransform.vite({ fallbacks: {} }),
   ],
-  css: {
-    postcss: {
-      plugins: [fontaine({ fallbacks: {} })],
-    },
-  },
   optimizeDeps: {
     exclude: ["@ui-sdk/core"],
   },
