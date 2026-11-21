@@ -413,7 +413,7 @@ p {
   &[data-variant="quiet"] {
     color: var(--ink-soft);
 
-    &:hover:not([data-disabled]) {
+    &:hover:not([data-disabled], [aria-disabled="true"]) {
       color: var(--ink);
     }
   }
@@ -423,9 +423,14 @@ p {
     background: var(--danger);
     color: var(--paper);
 
-    &:hover:not([data-disabled]) {
+    &:hover:not([data-disabled], [aria-disabled="true"]) {
       background: color-mix(in srgb, var(--danger) 85%, black);
     }
+  }
+
+  &[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   &:where([data-size="sm"]) {
@@ -529,6 +534,117 @@ p {
     [data-ending-style]
   )::backdrop {
   opacity: 0;
+}
+
+/* Enters with a fade, a zoom from 95% and a short slide away from the trigger; leaves with the fade and zoom only. */
+[data-slot="tooltip-content"] {
+  --tooltip-shift: 0.5rem;
+  --tooltip-arrow: 0.625rem;
+
+  max-inline-size: min(16rem, calc(100vw - 2rem));
+  padding: 0.3125rem 0.625rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 0.5rem;
+  overflow: visible;
+  background: var(--paper);
+  color: var(--ink);
+  filter: drop-shadow(1px 1px 0 var(--ink));
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.35;
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity 150ms ease-out,
+    scale 150ms ease-out,
+    translate 150ms ease-out;
+
+  /* The arrow: a rotated square with the border on the two sides facing the trigger, centered on the trigger when there's room. */
+  &::before {
+    position: absolute;
+    inline-size: var(--tooltip-arrow);
+    block-size: var(--tooltip-arrow);
+    border: 0 solid var(--ink);
+    background: var(--paper);
+    content: "";
+    rotate: 45deg;
+  }
+
+  &:is([data-side="top"], [data-side="bottom"])::before {
+    left: var(--arrow-offset, 50%);
+    translate: -50% -50%;
+  }
+
+  &:is([data-side="left"], [data-side="right"])::before {
+    top: var(--arrow-offset, 50%);
+    translate: -50% -50%;
+  }
+
+  &[data-side="top"]::before {
+    top: calc(100% + 0.75px);
+    border-right-width: 1.5px;
+    border-bottom-width: 1.5px;
+  }
+
+  &[data-side="bottom"]::before {
+    top: -0.75px;
+    border-top-width: 1.5px;
+    border-left-width: 1.5px;
+  }
+
+  &[data-side="left"]::before {
+    left: calc(100% + 0.75px);
+    border-top-width: 1.5px;
+    border-right-width: 1.5px;
+  }
+
+  &[data-side="right"]::before {
+    left: -0.75px;
+    border-bottom-width: 1.5px;
+    border-left-width: 1.5px;
+  }
+
+  &[data-starting-style] {
+    opacity: 0;
+    scale: 0.95;
+  }
+
+  &[data-starting-style][data-side="top"] {
+    translate: 0 var(--tooltip-shift);
+  }
+
+  &[data-starting-style][data-side="bottom"] {
+    translate: 0 calc(var(--tooltip-shift) * -1);
+  }
+
+  &[data-starting-style][data-side="left"] {
+    translate: var(--tooltip-shift) 0;
+  }
+
+  &[data-starting-style][data-side="right"] {
+    translate: calc(var(--tooltip-shift) * -1) 0;
+  }
+
+  &[data-ending-style] {
+    opacity: 0;
+    scale: 0.95;
+    transition-timing-function: ease-in;
+  }
+
+  &[data-instant] {
+    transition: none;
+  }
+
+  /* Repeats a button's own label, so it only shows once the label is hidden. */
+  &[data-compact-only] {
+    visibility: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:is([data-starting-style], [data-ending-style]) {
+      scale: none;
+      translate: none;
+    }
+  }
 }
 
 /*
@@ -992,6 +1108,30 @@ main {
 
 .roster-name {
   font-weight: 700;
+}
+
+/* A bot's avatar, in front of its name. */
+.bot-avatar {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* The dealer button: a gold poker-style disc at the end of the dealer's seat header. */
+.dealer-chip {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 1.5px 1.5px 0 var(--ink);
+  color: var(--ink);
 }
 
 .table {
@@ -1722,9 +1862,16 @@ main {
   }
 
   & .badge,
-  & .dealer-chip {
+  & .bot-avatar {
     flex: none;
   }
+}
+
+.seat-end {
+  display: flex;
+  flex: none;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .seat-meta {
@@ -1748,21 +1895,6 @@ main {
     overflow: hidden;
     text-overflow: ellipsis;
   }
-}
-
-/* The dealer button: a small poker-style disc beside the dealer's name. */
-.dealer-chip {
-  display: grid;
-  place-items: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  border: 1.5px solid var(--ink);
-  border-radius: 50%;
-  background: var(--paper-deep);
-  color: var(--ink);
-  font-size: 0.6875rem;
-  font-weight: 800;
-  line-height: 1;
 }
 
 .flip-run {
@@ -2575,7 +2707,8 @@ main {
   text-align: center;
 }
 
-.start-game {
+.start-game,
+.add-bot {
   display: grid;
 }
 
@@ -2986,6 +3119,11 @@ main {
  * only once a round is scored.
  */
 @media (max-width: 40rem), (max-height: 30rem) {
+  :is(.page-header, .table-header, .seat-header)
+    [data-slot="tooltip-content"][data-compact-only] {
+    visibility: visible;
+  }
+
   .label-long {
     display: none;
   }

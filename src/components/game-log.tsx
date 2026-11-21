@@ -14,6 +14,7 @@ import {
 
 import { CHAT_MAX_LENGTH } from "../game/engine";
 import type { LogEntry } from "../game/engine";
+import Tooltip from "./tooltip";
 
 export const CHAT_AND_GAME_LOG_TITLE = "Chat and game log";
 
@@ -96,12 +97,18 @@ const LogTime = (props: {
   });
 
   return (
-    <time
-      datetime={new Date(props.at).toISOString()}
-      title={clockTime.format(props.at)}
+    <Tooltip
+      content={clockTime.format(props.at)}
+      trigger={(hint) => (
+        <time
+          {...hint}
+          aria-label={label()}
+          datetime={new Date(props.at).toISOString()}
+        />
+      )}
     >
       {label()}
-    </time>
+    </Tooltip>
   );
 };
 
@@ -140,15 +147,22 @@ const ChatForm = (props: { onSend: (text: string) => boolean }) => {
         autocomplete="off"
         enterkeyhint="send"
       />
-      <Button
-        type="submit"
-        aria-label="Send"
-        data-size="sm"
-        data-variant="solid"
-        data-icon=""
+      <Tooltip
+        content="Send"
+        type="label"
+        trigger={(hint) => (
+          <Button
+            {...hint}
+            type="submit"
+            aria-label="Send"
+            data-size="sm"
+            data-variant="solid"
+            data-icon=""
+          />
+        )}
       >
         <Send size={16} aria-hidden="true" />
-      </Button>
+      </Tooltip>
     </form>
   );
 };

@@ -1,8 +1,10 @@
 import ArrowLeft from "@lucide/solid/icons/arrow-left";
 import ArrowRight from "@lucide/solid/icons/arrow-right";
-import Coins from "@lucide/solid/icons/coins";
+import BotIcon from "@lucide/solid/icons/bot";
 import Flame from "@lucide/solid/icons/flame";
+import Hand from "@lucide/solid/icons/hand";
 import MessageCircle from "@lucide/solid/icons/message-circle";
+import PlayingCards from "@lucide/solid/icons/playing-cards";
 import PlayingCardsFan from "@lucide/solid/icons/playing-cards-fan";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import SquarePlus from "@lucide/solid/icons/square-plus";
@@ -39,12 +41,14 @@ import type { DealStep } from "../lib/deal-plan";
 import type { RoomConnection } from "../lib/room-connection";
 import { passDealerChip, pop, slideRows } from "../lib/table-motion";
 import type { ChipSpot } from "../lib/table-motion";
+import CardTooltips from "./card-tooltips";
 import GameLog, { CHAT_AND_GAME_LOG_TITLE } from "./game-log";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
 import PlayingCard from "./playing-card";
 import RemovePlayer from "./remove-player";
 import TableSheet from "./table-sheet";
+import Tooltip from "./tooltip";
 
 const STATUS_LABELS = {
   active: "Active",
@@ -255,6 +259,7 @@ const RoundPlayer = (
     { equals: sameProgress }
   );
 
+  const isDealer = () => props.room.dealerId === props.player.id;
   const isMe = () => props.player.id === props.playerId;
   const canKick = () => props.moves.host.kick.includes(props.player.id);
 
@@ -378,15 +383,18 @@ const RoundPlayer = (
       </Show>
       <header class="seat-header">
         <div class="seat-name">
+          <Show when={props.player.bot}>
+            <Tooltip
+              content="Bot"
+              type="label"
+              trigger={(hint) => <span {...hint} class="bot-avatar" />}
+            >
+              <BotIcon size={16} strokeWidth={2.25} aria-hidden="true" />
+            </Tooltip>
+          </Show>
           <strong>{props.player.name}</strong>
           <Show when={isMe()}>
             <span class="badge">You</span>
-          </Show>
-          <Show when={props.room.dealerId === props.player.id}>
-            <span class="dealer-chip" title="Dealer">
-              <span aria-hidden="true">D</span>
-              <span class="sr-only">Dealer</span>
-            </span>
           </Show>
           <Show when={!props.player.connected}>
             <span class="badge" data-tone="danger">
@@ -395,14 +403,28 @@ const RoundPlayer = (
             </span>
           </Show>
         </div>
-        <Show when={canKick()}>
-          <RemovePlayer
-            disabled={props.actionsDisabled}
-            name={props.player.name}
-            onRemove={() => {
-              void props.send({ playerId: props.player.id, type: "kick" });
-            }}
-          />
+        <Show when={isDealer() || canKick()}>
+          <div class="seat-end">
+            <Show when={isDealer()}>
+              <Tooltip
+                content="Dealer"
+                type="label"
+                trigger={(hint) => <span {...hint} class="dealer-chip" />}
+              >
+                <PlayingCards size={14} strokeWidth={2.25} aria-hidden="true" />
+              </Tooltip>
+            </Show>
+            <Show when={canKick()}>
+              <RemovePlayer
+                bot={props.player.bot}
+                disabled={props.actionsDisabled}
+                name={props.player.name}
+                onRemove={() => {
+                  void props.send({ playerId: props.player.id, type: "kick" });
+                }}
+              />
+            </Show>
+          </div>
         </Show>
       </header>
       <div class="seat-meta">
@@ -811,7 +833,7 @@ const OfflineTurn = (
               await props.send({ forId: props.playerId, type: "stay" })
             }
           >
-            <Coins size={16} />
+            <Hand size={16} />
             <FitLabel
               long={`Stay for ${name()} · ${bankedPoints()}`}
               short={`Stay for ${name()}`}
@@ -969,14 +991,10 @@ const ActionBar = (
               <Button
                 data-size="lg"
                 disabled={props.actionsDisabled}
-                aria-label={`Stay with ${myRound()} points`}
                 onClick={async () => await props.send({ type: "stay" })}
               >
-                <Coins size={16} />
-                <FitLabel
-                  long={`Stay with ${myRound()} points`}
-                  short={`Stay · ${myRound()}`}
-                />
+                <Hand size={16} />
+                Stay
               </Button>
             </Show>
           </div>
@@ -1070,102 +1088,104 @@ export default function Table(
   };
 
   return (
-    <div class="table" data-phase={props.room.phase}>
-      <header class="table-header">
-        <h1>Round {props.room.round}</h1>
-        <div class="row">
-          <Show when={props.room.phase === "playing"}>
+    <CardTooltips>
+      <div class="table" data-phase={props.room.phase}>
+        <header class="table-header">
+          <h1>Round {props.room.round}</h1>
+          <div class="row">
+            <Show when={props.room.phase === "playing"}>
+              <TableSheet
+                title={SCORES_TITLE}
+                triggerLabel={SCORES_TITLE}
+                trigger={<Trophy size={16} aria-hidden="true" />}
+              >
+                <Leaderboard room={props.room} playerId={props.playerId} />
+              </TableSheet>
+            </Show>
             <TableSheet
-              title={SCORES_TITLE}
-              triggerLabel={SCORES_TITLE}
-              trigger={<Trophy size={16} aria-hidden="true" />}
+              title={CHAT_AND_GAME_LOG_TITLE}
+              triggerLabel={toggleLabel()}
+              keepMounted
+              open={logOpen()}
+              onOpenChange={onLogOpenChange}
+              trigger={
+                <>
+                  <MessageCircle size={16} aria-hidden="true" />
+                  <Show when={unreadChats() > 0}>
+                    <span class="unread-count" aria-hidden="true">
+                      {unreadChats()}
+                    </span>
+                  </Show>
+                </>
+              }
             >
-              <Leaderboard room={props.room} playerId={props.playerId} />
+              <GameLog
+                inSheet
+                log={props.room.log}
+                playerId={props.playerId}
+                onChat={props.chat}
+              />
             </TableSheet>
-          </Show>
-          <TableSheet
-            title={CHAT_AND_GAME_LOG_TITLE}
-            triggerLabel={toggleLabel()}
-            keepMounted
-            open={logOpen()}
-            onOpenChange={onLogOpenChange}
-            trigger={
-              <>
-                <MessageCircle size={16} aria-hidden="true" />
-                <Show when={unreadChats() > 0}>
-                  <span class="unread-count" aria-hidden="true">
-                    {unreadChats()}
-                  </span>
-                </Show>
-              </>
-            }
-          >
+            <InviteButton />
+            <LeaveRoom
+              disabled={props.actionsDisabled}
+              onLeave={() => {
+                void props.send({ type: "leave" });
+              }}
+            />
+          </div>
+        </header>
+
+        <ActionBar
+          room={props.room}
+          playerId={props.playerId}
+          send={props.send}
+          actionsDisabled={props.actionsDisabled}
+          dealing={props.dealing}
+          dealStep={props.dealStep}
+          moves={moves()}
+        />
+
+        <div class="table-body">
+          <div class="seats">
+            <For each={props.room.players} keyed={(player) => player.id}>
+              {(player) => (
+                <RoundPlayer
+                  player={player()}
+                  room={props.room}
+                  playerId={props.playerId}
+                  send={props.send}
+                  actionsDisabled={props.actionsDisabled}
+                  incomingCardId={props.incomingCardId}
+                  dealStep={props.dealStep}
+                  moves={moves()}
+                  onChoose={chooseTarget}
+                />
+              )}
+            </For>
+          </div>
+
+          <div class="stack table-sidebar">
+            <section
+              class="panel leaderboard-panel"
+              aria-labelledby="leaderboard-title"
+            >
+              <h2 id="leaderboard-title">{SCORES_TITLE}</h2>
+              <Leaderboard room={props.room} playerId={props.playerId} />
+            </section>
             <GameLog
-              inSheet
               log={props.room.log}
               playerId={props.playerId}
               onChat={props.chat}
             />
-          </TableSheet>
-          <InviteButton />
-          <LeaveRoom
-            disabled={props.actionsDisabled}
-            onLeave={() => {
-              void props.send({ type: "leave" });
-            }}
-          />
+          </div>
         </div>
-      </header>
-
-      <ActionBar
-        room={props.room}
-        playerId={props.playerId}
-        send={props.send}
-        actionsDisabled={props.actionsDisabled}
-        dealing={props.dealing}
-        dealStep={props.dealStep}
-        moves={moves()}
-      />
-
-      <div class="table-body">
-        <div class="seats">
-          <For each={props.room.players} keyed={(player) => player.id}>
-            {(player) => (
-              <RoundPlayer
-                player={player()}
-                room={props.room}
-                playerId={props.playerId}
-                send={props.send}
-                actionsDisabled={props.actionsDisabled}
-                incomingCardId={props.incomingCardId}
-                dealStep={props.dealStep}
-                moves={moves()}
-                onChoose={chooseTarget}
-              />
-            )}
-          </For>
-        </div>
-
-        <div class="stack table-sidebar">
-          <section
-            class="panel leaderboard-panel"
-            aria-labelledby="leaderboard-title"
-          >
-            <h2 id="leaderboard-title">{SCORES_TITLE}</h2>
-            <Leaderboard room={props.room} playerId={props.playerId} />
-          </section>
-          <GameLog
-            log={props.room.log}
-            playerId={props.playerId}
-            onChat={props.chat}
-          />
-        </div>
+        <div class="flight-layer" data-flight-layer="" aria-hidden="true" />
+        <div class="flight-layer" data-chip-layer="" aria-hidden="true" />
+        <Show when={props.room.phase === "gameOver"}>
+          <Confetti />
+        </Show>
       </div>
-      <div class="flight-layer" data-flight-layer="" aria-hidden="true" />
-      <div class="flight-layer" data-chip-layer="" aria-hidden="true" />
-      <Show when={props.room.phase === "gameOver"}>
-        <Confetti />
-      </Show>
-    </div>
+    </CardTooltips>
   );
 }
