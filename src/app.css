@@ -49,10 +49,14 @@
   --heat-11: #759bc5;
   --heat-12: #8f7f6d;
 
-  --font-display: "Bungee", ui-sans-serif, system-ui, sans-serif;
+  --font-display:
+    "Bungee", "Bungee fallback", ui-sans-serif, system-ui, sans-serif;
   --font-numeral:
-    "Big Shoulders Display Variable", "Bungee", ui-sans-serif, sans-serif;
-  --font-body: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+    "Big Shoulders Display Variable", "Big Shoulders Display Variable fallback",
+    "Bungee", ui-sans-serif, sans-serif;
+  --font-body:
+    "Inter Variable", "Inter Variable fallback", ui-sans-serif, system-ui,
+    sans-serif;
 
   --ui-background: var(--paper);
   --ui-foreground: var(--ink);
