@@ -41,7 +41,12 @@ const ActionIcon = (props: { kind: Card["kind"] }) => (
   </Switch>
 );
 
-export default function PlayingCard(props: { card: Card; bust?: boolean }) {
+export default function PlayingCard(props: {
+  card: Card;
+  bust?: boolean;
+  /** The card a bust card duplicates. */
+  dupe?: boolean;
+}) {
   return (
     <li
       class="card"
@@ -50,6 +55,7 @@ export default function PlayingCard(props: { card: Card; bust?: boolean }) {
       data-number={props.card.kind === "number" ? props.card.value : undefined}
       data-score-modifier={isScoreModifierCard(props.card) ? "" : undefined}
       data-bust={props.bust === true ? "" : undefined}
+      data-dupe={props.dupe === true ? "" : undefined}
       aria-label={cardName(props.card, props.bust === true)}
       title={CARD_HINTS[props.card.kind] || undefined}
     >

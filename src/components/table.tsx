@@ -8,9 +8,18 @@ import SquarePlus from "@lucide/solid/icons/square-plus";
 import WifiOff from "@lucide/solid/icons/wifi-off";
 import { Button } from "@ui-sdk/solid/button";
 import { Meter, MeterIndicator, MeterTrack } from "@ui-sdk/solid/meter";
-import { createMemo, For, Match, Repeat, Show, Switch } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  For,
+  Match,
+  Repeat,
+  Show,
+  Switch,
+} from "solid-js";
 
 import { cardLabel, calculateRoundScore } from "../game/cards";
+import type { Card } from "../game/cards";
 import {
   blockingPlayerId,
   canStay,
@@ -22,6 +31,8 @@ import type { PlayerView, RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
 import type { RoomConnection } from "../lib/room-connection";
+import { passDealerChip, pop, slideRows } from "../lib/table-motion";
+import type { ChipSpot } from "../lib/table-motion";
 import GameLog from "./game-log";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
@@ -194,6 +205,16 @@ const RoundPlayer = (
     equals: (a, b) => a?.id === b?.id,
   });
 
+  const isDupe = (card: Card) => {
+    const bust = bustCard();
+
+    return (
+      bust?.kind === "number" &&
+      card.kind === "number" &&
+      card.value === bust.value
+    );
+  };
+
   const flip = createMemo(
     () => flipProgress(props.room, props.dealStep, props.player.id),
     { equals: sameProgress }
@@ -237,6 +258,13 @@ const RoundPlayer = (
   const projectedScore = () => baseScore() + roundPoints();
 
   const shownBaseScore = createCountUp(baseScore);
+  let bankedLabel: HTMLSpanElement | undefined;
+
+  createEffect(baseScore, (score, previous) => {
+    if (previous !== undefined && score > previous) {
+      pop(bankedLabel, 1.35);
+    }
+  });
 
   const lostPoints = () =>
     props.room.phase === "playing" && props.player.status === "busted"
@@ -361,7 +389,7 @@ const RoundPlayer = (
       </div>
       <ul class="hand" aria-label={`${props.player.name}'s cards`}>
         <For each={numberCards()} keyed={(card) => card.id}>
-          {(card) => <PlayingCard card={card()} />}
+          {(card) => <PlayingCard card={card()} dupe={isDupe(card())} />}
         </For>
         <Show when={bustCard()}>
           {(card) => <PlayingCard card={card()} bust />}
@@ -413,7 +441,13 @@ const RoundPlayer = (
         }
       >
         <div class="seat-scores" aria-hidden="true">
-          <span class="seat-score" data-banked="">
+          <span
+            class="seat-score"
+            data-banked=""
+            ref={(element) => {
+              bankedLabel = element;
+            }}
+          >
             {shownBaseScore()}
           </span>
           <Show when={roundPoints() > 0}>
@@ -465,6 +499,12 @@ const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => (
   </>
 );
 
+const CountUp = (props: { value: number }) => {
+  const shown = createCountUp(() => props.value);
+
+  return <>{shown()}</>;
+};
+
 const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
   const ranked = createMemo(() => {
     const players = props.room.players.toSorted((a, b) => b.score - a.score);
@@ -475,12 +515,25 @@ const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
         rank = index + 1;
       }
 
-      return { player, rank };
+      return { index, player, rank };
     });
   });
 
   const roundScored = () =>
     props.room.phase === "roundOver" || props.room.phase === "gameOver";
+
+  let body: HTMLTableSectionElement | undefined;
+  let rowTops = new Map<string, number>();
+
+  createEffect(
+    () =>
+      ranked()
+        .map((entry) => entry.player.id)
+        .join(","),
+    () => {
+      rowTops = slideRows(body, rowTops);
+    }
+  );
 
   return (
     <section class="panel">
@@ -496,10 +549,15 @@ const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
             <th scope="col">Total</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody
+          ref={(element) => {
+            body = element;
+          }}
+        >
           <For each={ranked()} keyed={(entry) => entry.player.id}>
             {(entry) => (
               <tr
+                data-key={entry().player.id}
                 data-winner={
                   props.room.winnerIds.includes(entry().player.id)
                     ? ""
@@ -515,9 +573,16 @@ const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
                   </Show>
                 </th>
                 <Show when={roundScored()}>
-                  <td class="muted">+{entry().player.lastRound?.total ?? 0}</td>
+                  <td
+                    class="muted leaderboard-round"
+                    style={{ "--row": entry().index }}
+                  >
+                    +{entry().player.lastRound?.total ?? 0}
+                  </td>
                 </Show>
-                <td class="leaderboard-total">{entry().player.score}</td>
+                <td class="leaderboard-total">
+                  <CountUp value={entry().player.score} />
+                </td>
               </tr>
             )}
           </For>
@@ -547,19 +612,83 @@ const discardLabel = (step: DealStep, isMe: boolean, name: string) => {
   return `${cardLabel(step.card)} is discarded`;
 };
 
-const Deck = (props: { count: number }) => (
-  <div class="deck" data-deck="">
-    <span
-      class="card-back"
-      data-empty={props.count === 0 ? "" : undefined}
-      aria-hidden="true"
-    >
-      <Flame />
-    </span>
-    <span class="deck-count">
-      {props.count}
-      <span class="sr-only"> cards left in the deck</span>
-    </span>
+const LOW_DECK = 15;
+const CONFETTI_PIECES = 56;
+
+const CONFETTI_COLORS = [
+  "var(--gold)",
+  "var(--accent)",
+  "var(--flip)",
+  "var(--good)",
+  "var(--danger)",
+  "var(--cool)",
+] as const;
+
+const GOLDEN_RATIO = 0.618034;
+
+const scatter = (index: number, salt: number) =>
+  ((index + 1) * (GOLDEN_RATIO + salt)) % 1;
+
+const deckStack = (count: number) => {
+  if (count === 0) {
+    return "empty";
+  }
+
+  return count <= LOW_DECK ? "low" : "full";
+};
+
+const Deck = (props: { count: number }) => {
+  let counter: HTMLSpanElement | undefined;
+
+  createEffect(
+    () => props.count,
+    (count, previous) => {
+      if (previous !== undefined && count !== previous) {
+        pop(counter);
+      }
+    }
+  );
+
+  return (
+    <div class="deck" data-deck="">
+      <span
+        class="card-back"
+        data-stack={deckStack(props.count)}
+        data-empty={props.count === 0 ? "" : undefined}
+        aria-hidden="true"
+      >
+        <Flame />
+      </span>
+      <span
+        class="deck-count"
+        ref={(element) => {
+          counter = element;
+        }}
+      >
+        {props.count}
+        <span class="sr-only"> cards left in the deck</span>
+      </span>
+    </div>
+  );
+};
+
+const Confetti = () => (
+  <div class="confetti" aria-hidden="true">
+    <Repeat count={CONFETTI_PIECES}>
+      {(index) => (
+        <span
+          class="confetti-piece"
+          style={{
+            "--color": CONFETTI_COLORS[index % CONFETTI_COLORS.length],
+            "--delay": `${Math.round(scatter(index, 0.11) * 600)}ms`,
+            "--drift": `${Math.round((scatter(index, 0.23) - 0.5) * 16)}rem`,
+            "--fall": `${Math.round(2200 + scatter(index, 0.37) * 1400)}ms`,
+            "--spin": `${Math.round((scatter(index, 0.41) - 0.5) * 1440)}deg`,
+            "--x": `${Math.round(scatter(index, 0) * 100)}%`,
+          }}
+        />
+      )}
+    </Repeat>
   </div>
 );
 
@@ -622,6 +751,7 @@ const ActionBar = (props: TableProps & DealProps) => {
   return (
     <section
       class="action-bar"
+      data-action-bar=""
       aria-label="Your move"
       data-turn={myTurn() ? "" : undefined}
     >
@@ -731,6 +861,15 @@ const ActionBar = (props: TableProps & DealProps) => {
 export default function Table(
   props: TableProps & DealProps & { chat: RoomConnection["chat"] }
 ) {
+  let chipSpot: ChipSpot | null = null;
+
+  createEffect(
+    () => props.room.dealerId,
+    (dealerId) => {
+      chipSpot = passDealerChip(dealerId, chipSpot);
+    }
+  );
+
   return (
     <div class="table">
       <header class="table-header">
@@ -782,6 +921,10 @@ export default function Table(
         </div>
       </div>
       <div class="flight-layer" data-flight-layer="" aria-hidden="true" />
+      <div class="flight-layer" data-chip-layer="" aria-hidden="true" />
+      <Show when={props.room.phase === "gameOver"}>
+        <Confetti />
+      </Show>
     </div>
   );
 }

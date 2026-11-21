@@ -118,14 +118,16 @@ export default function Lobby(props: {
                 </p>
               }
             >
-              <Button
-                disabled={props.actionsDisabled}
-                data-variant="solid"
-                onClick={async () => await props.send({ type: "start" })}
-              >
-                <Play size={16} />
-                Start game
-              </Button>
+              <div class="start-game">
+                <Button
+                  disabled={props.actionsDisabled}
+                  data-variant="solid"
+                  onClick={async () => await props.send({ type: "start" })}
+                >
+                  <Play size={16} />
+                  Start game
+                </Button>
+              </div>
             </Show>
           </Show>
         </section>

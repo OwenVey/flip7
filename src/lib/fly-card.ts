@@ -252,3 +252,47 @@ export const riffleDeck = (deck: Element) => {
     { duration: 480, easing: "ease-in-out" }
   );
 };
+
+const SWEEP_MS = 420;
+const SWEEP_SPREAD_MS = 360;
+const SWEEP_STEP_MS = 30;
+
+/**
+ * Gathers every card off the table toward the deck, one after another, so a
+ * new round reads as a fresh deal instead of hands vanishing at once.
+ */
+export const sweepCards = async (cards: Element[], toward: DOMRect) => {
+  if (cards.length === 0) {
+    return;
+  }
+
+  const step = Math.min(SWEEP_STEP_MS, SWEEP_SPREAD_MS / cards.length);
+  const end = centre(toward);
+
+  const animations = cards.map((card, index) => {
+    const start = centre(card.getBoundingClientRect());
+
+    return card.animate(
+      [
+        { opacity: 1, transform: "none" },
+        {
+          offset: 0.25,
+          opacity: 1,
+          transform: "translateY(-0.375rem) rotate(-4deg)",
+        },
+        {
+          opacity: 0,
+          transform: `translate(${end.x - start.x}px, ${end.y - start.y}px) rotate(-12deg) scale(0.5)`,
+        },
+      ],
+      {
+        delay: index * step,
+        duration: SWEEP_MS,
+        easing: "cubic-bezier(0.5, 0, 0.75, 0)",
+        fill: "forwards",
+      }
+    );
+  });
+
+  await settle(animations, SWEEP_MS + SWEEP_SPREAD_MS);
+};

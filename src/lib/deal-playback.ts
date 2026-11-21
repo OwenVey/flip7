@@ -1,9 +1,11 @@
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 
 import type { RoomView } from "../game/protocol";
-import { dealFrame, leavesTable, planDeal } from "./deal-plan";
+import { dealFrame, leavesTable, planDeal, startsNewRound } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
-import { discardCards, flyCard, riffleDeck } from "./fly-card";
+import { discardCards, flyCard, riffleDeck, sweepCards } from "./fly-card";
+import { motionAllowed } from "./motion";
+import { bump } from "./table-motion";
 
 const FLIGHT_MS = 460;
 const FLIP_FLIGHT_MS = 560;
@@ -26,10 +28,6 @@ const wait = async (ms: number) => {
   setTimeout(resolve, ms);
   await promise;
 };
-
-const motionAllowed = () =>
-  document.visibilityState === "visible" &&
-  !matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const cardAt = (cardId: number | null) =>
   cardId === null ? "" : ` [data-card-id="${cardId}"]`;
@@ -124,6 +122,21 @@ const discardAfterLanding = async (step: DealStep) => {
   await discardCards(cards.filter((card) => card !== null));
 };
 
+const sweepLastRound = async (
+  previous: RoomView,
+  current: RoomView,
+  deck: Element
+) => {
+  if (previous.phase === "lobby" || !startsNewRound(previous, current)) {
+    return;
+  }
+
+  await sweepCards(
+    [...document.querySelectorAll(".seat .card")],
+    deck.getBoundingClientRect()
+  );
+};
+
 /**
  * Plays room updates back as a dealer would: each new card leaves the deck
  * and flies into its place one at a time, and the rest of the update shows
@@ -190,6 +203,11 @@ export const createDealPlayback = (
     setIncoming(null);
     flush();
     hooks.onCardLanded?.(next);
+
+    if (next.from === "choice" && next.to.kind !== "choice") {
+      bump(document.querySelector(`[data-seat="${next.to.playerId}"]`));
+    }
+
     await discardAfterLanding(next);
     await wait(pauseAfter(next, hurry));
     await dealFrom(previous, current, steps, index + 1, run);
@@ -222,6 +240,11 @@ export const createDealPlayback = (
     if (steps.length > 0) {
       setDealing(true);
       hooks.onDealStart?.(previous, current);
+
+      if (deck && queue.length === 0) {
+        await sweepLastRound(previous, current, deck);
+      }
+
       await dealFrom(previous, current, steps, 0, run);
     }
 

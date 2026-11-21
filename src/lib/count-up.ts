@@ -1,10 +1,8 @@
 import { createEffect, createSignal, untrack } from "solid-js";
 
-const COUNT_MS = 600;
+import { motionAllowed } from "./motion";
 
-const motionAllowed = () =>
-  document.visibilityState === "visible" &&
-  globalThis.matchMedia?.("(prefers-reduced-motion: no-preference)").matches;
+const COUNT_MS = 600;
 
 const easeOut = (progress: number) => 1 - (1 - progress) ** 3;
 

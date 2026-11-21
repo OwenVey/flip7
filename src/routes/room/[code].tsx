@@ -28,6 +28,7 @@ import {
   roomCues,
   roundStarted,
 } from "../../lib/room-sounds";
+import { nudge } from "../../lib/table-motion";
 import { paths } from "../../router";
 
 const TURN_VIBRATION_MS = 200;
@@ -131,7 +132,13 @@ const Room = (props: { code: string }) => {
   };
 
   createEffect(myMove, (mine) => {
-    if (mine && "vibrate" in navigator) {
+    if (!mine) {
+      return;
+    }
+
+    nudge(document.querySelector("[data-action-bar]"));
+
+    if ("vibrate" in navigator) {
       navigator.vibrate(TURN_VIBRATION_MS);
     }
   });
