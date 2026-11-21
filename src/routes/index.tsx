@@ -7,7 +7,11 @@ import { Field, FieldError, FieldLabel } from "@ui-sdk/solid/field";
 import { OTPInput, OTPInputGroup, OTPInputSlot } from "@ui-sdk/solid/otp-input";
 import { createSignal, For, Repeat } from "solid-js";
 
-import PageMeta, { SITE_DESCRIPTION, SITE_NAME } from "../components/page-meta";
+import PageMeta, {
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_ORIGIN,
+} from "../components/page-meta";
 import PlayingCard from "../components/playing-card";
 import { ADDITIVE_MODIFIER_KIND } from "../game/cards";
 import type { Card } from "../game/cards";
@@ -37,6 +41,7 @@ const GAME_STRUCTURED_DATA = JSON.stringify({
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
   operatingSystem: "Any",
   playMode: "MultiPlayer",
+  url: `${SITE_ORIGIN}/`,
 });
 
 const CODE_CHARACTER_PATTERN = new RegExp(

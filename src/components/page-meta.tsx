@@ -1,8 +1,9 @@
 import { Link, Meta } from "@solidjs/meta";
-import { getRequestEvent, isServer } from "@solidjs/web";
 import { Show } from "solid-js";
 
 export const SITE_NAME = "Hot Streak";
+
+export const SITE_ORIGIN = "https://hotstreak.owenvey.com";
 
 export const SITE_DESCRIPTION =
   "A multiplayer push-your-luck card game for 2 to 12 players. Hit or Stay, dodge duplicates, and flip 7 for a bonus. Share a room code and play in your browser, no accounts.";
@@ -14,16 +15,6 @@ const OG_IMAGE = {
   type: "image/jpeg",
   width: "1200",
 } as const;
-
-const siteOrigin = () => {
-  if (isServer) {
-    const event = getRequestEvent();
-
-    return event ? new URL(event.request.url).origin : "";
-  }
-
-  return window.location.origin;
-};
 
 /**
  * Search and link-preview metadata for one page. Tags deduplicate by name, so
@@ -37,8 +28,7 @@ export default function PageMeta(props: {
   /** Keep the page out of search results (it still gets link previews). */
   noindex?: boolean;
 }) {
-  const origin = siteOrigin();
-  const url = () => `${origin}${props.path}`;
+  const url = () => `${SITE_ORIGIN}${props.path}`;
   const description = () => props.description ?? SITE_DESCRIPTION;
 
   return (
@@ -58,7 +48,7 @@ export default function PageMeta(props: {
       <Meta property="og:title" content={props.title} />
       <Meta property="og:description" content={description()} />
       <Meta property="og:url" content={url()} />
-      <Meta property="og:image" content={`${origin}${OG_IMAGE.path}`} />
+      <Meta property="og:image" content={`${SITE_ORIGIN}${OG_IMAGE.path}`} />
       <Meta property="og:image:type" content={OG_IMAGE.type} />
       <Meta property="og:image:width" content={OG_IMAGE.width} />
       <Meta property="og:image:height" content={OG_IMAGE.height} />
@@ -67,7 +57,7 @@ export default function PageMeta(props: {
       <Meta name="twitter:card" content="summary_large_image" />
       <Meta name="twitter:title" content={props.title} />
       <Meta name="twitter:description" content={description()} />
-      <Meta name="twitter:image" content={`${origin}${OG_IMAGE.path}`} />
+      <Meta name="twitter:image" content={`${SITE_ORIGIN}${OG_IMAGE.path}`} />
       <Meta name="twitter:image:alt" content={OG_IMAGE.alt} />
     </>
   );
