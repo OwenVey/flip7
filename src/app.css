@@ -157,9 +157,54 @@ p {
   color: var(--ink-soft);
 }
 
+/* The room code: five separate printed tiles that span the form, like the button below. */
+[data-slot="otp-input"]:has(.code-input) {
+  display: flex;
+  width: 100%;
+}
+
 .code-input {
-  font-weight: 700;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.625rem;
+  width: 100%;
+  max-width: 24rem;
   text-transform: uppercase;
+
+  & [data-slot="otp-input-slot"] {
+    width: auto;
+    height: auto;
+    aspect-ratio: 5 / 6;
+    margin: 0;
+    border: 1px solid var(--ink);
+    border-radius: var(--ui-radius);
+    background: #fffdf6;
+    box-shadow: 2px 2px 0 var(--ink);
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    line-height: 1;
+    transition:
+      transform 80ms ease,
+      box-shadow 80ms ease;
+
+    &[data-active] {
+      transform: translate(-1px, -1px);
+      box-shadow: 3px 3px 0 var(--ink);
+      outline-offset: 0;
+    }
+
+    &[data-fake-caret]:empty::after {
+      height: 0.9em;
+      width: 2px;
+    }
+  }
+}
+
+[data-slot="otp-input"]:has([aria-invalid="true"])
+  .code-input
+  [data-slot="otp-input-slot"] {
+  border-color: var(--danger);
+  box-shadow: 2px 2px 0 var(--danger);
 }
 
 .page-header {
