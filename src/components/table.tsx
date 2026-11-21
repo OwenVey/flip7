@@ -2,6 +2,7 @@ import ArrowLeft from "@lucide/solid/icons/arrow-left";
 import ArrowRight from "@lucide/solid/icons/arrow-right";
 import Coins from "@lucide/solid/icons/coins";
 import Flame from "@lucide/solid/icons/flame";
+import MessageCircle from "@lucide/solid/icons/message-circle";
 import PlayingCardsFan from "@lucide/solid/icons/playing-cards-fan";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import SquarePlus from "@lucide/solid/icons/square-plus";
@@ -11,11 +12,14 @@ import { Meter, MeterIndicator, MeterTrack } from "@ui-sdk/solid/meter";
 import {
   createEffect,
   createMemo,
+  createSignal,
+  flush,
   For,
   Match,
   Repeat,
   Show,
   Switch,
+  untrack,
 } from "solid-js";
 
 import { cardLabel, calculateRoundScore } from "../game/cards";
@@ -26,7 +30,12 @@ import {
   FLIP_SEVEN_STATUS,
   FLIP_THREE_COUNT,
 } from "../game/engine";
-import type { ActionCardChoice, HeldCard, RoundStatus } from "../game/engine";
+import type {
+  ActionCardChoice,
+  HeldCard,
+  LogEntry,
+  RoundStatus,
+} from "../game/engine";
 import type { PlayerView, RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
@@ -197,6 +206,50 @@ const choiceVerb = (choice: ActionCardChoice) => {
   return "Give Second Chance to";
 };
 
+const pickLabel = (
+  room: RoomView,
+  playerId: string,
+  choice: ActionCardChoice,
+  targetId: string
+) => {
+  const forOther = choice.chooserId !== playerId;
+  let target = nameOf(room, targetId);
+
+  if (targetId === playerId) {
+    target = "yourself";
+  } else if (forOther && targetId === choice.chooserId) {
+    target = "themselves";
+  }
+
+  const label = `${choiceVerb(choice)} ${target}`;
+
+  return forOther ? `${label} for ${nameOf(room, choice.chooserId)}` : label;
+};
+
+const chooseTarget = (
+  send: RoomConnection["send"],
+  playerId: string,
+  choice: ActionCardChoice,
+  targetId: string
+) => {
+  const { chooserId } = choice;
+
+  void send({
+    ...(chooserId !== playerId && { forId: chooserId }),
+    targetId,
+    type: "choose",
+  });
+};
+
+const FitLabel = (props: { long: string; short: string }) => (
+  <>
+    <span class="label-long">{props.long}</span>
+    <span class="label-short" aria-hidden="true">
+      {props.short}
+    </span>
+  </>
+);
+
 const RoundPlayer = (
   props: TableProps &
     Pick<DealProps, "incomingCardId" | "dealStep"> & {
@@ -246,23 +299,6 @@ const RoundPlayer = (
     const choice = choiceToMake(props.room, props.playerId);
 
     return choice?.options.includes(props.player.id) === true ? choice : null;
-  };
-
-  const pickLabel = (choice: ActionCardChoice) => {
-    const forOther = choice.chooserId !== props.playerId;
-    let target = props.player.name;
-
-    if (isMe()) {
-      target = "yourself";
-    } else if (forOther && props.player.id === choice.chooserId) {
-      target = "themselves";
-    }
-
-    const label = `${choiceVerb(choice)} ${target}`;
-
-    return forOther
-      ? `${label} for ${nameOf(props.room, choice.chooserId)}`
-      : label;
   };
 
   const roundResult = () =>
@@ -361,15 +397,19 @@ const RoundPlayer = (
             type="button"
             class="seat-pick"
             disabled={props.actionsDisabled}
-            aria-label={pickLabel(choice())}
+            aria-label={pickLabel(
+              props.room,
+              props.playerId,
+              choice(),
+              props.player.id
+            )}
             onClick={() => {
-              const { chooserId } = choice();
-
-              void props.send({
-                ...(chooserId !== props.playerId && { forId: chooserId }),
-                targetId: props.player.id,
-                type: "choose",
-              });
+              chooseTarget(
+                props.send,
+                props.playerId,
+                choice(),
+                props.player.id
+              );
             }}
           />
         )}
@@ -508,6 +548,34 @@ const RoundPlayer = (
   );
 };
 
+const countChatsAfter = (log: LogEntry[], playerId: string, seenId: number) =>
+  log.filter(
+    (entry) =>
+      entry.id > seenId &&
+      entry.from !== undefined &&
+      entry.from.id !== playerId
+  ).length;
+
+const targetButtonLabel = (room: RoomView, playerId: string, id: string) =>
+  id === playerId ? "You" : nameOf(room, id);
+
+const ChoiceButtons = (props: TableProps & { choice: ActionCardChoice }) => (
+  <div class="action-buttons" data-choice-buttons="">
+    <For each={props.choice.options}>
+      {(targetId) => (
+        <Button
+          disabled={props.actionsDisabled}
+          onClick={() => {
+            chooseTarget(props.send, props.playerId, props.choice, targetId);
+          }}
+        >
+          {targetButtonLabel(props.room, props.playerId, targetId)}
+        </Button>
+      )}
+    </For>
+  </div>
+);
+
 const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => (
   <>
     <ul class="dealt-action-card" data-choice-card="" aria-hidden="true">
@@ -529,9 +597,15 @@ const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => (
     >
       <Match when={props.choice.chooserId === props.playerId}>
         <p class="headline">
-          {choiceVerb(props.choice)}…{" "}
-          <span class="muted">· Pick a player below</span>
+          {choiceVerb(props.choice)}… <span class="muted">· Pick a player</span>
         </p>
+        <ChoiceButtons
+          choice={props.choice}
+          room={props.room}
+          playerId={props.playerId}
+          send={props.send}
+          actionsDisabled={props.actionsDisabled}
+        />
       </Match>
       <Match
         when={hostCanPlayFor(
@@ -547,6 +621,13 @@ const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => (
             played for them soon.
           </span>
         </p>
+        <ChoiceButtons
+          choice={props.choice}
+          room={props.room}
+          playerId={props.playerId}
+          send={props.send}
+          actionsDisabled={props.actionsDisabled}
+        />
       </Match>
     </Switch>
   </>
@@ -589,7 +670,7 @@ const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
   );
 
   return (
-    <section class="panel">
+    <section class="panel leaderboard-panel">
       <h2 id="leaderboard-title">Leaderboard</h2>
       <table class="leaderboard" aria-labelledby="leaderboard-title">
         <thead>
@@ -779,22 +860,27 @@ const OfflineTurn = (
         <Button
           disabled={props.actionsDisabled}
           data-variant="solid"
+          aria-label={`Hit for ${name()}`}
           onClick={async () =>
             await props.send({ forId: props.playerId, type: "hit" })
           }
         >
           <SquarePlus size={16} />
-          Hit for {name()}
+          <FitLabel long={`Hit for ${name()}`} short="Hit" />
         </Button>
         <Show when={canStayFor()}>
           <Button
             disabled={props.actionsDisabled}
+            aria-label={`Stay with ${points()} points`}
             onClick={async () =>
               await props.send({ forId: props.playerId, type: "stay" })
             }
           >
             <Coins size={16} />
-            Stay with {points()} points
+            <FitLabel
+              long={`Stay with ${points()} points`}
+              short={`Stay · ${points()}`}
+            />
           </Button>
         </Show>
       </div>
@@ -951,10 +1037,14 @@ const ActionBar = (props: TableProps & DealProps) => {
             <Show when={iCanStay()}>
               <Button
                 disabled={props.actionsDisabled}
+                aria-label={`Stay with ${myRound()} points`}
                 onClick={async () => await props.send({ type: "stay" })}
               >
                 <Coins size={16} />
-                Stay with {myRound()} points
+                <FitLabel
+                  long={`Stay with ${myRound()} points`}
+                  short={`Stay · ${myRound()}`}
+                />
               </Button>
             </Show>
           </div>
@@ -1000,11 +1090,87 @@ export default function Table(
     }
   );
 
+  const [logOpen, setLogOpen] = createSignal(false);
+  const latestLogId = () => props.room.log.at(-1)?.id ?? 0;
+  const [seenLogId, setSeenLogId] = createSignal(untrack(latestLogId));
+  let logToggle: HTMLButtonElement | undefined;
+
+  const unreadChats = () =>
+    logOpen()
+      ? 0
+      : countChatsAfter(props.room.log, props.playerId, seenLogId());
+
+  const toggleLabel = () => {
+    const unread = unreadChats();
+
+    return unread > 0
+      ? `Chat and game log, ${unread} new ${unread === 1 ? "message" : "messages"}`
+      : "Chat and game log";
+  };
+
+  const openLog = () => {
+    setSeenLogId(latestLogId());
+    setLogOpen(true);
+    flush();
+    document.querySelector<HTMLElement>("#game-log")?.focus();
+  };
+
+  const closeLog = () => {
+    setSeenLogId(latestLogId());
+    setLogOpen(false);
+    flush();
+    logToggle?.focus();
+  };
+
+  const closeOnEscape = (event: KeyboardEvent) => {
+    if (event.key === "Escape" && !event.defaultPrevented) {
+      event.preventDefault();
+      closeLog();
+    }
+  };
+
+  createEffect(logOpen, (open) => {
+    if (open) {
+      document.addEventListener("keydown", closeOnEscape);
+    }
+
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  });
+
   return (
-    <div class="table">
+    <div
+      class="table"
+      data-phase={props.room.phase}
+      data-log-open={logOpen() ? "" : undefined}
+    >
       <header class="table-header">
         <h1>Round {props.room.round}</h1>
         <div class="row">
+          <Button
+            ref={(element) => {
+              logToggle = element;
+            }}
+            data-log-toggle=""
+            aria-label={toggleLabel()}
+            aria-controls="game-log"
+            aria-expanded={logOpen() ? "true" : "false"}
+            onClick={() => {
+              if (logOpen()) {
+                closeLog();
+              } else {
+                openLog();
+              }
+            }}
+          >
+            <MessageCircle size={16} />
+            <Show when={unreadChats() > 0}>
+              <span class="unread-count" aria-hidden="true">
+                {unreadChats()}
+              </span>
+            </Show>
+          </Button>
           <InviteButton />
           <LeaveRoom
             disabled={props.actionsDisabled}
@@ -1047,9 +1213,19 @@ export default function Table(
             log={props.room.log}
             playerId={props.playerId}
             onChat={props.chat}
+            onClose={closeLog}
           />
         </div>
       </div>
+      <Show when={logOpen()}>
+        <button
+          type="button"
+          class="log-backdrop"
+          tabindex="-1"
+          aria-label="Close game log"
+          onClick={closeLog}
+        />
+      </Show>
       <div class="flight-layer" data-flight-layer="" aria-hidden="true" />
       <div class="flight-layer" data-chip-layer="" aria-hidden="true" />
       <Show when={props.room.phase === "gameOver"}>

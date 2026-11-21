@@ -16,8 +16,8 @@ export default function LeaveRoom(props: {
   return (
     <AlertDialog>
       <AlertDialogTrigger data-variant="destructive" disabled={props.disabled}>
-        <LogOut size={16} />
-        Leave room
+        <LogOut size={16} aria-hidden="true" />
+        <span class="button-label">Leave room</span>
       </AlertDialogTrigger>
       <AlertDialogBackdrop />
       <AlertDialogContent>

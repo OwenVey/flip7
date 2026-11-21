@@ -21,8 +21,9 @@ export default function RemovePlayer(props: {
         data-size="sm"
         disabled={props.disabled}
       >
-        <UserMinus size={14} />
-        Remove<span class="sr-only"> {props.name}</span>
+        <UserMinus size={14} aria-hidden="true" />
+        <span class="button-label">Remove</span>
+        <span class="sr-only"> {props.name}</span>
       </AlertDialogTrigger>
       <AlertDialogBackdrop />
       <AlertDialogContent>

@@ -1,3 +1,4 @@
+import ChevronDown from "@lucide/solid/icons/chevron-down";
 import Play from "@lucide/solid/icons/play";
 import { Button } from "@ui-sdk/solid/button";
 import { createMemo, For, Repeat, Show } from "solid-js";
@@ -132,8 +133,11 @@ export default function Lobby(props: {
           </Show>
         </section>
 
-        <section class="panel rules">
-          <h2>How to play</h2>
+        <details class="panel rules">
+          <summary>
+            <h2>How to play</h2>
+            <ChevronDown size={18} class="rules-chevron" aria-hidden="true" />
+          </summary>
           <ul>
             <li>
               On your turn, <strong>Hit</strong> to get dealt another card or{" "}
@@ -166,7 +170,7 @@ export default function Lobby(props: {
               more, the highest score wins. A tie for first plays on.
             </li>
           </ul>
-        </section>
+        </details>
       </div>
     </div>
   );

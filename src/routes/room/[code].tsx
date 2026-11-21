@@ -28,7 +28,7 @@ import {
   roomCues,
   roundStarted,
 } from "../../lib/room-sounds";
-import { nudge } from "../../lib/table-motion";
+import { nudge, revealSeat } from "../../lib/table-motion";
 import { paths } from "../../router";
 
 const TURN_VIBRATION_MS = 200;
@@ -137,6 +137,7 @@ const Room = (props: { code: string }) => {
     }
 
     nudge(document.querySelector("[data-action-bar]"));
+    revealSeat(document.querySelector(".seat[data-me]"));
 
     if ("vibrate" in navigator) {
       navigator.vibrate(TURN_VIBRATION_MS);

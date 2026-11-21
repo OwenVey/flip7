@@ -52,6 +52,14 @@ export const nudge = (element: Element | null) => {
   );
 };
 
+/** Brings your own seat into view, clear of the action bar, so you see your cards as you decide. */
+export const revealSeat = (element: Element | null) => {
+  element?.scrollIntoView({
+    behavior: motionAllowed() ? "smooth" : "auto",
+    block: "nearest",
+  });
+};
+
 /**
  * Slides each keyed child of `list` from where it sat last time to where it
  * sits now, so a reordered table shows who moved. Returns the new positions

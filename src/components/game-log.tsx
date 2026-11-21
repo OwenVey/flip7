@@ -1,4 +1,5 @@
 import ArrowDown from "@lucide/solid/icons/arrow-down";
+import X from "@lucide/solid/icons/x";
 import { createPolled } from "@solid-primitives/timer";
 import { Button } from "@ui-sdk/solid/button";
 import { Input } from "@ui-sdk/solid/input";
@@ -147,6 +148,7 @@ export default function GameLog(props: {
   log: LogEntry[];
   playerId: string;
   onChat: (text: string) => boolean;
+  onClose?: () => void;
 }) {
   const groups = createMemo(() => groupLogByRound(props.log));
   const latestId = createMemo(() => props.log.at(-1)?.id ?? 0);
@@ -202,7 +204,22 @@ export default function GameLog(props: {
   });
 
   return (
-    <section class="panel log" aria-labelledby="game-log-title">
+    <section
+      class="panel log"
+      id="game-log"
+      tabindex="-1"
+      aria-labelledby="game-log-title"
+    >
+      <Show when={props.onClose}>
+        {(close) => (
+          <div class="sheet-bar">
+            <Button data-variant="quiet" data-size="sm" onClick={close()}>
+              <X size={16} aria-hidden="true" />
+              Close
+            </Button>
+          </div>
+        )}
+      </Show>
       <h2 id="game-log-title">Game log</h2>
       <div class="log-body">
         <div
@@ -251,11 +268,9 @@ export default function GameLog(props: {
                             }
                           >
                             <span class="log-text">
-                              <Show when={entry().from}>
-                                {(from) => (
-                                  <strong class="log-author">
-                                    {from().name}
-                                  </strong>
+                              <Show when={entry().from?.name}>
+                                {(name) => (
+                                  <strong class="log-author">{name()}</strong>
                                 )}
                               </Show>
                               {entry().text}

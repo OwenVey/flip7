@@ -1,14 +1,23 @@
 import Check from "@lucide/solid/icons/check";
 import Link2 from "@lucide/solid/icons/link-2";
+import Share2 from "@lucide/solid/icons/share-2";
 import { writeClipboard } from "@solid-primitives/clipboard";
 import { createTimer } from "@solid-primitives/timer";
 import { Button } from "@ui-sdk/solid/button";
-import { createSignal } from "solid-js";
+import { createSignal, Match, onSettled, Switch } from "solid-js";
 
 const COPIED_RESET_MS = 2000;
 
+const canUseShareSheet = () =>
+  "share" in navigator && globalThis.matchMedia?.("(pointer: coarse)").matches;
+
 export default function InviteButton(props: { solid?: boolean }) {
   const [copied, setCopied] = createSignal(false);
+  const [shares, setShares] = createSignal(false);
+
+  onSettled(() => {
+    setShares(canUseShareSheet());
+  });
 
   createTimer(
     () => {
@@ -18,7 +27,30 @@ export default function InviteButton(props: { solid?: boolean }) {
     setTimeout
   );
 
-  const copyLink = async () => {
+  const label = () => {
+    if (copied()) {
+      return "Link copied";
+    }
+
+    return shares() ? "Share invite link" : "Copy invite link";
+  };
+
+  const invite = async () => {
+    if (shares()) {
+      try {
+        await navigator.share({
+          title: "Join my Hot Streak table",
+          url: location.href,
+        });
+
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+      }
+    }
+
     await writeClipboard(location.href);
     setCopied(true);
   };
@@ -26,10 +58,17 @@ export default function InviteButton(props: { solid?: boolean }) {
   return (
     <Button
       data-variant={props.solid === true ? "solid" : undefined}
-      onClick={copyLink}
+      onClick={invite}
     >
-      {copied() ? <Check size={16} /> : <Link2 size={16} />}
-      {copied() ? "Link copied" : "Copy invite link"}
+      <Switch fallback={<Link2 size={16} />}>
+        <Match when={copied()}>
+          <Check size={16} />
+        </Match>
+        <Match when={shares()}>
+          <Share2 size={16} />
+        </Match>
+      </Switch>
+      <span class="button-label">{label()}</span>
     </Button>
   );
 }

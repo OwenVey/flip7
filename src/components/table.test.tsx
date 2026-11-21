@@ -556,6 +556,66 @@ describe("<Table />", () => {
     ).toBeInTheDocument();
   });
 
+  it("the chooser can also pick a target from the action bar", () => {
+    const send = vi.fn<RoomConnection["send"]>();
+
+    render(() => (
+      <Table
+        room={room({
+          choice: {
+            card: { id: 9, kind: "freeze" },
+            chooserId: "a",
+            options: ["a", "b"],
+          },
+        })}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const bar = screen.getByRole("region", { name: "Your move" });
+    expect(within(bar).getByRole("button", { name: "You" })).toBeEnabled();
+    within(bar).getByRole("button", { name: "Ben" }).click();
+    flush();
+    expect(send).toHaveBeenCalledWith({ targetId: "b", type: "choose" });
+  });
+
+  it("counts new chat messages until the log is opened", () => {
+    const [view, setView] = createSignal(room());
+
+    render(() => (
+      <Table
+        room={view()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const toggle = screen.getByRole("button", { name: "Chat and game log" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    setView(
+      room({
+        log: [
+          { id: 1, text: "Round 1 begins. Ben deals." },
+          { from: { id: "b", name: "Ben" }, id: 2, text: "gl" },
+          { from: { id: "a", name: "Ana" }, id: 3, text: "you too" },
+        ],
+      })
+    );
+    flush();
+
+    expect(toggle).toHaveAccessibleName("Chat and game log, 1 new message");
+
+    toggle.click();
+    flush();
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveAccessibleName("Chat and game log");
+  });
+
   it("other players see whose turn it is, not the Hit button", () => {
     render(() => (
       <Table
