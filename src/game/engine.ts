@@ -9,6 +9,7 @@ import {
   startFlipThree,
 } from "./action-card-resolution";
 import type { ActionCardState, FlipDraw } from "./action-card-resolution";
+import { decideBotMove } from "./bot";
 import {
   buildDeck,
   FLIP_SEVEN_COUNT,
@@ -18,11 +19,12 @@ import {
   countUniqueNumberCards,
 } from "./cards";
 import type { ActionCard, Card, NumberCard, Random, RoundScore } from "./cards";
-import { MIN_PLAYERS, rejectMove, waitingOn } from "./moves";
+import { MAX_PLAYERS, MIN_PLAYERS, rejectMove, waitingOn } from "./moves";
 import type { Move } from "./moves";
 
 export const TARGET_SCORE = 200;
-export const MAX_PLAYERS = 16;
+
+export { MAX_PLAYERS } from "./moves";
 
 export { FLIP_THREE_COUNT } from "./action-card-resolution";
 
@@ -49,7 +51,10 @@ export interface Player {
   id: string;
   name: string;
   score: number;
+  /** Bots are always connected. */
   connected: boolean;
+  /** Set on players the room plays itself. Missing on rooms saved before bots. */
+  bot?: boolean;
   status: RoundStatus;
   hand: Card[];
   bustCard: Card | null;
@@ -633,6 +638,80 @@ export const addPlayer = (state: GameState, id: string, name: string) => {
   );
 };
 
+const BOT_NAMES = [
+  "Ember",
+  "Blaze",
+  "Cinder",
+  "Flare",
+  "Sparky",
+  "Ash",
+  "Torch",
+  "Kindle",
+  "Scorch",
+  "Fuse",
+  "Wick",
+  "Flint",
+  "Pyro",
+  "Smolder",
+  "Glow",
+  "Sizzle",
+] as const;
+
+const botName = (state: GameState, random: Random) => {
+  const taken = new Set(
+    state.players.map((player) => player.name.toLowerCase())
+  );
+
+  const free = BOT_NAMES.filter((name) => !taken.has(name.toLowerCase()));
+  const picked = free[Math.floor(random() * free.length)];
+
+  if (picked !== undefined) {
+    return picked;
+  }
+
+  let number = 1;
+
+  while (taken.has(`bot ${number}`)) {
+    number += 1;
+  }
+
+  return `Bot ${number}`;
+};
+
+/** The host seats a bot, which the room plays itself. */
+export const addBot = (
+  state: GameState,
+  hostId: string,
+  id: string,
+  random: Random
+) => {
+  assertMove(state, hostId, { type: "addBot" });
+
+  const name = botName(state, random);
+
+  state.players.push({
+    bot: true,
+    bustCard: null,
+    connected: true,
+    hand: [],
+    id,
+    lastRound: null,
+    name,
+    score: 0,
+    status: "out",
+  });
+  say(state, `The host added ${name}, a bot.`, "join");
+
+  return name;
+};
+
+/** Whether anyone in the room is a person rather than a bot. */
+export const hasHumans = (state: GameState) =>
+  state.players.some((player) => player.bot !== true);
+
+const isOnlineHuman = (player: Player) =>
+  player.connected && player.bot !== true;
+
 export const startGame = (
   state: GameState,
   playerId: string,
@@ -770,8 +849,8 @@ export const removePlayer = (
 
   if (state.hostId === playerId) {
     state.hostId =
-      state.players.find((other) => other.connected)?.id ??
-      state.players[0]?.id ??
+      state.players.find(isOnlineHuman)?.id ??
+      state.players.find((other) => other.bot !== true)?.id ??
       null;
   }
 
@@ -849,7 +928,7 @@ export const transferHost = (state: GameState) => {
     return false;
   }
 
-  const next = state.players.find((player) => player.connected);
+  const next = state.players.find(isOnlineHuman);
 
   if (!next || next.id === state.hostId) {
     return false;
@@ -909,6 +988,37 @@ export const playForAbsent = (state: GameState, random: Random) => {
     (banked) =>
       `${player.name} is offline, so the game stayed for them and banked ${banked}.`
   );
+
+  return true;
+};
+
+/** Makes the move a bot owes. Returns false when the game isn't waiting on a bot. */
+export const playForBot = (state: GameState, random: Random) => {
+  const waiting = waitingOn(state);
+
+  const player =
+    waiting === null ? undefined : findPlayer(state, waiting.playerId);
+
+  if (player?.bot !== true) {
+    return false;
+  }
+
+  const move = decideBotMove(
+    { choice: state.choice, players: state.players, targetScore: TARGET_SCORE },
+    player.id
+  );
+
+  if (!move) {
+    return false;
+  }
+
+  if (move.type === "choose") {
+    choose(state, player.id, move.targetId, random);
+  } else if (move.type === "hit") {
+    hit(state, player.id, random);
+  } else {
+    stay(state, player.id, random);
+  }
 
   return true;
 };

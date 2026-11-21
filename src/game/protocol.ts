@@ -89,6 +89,7 @@ export const toRoomView = (code: string, state: GameState) => {
     log: state.log,
     phase: state.phase,
     players: state.players.map((player) => ({
+      bot: player.bot === true,
       bustCard: player.bustCard,
       connected: player.connected,
       hand: player.hand,

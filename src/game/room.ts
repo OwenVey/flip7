@@ -1,6 +1,7 @@
 import type { Random } from "./cards";
 import type { GameCommand } from "./client-message";
 import {
+  addBot,
   addPlayer,
   backToLobby,
   chat,
@@ -8,6 +9,7 @@ import {
   createGame,
   findPlayer,
   GameError,
+  hasHumans,
   hit,
   kick,
   leave,
@@ -214,6 +216,8 @@ export const createRoom = (
     return outcome;
   };
 
+  const onlyBotsLeft = () => game.players.length > 0 && !hasHumans(game);
+
   const touch = () => {
     stored.lastActiveAt = deps.now();
   };
@@ -312,6 +316,12 @@ export const createRoom = (
 
       case "lobby": {
         backToLobby(game, playerId);
+
+        return none;
+      }
+
+      case "addBot": {
+        addBot(game, playerId, deps.newId(), random);
 
         return none;
       }
@@ -434,7 +444,8 @@ export const createRoom = (
           }
 
           return [BROADCAST, reply({ requestId, type: "accepted" }), ...closes];
-        }, requestId)
+        }, requestId),
+        onlyBotsLeft()
       );
     },
 
@@ -474,7 +485,7 @@ export const createRoom = (
       let changed = false;
 
       for (const player of game.players) {
-        const connected = seated.has(player.id);
+        const connected = player.bot === true || seated.has(player.id);
 
         if (connected !== player.connected) {
           player.connected = connected;

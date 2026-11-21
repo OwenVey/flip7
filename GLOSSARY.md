@@ -10,6 +10,8 @@ A multiplayer push-your-luck card game played in shared rooms, where players joi
 
 **Host**: The player who can start games, move the table on, remove players and move for offline players.
 
+**Bot**: A player the room plays itself. Always present, never host, never stalls. The host adds bots in the lobby. _Avoid_: AI, CPU, computer player
+
 **Evict**: To remove a player from the room, either by a **kick** from the host or by the player choosing to **leave**. _Avoid_: remove (when you mean the room-level act)
 
 ## Play

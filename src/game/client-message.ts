@@ -31,6 +31,7 @@ const ClientMessageSchema = v.variant("type", [
   }),
   v.object({ requestId: RequestIdSchema, type: v.literal("nextRound") }),
   v.object({ requestId: RequestIdSchema, type: v.literal("lobby") }),
+  v.object({ requestId: RequestIdSchema, type: v.literal("addBot") }),
   v.object({
     playerId: IdSchema,
     requestId: RequestIdSchema,

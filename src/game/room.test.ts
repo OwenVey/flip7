@@ -452,3 +452,59 @@ describe("clocks", () => {
     expect(empty.room.alarm().expired).toBeTruthy();
   });
 });
+
+describe("bots", () => {
+  it("lets the host add a bot that is always present", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+
+    const outcome = h.room.command("ana-tab", {
+      requestId: "00000000-0000-4000-8000-000000000001",
+      type: "addBot",
+    });
+
+    const [, bot] = h.stored.game.players;
+
+    expect(broadcasts(outcome)).toBeTruthy();
+    expect(bot).toMatchObject({ bot: true, connected: true });
+    expect(h.room.reconcile().effects).toStrictEqual([]);
+    expect(h.stored.tokens.size).toBe(1);
+  });
+
+  it("plays the bot's moves from the alarm", () => {
+    const h = harness();
+    const ana = joinAs(h, "ana-tab", "Ana");
+    h.room.command("ana-tab", { type: "addBot" });
+    h.room.command("ana-tab", { type: "start" });
+
+    if (h.stored.game.turnId === ana.playerId) {
+      h.room.command("ana-tab", { type: "stay" });
+    }
+
+    const due = h.stored.botTurn?.at ?? 0;
+    const logged = h.stored.game.log.length;
+    h.advance(due - h.now());
+    h.ping("ana-tab");
+
+    expect(broadcasts(h.room.alarm())).toBeTruthy();
+    expect(h.stored.game.log.length).toBeGreaterThan(logged);
+  });
+
+  it("deletes the room when the last person leaves a table of bots", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    h.room.command("ana-tab", { type: "addBot" });
+
+    expect(h.room.command("ana-tab", { type: "leave" }).expired).toBeTruthy();
+  });
+
+  it("keeps the room while another person is still seated", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+    h.room.command("ana-tab", { type: "addBot" });
+
+    expect(h.room.command("ana-tab", { type: "leave" }).expired).toBeFalsy();
+    expect(player(h, h.stored.game.hostId ?? "").name).toBe("Ben");
+  });
+});

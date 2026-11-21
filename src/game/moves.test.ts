@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Card } from "./cards";
 import {
+  addBot,
   addPlayer,
   createGame,
   hit,
@@ -53,6 +54,14 @@ const round = (names: string[], draws: Card[]) => {
 
 const rig = (state: GameState, draws: Card[]) => {
   state.deck = [...draws].toReversed();
+};
+
+const makeBot = (state: GameState, id: string) => {
+  const player = state.players.find((candidate) => candidate.id === id);
+
+  if (player) {
+    player.bot = true;
+  }
 };
 
 const goOffline = (state: GameState, id: string) => {
@@ -136,12 +145,14 @@ describe(availableMoves, () => {
   it("lets the host start once enough players have joined, and kick anyone else", () => {
     expect(availableMoves(lobby(["a"]), "a").host.start).toBeFalsy();
     expect(availableMoves(lobby(["a", "b"]), "a").host).toStrictEqual({
+      addBot: true,
       kick: ["b"],
       lobby: false,
       nextRound: false,
       start: true,
     });
     expect(availableMoves(lobby(["a", "b"]), "b").host).toStrictEqual({
+      addBot: false,
       kick: [],
       lobby: false,
       nextRound: false,
@@ -170,6 +181,53 @@ describe(rejectMove, () => {
   });
 });
 
+describe("bots", () => {
+  it("lets only the host add bots, and only in the lobby", () => {
+    const state = lobby(["a", "b"]);
+
+    expect(rejectMove(state, "a", { type: "addBot" })).toBeNull();
+    expect(rejectMove(state, "b", { type: "addBot" })).toBe(
+      "Only the host can do that."
+    );
+
+    const playing = round(["a", "b"], [num(5), num(3)]);
+
+    expect(rejectMove(playing, "a", { type: "addBot" })).toBe(
+      "You can only add bots in the lobby."
+    );
+  });
+
+  it("counts bots toward the player cap", () => {
+    const state = lobby(["a"]);
+
+    for (let added = 1; added < 16; added += 1) {
+      addBot(state, "a", `bot-${added}`, random);
+    }
+
+    expect(rejectMove(state, "a", { type: "addBot" })).toBe(
+      "This room is full (16 players)."
+    );
+  });
+
+  it("lets a lone player start a game against a bot", () => {
+    const state = lobby(["a"]);
+    addBot(state, "a", "bot", random);
+
+    expect(rejectMove(state, "a", { type: "start" })).toBeNull();
+  });
+
+  it("never lets the host move for a bot", () => {
+    const state = round(["a", "b"], [num(5), num(3)]);
+    stay(state, "a", random);
+    makeBot(state, "b");
+    goOffline(state, "b");
+
+    expect(rejectMove(state, "a", { forId: "b", type: "hit" })).toBe(
+      "Bots make their own moves."
+    );
+  });
+});
+
 const candidateMoves = (state: MovesView) => {
   const ids = state.players.map((player) => player.id);
   const forIds = [undefined, ...ids];
@@ -178,6 +236,7 @@ const candidateMoves = (state: MovesView) => {
     { type: "start" },
     { type: "nextRound" },
     { type: "lobby" },
+    { type: "addBot" },
     ...ids.map((playerId) => ({ playerId, type: "kick" }) satisfies Move),
   ];
 
@@ -223,7 +282,8 @@ const offers = (state: MovesView, viewerId: string, move: Move) => {
 
     case "start":
     case "nextRound":
-    case "lobby": {
+    case "lobby":
+    case "addBot": {
       return moves.host[move.type];
     }
 
@@ -255,10 +315,15 @@ const tables = () => {
   const gameOver = structuredClone(roundOver);
   gameOver.phase = "gameOver";
 
+  const botTurn = round(["a", "b"], [num(5), num(3)]);
+  stay(botTurn, "a", random);
+  makeBot(botTurn, "b");
+
   const noCards = round(["a", "b"], [num(5), num(3)]);
   noCards.players[0]?.hand.splice(0);
 
   return {
+    botTurn,
     choice,
     gameOver,
     lobby: lobby(["a", "b"]),

@@ -9,7 +9,7 @@ A multiplayer push-your-luck card game for **2–16 players**. Share a room link
 ## How to play
 
 1. **Create a room** and share the invite link or room code.
-2. **Join with a display name.** The host can start once two players have joined.
+2. **Join with a display name.** The host can start once two players have joined. Playing alone or short-handed? The host can **add bots** in the lobby. Bots count toward the 16-player limit and make their own moves after a short pause.
 3. **Hit or Stay.** Hit to draw another card, or Stay to bank your points and sit out the round. You need a card in front of you to Stay. Drawing a duplicate Number card makes you bust for zero points unless you have a Second Chance.
 
 ### Rounds and scoring
@@ -44,7 +44,7 @@ When the deck runs out, the discard pile is shuffled into a new deck. Cards in f
 
 The browser remembers your display name and room identity. Refreshing or reopening the link in the same browser profile returns you to the same player while that player is still in the room. Use **Leave** to give up your place.
 
-The host can remove players and move for an offline player the game is waiting on. While someone else is online, the host role passes to a connected player after 20 seconds away. After a 30-second stall, the game makes the missing move automatically. A room expires after 24 hours of inactivity once all connections are closed.
+The host can remove players and move for an offline player the game is waiting on. While someone else is online, the host role passes to a connected player after 20 seconds away. After a 30-second stall, the game makes the missing move automatically. Bots only play while at least one person is online, and a room is deleted when the last person leaves a table of bots. A room expires after 24 hours of inactivity once all connections are closed.
 
 ## Local development
 

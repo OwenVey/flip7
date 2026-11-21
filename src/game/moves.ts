@@ -2,13 +2,17 @@ import type { Card } from "./cards";
 import type { GameState, Player } from "./engine";
 
 export const MIN_PLAYERS = 2;
+export const MAX_PLAYERS = 16;
 
 /** What the moves rules read, shared by the engine's state and the room view sent to players. */
 export type MovesView = Pick<
   GameState,
   "choice" | "hostId" | "phase" | "turnId"
 > & {
-  players: readonly Pick<Player, "connected" | "hand" | "id" | "name">[];
+  players: readonly Pick<
+    Player,
+    "bot" | "connected" | "hand" | "id" | "name"
+  >[];
 };
 
 /** A command a player can send, with `forId` set when the host moves for an offline player. */
@@ -19,6 +23,7 @@ export type Move =
   | { type: "start" }
   | { type: "nextRound" }
   | { type: "lobby" }
+  | { type: "addBot" }
   | { type: "kick"; playerId: string };
 
 /** A player may stay only once they have at least one card in front of them. */
@@ -113,6 +118,10 @@ const rejectMoveFor = (
     return "That player isn't in this room.";
   }
 
+  if (player.bot === true) {
+    return "Bots make their own moves.";
+  }
+
   if (player.connected) {
     return `${player.name} is back online, so it's their move.`;
   }
@@ -159,6 +168,16 @@ const rejectHostMove = (
     return "Only the host can do that.";
   }
 
+  if (move.type === "addBot") {
+    if (view.phase !== "lobby") {
+      return "You can only add bots in the lobby.";
+    }
+
+    return view.players.length >= MAX_PLAYERS
+      ? `This room is full (${MAX_PLAYERS} players).`
+      : null;
+  }
+
   if (move.type === "start") {
     if (view.phase === "playing" || view.phase === "roundOver") {
       return "A game is already running.";
@@ -190,6 +209,7 @@ export const rejectMove = (view: MovesView, viewerId: string, move: Move) => {
     case "start":
     case "nextRound":
     case "lobby":
+    case "addBot":
     case "kick": {
       return rejectHostMove(view, viewerId, move);
     }
@@ -219,6 +239,7 @@ export const availableMoves = (view: MovesView, viewerId: string) => {
     owed && view.choice ? { forId, targets: [...view.choice.options] } : null;
 
   const host = {
+    addBot: rejectHostMove(view, viewerId, { type: "addBot" }) === null,
     kick: isHost
       ? view.players.flatMap((player) =>
           player.id === viewerId ? [] : [player.id]
