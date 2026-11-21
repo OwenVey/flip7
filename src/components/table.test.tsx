@@ -669,7 +669,7 @@ describe("<Table />", () => {
     expect(screen.queryByRole("button", { name: "Hit for Ben" })).toBeNull();
   });
 
-  it("lets the host pick the target for an offline player's action card", () => {
+  it("sends the same choice for an offline player from a seat or the action bar", () => {
     const send = vi.fn<RoomConnection["send"]>();
 
     const view = room({
@@ -696,14 +696,67 @@ describe("<Table />", () => {
     expect(screen.getByText(/Pick who gets their Freeze/u)).toBeVisible();
     screen.getByRole("button", { name: "Freeze themselves for Ben" }).click();
     flush();
-    expect(send).toHaveBeenCalledWith({
+
+    const bar = screen.getByRole("region", { name: "Your move" });
+    within(bar).getByRole("button", { name: "Ben" }).click();
+    flush();
+
+    const move = {
       forId: "b",
       targetId: "b",
       type: "choose",
-    });
+    };
+
+    expect(send.mock.calls).toStrictEqual([[move], [move]]);
     expect(
       screen.getByRole("button", { name: "Freeze yourself for Ben" })
     ).toBeInTheDocument();
+  });
+
+  it("updates eligible targets on both controls during a Room sync", async () => {
+    const send = vi.fn<RoomConnection["send"]>();
+
+    const choice = {
+      card: { id: 9, kind: "freeze" as const },
+      chooserId: "a",
+      options: ["a", "b"],
+    };
+
+    const [view, setView] = createSignal(room({ choice }));
+    const [syncing, setSyncing] = createSignal(true);
+
+    render(() => (
+      <Table
+        room={view()}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        actionsDisabled={syncing()}
+      />
+    ));
+
+    const bar = within(screen.getByRole("region", { name: "Your move" }));
+    expect(screen.getByRole("button", { name: "Freeze Ben" })).toBeDisabled();
+    expect(bar.getByRole("button", { name: "Ben" })).toBeDisabled();
+
+    const { artifact } = await captureArtifact(
+      () => {
+        setView(room({ choice: { ...choice, options: ["a"] } }));
+        setSyncing(false);
+        flush();
+      },
+      { scenario: "table-choice-targets-after-sync" }
+    );
+
+    expectNoDiagnostics(artifact);
+    expect([
+      screen.queryByRole("button", { name: "Freeze Ben" }),
+      bar.queryByRole("button", { name: "Ben" }),
+    ]).toStrictEqual([null, null]);
+    expect(
+      screen.getByRole("button", { name: "Freeze yourself" })
+    ).toBeEnabled();
+    expect(bar.getByRole("button", { name: "You" })).toBeEnabled();
   });
 
   it("names later games in the log's round headings", () => {

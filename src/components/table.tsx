@@ -61,6 +61,11 @@ interface TableProps {
   actionsDisabled?: boolean;
 }
 
+interface MoveControls {
+  moves: AvailableMoves;
+  onChoose: (targetId: string) => void;
+}
+
 interface DealProps {
   /** True while cards are still flying from the deck. */
   dealing?: boolean;
@@ -181,35 +186,20 @@ const pickLabel = (
   room: RoomView,
   playerId: string,
   choice: ActionCardChoice,
-  targetId: string
+  targetId: string,
+  forId: string | undefined
 ) => {
-  const forOther = choice.chooserId !== playerId;
   let target = nameOf(room, targetId);
 
   if (targetId === playerId) {
     target = "yourself";
-  } else if (forOther && targetId === choice.chooserId) {
+  } else if (targetId === forId) {
     target = "themselves";
   }
 
   const label = `${choiceVerb(choice)} ${target}`;
 
-  return forOther ? `${label} for ${nameOf(room, choice.chooserId)}` : label;
-};
-
-const chooseTarget = (
-  send: RoomConnection["send"],
-  playerId: string,
-  choice: ActionCardChoice,
-  targetId: string
-) => {
-  const { chooserId } = choice;
-
-  void send({
-    ...(chooserId !== playerId && { forId: chooserId }),
-    targetId,
-    type: "choose",
-  });
+  return forId === undefined ? label : `${label} for ${nameOf(room, forId)}`;
 };
 
 const FitLabel = (props: { long: string; short: string }) => (
@@ -223,6 +213,7 @@ const FitLabel = (props: { long: string; short: string }) => (
 
 const RoundPlayer = (
   props: TableProps &
+    MoveControls &
     Pick<DealProps, "incomingCardId" | "dealStep"> & {
       player: PlayerView;
     }
@@ -262,15 +253,14 @@ const RoundPlayer = (
   );
 
   const isMe = () => props.player.id === props.playerId;
-  const moves = createMemo(() => availableMoves(props.room, props.playerId));
-  const canKick = () => moves().host.kick.includes(props.player.id);
+  const canKick = () => props.moves.host.kick.includes(props.player.id);
 
-  const hasDecision = () => moves().waitingOn?.playerId === props.player.id;
+  const hasDecision = () => props.moves.waitingOn?.playerId === props.player.id;
 
   const isFrozen = () => props.player.status === "frozen";
 
   const pickChoice = () =>
-    moves().choice?.targets.includes(props.player.id) === true
+    props.moves.choice?.targets.includes(props.player.id) === true
       ? props.room.choice
       : null;
 
@@ -374,15 +364,11 @@ const RoundPlayer = (
               props.room,
               props.playerId,
               choice(),
-              props.player.id
+              props.player.id,
+              props.moves.choice?.forId
             )}
             onClick={() => {
-              chooseTarget(
-                props.send,
-                props.playerId,
-                choice(),
-                props.player.id
-              );
+              props.onChoose(props.player.id);
             }}
           />
         )}
@@ -532,31 +518,16 @@ const countChatsAfter = (log: LogEntry[], playerId: string, seenId: number) =>
 const targetButtonLabel = (room: RoomView, playerId: string, id: string) =>
   id === playerId ? "You" : nameOf(room, id);
 
-const ChoiceButtons = (props: TableProps & { choice: ActionCardChoice }) => (
-  <div class="action-buttons" data-choice-buttons="">
-    <For each={props.choice.options}>
-      {(targetId) => (
-        <Button
-          disabled={props.actionsDisabled}
-          onClick={() => {
-            chooseTarget(props.send, props.playerId, props.choice, targetId);
-          }}
-        >
-          {targetButtonLabel(props.room, props.playerId, targetId)}
-        </Button>
-      )}
-    </For>
-  </div>
-);
-
 const ActionCardPrompt = (
-  props: TableProps & { choice: ActionCardChoice; moves: AvailableMoves }
+  props: Pick<TableProps, "room" | "playerId" | "actionsDisabled"> &
+    MoveControls & { choice: ActionCardChoice }
 ) => (
   <>
     <ul class="dealt-action-card" data-choice-card="" aria-hidden="true">
       <PlayingCard card={props.choice.card} />
     </ul>
-    <Switch
+    <Show
+      when={props.moves.choice}
       fallback={
         <p class="headline">
           {nameOf(props.room, props.choice.chooserId)} is choosing who receives{" "}
@@ -570,39 +541,42 @@ const ActionCardPrompt = (
         </p>
       }
     >
-      <Match
-        when={
-          props.moves.choice !== null && props.moves.choice.forId === undefined
-        }
-      >
-        <p class="headline">
-          {choiceVerb(props.choice)}… <span class="muted">· Pick a player</span>
-        </p>
-        <ChoiceButtons
-          choice={props.choice}
-          room={props.room}
-          playerId={props.playerId}
-          send={props.send}
-          actionsDisabled={props.actionsDisabled}
-        />
-      </Match>
-      <Match when={props.moves.choice?.forId !== undefined}>
-        <p class="headline">
-          {nameOf(props.room, props.choice.chooserId)} is offline.{" "}
-          <span class="muted">
-            · Pick who gets their {cardLabel(props.choice.card)}, or it will be
-            played for them soon.
-          </span>
-        </p>
-        <ChoiceButtons
-          choice={props.choice}
-          room={props.room}
-          playerId={props.playerId}
-          send={props.send}
-          actionsDisabled={props.actionsDisabled}
-        />
-      </Match>
-    </Switch>
+      {(move) => (
+        <>
+          <Show
+            when={move().forId === undefined}
+            fallback={
+              <p class="headline">
+                {nameOf(props.room, props.choice.chooserId)} is offline.{" "}
+                <span class="muted">
+                  · Pick who gets their {cardLabel(props.choice.card)}, or it
+                  will be played for them soon.
+                </span>
+              </p>
+            }
+          >
+            <p class="headline">
+              {choiceVerb(props.choice)}…{" "}
+              <span class="muted">· Pick a player</span>
+            </p>
+          </Show>
+          <div class="action-buttons" data-choice-buttons="">
+            <For each={move().targets}>
+              {(targetId) => (
+                <Button
+                  disabled={props.actionsDisabled}
+                  onClick={() => {
+                    props.onChoose(targetId);
+                  }}
+                >
+                  {targetButtonLabel(props.room, props.playerId, targetId)}
+                </Button>
+              )}
+            </For>
+          </div>
+        </>
+      )}
+    </Show>
   </>
 );
 
@@ -856,14 +830,12 @@ const OfflineTurn = (
   );
 };
 
-const ActionBar = (props: TableProps & DealProps) => {
-  const moves = createMemo(() => availableMoves(props.room, props.playerId));
-
+const ActionBar = (props: TableProps & DealProps & MoveControls) => {
   const me = () =>
     props.room.players.find((player) => player.id === props.playerId);
 
   const myTurn = () => {
-    const { turn } = moves();
+    const { turn } = props.moves;
 
     return turn !== null && turn.forId === undefined && props.dealing !== true;
   };
@@ -898,7 +870,7 @@ const ActionBar = (props: TableProps & DealProps) => {
     return isMe ? "Dealing to you…" : `Dealing to ${name}…`;
   };
 
-  const iCanStay = () => moves().turn?.canStay === true;
+  const iCanStay = () => props.moves.turn?.canStay === true;
 
   const myRound = () => {
     const player = me();
@@ -910,7 +882,7 @@ const ActionBar = (props: TableProps & DealProps) => {
     props.room.winnerIds.map((id) => nameOf(props.room, id)).join(" and ");
 
   const offlineTurn = () => {
-    const { turn } = moves();
+    const { turn } = props.moves;
 
     return turn?.forId === undefined
       ? null
@@ -929,7 +901,7 @@ const ActionBar = (props: TableProps & DealProps) => {
         <Match when={props.room.phase === "gameOver"}>
           <p class="headline">{winners()} wins!</p>
           <Show
-            when={moves().host.lobby}
+            when={props.moves.host.lobby}
             fallback={<p class="muted">Waiting for the host.</p>}
           >
             <div class="action-buttons">
@@ -947,7 +919,7 @@ const ActionBar = (props: TableProps & DealProps) => {
         <Match when={props.room.phase === "roundOver"}>
           <p class="headline">End of round {props.room.round}</p>
           <Show
-            when={moves().host.nextRound}
+            when={props.moves.host.nextRound}
             fallback={
               <p class="muted">Waiting for the host to start the next round.</p>
             }
@@ -968,10 +940,10 @@ const ActionBar = (props: TableProps & DealProps) => {
           {(choice) => (
             <ActionCardPrompt
               choice={choice()}
-              moves={moves()}
+              moves={props.moves}
               room={props.room}
               playerId={props.playerId}
-              send={props.send}
+              onChoose={props.onChoose}
               actionsDisabled={props.actionsDisabled}
             />
           )}
@@ -1028,11 +1000,14 @@ const ActionBar = (props: TableProps & DealProps) => {
           {(turnId) => (
             <p class="headline">
               {nameOf(props.room, turnId())} is deciding…
-              <Show when={moves().waitingOn?.offline}>
+              <Show when={props.moves.waitingOn?.offline}>
                 <span class="muted">
                   {" "}
                   · Offline, so they'll{" "}
-                  {moves().waitingOn?.canStay === true ? "stay" : "hit"} soon.
+                  {props.moves.waitingOn?.canStay === true
+                    ? "stay"
+                    : "hit"}{" "}
+                  soon.
                 </span>
               </Show>
             </p>
@@ -1046,6 +1021,27 @@ const ActionBar = (props: TableProps & DealProps) => {
 export default function Table(
   props: TableProps & DealProps & { chat: RoomConnection["chat"] }
 ) {
+  const moves = createMemo(() => availableMoves(props.room, props.playerId));
+
+  const chooseTarget = (targetId: string) => {
+    const { choice } = moves();
+
+    if (
+      props.actionsDisabled === true ||
+      choice === null ||
+      !choice.targets.includes(targetId)
+    ) {
+      return;
+    }
+
+    const { forId } = choice;
+    void props.send({
+      ...(forId !== undefined && { forId }),
+      targetId,
+      type: "choose",
+    });
+  };
+
   let chipSpot: ChipSpot | null = null;
 
   createEffect(
@@ -1153,6 +1149,8 @@ export default function Table(
         actionsDisabled={props.actionsDisabled}
         dealing={props.dealing}
         dealStep={props.dealStep}
+        moves={moves()}
+        onChoose={chooseTarget}
       />
 
       <div class="table-body">
@@ -1167,6 +1165,8 @@ export default function Table(
                 actionsDisabled={props.actionsDisabled}
                 incomingCardId={props.incomingCardId}
                 dealStep={props.dealStep}
+                moves={moves()}
+                onChoose={chooseTarget}
               />
             )}
           </For>
