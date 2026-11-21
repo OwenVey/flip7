@@ -730,12 +730,6 @@ export default function Table(
     <div class="table">
       <header class="table-header">
         <h1>Round {props.room.round}</h1>
-        <dl class="table-stats">
-          <div>
-            <dt>Goal</dt>
-            <dd>{props.room.targetScore}</dd>
-          </div>
-        </dl>
         <div class="row">
           <InviteButton />
           <LeaveRoom

@@ -623,37 +623,6 @@ main {
   justify-content: space-between;
 }
 
-.table-stats {
-  display: flex;
-  gap: 0.75rem;
-  margin: 0 auto 0 0;
-
-  & div {
-    display: grid;
-    padding: 0.25rem 0.75rem;
-    border: 2px solid var(--ink);
-    border-radius: 0.5rem;
-    background: var(--paper);
-    box-shadow: var(--shadow-table);
-  }
-
-  & dt {
-    color: var(--ink-soft);
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  & dd {
-    margin: 0;
-    font-family: var(--font-numeral);
-    font-size: 1.5rem;
-    font-weight: 900;
-    line-height: 1.1;
-  }
-}
-
 .action-bar {
   position: sticky;
   top: 0.5rem;
@@ -2015,10 +1984,6 @@ main {
 @media (max-width: 40rem) {
   .table-header {
     gap: 0.75rem;
-  }
-
-  .table-stats dd {
-    font-size: 1.25rem;
   }
 }
 
