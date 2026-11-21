@@ -168,6 +168,23 @@ const canStayById = (room: RoomView, id: string) => {
   return player ? canStay(player) : false;
 };
 
+const hostCanPlayFor = (room: RoomView, playerId: string, id: string) =>
+  room.hostId === playerId && id !== playerId && isOffline(room, id);
+
+const choiceToMake = (room: RoomView, playerId: string) => {
+  const { choice } = room;
+
+  if (
+    choice &&
+    (choice.chooserId === playerId ||
+      hostCanPlayFor(room, playerId, choice.chooserId))
+  ) {
+    return choice;
+  }
+
+  return null;
+};
+
 const choiceVerb = (choice: ActionCardChoice) => {
   if (choice.card.kind === "freeze") {
     return "Freeze";
@@ -226,12 +243,26 @@ const RoundPlayer = (
   const isFrozen = () => props.player.status === "frozen";
 
   const pickChoice = () => {
-    const { choice } = props.room;
+    const choice = choiceToMake(props.room, props.playerId);
 
-    return choice?.chooserId === props.playerId &&
-      choice.options.includes(props.player.id)
-      ? choice
-      : null;
+    return choice?.options.includes(props.player.id) === true ? choice : null;
+  };
+
+  const pickLabel = (choice: ActionCardChoice) => {
+    const forOther = choice.chooserId !== props.playerId;
+    let target = props.player.name;
+
+    if (isMe()) {
+      target = "yourself";
+    } else if (forOther && props.player.id === choice.chooserId) {
+      target = "themselves";
+    }
+
+    const label = `${choiceVerb(choice)} ${target}`;
+
+    return forOther
+      ? `${label} for ${nameOf(props.room, choice.chooserId)}`
+      : label;
   };
 
   const roundResult = () =>
@@ -330,9 +361,15 @@ const RoundPlayer = (
             type="button"
             class="seat-pick"
             disabled={props.actionsDisabled}
-            aria-label={`${choiceVerb(choice())} ${isMe() ? "yourself" : props.player.name}`}
+            aria-label={pickLabel(choice())}
             onClick={() => {
-              void props.send({ targetId: props.player.id, type: "choose" });
+              const { chooserId } = choice();
+
+              void props.send({
+                ...(chooserId !== props.playerId && { forId: chooserId }),
+                targetId: props.player.id,
+                type: "choose",
+              });
             }}
           />
         )}
@@ -476,8 +513,7 @@ const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => (
     <ul class="dealt-action-card" data-choice-card="" aria-hidden="true">
       <PlayingCard card={props.choice.card} />
     </ul>
-    <Show
-      when={props.choice.chooserId === props.playerId}
+    <Switch
       fallback={
         <p class="headline">
           {nameOf(props.room, props.choice.chooserId)} is choosing who receives{" "}
@@ -491,11 +527,28 @@ const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => (
         </p>
       }
     >
-      <p class="headline">
-        {choiceVerb(props.choice)}…{" "}
-        <span class="muted">· Pick a player below</span>
-      </p>
-    </Show>
+      <Match when={props.choice.chooserId === props.playerId}>
+        <p class="headline">
+          {choiceVerb(props.choice)}…{" "}
+          <span class="muted">· Pick a player below</span>
+        </p>
+      </Match>
+      <Match
+        when={hostCanPlayFor(
+          props.room,
+          props.playerId,
+          props.choice.chooserId
+        )}
+      >
+        <p class="headline">
+          {nameOf(props.room, props.choice.chooserId)} is offline.{" "}
+          <span class="muted">
+            · Pick who gets their {cardLabel(props.choice.card)}, or it will be
+            played for them soon.
+          </span>
+        </p>
+      </Match>
+    </Switch>
   </>
 );
 
@@ -692,6 +745,63 @@ const Confetti = () => (
   </div>
 );
 
+const OfflineTurn = (
+  props: Pick<TableProps, "room" | "send" | "actionsDisabled"> & {
+    playerId: string;
+  }
+) => {
+  const player = () =>
+    props.room.players.find((candidate) => candidate.id === props.playerId);
+
+  const name = () => player()?.name ?? "Someone";
+
+  const canStayFor = () => {
+    const current = player();
+
+    return current ? canStay(current) : false;
+  };
+
+  const points = () => {
+    const current = player();
+
+    return current ? currentRoundPoints(current) : 0;
+  };
+
+  return (
+    <>
+      <p class="headline">
+        {name()} is offline.{" "}
+        <span class="muted">
+          · Move for them, or they'll {canStayFor() ? "stay" : "hit"} soon.
+        </span>
+      </p>
+      <div class="action-buttons">
+        <Button
+          disabled={props.actionsDisabled}
+          data-variant="solid"
+          onClick={async () =>
+            await props.send({ forId: props.playerId, type: "hit" })
+          }
+        >
+          <SquarePlus size={16} />
+          Hit for {name()}
+        </Button>
+        <Show when={canStayFor()}>
+          <Button
+            disabled={props.actionsDisabled}
+            onClick={async () =>
+              await props.send({ forId: props.playerId, type: "stay" })
+            }
+          >
+            <Coins size={16} />
+            Stay with {points()} points
+          </Button>
+        </Show>
+      </div>
+    </>
+  );
+};
+
 const ActionBar = (props: TableProps & DealProps) => {
   const isHost = () => props.room.hostId === props.playerId;
 
@@ -747,6 +857,16 @@ const ActionBar = (props: TableProps & DealProps) => {
 
   const winners = () =>
     props.room.winnerIds.map((id) => nameOf(props.room, id)).join(" and ");
+
+  const offlineTurnId = () => {
+    const { turnId } = props.room;
+
+    return turnId !== null &&
+      props.room.choice === null &&
+      hostCanPlayFor(props.room, props.playerId, turnId)
+      ? turnId
+      : null;
+  };
 
   return (
     <section
@@ -838,6 +958,16 @@ const ActionBar = (props: TableProps & DealProps) => {
               </Button>
             </Show>
           </div>
+        </Match>
+        <Match when={offlineTurnId()}>
+          {(turnId) => (
+            <OfflineTurn
+              playerId={turnId()}
+              room={props.room}
+              send={props.send}
+              actionsDisabled={props.actionsDisabled}
+            />
+          )}
         </Match>
         <Match when={props.room.turnId}>
           {(turnId) => (

@@ -17,6 +17,7 @@ import {
   GameError,
   hit,
   nextRound,
+  playFor,
   playForAbsent,
   removePlayer,
   startGame,
@@ -441,6 +442,70 @@ describe("an offline player", () => {
     stay(state, "b", random);
     expect(state.phase).toBe("roundOver");
     expect(blockingPlayerId(state)).toBeNull();
+  });
+});
+
+describe("the host moving for an offline player", () => {
+  it("stays for them", () => {
+    const state = setup(["a", "b"], [num(5), num(3)]);
+    stay(state, "a", random);
+    player(state, "b").connected = false;
+
+    playFor(state, "a", "b", { type: "stay" }, random);
+
+    expect(player(state, "b").status).toBe("stayed");
+    expect(
+      state.log.some(
+        (entry) =>
+          entry.text === "a stayed for b, who is offline, and banked 3 points."
+      )
+    ).toBeTruthy();
+  });
+
+  it("hits for them", () => {
+    const state = setup(["a", "b", "c"], [num(5), num(3), num(8)]);
+    stay(state, "a", random);
+    player(state, "b").connected = false;
+    rig(state, [num(7)]);
+
+    playFor(state, "a", "b", { type: "hit" }, random);
+
+    expect(player(state, "b").hand).toHaveLength(2);
+    expect(state.turnId).toBe("c");
+    expect(state.log.at(-1)?.text).toBe("a hit for b, who is offline.");
+  });
+
+  it("chooses who gets their action card", () => {
+    const state = setup(["a", "b", "c"], [num(5), num(3), num(8)]);
+    stay(state, "a", random);
+    rig(state, [freeze()]);
+    hit(state, "b", random);
+    player(state, "b").connected = false;
+
+    playFor(state, "a", "b", { targetId: "c", type: "choose" }, random);
+
+    expect(state.choice).toBeNull();
+    expect(player(state, "c").status).toBe("frozen");
+  });
+
+  it("is only for the host, and only while the game waits on that offline player", () => {
+    const state = setup(["a", "b", "c"], [num(5), num(3), num(8)]);
+    stay(state, "a", random);
+
+    expect(() => {
+      playFor(state, "a", "b", { type: "stay" }, random);
+    }).toThrow("b is back online, so it's their move.");
+
+    player(state, "b").connected = false;
+    expect(() => {
+      playFor(state, "c", "b", { type: "stay" }, random);
+    }).toThrow("Only the host can do that.");
+
+    player(state, "c").connected = false;
+    expect(() => {
+      playFor(state, "a", "c", { type: "hit" }, random);
+    }).toThrow("The game isn't waiting on c.");
+    expect(state.turnId).toBe("b");
   });
 });
 

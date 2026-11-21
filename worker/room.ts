@@ -13,6 +13,7 @@ import {
   GameError,
   hit,
   nextRound,
+  playFor,
   removePlayer,
   say,
   startGame,
@@ -351,20 +352,24 @@ export class GameRoom extends Server<Env> {
         return null;
       }
 
-      case "hit": {
-        hit(game, playerId, random);
-
-        return null;
-      }
-
-      case "stay": {
-        stay(game, playerId, random);
-
-        return null;
-      }
-
+      case "hit":
+      case "stay":
       case "choose": {
-        choose(game, playerId, message.targetId, random);
+        if (message.forId !== undefined && message.forId !== playerId) {
+          playFor(game, playerId, message.forId, message, random);
+          // WARNING: restart the offline clock, or the auto-move can beat the host when the game waits on the same player again.
+          room.stall = null;
+
+          return null;
+        }
+
+        if (message.type === "hit") {
+          hit(game, playerId, random);
+        } else if (message.type === "stay") {
+          stay(game, playerId, random);
+        } else {
+          choose(game, playerId, message.targetId, random);
+        }
 
         return null;
       }

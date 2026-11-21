@@ -572,6 +572,80 @@ describe("<Table />", () => {
     expect(screen.queryByRole("button", { name: /Remove/u })).toBeNull();
   });
 
+  it("lets the host move for an offline player whose turn it is", () => {
+    const send = vi.fn<RoomConnection["send"]>();
+    const view = room({ turnId: "b" });
+    view.players = view.players.map((seat) =>
+      seat.id === "b" ? { ...seat, connected: false } : seat
+    );
+
+    render(() => (
+      <Table
+        room={view}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+    expect(
+      screen.getByText(/Move for them, or they'll stay soon/u)
+    ).toBeVisible();
+    screen.getByRole("button", { name: "Hit for Ben" }).click();
+    flush();
+    expect(send).toHaveBeenCalledWith({ forId: "b", type: "hit" });
+    screen.getByRole("button", { name: "Stay with 3 points" }).click();
+    flush();
+    expect(send).toHaveBeenCalledWith({ forId: "b", type: "stay" });
+    cleanup();
+
+    render(() => (
+      <Table
+        room={{ ...view, hostId: "b" }}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+    expect(screen.queryByRole("button", { name: "Hit for Ben" })).toBeNull();
+  });
+
+  it("lets the host pick the target for an offline player's action card", () => {
+    const send = vi.fn<RoomConnection["send"]>();
+
+    const view = room({
+      choice: {
+        card: { id: 9, kind: "freeze" },
+        chooserId: "b",
+        options: ["a", "b"],
+      },
+      turnId: null,
+    });
+
+    view.players = view.players.map((seat) =>
+      seat.id === "b" ? { ...seat, connected: false } : seat
+    );
+
+    render(() => (
+      <Table
+        room={view}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+    expect(screen.getByText(/Pick who gets their Freeze/u)).toBeVisible();
+    screen.getByRole("button", { name: "Freeze themselves for Ben" }).click();
+    flush();
+    expect(send).toHaveBeenCalledWith({
+      forId: "b",
+      targetId: "b",
+      type: "choose",
+    });
+    expect(
+      screen.getByRole("button", { name: "Freeze yourself for Ben" })
+    ).toBeInTheDocument();
+  });
+
   it("names later games in the log's round headings", () => {
     render(() => (
       <Table

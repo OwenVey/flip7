@@ -1190,3 +1190,67 @@ export const playForAbsent = (state: GameState, random: Random) => {
 
   return true;
 };
+
+export type MoveForOffline =
+  | { type: "hit" }
+  | { type: "stay" }
+  | { type: "choose"; targetId: string };
+
+/**
+ * Lets the host make the move an offline player owes, so a table that can
+ * still reach them (on a call, in the same room) needn't wait for the grace
+ * period or accept the automatic move.
+ */
+export const playFor = (
+  state: GameState,
+  hostId: string,
+  playerId: string,
+  move: MoveForOffline,
+  random: Random
+) => {
+  assertHost(state, hostId);
+  const host = getPlayer(state, hostId);
+  const player = getPlayer(state, playerId);
+
+  if (player.connected) {
+    throw new GameError(`${player.name} is back online, so it's their move.`);
+  }
+
+  if (blockingPlayerId(state) !== player.id) {
+    throw new GameError(`The game isn't waiting on ${player.name}.`);
+  }
+
+  if (move.type === "choose") {
+    if (state.choice?.options.includes(move.targetId) !== true) {
+      throw new GameError("You can't choose that player.");
+    }
+
+    say(state, `${host.name} chose for ${player.name}, who is offline.`);
+    choose(state, player.id, move.targetId, random);
+
+    return;
+  }
+
+  assertTurn(state, player.id);
+
+  if (move.type === "hit") {
+    say(state, `${host.name} hit for ${player.name}, who is offline.`);
+    hit(state, player.id, random);
+
+    return;
+  }
+
+  if (!canStay(player)) {
+    throw new GameError(
+      `${player.name} needs a card in front of them before they can stay.`
+    );
+  }
+
+  stayAndBankPoints(
+    state,
+    player,
+    random,
+    (banked) =>
+      `${host.name} stayed for ${player.name}, who is offline, and banked ${banked}.`
+  );
+};
