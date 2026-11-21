@@ -181,10 +181,13 @@ export const createRoomConnection = (code: string) => {
   return {
     canAct: () => state().canAct,
     chat: client.chat,
+    clearJoinError: client.clearJoinError,
     join: (name: string) => {
       setSavedName(name);
       client.join(name);
     },
+    joinError: () => state().joinError,
+    joining: () => state().joining,
     needsName: () => state().needsName,
     notice: () => state().notice,
     online: () => state().online,

@@ -282,6 +282,35 @@ describe("joining through the room client", () => {
     });
     expect(net.stored.game.players).toHaveLength(2);
   });
+
+  it("lets a player correct a rejected name and retry", () => {
+    const net = network();
+    net.join("Ana");
+    const guest = net.testPlayer();
+    net.connect(guest);
+    net.flush();
+
+    guest.client.join("Ana");
+    guest.client.join("Ben");
+    expect(guest.client.state.joining).toBeTruthy();
+    net.flush();
+
+    expect(guest.client.state).toMatchObject({
+      joinError: "Someone here is already called Ana.",
+      joining: false,
+      needsName: true,
+      notice: null,
+    });
+
+    guest.client.join("Ben");
+    net.flush();
+    expect(guest.client.state).toMatchObject({
+      joinError: "",
+      joining: false,
+      needsName: false,
+      ready: true,
+    });
+  });
 });
 
 describe("a pending move", () => {

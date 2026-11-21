@@ -1,5 +1,11 @@
 import { captureArtifact, expectNoDiagnostics } from "@solidjs/diagnostics";
-import { cleanup, render, screen, within } from "@solidjs/testing-library";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@solidjs/testing-library";
 import { createAgent } from "@ui-sdk/solid/agent";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -72,6 +78,36 @@ const entries = () =>
 
 describe("<Table />", () => {
   afterEach(cleanup);
+
+  it("opens the Scores sheet during play and returns focus on close", async () => {
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const scores = screen.getByRole("button", { name: "Scores" });
+    scores.focus();
+
+    const result = await agent.act({
+      steps: [{ action: "press", ref: "Scores" }],
+    });
+
+    expect(result.error).toBeUndefined();
+    const sheet = await screen.findByRole("dialog", { name: "Scores" });
+    const standings = within(sheet).getByRole("table", { name: "Leaderboard" });
+    expect(
+      within(standings).getByRole("row", { name: /Ana.*40/u })
+    ).toBeVisible();
+
+    within(sheet).getByRole("button", { name: "Close" }).click();
+    flush();
+    expect(screen.queryByRole("dialog", { name: "Scores" })).toBeNull();
+    expect(scores).toHaveFocus();
+  });
 
   it("shows both score totals and the goal in the same label row", () => {
     render(() => (
@@ -581,7 +617,7 @@ describe("<Table />", () => {
     expect(send).toHaveBeenCalledWith({ targetId: "b", type: "choose" });
   });
 
-  it("counts new chat messages until the log is opened", () => {
+  it("clears the unread count when the chat sheet opens and returns focus on close", async () => {
     const [view, setView] = createSignal(room());
 
     render(() => (
@@ -594,7 +630,7 @@ describe("<Table />", () => {
     ));
 
     const toggle = screen.getByRole("button", { name: "Chat and game log" });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("aria-haspopup", "dialog");
 
     setView(
       room({
@@ -609,11 +645,45 @@ describe("<Table />", () => {
 
     expect(toggle).toHaveAccessibleName("Chat and game log, 1 new message");
 
+    toggle.focus();
     toggle.click();
     flush();
 
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const sheet = await screen.findByRole("dialog", { name: "Game log" });
     expect(toggle).toHaveAccessibleName("Chat and game log");
+    within(sheet).getByRole("button", { name: "Close" }).click();
+    flush();
+    expect(screen.queryByRole("dialog", { name: "Game log" })).toBeNull();
+    expect(toggle).toHaveFocus();
+  });
+
+  it("keeps the chat draft after dismissing the sheet with Escape", async () => {
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const toggle = screen.getByRole("button", { name: "Chat and game log" });
+    toggle.focus();
+    toggle.click();
+    const sheet = await screen.findByRole("dialog", { name: "Game log" });
+    const input = within(sheet).getByRole("textbox", { name: "Chat message" });
+    fireEvent.input(input, { target: { value: "See you next round" } });
+    flush();
+
+    fireEvent.keyDown(input, { key: "Escape" });
+    flush();
+    expect(toggle).toHaveFocus();
+
+    toggle.click();
+    const reopened = await screen.findByRole("dialog", { name: "Game log" });
+    expect(
+      within(reopened).getByRole("textbox", { name: "Chat message" })
+    ).toHaveValue("See you next round");
   });
 
   it("other players see whose turn it is, not the Hit button", () => {

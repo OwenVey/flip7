@@ -4,7 +4,12 @@ import { Title } from "@solidjs/meta";
 import { useNavigate } from "@solidjs/router";
 import { Button } from "@ui-sdk/solid/button";
 import { Field, FieldError, FieldLabel } from "@ui-sdk/solid/field";
-import { OTPInput, OTPInputGroup, OTPInputSlot } from "@ui-sdk/solid/otp-input";
+import {
+  createOTPInputController,
+  OTPInput,
+  OTPInputGroup,
+  OTPInputSlot,
+} from "@ui-sdk/solid/otp-input";
 import { createSignal, For, Repeat } from "solid-js";
 
 import PageMeta, {
@@ -16,7 +21,7 @@ import PlayingCard from "../components/playing-card";
 import { ADDITIVE_MODIFIER_KIND } from "../game/cards";
 import type { Card } from "../game/cards";
 import { CODE_ALPHABET, CODE_LENGTH, normalizeCode } from "../game/protocol";
-import { createRoom } from "../lib/room-functions";
+import { createRoom, roomExists } from "../lib/room-functions";
 import { paths } from "../router";
 
 const HERO_CARDS: Card[] = [
@@ -53,8 +58,16 @@ export default function Home() {
   const navigate = useNavigate();
   const [code, setCode] = createSignal("");
   const [createError, setCreateError] = createSignal("");
+  const [codeError, setCodeError] = createSignal("");
+  const [pending, setPending] = createSignal<"create" | "join" | null>(null);
+  const codeInput = createOTPInputController();
 
   const handleCreateRoom = async () => {
+    if (pending() !== null) {
+      return;
+    }
+
+    setPending("create");
     setCreateError("");
 
     try {
@@ -62,6 +75,40 @@ export default function Home() {
       navigate(paths.room(roomCode));
     } catch {
       setCreateError("Couldn't create a room. Try again.");
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const handleJoinRoom = async (event: SubmitEvent) => {
+    event.preventDefault();
+
+    if (pending() !== null) {
+      return;
+    }
+
+    const normalized = normalizeCode(code());
+
+    if (normalized === null) {
+      setCodeError(`Enter the ${CODE_LENGTH}-letter room code.`);
+      codeInput.focus();
+
+      return;
+    }
+
+    setCodeError("");
+    setPending("join");
+
+    try {
+      if (await roomExists(normalized)) {
+        navigate(paths.room(normalized));
+      } else {
+        setCodeError("Room not found. Check the code and try again.");
+      }
+    } catch {
+      setCodeError("Couldn't check that room. Try again.");
+    } finally {
+      setPending(null);
     }
   };
 
@@ -88,9 +135,13 @@ export default function Home() {
         <section class="panel">
           <h2>Start a room</h2>
           <p class="muted">You'll get a code to share with friends.</p>
-          <Button data-variant="solid" onClick={handleCreateRoom}>
+          <Button
+            data-variant="solid"
+            disabled={pending() !== null}
+            onClick={handleCreateRoom}
+          >
             <Plus size={16} />
-            Create room
+            {pending() === "create" ? "Creating room…" : "Create room"}
           </Button>
           <p class="error" role="alert">
             {createError()}
@@ -101,25 +152,24 @@ export default function Home() {
           <h2>Join a room</h2>
           <form
             class="stack"
+            novalidate
             onSubmit={(event) => {
-              event.preventDefault();
-              const normalized = normalizeCode(code());
-
-              if (normalized !== null) {
-                navigate(paths.room(normalized));
-              }
+              void handleJoinRoom(event);
             }}
           >
-            <Field name="code">
+            <Field name="code" invalid={codeError() ? true : undefined}>
               <FieldLabel>Room code</FieldLabel>
               <OTPInput
                 autoComplete="off"
+                controller={codeInput}
                 inputMode="text"
                 maxLength={CODE_LENGTH}
                 onValueChange={(value) => {
                   setCode(value);
+                  setCodeError("");
                 }}
                 pattern={CODE_CHARACTER_PATTERN}
+                readOnly={pending() === "join"}
                 required
                 value={code()}
               >
@@ -129,11 +179,11 @@ export default function Home() {
                   </Repeat>
                 </OTPInputGroup>
               </OTPInput>
-              <FieldError>Enter the {CODE_LENGTH}-letter room code.</FieldError>
+              <FieldError role="alert">{codeError()}</FieldError>
             </Field>
-            <Button type="submit">
+            <Button type="submit" disabled={pending() !== null}>
               <ArrowRight size={16} />
-              Join room
+              {pending() === "join" ? "Checking room…" : "Join room"}
             </Button>
           </form>
         </section>

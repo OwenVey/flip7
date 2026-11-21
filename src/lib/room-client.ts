@@ -20,6 +20,8 @@ export interface RoomClientState {
   room: RoomView | null;
   playerId: string | null;
   needsName: boolean;
+  joining: boolean;
+  joinError: string;
   /** Seated and synced with the table since the last connect. */
   ready: boolean;
   /** A pending move is waiting for the room's reply. */
@@ -71,6 +73,8 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
   let state: RoomClientState = {
     canAct: false,
+    joinError: "",
+    joining: false,
     needsName: false,
     notice: null,
     online: true,
@@ -84,6 +88,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   let synced = false;
   let seatedPlayerId: string | null = null;
   let awaitingWelcome = false;
+  let joinTimeout: ReturnType<typeof setTimeout> | undefined;
   let noticeId = 0;
   let lastRequestId: string | undefined;
   let pendingMove: PendingMove | null = null;
@@ -116,11 +121,22 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     }
   };
 
+  const finishJoin = (error = "") => {
+    clearTimeout(joinTimeout);
+    joinTimeout = undefined;
+    update({ joinError: error, joining: false });
+  };
+
   const startSync = () => {
     synced = false;
     seatedPlayerId = null;
     lastRequestId = undefined;
     awaitingWelcome = false;
+
+    if (state.joining) {
+      finishJoin("Connection lost while joining. Try again when reconnected.");
+    }
+
     update({ ready: false });
 
     if (pendingMove) {
@@ -180,6 +196,10 @@ export const createRoomClient = (deps: RoomClientDeps) => {
         ({ lastRequestId } = message);
         update({ needsName: false, playerId: message.playerId });
 
+        if (state.joining) {
+          finishJoin();
+        }
+
         return;
       }
 
@@ -206,6 +226,12 @@ export const createRoomClient = (deps: RoomClientDeps) => {
           forget();
           settleMove(false);
           update({ needsName: true, status: "open" });
+
+          if (state.joining) {
+            finishJoin(message.message);
+
+            return;
+          }
         }
 
         notify(message.message);
@@ -234,6 +260,12 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   };
 
   return {
+    clearJoinError: () => {
+      if (state.joinError) {
+        update({ joinError: "" });
+      }
+    },
+
     chat: (text: string) => {
       if (!state.online || !synced || !raw({ text, type: "chat" })) {
         notify(TRY_AGAIN);
@@ -265,11 +297,23 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     },
 
     join: (name: string) => {
+      if (!state.needsName || awaitingWelcome || stopped) {
+        return;
+      }
+
+      if (!state.online || state.status !== "open" || !socket.isOpen()) {
+        finishJoin("Not connected yet. Try again in a moment.");
+
+        return;
+      }
+
       awaitingWelcome = true;
+      update({ joinError: "", joining: true });
+      joinTimeout = setTimeout(reconnect, REPLY_TIMEOUT_MS);
 
       if (!raw({ name, token: null, type: "join" })) {
         awaitingWelcome = false;
-        notify("Not connected yet. Try again in a moment.");
+        finishJoin("Not connected yet. Try again in a moment.");
       }
     },
 
@@ -337,6 +381,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
     stop: () => {
       if (!stopped) {
+        clearTimeout(joinTimeout);
         settleMove(false);
         stopped = true;
         socket.close();

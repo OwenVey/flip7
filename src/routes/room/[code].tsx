@@ -201,11 +201,17 @@ const Room = (props: { code: string }) => {
               </a>
             </section>
           </Match>
-          <Match when={connection.needsName()}>
+          <Match when={connection.needsName() && connection.room() !== null}>
             <JoinForm
               room={connection.room()}
               savedName={connection.savedName()}
               onJoin={connection.join}
+              error={connection.joinError()}
+              joining={connection.joining()}
+              unavailable={
+                !connection.online() || connection.status() !== "open"
+              }
+              onEdit={connection.clearJoinError}
             />
           </Match>
           <Match when={seated()}>

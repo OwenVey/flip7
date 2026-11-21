@@ -6,6 +6,7 @@ import MessageCircle from "@lucide/solid/icons/message-circle";
 import PlayingCardsFan from "@lucide/solid/icons/playing-cards-fan";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import SquarePlus from "@lucide/solid/icons/square-plus";
+import Trophy from "@lucide/solid/icons/trophy";
 import WifiOff from "@lucide/solid/icons/wifi-off";
 import { Button } from "@ui-sdk/solid/button";
 import { Meter, MeterIndicator, MeterTrack } from "@ui-sdk/solid/meter";
@@ -13,7 +14,6 @@ import {
   createEffect,
   createMemo,
   createSignal,
-  flush,
   For,
   Match,
   Repeat,
@@ -44,6 +44,7 @@ import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
 import PlayingCard from "./playing-card";
 import RemovePlayer from "./remove-player";
+import TableSheet from "./table-sheet";
 
 const STATUS_LABELS = {
   active: "Active",
@@ -617,59 +618,56 @@ const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
   );
 
   return (
-    <section class="panel leaderboard-panel">
-      <h2 id="leaderboard-title">Leaderboard</h2>
-      <table class="leaderboard" aria-labelledby="leaderboard-title">
-        <thead>
-          <tr>
-            <th scope="col">Rank</th>
-            <th scope="col">Player</th>
-            <Show when={roundScored()}>
-              <th scope="col">Round</th>
-            </Show>
-            <th scope="col">Total</th>
-          </tr>
-        </thead>
-        <tbody
-          ref={(element) => {
-            body = element;
-          }}
-        >
-          <For each={ranked()} keyed={(entry) => entry.player.id}>
-            {(entry) => (
-              <tr
-                data-key={entry().player.id}
-                data-winner={
-                  props.room.winnerIds.includes(entry().player.id)
-                    ? ""
-                    : undefined
-                }
-              >
-                <td>{entry().rank}</td>
-                <th scope="row">
-                  {entry().player.name}
-                  <Show when={entry().player.id === props.playerId}>
-                    {" "}
-                    <span class="badge">You</span>
-                  </Show>
-                </th>
-                <Show when={roundScored()}>
-                  <td
-                    class="muted leaderboard-round"
-                    style={{ "--row": entry().index }}
-                  >
-                    +{entry().player.lastRound?.total ?? 0}
-                  </td>
+    <table class="leaderboard" aria-label="Leaderboard">
+      <thead>
+        <tr>
+          <th scope="col">Rank</th>
+          <th scope="col">Player</th>
+          <Show when={roundScored()}>
+            <th scope="col">Round</th>
+          </Show>
+          <th scope="col">Total</th>
+        </tr>
+      </thead>
+      <tbody
+        ref={(element) => {
+          body = element;
+        }}
+      >
+        <For each={ranked()} keyed={(entry) => entry.player.id}>
+          {(entry) => (
+            <tr
+              data-key={entry().player.id}
+              data-winner={
+                props.room.winnerIds.includes(entry().player.id)
+                  ? ""
+                  : undefined
+              }
+            >
+              <td>{entry().rank}</td>
+              <th scope="row">
+                {entry().player.name}
+                <Show when={entry().player.id === props.playerId}>
+                  {" "}
+                  <span class="badge">You</span>
                 </Show>
-                <td class="leaderboard-total">
-                  <CountUp value={entry().player.score} />
+              </th>
+              <Show when={roundScored()}>
+                <td
+                  class="muted leaderboard-round"
+                  style={{ "--row": entry().index }}
+                >
+                  +{entry().player.lastRound?.total ?? 0}
                 </td>
-              </tr>
-            )}
-          </For>
-        </tbody>
-      </table>
-    </section>
+              </Show>
+              <td class="leaderboard-total">
+                <CountUp value={entry().player.score} />
+              </td>
+            </tr>
+          )}
+        </For>
+      </tbody>
+    </table>
   );
 };
 
@@ -1054,7 +1052,6 @@ export default function Table(
   const [logOpen, setLogOpen] = createSignal(false);
   const latestLogId = () => props.room.log.at(-1)?.id ?? 0;
   const [seenLogId, setSeenLogId] = createSignal(untrack(latestLogId));
-  let logToggle: HTMLButtonElement | undefined;
 
   const unreadChats = () =>
     logOpen()
@@ -1069,69 +1066,49 @@ export default function Table(
       : "Chat and game log";
   };
 
-  const openLog = () => {
+  const onLogOpenChange = (open: boolean) => {
     setSeenLogId(latestLogId());
-    setLogOpen(true);
-    flush();
-    document.querySelector<HTMLElement>("#game-log")?.focus();
+    setLogOpen(open);
   };
-
-  const closeLog = () => {
-    setSeenLogId(latestLogId());
-    setLogOpen(false);
-    flush();
-    logToggle?.focus();
-  };
-
-  const closeOnEscape = (event: KeyboardEvent) => {
-    if (event.key === "Escape" && !event.defaultPrevented) {
-      event.preventDefault();
-      closeLog();
-    }
-  };
-
-  createEffect(logOpen, (open) => {
-    if (open) {
-      document.addEventListener("keydown", closeOnEscape);
-    }
-
-    return () => {
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  });
 
   return (
-    <div
-      class="table"
-      data-phase={props.room.phase}
-      data-log-open={logOpen() ? "" : undefined}
-    >
+    <div class="table" data-phase={props.room.phase}>
       <header class="table-header">
         <h1>Round {props.room.round}</h1>
         <div class="row">
-          <Button
-            ref={(element) => {
-              logToggle = element;
-            }}
-            data-log-toggle=""
-            aria-label={toggleLabel()}
-            aria-controls="game-log"
-            aria-expanded={logOpen() ? "true" : "false"}
-            onClick={() => {
-              if (logOpen()) {
-                closeLog();
-              } else {
-                openLog();
-              }
-            }}
+          <Show when={props.room.phase === "playing"}>
+            <TableSheet
+              title="Scores"
+              triggerLabel="Scores"
+              trigger={<Trophy size={16} aria-hidden="true" />}
+            >
+              <Leaderboard room={props.room} playerId={props.playerId} />
+            </TableSheet>
+          </Show>
+          <TableSheet
+            title="Game log"
+            triggerLabel={toggleLabel()}
+            keepMounted
+            open={logOpen()}
+            onOpenChange={onLogOpenChange}
+            trigger={
+              <>
+                <MessageCircle size={16} aria-hidden="true" />
+                <Show when={unreadChats() > 0}>
+                  <span class="unread-count" aria-hidden="true">
+                    {unreadChats()}
+                  </span>
+                </Show>
+              </>
+            }
           >
-            <MessageCircle size={16} />
-            <Show when={unreadChats() > 0}>
-              <span class="unread-count" aria-hidden="true">
-                {unreadChats()}
-              </span>
-            </Show>
-          </Button>
+            <GameLog
+              inSheet
+              log={props.room.log}
+              playerId={props.playerId}
+              onChat={props.chat}
+            />
+          </TableSheet>
           <InviteButton />
           <LeaveRoom
             disabled={props.actionsDisabled}
@@ -1173,24 +1150,20 @@ export default function Table(
         </div>
 
         <div class="stack table-sidebar">
-          <Leaderboard room={props.room} playerId={props.playerId} />
+          <section
+            class="panel leaderboard-panel"
+            aria-labelledby="leaderboard-title"
+          >
+            <h2 id="leaderboard-title">Leaderboard</h2>
+            <Leaderboard room={props.room} playerId={props.playerId} />
+          </section>
           <GameLog
             log={props.room.log}
             playerId={props.playerId}
             onChat={props.chat}
-            onClose={closeLog}
           />
         </div>
       </div>
-      <Show when={logOpen()}>
-        <button
-          type="button"
-          class="log-backdrop"
-          tabindex="-1"
-          aria-label="Close game log"
-          onClick={closeLog}
-        />
-      </Show>
       <div class="flight-layer" data-flight-layer="" aria-hidden="true" />
       <div class="flight-layer" data-chip-layer="" aria-hidden="true" />
       <Show when={props.room.phase === "gameOver"}>

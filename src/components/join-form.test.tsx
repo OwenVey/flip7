@@ -2,6 +2,7 @@ import { cleanup, render, screen } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { MAX_PLAYERS } from "../game/engine";
 import type { RoomView } from "../game/protocol";
 import JoinForm from "./join-form";
 
@@ -67,5 +68,62 @@ describe("<JoinForm />", () => {
     setRoom(roomWith(["Ben"]));
     flush();
     expect(input).toHaveValue("Cal");
+  });
+
+  it("shows a full room before asking for a name", () => {
+    const room = roomWith(
+      Array.from({ length: MAX_PLAYERS }, (_, index) => `Player ${index + 1}`)
+    );
+
+    render(() => (
+      <JoinForm
+        room={room}
+        savedName=""
+        onJoin={vi.fn<(name: string) => void>()}
+      />
+    ));
+
+    expect(screen.getByRole("status")).toHaveTextContent("This room is full");
+    expect(screen.queryByRole("textbox", { name: "Your name" })).toBeNull();
+  });
+
+  it("keeps the name and shows the rejection at the field", () => {
+    const [joining, setJoining] = createSignal(false);
+    const [error, setError] = createSignal("");
+    const room = roomWith(["Ana"]);
+    let submittedName = "";
+
+    const onJoin = (name: string) => {
+      submittedName = name;
+      setJoining(true);
+    };
+
+    render(() => (
+      <JoinForm
+        room={room}
+        savedName="Ben"
+        onJoin={onJoin}
+        joining={joining()}
+        error={error()}
+      />
+    ));
+    const name = screen.getByRole("textbox", { name: "Your name" });
+    screen.getByRole("button", { name: "Join the table" }).click();
+    flush();
+
+    expect(submittedName).toBe("Ben");
+    expect(screen.getByRole("button", { name: "Joining…" })).toBeDisabled();
+
+    setJoining(false);
+    setError("Someone here is already called Ben.");
+    flush();
+
+    expect(name).toHaveValue("Ben");
+    expect(name).toHaveAccessibleDescription(
+      /Someone here is already called Ben/u
+    );
+    expect(
+      screen.getByRole("button", { name: "Join the table" })
+    ).toBeEnabled();
   });
 });
