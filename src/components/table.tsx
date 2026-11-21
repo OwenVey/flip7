@@ -2,6 +2,7 @@ import ArrowLeft from "@lucide/solid/icons/arrow-left";
 import ArrowRight from "@lucide/solid/icons/arrow-right";
 import Coins from "@lucide/solid/icons/coins";
 import Flame from "@lucide/solid/icons/flame";
+import Snowflake from "@lucide/solid/icons/snowflake";
 import SquarePlus from "@lucide/solid/icons/square-plus";
 import { Button } from "@ui-sdk/solid/button";
 import { Meter, MeterIndicator, MeterTrack } from "@ui-sdk/solid/meter";
@@ -53,6 +54,7 @@ const RoundPlayer = (props: TableProps & { player: PlayerView }) => {
   const isMe = () => props.player.id === props.playerId;
   const isHost = () => props.room.hostId === props.playerId;
   const hasDecision = () => blockingPlayerId(props.room) === props.player.id;
+  const isFrozen = () => props.player.status === "frozen";
 
   const roundResult = () =>
     props.room.phase === "playing" ? null : props.player.lastRound;
@@ -127,7 +129,12 @@ const RoundPlayer = (props: TableProps & { player: PlayerView }) => {
       </header>
       <div class="seat-meta">
         <Show when={props.player.status !== "active"}>
-          <span class="status-pill">{STATUS_LABELS[props.player.status]}</span>
+          <span class="status-pill">
+            <Show when={isFrozen()}>
+              <Snowflake size={12} aria-hidden="true" />
+            </Show>
+            {STATUS_LABELS[props.player.status]}
+          </span>
         </Show>
         <span class="muted">
           <Show
@@ -149,6 +156,14 @@ const RoundPlayer = (props: TableProps & { player: PlayerView }) => {
           {(card) => <PlayingCard card={card()} bust />}
         </Show>
       </ul>
+      <Show when={isFrozen()}>
+        <div class="frost" aria-hidden="true">
+          <Snowflake class="frost-burst" />
+          <Snowflake class="frost-flake" />
+          <Snowflake class="frost-flake" />
+          <Snowflake class="frost-flake" />
+        </div>
+      </Show>
       <Meter
         aria-label="Total score"
         class="seat-meter"

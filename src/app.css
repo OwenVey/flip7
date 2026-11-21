@@ -867,6 +867,7 @@ main {
 }
 
 .seat {
+  position: relative;
   display: grid;
   gap: 0.625rem;
   align-content: start;
@@ -899,6 +900,153 @@ main {
   &[data-status="busted"] .hand,
   &[data-status="out"] .hand {
     opacity: 0.6;
+  }
+
+  /* Frozen: the seat ices over with a shiver, so the whole room sees it. */
+  &[data-status="frozen"] {
+    border-color: var(--cool);
+    background: linear-gradient(170deg, #dff2fa, #eef8fb 45%, var(--paper));
+    box-shadow:
+      3px 3px 0 var(--cool),
+      0 0 1.25rem rgb(169 222 240 / 0.55),
+      var(--shadow-table);
+    animation: freeze-shiver 520ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+
+  &[data-status="frozen"] .hand {
+    background:
+      radial-gradient(rgb(255 255 255 / 0.14) 0.6px, transparent 1px) 0 0 / 4px
+        4px,
+      radial-gradient(ellipse at 50% 0%, #5f9fbb, #24546b);
+    box-shadow:
+      inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.35),
+      inset 0 0 0 2px rgb(169 222 240 / 0.75),
+      inset 0 0 1.5rem rgb(223 244 251 / 0.5);
+  }
+
+  &[data-status="frozen"] .hand .card {
+    filter: saturate(0.45) brightness(1.04);
+  }
+}
+
+/* Frost overlay over a frozen seat: icy edges, a snowflake burst, drifting flakes. */
+.frost {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      rgb(255 255 255 / 0.5),
+      transparent 4.5rem
+    ),
+    radial-gradient(
+      circle at 100% 100%,
+      rgb(223 244 251 / 0.85),
+      transparent 5.5rem
+    );
+  box-shadow: inset 0 0 1.25rem rgb(169 222 240 / 0.9);
+  pointer-events: none;
+  animation: frost-spread 700ms ease-out both;
+}
+
+.frost-burst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6rem;
+  height: 6rem;
+  margin: -3rem 0 0 -3rem;
+  color: #fff;
+  filter: drop-shadow(0 0 0.5rem var(--frost)) drop-shadow(0 0 1px var(--cool));
+  animation: frost-burst 1100ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.frost-flake {
+  position: absolute;
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--cool);
+  opacity: 0.45;
+  animation: flake-drift 5s ease-in-out infinite alternate;
+
+  &:nth-of-type(2) {
+    top: 0.5rem;
+    right: 42%;
+    animation-delay: -1.5s;
+  }
+
+  &:nth-of-type(3) {
+    right: 0.75rem;
+    bottom: 3.25rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    animation-delay: -3s;
+  }
+
+  &:nth-of-type(4) {
+    bottom: 0.625rem;
+    left: 0.75rem;
+    width: 0.875rem;
+    height: 0.875rem;
+    animation-duration: 6.5s;
+  }
+}
+
+@keyframes freeze-shiver {
+  0%,
+  100% {
+    transform: none;
+  }
+
+  15%,
+  55% {
+    transform: translateX(-3px) rotate(-0.4deg);
+  }
+
+  35%,
+  75% {
+    transform: translateX(3px) rotate(0.4deg);
+  }
+}
+
+@keyframes frost-spread {
+  from {
+    opacity: 0;
+    clip-path: circle(0% at 50% 55%);
+  }
+
+  to {
+    opacity: 1;
+    clip-path: circle(150% at 50% 55%);
+  }
+}
+
+@keyframes frost-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(-90deg);
+  }
+
+  35% {
+    opacity: 1;
+    transform: scale(1.15) rotate(0deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.6) rotate(30deg);
+  }
+}
+
+@keyframes flake-drift {
+  from {
+    transform: translateY(0) rotate(0deg);
+  }
+
+  to {
+    transform: translateY(0.375rem) rotate(60deg);
   }
 }
 
@@ -957,6 +1105,9 @@ main {
 }
 
 .status-pill {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
   padding: 0 0.5rem;
   border: 1.5px solid currentcolor;
   border-radius: 999px;
@@ -1460,6 +1611,16 @@ main {
 
   .seat {
     transition: none;
+  }
+
+  .seat[data-status="frozen"],
+  .frost,
+  .frost-flake {
+    animation: none;
+  }
+
+  .frost-burst {
+    display: none;
   }
 }
 
