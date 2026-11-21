@@ -21,14 +21,10 @@ import SiteNav from "../../components/site-nav";
 import SoundControls from "../../components/sound-controls";
 import Table from "../../components/table";
 import { waitingOn } from "../../game/moves";
-import { normalizeCode } from "../../game/protocol";
+import { normalizeCode, roundStarted } from "../../game/protocol";
 import { createDealPlayback } from "../../lib/deal-playback";
 import { createRoomConnection } from "../../lib/room-connection";
-import {
-  createRoomSounds,
-  roomCues,
-  roundStarted,
-} from "../../lib/room-sounds";
+import { createRoomSounds, roomCues } from "../../lib/room-sounds";
 import { nudge, revealSeat } from "../../lib/table-motion";
 import { paths } from "../../router";
 
