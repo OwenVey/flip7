@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { addPlayer, createGame } from "../game/engine";
 import { toRoomView } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
-import { roomCues } from "./room-sounds";
+import { roomCues } from "./room-cues";
 
 const game = createGame();
 
@@ -21,10 +21,10 @@ const before: RoomView = {
 };
 
 describe(roomCues, () => {
-  it("plays a newly revealed card and alerts the next player", () => {
+  it("reports a newly revealed card", () => {
     expect(
       roomCues(before, { ...before, drawSeq: 11, turnId: "me" }, "me")
-    ).toStrictEqual(["reveal", "turn"]);
+    ).toStrictEqual(["reveal"]);
     expect(
       roomCues(before, { ...before, drawSeq: 11, turnId: "me" }, "opponent")
     ).toStrictEqual(["reveal"]);

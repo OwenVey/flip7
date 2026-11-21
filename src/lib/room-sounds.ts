@@ -3,20 +3,6 @@ import type { Audio, Sound as AudioSound } from "@nkzw/audio";
 import { makePersisted } from "@solid-primitives/storage";
 import { createSignal, onSettled } from "solid-js";
 
-import type { GameCue, LogEntry } from "../game/engine";
-import { waitingOn } from "../game/moves";
-import { roundStarted } from "../game/protocol";
-import type { RoomView } from "../game/protocol";
-
-const GAME_CUE_PRIORITY = [
-  "streak",
-  "bust",
-  "freeze",
-  "special",
-  "bank",
-  "join",
-] as const satisfies readonly GameCue[];
-
 const SOUND_VOLUMES = [
   ["bank", 0.72],
   ["bust", 0.72],
@@ -41,77 +27,6 @@ const MUSIC_VOLUME_KEY = "hot-streak:music-volume";
 const MAX_PERCENT = 100;
 const DEFAULT_MUSIC_VOLUME = 25;
 const MUSIC_GAIN = 0.35;
-
-const waitingOnId = (room: RoomView) => waitingOn(room)?.playerId ?? null;
-
-const isChatFromOthers = (entry: LogEntry, playerId: string) =>
-  entry.from !== undefined && entry.from.id !== playerId;
-
-const tableCue = (
-  previous: RoomView,
-  current: RoomView,
-  events: LogEntry[]
-) => {
-  const eventCue = GAME_CUE_PRIORITY.find((cue) =>
-    events.some((entry) => entry.cue === cue)
-  );
-
-  if (current.phase === "gameOver" && previous.phase !== "gameOver") {
-    return "win";
-  }
-
-  if (eventCue) {
-    return eventCue satisfies Sound;
-  }
-
-  if (current.phase === "roundOver" && previous.phase !== "roundOver") {
-    return "round";
-  }
-
-  if (roundStarted(previous, current)) {
-    return "deal";
-  }
-
-  if ((current.drawSeq ?? 0) > (previous.drawSeq ?? 0)) {
-    return "reveal";
-  }
-
-  return null;
-};
-
-export const roomCues = (
-  previous: RoomView,
-  current: RoomView,
-  playerId: string
-) => {
-  const lastId = previous.log.at(-1)?.id ?? 0;
-  const events = current.log.filter((entry) => entry.id > lastId);
-  const cues: Sound[] = [];
-  const cue = tableCue(previous, current, events);
-
-  if (cue) {
-    cues.push(cue);
-  }
-
-  if (events.some((entry) => isChatFromOthers(entry, playerId))) {
-    cues.push("message");
-  }
-
-  const newChoice =
-    current.choice !== null &&
-    current.choice.card.id !== previous.choice?.card.id;
-
-  if (
-    waitingOnId(current) === playerId &&
-    (waitingOnId(previous) !== playerId ||
-      newChoice ||
-      roundStarted(previous, current))
-  ) {
-    cues.push("turn");
-  }
-
-  return cues;
-};
 
 const preferenceStorage = {
   getItem(key: string) {

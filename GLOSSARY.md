@@ -20,6 +20,8 @@ A multiplayer push-your-luck card game played in shared rooms, where players joi
 
 **Waiting on**: The one player whose move the game needs next. _Avoid_: blocking player, whose turn (a choice can be owed outside a turn)
 
+**Deal playback**: The sequence in which the table reveals dealt cards and shows their results to a player.
+
 ## Clocks
 
 **Stall**: The game is waiting on an offline player while someone else is online. When a stall runs past its grace period, the player's move is played for them automatically. _Avoid_: timeout, AFK

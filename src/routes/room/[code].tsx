@@ -8,6 +8,8 @@ import {
 } from "@ui-sdk/solid/toast";
 import {
   createEffect,
+  createSignal,
+  flush,
   Match,
   onSettled,
   Show,
@@ -20,11 +22,14 @@ import Lobby from "../../components/lobby";
 import SiteNav from "../../components/site-nav";
 import SoundControls from "../../components/sound-controls";
 import Table from "../../components/table";
-import { waitingOn } from "../../game/moves";
-import { normalizeCode, roundStarted } from "../../game/protocol";
-import { createDealPlayback } from "../../lib/deal-playback";
+import { normalizeCode } from "../../game/protocol";
+import { createDealMotion } from "../../lib/deal-motion";
+import {
+  createDealPlayback,
+  initialDealPlayback,
+} from "../../lib/deal-playback";
 import { createRoomConnection } from "../../lib/room-connection";
-import { createRoomSounds, roomCues } from "../../lib/room-sounds";
+import { createRoomSounds } from "../../lib/room-sounds";
 import { nudge, revealSeat } from "../../lib/table-motion";
 import { paths } from "../../router";
 
@@ -35,29 +40,51 @@ const Room = (props: { code: string }) => {
 
   const connection = createRoomConnection(untrack(() => props.code));
 
-  const playback = createDealPlayback(() => connection.room(), {
-    onCardLanded: () => {
-      sounds.play("reveal");
-    },
-    onDealStart: (previous, current) => {
-      if (roundStarted(previous, current)) {
-        sounds.play("deal");
-      }
-    },
-    onSettled: (previous, current, dealt) => {
-      const playerId = untrack(connection.playerId);
+  let roomPage: HTMLElement | undefined;
+  let disposed = false;
+  const [table, setTable] = createSignal(initialDealPlayback);
 
-      if (playerId === null) {
-        return;
-      }
+  const playback = createDealPlayback(
+    createDealMotion(() => roomPage),
+    (view) => {
+      setTable(view);
+      flush();
+    },
+    (cue) => {
+      sounds.play(cue);
 
-      for (const cue of roomCues(previous, current, playerId)) {
-        if (dealt === 0 || (cue !== "reveal" && cue !== "deal")) {
-          sounds.play(cue);
+      if (cue === "turn") {
+        nudge(roomPage?.querySelector("[data-action-bar]") ?? null);
+        revealSeat(roomPage?.querySelector(".seat[data-me]") ?? null);
+
+        if ("vibrate" in navigator) {
+          navigator.vibrate(TURN_VIBRATION_MS);
         }
       }
+    }
+  );
+
+  createEffect(
+    () => {
+      const status = connection.status();
+      const playerId = connection.playerId();
+      const room = connection.room();
+
+      return room &&
+        playerId !== null &&
+        status !== "missing" &&
+        status !== "removed"
+        ? { canAct: connection.canAct(), playerId, room }
+        : null;
     },
-  });
+    (next) => {
+      queueMicrotask(() => {
+        if (!disposed) {
+          playback.update(next);
+        }
+      });
+    }
+  );
 
   const toast = createToaster();
 
@@ -94,6 +121,8 @@ const Room = (props: { code: string }) => {
   );
 
   onSettled(() => () => {
+    disposed = true;
+    playback.dispose();
     toast.dismiss();
   });
 
@@ -110,35 +139,16 @@ const Room = (props: { code: string }) => {
   };
 
   const seated = () => {
-    const room = playback.room();
+    const { room } = table();
     const playerId = connection.playerId();
 
     return room && playerId !== null ? { playerId, room } : null;
   };
 
-  const myMove = () => {
-    const view = seated();
-
-    return view ? waitingOn(view.room)?.playerId === view.playerId : false;
-  };
-
-  createEffect(myMove, (mine) => {
-    if (!mine) {
-      return;
-    }
-
-    nudge(document.querySelector("[data-action-bar]"));
-    revealSeat(document.querySelector(".seat[data-me]"));
-
-    if ("vibrate" in navigator) {
-      navigator.vibrate(TURN_VIBRATION_MS);
-    }
-  });
-
   return (
     <>
       <Title>
-        {`${myMove() ? "Your move · " : ""}Room ${props.code} · Hot Streak`}
+        {`${table().myMove ? "Your move · " : ""}Room ${props.code} · Hot Streak`}
       </Title>
       <SiteNav>
         <SoundControls
@@ -150,7 +160,12 @@ const Room = (props: { code: string }) => {
           onToggle={sounds.toggle}
         />
       </SiteNav>
-      <main class="room-page">
+      <main
+        class="room-page"
+        ref={(element) => {
+          roomPage = element;
+        }}
+      >
         <output class="connection-banner">{connectionProblem()}</output>
         <Switch
           fallback={
@@ -196,10 +211,10 @@ const Room = (props: { code: string }) => {
                     playerId={view().playerId}
                     send={connection.send}
                     chat={connection.chat}
-                    actionsDisabled={!connection.canAct() || playback.dealing()}
-                    dealing={playback.dealing()}
-                    dealStep={playback.step()}
-                    incomingCardId={playback.incoming()}
+                    actionsDisabled={table().actionsDisabled}
+                    dealing={table().dealing}
+                    dealStep={table().step}
+                    incomingCardId={table().incomingCardId}
                   />
                 }
               >
@@ -207,7 +222,7 @@ const Room = (props: { code: string }) => {
                   room={view().room}
                   playerId={view().playerId}
                   send={connection.send}
-                  actionsDisabled={!connection.canAct()}
+                  actionsDisabled={table().actionsDisabled}
                 />
               </Show>
             )}
