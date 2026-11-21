@@ -11,7 +11,6 @@ import {
   untrack,
 } from "solid-js";
 
-import type { ClientMessage, GameCommand } from "../game/client-message";
 import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_PING,
@@ -19,32 +18,13 @@ import {
   ROOM_PARTY,
   ROOM_REMOVED_CLOSE_CODE,
 } from "../game/protocol";
-import type { RoomView, ServerMessage } from "../game/protocol";
 import { makeSteadyHeartbeat } from "./heartbeat";
+import { createRoomClient } from "./room-client";
 import { roomExists } from "./room-functions";
 
-export type ConnectionStatus =
-  | "connecting"
-  | "open"
-  | "reconnecting"
-  | "missing"
-  | "removed";
-
-export interface Notice {
-  id: number;
-  message: string;
-  confirmed?: boolean;
-}
-
-interface PendingMove {
-  requestId: string;
-  resolve: (accepted: boolean) => void;
-  timeout: ReturnType<typeof setTimeout>;
-}
+export type { ConnectionStatus, Notice } from "./room-client";
 
 const RETRY_DELAY_MS = 1500;
-const FAILURES_BEFORE_RECHECK = 3;
-const REPLY_TIMEOUT_MS = 6000;
 
 const HEARTBEAT = {
   interval: HEARTBEAT_INTERVAL_MS,
@@ -75,18 +55,7 @@ const plainText = {
   serialize: (data: string | null) => data ?? "",
 };
 
-export const createRoomConnection = (
-  code: string,
-  onUpdate?: (previous: RoomView, current: RoomView, playerId: string) => void
-) => {
-  const [room, setRoom] = createSignal<RoomView | null>(null);
-  const [playerId, setPlayerId] = createSignal<string | null>(null);
-  const [status, setStatus] = createSignal<ConnectionStatus>("connecting");
-  const [needsName, setNeedsName] = createSignal(false);
-  const [notice, setNotice] = createSignal<Notice | null>(null);
-  const [ready, setReady] = createSignal(false);
-  const [sending, setSending] = createSignal(false);
-
+export const createRoomConnection = (code: string) => {
   const [savedName, setSavedName] = makePersisted(
     createSignal("", { ownedWrite: true }),
     {
@@ -105,154 +74,44 @@ export const createRoomConnection = (
     }
   );
 
-  const [online, setOnline] = createSignal(true, { ownedWrite: true });
-  const owner = getOwner();
-
-  let previousRoom: RoomView | null = null;
-  let seatedPlayerId: string | null = null;
   let socket: PartySocket | null = null;
-  let awaitingWelcome = false;
-  let noticeId = 0;
-  let lastRequestId: string | undefined;
-  let pendingMove: PendingMove | null = null;
 
-  const settleMove = (accepted: boolean) => {
-    if (pendingMove) {
-      clearTimeout(pendingMove.timeout);
-      pendingMove.resolve(accepted);
-      pendingMove = null;
-      setSending(false);
-    }
-  };
-
-  const startSync = () => {
-    previousRoom = null;
-    seatedPlayerId = null;
-    lastRequestId = undefined;
-    awaitingWelcome = false;
-    setReady(false);
-
-    if (pendingMove) {
-      clearTimeout(pendingMove.timeout);
-    }
-  };
-
-  const closeSocket = () => {
-    const closing = socket;
-    socket = null;
-    closing?.close();
-  };
-
-  const raw = (message: ClientMessage) => {
-    if (socket?.readyState !== PartySocket.OPEN) {
-      return false;
-    }
-
-    socket.send(JSON.stringify(message));
-
-    return true;
-  };
-
-  const notify = (message: string, confirmed = false) => {
-    noticeId += 1;
-    setNotice({ confirmed, id: noticeId, message });
-  };
-
-  const forget = () => {
-    seatedPlayerId = null;
-    previousRoom = null;
-    setToken(null);
-    setPlayerId(null);
-  };
-
-  const handle = (message: ServerMessage) => {
-    switch (message.type) {
-      case "state": {
-        const previous = previousRoom;
-        previousRoom = seatedPlayerId === null ? null : message.room;
-        setRoom(message.room);
-
-        if (seatedPlayerId !== null) {
-          if (previous) {
-            onUpdate?.(previous, message.room, seatedPlayerId);
-          } else {
-            if (pendingMove) {
-              const accepted = pendingMove.requestId === lastRequestId;
-              settleMove(accepted);
-              notify(
-                accepted
-                  ? "Reconnected. Your last move counted."
-                  : "Couldn't confirm your last move. The table is up to date.",
-                accepted
-              );
-            }
-
-            setStatus("open");
-            setReady(true);
-          }
+  const client = createRoomClient({
+    newId: () => crypto.randomUUID(),
+    roomExists: async () => await roomExists(code),
+    socket: {
+      close: () => {
+        const closing = socket;
+        socket = null;
+        closing?.close();
+      },
+      isOpen: () => socket?.readyState === PartySocket.OPEN,
+      reconnect: () => {
+        socket?.reconnect();
+      },
+      send: (frame) => {
+        if (socket?.readyState !== PartySocket.OPEN) {
+          return false;
         }
 
-        return;
-      }
+        socket.send(frame);
 
-      case "welcome": {
-        awaitingWelcome = false;
-        setToken(message.token);
-        seatedPlayerId = message.playerId;
-        ({ lastRequestId } = message);
-        setPlayerId(message.playerId);
-        setNeedsName(false);
+        return true;
+      },
+    },
+    token: {
+      get: () => untrack(token),
+      set: (next) => {
+        setToken(next);
+      },
+    },
+  });
 
-        return;
-      }
-
-      case "accepted": {
-        if (pendingMove?.requestId === message.requestId) {
-          settleMove(true);
-        }
-
-        return;
-      }
-
-      case "rejected": {
-        if (pendingMove?.requestId === message.requestId) {
-          settleMove(false);
-          notify(message.message);
-        }
-
-        return;
-      }
-
-      case "error": {
-        if (awaitingWelcome) {
-          awaitingWelcome = false;
-          forget();
-          settleMove(false);
-          setNeedsName(true);
-          setStatus("open");
-        }
-
-        notify(message.message);
-
-        return;
-      }
-
-      default: {
-        message satisfies never;
-      }
-    }
-  };
-
-  const recheckRoom = async (ws: PartySocket) => {
-    const exists = await roomExists(code).catch(() => true);
-
-    if (!exists && ws === socket && untrack(status) === "reconnecting") {
-      settleMove(false);
-      startSync();
-      setStatus("missing");
-      closeSocket();
-    }
-  };
+  const [state, setState] = createSignal(client.state, { ownedWrite: true });
+  client.subscribe((next) => {
+    setState(next);
+  });
+  const owner = getOwner();
 
   const connect = () => {
     const ws = makeSteadyHeartbeat(
@@ -271,18 +130,9 @@ export const createRoomConnection = (
 
     socket = ws;
     ws.addEventListener("open", () => {
-      startSync();
-      const saved = token();
-
-      if (saved === null) {
-        setStatus("open");
-        setNeedsName(true);
-
-        return;
+      if (ws === socket) {
+        client.opened();
       }
-
-      awaitingWelcome = true;
-      raw({ name: "", token: saved, type: "join" });
     });
     ws.addEventListener("message", (event: MessageEvent<string>) => {
       if (ws !== socket || ws.readyState !== PartySocket.OPEN) {
@@ -292,47 +142,26 @@ export const createRoomConnection = (
       const message = parseServerMessage(event.data);
 
       if (message) {
-        handle(message);
+        client.received(message);
       }
     });
     ws.addEventListener("close", (event) => {
-      if (ws !== socket) {
-        return;
-      }
-
-      if (event.code === ROOM_REMOVED_CLOSE_CODE) {
-        settleMove(false);
-        startSync();
-        forget();
-        setStatus("removed");
-        closeSocket();
-
-        return;
-      }
-
-      startSync();
-      setStatus("reconnecting");
-      const { retryCount } = ws;
-
-      if (
-        retryCount === 1 ||
-        (retryCount > 0 && retryCount % FAILURES_BEFORE_RECHECK === 0)
-      ) {
-        void recheckRoom(ws);
+      if (ws === socket) {
+        client.closed(event.code, ws.retryCount);
       }
     });
   };
 
   const watchConnectivity = () => {
     makeConnectivityListener((isOnline) => {
-      setOnline(isOnline);
+      client.setOnline(isOnline);
     });
     const visible = usePageVisibility();
     createEffect(
-      () => online() && visible(),
+      () => state().online && visible(),
       (back) => {
-        if (back && untrack(status) === "reconnecting") {
-          socket?.reconnect();
+        if (back) {
+          client.resume();
         }
       }
     );
@@ -340,76 +169,30 @@ export const createRoomConnection = (
 
   // WARNING: browser-only primitives add owners the server render lacks, so start them after hydration.
   onSettled(() => {
-    setOnline(navigator.onLine);
+    client.setOnline(navigator.onLine);
     runWithOwner(owner, watchConnectivity);
     connect();
 
     return () => {
-      settleMove(false);
-      closeSocket();
+      client.stop();
     };
   });
 
   return {
-    canAct: () => online() && ready() && !sending(),
-    chat: (text: string) => {
-      if (!online() || previousRoom === null || !raw({ text, type: "chat" })) {
-        notify("Reconnecting. Try again in a moment.");
-
-        return false;
-      }
-
-      return true;
-    },
+    canAct: () => state().canAct,
+    chat: client.chat,
     join: (name: string) => {
       setSavedName(name);
-      awaitingWelcome = true;
-
-      if (!raw({ name, token: null, type: "join" })) {
-        awaitingWelcome = false;
-        notify("Not connected yet. Try again in a moment.");
-      }
+      client.join(name);
     },
-    needsName,
-    notice,
-    online,
-    playerId,
-    room,
+    needsName: () => state().needsName,
+    notice: () => state().notice,
+    online: () => state().online,
+    playerId: () => state().playerId,
+    room: () => state().room,
     savedName,
-    send: async (command: GameCommand) => {
-      if (pendingMove) {
-        return false;
-      }
-
-      if (
-        !online() ||
-        previousRoom === null ||
-        socket?.readyState !== PartySocket.OPEN
-      ) {
-        notify("Reconnecting. Try again in a moment.");
-
-        return false;
-      }
-
-      const requestId = crypto.randomUUID();
-      const { promise, resolve } = Promise.withResolvers<boolean>();
-
-      const timeout = setTimeout(() => {
-        startSync();
-        setStatus("reconnecting");
-        socket?.reconnect();
-      }, REPLY_TIMEOUT_MS);
-
-      pendingMove = { requestId, resolve, timeout };
-      setSending(true);
-
-      if (!raw({ ...command, requestId })) {
-        settleMove(false);
-      }
-
-      return await promise;
-    },
-    status,
+    send: client.send,
+    status: () => state().status,
   };
 };
 

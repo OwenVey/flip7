@@ -16,6 +16,8 @@ A multiplayer push-your-luck card game played in shared rooms, where players joi
 
 **Move**: A hit, stay or choice that the game is waiting on a player to make. The host can make it for an offline player. _Avoid_: decision, action (an action is a kind of card)
 
+**Pending move**: A move a player has sent that the room hasn't confirmed or rejected yet. A player has at most one. _Avoid_: in-flight request
+
 **Waiting on**: The one player whose move the game needs next. _Avoid_: blocking player, whose turn (a choice can be owed outside a turn)
 
 ## Clocks
