@@ -9,7 +9,7 @@ import {
 import { configureServerFunctionsClient } from "@solidjs/web/server-functions/client";
 import { createAgent } from "@ui-sdk/solid/agent";
 import { flush } from "solid-js";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import Home from ".";
 
@@ -30,8 +30,14 @@ const renderHome = () => {
 };
 
 describe(Home, () => {
+  beforeEach(() => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia, which the footer's rules dialog reads.
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  });
+
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
     configureServerFunctionsClient({ fetch: null });
   });
 

@@ -18,8 +18,10 @@ import PageMeta, {
   SITE_ORIGIN,
 } from "../components/page-meta";
 import PlayingCard from "../components/playing-card";
+import RulesDialog from "../components/rules-dialog";
 import { ADDITIVE_MODIFIER_KIND } from "../game/cards";
 import type { Card } from "../game/cards";
+import { TARGET_SCORE } from "../game/engine";
 import { CODE_ALPHABET, CODE_LENGTH, normalizeCode } from "../game/protocol";
 import { createRoom, roomExists } from "../lib/room-functions";
 import { paths } from "../router";
@@ -31,6 +33,8 @@ const HERO_CARDS: Card[] = [
   { id: 4, kind: ADDITIVE_MODIFIER_KIND, value: 4 },
   { id: 5, kind: "number", value: 12 },
 ];
+
+const HERO_FACTS = ["2–12 players", "No accounts", "Free to play"];
 
 const HOME_TITLE = `${SITE_NAME} · A push-your-luck card game`;
 
@@ -123,10 +127,15 @@ export default function Home() {
         <div class="hero-copy">
           <h1 class="wordmark">Hot Streak</h1>
           <p class="lede">
-            Hit to get another card or Stay to bank your points. Flip 7 unique
-            Number cards for 15 bonus points. Two to twelve players, no
-            accounts.
+            Hit for another card or Stay to bank your points. Flip 7 unique
+            Number cards for a 15-point bonus.
           </p>
+          <div class="hero-meta">
+            <ul class="hero-facts">
+              <For each={HERO_FACTS}>{(fact) => <li>{fact}</li>}</For>
+            </ul>
+            <RulesDialog targetScore={TARGET_SCORE} />
+          </div>
         </div>
         <ul class="hero-cards" aria-hidden="true">
           <For each={HERO_CARDS}>{(card) => <PlayingCard card={card} />}</For>
@@ -136,7 +145,11 @@ export default function Home() {
       <div class="home-actions">
         <section class="panel">
           <h2>Start a room</h2>
-          <p class="muted">You'll get a code to share with friends.</p>
+          <ol class="home-steps">
+            <li>Create a room and pick a name.</li>
+            <li>Share the code or link with friends.</li>
+            <li>Start the game once everyone has a seat.</li>
+          </ol>
           <Button
             data-variant="solid"
             disabled={pending() !== null}
@@ -183,7 +196,11 @@ export default function Home() {
               </OTPInput>
               <FieldError role="alert">{codeError()}</FieldError>
             </Field>
-            <Button type="submit" disabled={pending() !== null}>
+            <Button
+              type="submit"
+              data-variant={code().length === CODE_LENGTH ? "solid" : undefined}
+              disabled={pending() !== null}
+            >
               <ArrowRight size={16} />
               {pending() === "join" ? "Checking room…" : "Join room"}
             </Button>
