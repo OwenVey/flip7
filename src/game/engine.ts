@@ -1096,6 +1096,45 @@ export const removePlayer = (
   advance(state, random);
 };
 
+const evict = (
+  state: GameState,
+  playerId: string,
+  random: Random,
+  logText: (name: string) => string
+) => {
+  const player = findPlayer(state, playerId);
+
+  if (!player) {
+    throw new GameError("That player already left.");
+  }
+
+  removePlayer(state, playerId, random);
+  say(state, logText(player.name));
+};
+
+/** The host removes another player from the room. */
+export const kick = (
+  state: GameState,
+  hostId: string,
+  playerId: string,
+  random: Random
+) => {
+  if (state.hostId !== hostId) {
+    throw new GameError("Only the host can remove players.");
+  }
+
+  if (playerId === hostId) {
+    throw new GameError("Use Leave to leave the room.");
+  }
+
+  evict(state, playerId, random, (name) => `${name} was removed by the host.`);
+};
+
+/** A player removes themselves from the room. */
+export const leave = (state: GameState, playerId: string, random: Random) => {
+  evict(state, playerId, random, (name) => `${name} left.`);
+};
+
 export const backToLobby = (state: GameState, playerId: string) => {
   assertHost(state, playerId);
 

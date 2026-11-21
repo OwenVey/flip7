@@ -16,6 +16,8 @@ import {
   createGame,
   GameError,
   hit,
+  kick,
+  leave,
   nextRound,
   playFor,
   playForAbsent,
@@ -403,6 +405,49 @@ describe("winning and leaving", () => {
     removePlayer(state, "a", random);
     expect(state.choice).toBeNull();
     expect(state.turnId).toBe("b");
+  });
+});
+
+describe("evicting a player", () => {
+  it("lets the host kick another player and says so", () => {
+    const state = setup(["a", "b", "c"], [num(1), num(2), num(3)]);
+
+    kick(state, "a", "b", random);
+
+    expect(state.players.map((candidate) => candidate.id)).toStrictEqual([
+      "a",
+      "c",
+    ]);
+    expect(state.log.at(-1)?.text).toBe("b was removed by the host.");
+  });
+
+  it("only lets the host kick, and not themselves", () => {
+    const state = setup(["a", "b"], [num(1), num(2)]);
+
+    expect(() => {
+      kick(state, "b", "a", random);
+    }).toThrow("Only the host can remove players.");
+    expect(() => {
+      kick(state, "a", "a", random);
+    }).toThrow("Use Leave to leave the room.");
+    expect(state.players).toHaveLength(2);
+  });
+
+  it("rejects kicking someone who already left", () => {
+    const state = setup(["a", "b"], [num(1), num(2)]);
+
+    expect(() => {
+      kick(state, "a", "z", random);
+    }).toThrow("That player already left.");
+  });
+
+  it("lets a player leave and says so", () => {
+    const state = setup(["a", "b", "c"], [num(1), num(2), num(3)]);
+
+    leave(state, "a", random);
+
+    expect(state.hostId).toBe("b");
+    expect(state.log.at(-1)?.text).toBe("a left.");
   });
 });
 
