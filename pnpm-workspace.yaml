@@ -1,9 +1,6 @@
 packages:
   - "."
 
-lockfile:
-  format: v13
-
 allowBuilds:
   esbuild: true
   lefthook: true
