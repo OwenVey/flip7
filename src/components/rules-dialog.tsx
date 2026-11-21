@@ -7,6 +7,8 @@ import {
   DialogTrigger,
 } from "@ui-sdk/solid/dialog";
 
+import Tooltip from "./tooltip";
+
 export default function RulesDialog(props: { targetScore: number }) {
   return (
     <Dialog presentation="auto">
@@ -14,9 +16,20 @@ export default function RulesDialog(props: { targetScore: number }) {
       <DialogContent class="rules-dialog" initialFocus="content">
         <header class="table-sheet-header">
           <DialogTitle>How to play</DialogTitle>
-          <DialogClose aria-label="Close rules" data-size="sm" data-icon="">
+          <Tooltip
+            content="Close rules"
+            type="label"
+            trigger={(hint) => (
+              <DialogClose
+                {...hint}
+                aria-label="Close rules"
+                data-size="sm"
+                data-icon=""
+              />
+            )}
+          >
             <X size={16} aria-hidden="true" />
-          </DialogClose>
+          </Tooltip>
         </header>
         <div class="table-sheet-body">
           <ul>

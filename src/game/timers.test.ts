@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { addPlayer, chat, createGame, startGame } from "./engine";
+import { addBot, addPlayer, chat, createGame, startGame, stay } from "./engine";
+import { waitingOn as waitingOnPlayer } from "./moves";
 import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_STALE_MS } from "./protocol";
 import {
   ABSENT_GRACE_MS,
+  BOT_DELAY_MS,
   heartbeatDeadline,
   HOST_GRACE_MS,
   IDLE_EXPIRY_MS,
@@ -43,6 +45,19 @@ const goOffline = (timers: RoomTimers, id: string) => {
   if (player) {
     player.connected = false;
   }
+};
+
+const humanAgainstBotWaitingOnBot = () => {
+  const timers = room(["a"]);
+  addBot(timers.game, "a", "bot", random);
+  syncTimers(timers, START);
+  startGame(timers.game, "a", random);
+
+  if (waitingOnPlayer(timers.game)?.playerId === "a") {
+    stay(timers.game, "a", random);
+  }
+
+  return timers;
 };
 
 describe("room timers", () => {
@@ -133,5 +148,43 @@ describe("room timers", () => {
 
     syncTimers(timers, START + 1);
     expect(timers.stall).toBeNull();
+  });
+
+  it("waits a fixed time before a bot's move", () => {
+    const timers = humanAgainstBotWaitingOnBot();
+    expect(waitingOnPlayer(timers.game)?.playerId).toBe("bot");
+
+    syncTimers(timers, START);
+    const due = START + BOT_DELAY_MS;
+    expect(timers.botTurn).toStrictEqual({ at: due, playerId: "bot" });
+    expect(nextAlarmAt(timers)).toBe(due);
+  });
+
+  it("makes the bot's move once its wait is up", () => {
+    const timers = humanAgainstBotWaitingOnBot();
+    syncTimers(timers, START);
+    const due = timers.botTurn?.at ?? 0;
+
+    expect(runTimers(timers, due - 1, random, true).changed).toBeFalsy();
+    expect(runTimers(timers, due, random, true).changed).toBeTruthy();
+    expect(timers.botTurn).toBeNull();
+  });
+
+  it("pauses bots while no human is online", () => {
+    const timers = humanAgainstBotWaitingOnBot();
+    goOffline(timers, "a");
+    syncTimers(timers, START);
+    expect(timers.botTurn).toBeNull();
+    expect(timers.stall).toBeNull();
+    expect(nextAlarmAt(timers)).toBe(START + IDLE_EXPIRY_MS);
+  });
+
+  it("never hands the host to a bot", () => {
+    const timers = room(["a"]);
+    addBot(timers.game, "a", "bot", random);
+    goOffline(timers, "a");
+    syncTimers(timers, START);
+    expect(timers.hostLeftAt).toBeNull();
+    expect(timers.game.hostId).toBe("a");
   });
 });

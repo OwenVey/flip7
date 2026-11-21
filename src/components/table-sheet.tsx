@@ -9,6 +9,8 @@ import {
 } from "@ui-sdk/solid/dialog";
 import type { ParentProps } from "solid-js";
 
+import Tooltip from "./tooltip";
+
 export default function TableSheet(
   props: ParentProps<{
     title: string;
@@ -25,19 +27,37 @@ export default function TableSheet(
       open={props.open}
       onOpenChange={props.onOpenChange}
     >
-      <DialogTrigger
-        data-table-sheet-trigger=""
-        aria-label={props.triggerLabel}
-        title={props.title}
+      <Tooltip
+        content={props.triggerLabel}
+        type="label"
+        side="bottom"
+        trigger={(hint) => (
+          <DialogTrigger
+            {...hint}
+            data-table-sheet-trigger=""
+            aria-label={props.triggerLabel}
+          />
+        )}
       >
         {props.trigger}
-      </DialogTrigger>
+      </Tooltip>
       <DialogContent class="table-sheet" keepMounted={props.keepMounted}>
         <header class="table-sheet-header">
           <DialogTitle>{props.title}</DialogTitle>
-          <DialogClose aria-label="Close" data-size="sm" data-icon="">
+          <Tooltip
+            content="Close"
+            type="label"
+            trigger={(hint) => (
+              <DialogClose
+                {...hint}
+                aria-label="Close"
+                data-size="sm"
+                data-icon=""
+              />
+            )}
+          >
             <X size={16} aria-hidden="true" />
-          </DialogClose>
+          </Tooltip>
         </header>
         <div
           class="table-sheet-body"

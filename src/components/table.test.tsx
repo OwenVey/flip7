@@ -448,7 +448,7 @@ describe("<Table />", () => {
     expect(labels).toStrictEqual(
       expect.arrayContaining([
         "Hit",
-        "Stay with 7 points",
+        "Stay",
         "Copy invite link",
         "Leave room",
         "Remove Ben",
@@ -509,7 +509,7 @@ describe("<Table />", () => {
     ));
 
     const hit = screen.getByRole("button", { name: "Hit" });
-    const stay = screen.getByRole("button", { name: "Stay with 7 points" });
+    const stay = screen.getByRole("button", { name: "Stay" });
     expect(hit).toBeDisabled();
     expect(stay).toBeDisabled();
     hit.click();

@@ -9,6 +9,8 @@ import {
   AlertDialogTrigger,
 } from "@ui-sdk/solid/alert-dialog";
 
+import Tooltip from "./tooltip";
+
 export default function LeaveRoom(props: {
   disabled?: boolean;
   onLeave: () => void;
@@ -31,10 +33,26 @@ export default function LeaveRoom(props: {
         }
       }}
     >
-      <AlertDialogTrigger data-variant="destructive" disabled={props.disabled}>
+      <Tooltip
+        content="Leave room"
+        type="label"
+        compactOnly
+        trigger={(hint) => (
+          <AlertDialogTrigger
+            {...hint}
+            data-variant="destructive"
+            aria-disabled={props.disabled === true ? "true" : undefined}
+            onClick={(event) => {
+              if (props.disabled === true) {
+                event.preventDefault();
+              }
+            }}
+          />
+        )}
+      >
         <LogOut size={16} aria-hidden="true" />
         <span class="button-label">Leave room</span>
-      </AlertDialogTrigger>
+      </Tooltip>
       <AlertDialogBackdrop />
       <AlertDialogContent>
         <div class="alert-dialog-copy">

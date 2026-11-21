@@ -6,6 +6,8 @@ import { createTimer } from "@solid-primitives/timer";
 import { Button } from "@ui-sdk/solid/button";
 import { createSignal, Match, onSettled, Switch } from "solid-js";
 
+import Tooltip from "./tooltip";
+
 const COPIED_RESET_MS = 2000;
 
 const canUseShareSheet = () =>
@@ -56,9 +58,17 @@ export default function InviteButton(props: { solid?: boolean }) {
   };
 
   return (
-    <Button
-      data-variant={props.solid === true ? "solid" : undefined}
-      onClick={invite}
+    <Tooltip
+      content={label()}
+      type="label"
+      compactOnly
+      trigger={(hint) => (
+        <Button
+          {...hint}
+          data-variant={props.solid === true ? "solid" : undefined}
+          onClick={invite}
+        />
+      )}
     >
       <Switch fallback={<Link2 size={16} />}>
         <Match when={copied()}>
@@ -69,6 +79,6 @@ export default function InviteButton(props: { solid?: boolean }) {
         </Match>
       </Switch>
       <span class="button-label">{label()}</span>
-    </Button>
+    </Tooltip>
   );
 }

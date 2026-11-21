@@ -16,6 +16,8 @@ import {
   SliderTrack,
 } from "@ui-sdk/solid/slider";
 
+import Tooltip from "./tooltip";
+
 const VolumeControl = (props: {
   label: string;
   value: number;
@@ -50,17 +52,20 @@ export default function SoundControls(props: {
 
   return (
     <Popover>
-      <PopoverTrigger
-        aria-label="Audio settings"
-        data-icon=""
-        title="Audio settings"
+      <Tooltip
+        content="Audio settings"
+        type="label"
+        side="bottom"
+        trigger={(hint) => (
+          <PopoverTrigger {...hint} aria-label="Audio settings" data-icon="" />
+        )}
       >
         {silent() ? (
           <VolumeX size={18} aria-hidden="true" />
         ) : (
           <Volume2 size={18} aria-hidden="true" />
         )}
-      </PopoverTrigger>
+      </Tooltip>
       <PopoverContent class="audio-settings" side="bottom" align="end">
         <PopoverTitle>Audio settings</PopoverTitle>
         <VolumeControl

@@ -1,5 +1,5 @@
 import type { Random } from "./cards";
-import { findPlayer, playForAbsent, transferHost } from "./engine";
+import { findPlayer, playForAbsent, playForBot, transferHost } from "./engine";
 import type { GameState } from "./engine";
 import { waitingOn } from "./moves";
 import { HEARTBEAT_STALE_MS } from "./protocol";
@@ -8,13 +8,23 @@ export const HOST_GRACE_MS = 20_000;
 export const ABSENT_GRACE_MS = 30_000;
 export const IDLE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
+/** How long a bot waits before its move. */
+export const BOT_DELAY_MS = 500;
+
 export interface Stall {
   playerId: string;
   since: number;
 }
 
+export interface BotTurn {
+  playerId: string;
+  at: number;
+}
+
 export interface RoomTimers {
   game: GameState;
+  /** When the bot the game is waiting on makes its move. Missing on rooms saved before bots. */
+  botTurn?: BotTurn | null;
   lastActiveAt: number;
   hostLeftAt: number | null;
   /** Missing on rooms saved before offline players were auto-played. */
@@ -28,7 +38,27 @@ const offlineWhileOthersOnline = (game: GameState, id: string | null) => {
     return false;
   }
 
-  return game.players.some((other) => other.connected && other.id !== id);
+  return game.players.some(
+    (other) => other.connected && other.bot !== true && other.id !== id
+  );
+};
+
+const humanOnline = (game: GameState) =>
+  game.players.some((player) => player.connected && player.bot !== true);
+
+const syncBotTurn = (
+  room: RoomTimers,
+  blockerId: string | null,
+  now: number
+) => {
+  const { game } = room;
+  const bot = blockerId === null ? undefined : findPlayer(game, blockerId);
+
+  if (bot?.bot !== true || !humanOnline(game)) {
+    room.botTurn = null;
+  } else if (room.botTurn?.playerId !== bot.id) {
+    room.botTurn = { at: now + BOT_DELAY_MS, playerId: bot.id };
+  }
 };
 
 /**
@@ -52,6 +82,8 @@ export const syncTimers = (room: RoomTimers, now: number) => {
   } else if (room.stall?.playerId !== blockerId) {
     room.stall = { playerId: blockerId, since: now };
   }
+
+  syncBotTurn(room, blockerId, now);
 };
 
 export const heartbeatDeadline = (seatedAt: number, lastPing: Date | null) =>
@@ -69,6 +101,10 @@ export const nextAlarmAt = (
 
   if (room.stall) {
     deadlines.push(room.stall.since + ABSENT_GRACE_MS);
+  }
+
+  if (room.botTurn) {
+    deadlines.push(room.botTurn.at);
   }
 
   let next = Math.min(...deadlines);
@@ -100,6 +136,11 @@ export const runTimers = (
   if (room.stall && now - room.stall.since >= ABSENT_GRACE_MS) {
     room.stall = null;
     changed = playForAbsent(room.game, random) || changed;
+  }
+
+  if (room.botTurn && now >= room.botTurn.at) {
+    room.botTurn = null;
+    changed = playForBot(room.game, random) || changed;
   }
 
   const idle = now - room.lastActiveAt >= IDLE_EXPIRY_MS;
