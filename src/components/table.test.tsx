@@ -517,7 +517,7 @@ describe("<Table />", () => {
     approve = false;
   });
 
-  it("only the chooser sees target buttons for an action card", () => {
+  it("the chooser picks an action card target by clicking a seat", () => {
     const send = vi.fn<RoomConnection["send"]>();
 
     const choice = {

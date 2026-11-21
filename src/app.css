@@ -1014,6 +1014,83 @@ main {
   }
 }
 
+/*
+ * Choosing a target for an action card: a pickable seat looks as usual until
+ * the pointer is on it, then it lifts with a ring and glow in the card's color
+ * while the others step back.
+ */
+.seat[data-pickable] {
+  --pick-color: var(--accent);
+  --pick-glow: rgb(255 246 223 / 0.5);
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    opacity 140ms ease,
+    box-shadow 160ms ease;
+
+  &[data-pickable="freeze"] {
+    --pick-color: #2f7fb0;
+    --pick-glow: rgb(169 222 240 / 0.7);
+  }
+
+  &[data-pickable="flipThree"] {
+    --pick-color: var(--flip);
+    --pick-glow: rgb(212 195 240 / 0.7);
+  }
+
+  &[data-pickable="secondChance"] {
+    --pick-color: var(--good);
+    --pick-glow: rgb(158 219 203 / 0.7);
+  }
+
+  &:has(.seat-pick:is(:hover, :focus-visible):not(:disabled)) {
+    z-index: 1;
+    transform: translateY(-6px);
+    outline: 3px solid var(--pick-color);
+    outline-offset: 3px;
+    box-shadow:
+      var(--shadow-print),
+      0 0 2rem 0.25rem var(--pick-glow),
+      0 1.25rem 2rem rgb(4 20 14 / 0.5);
+  }
+
+  &:has(.seat-pick:disabled) {
+    cursor: default;
+  }
+
+  /* The host's Remove button stays clickable above the pick target. */
+  & [data-slot="alert-dialog-trigger"] {
+    position: relative;
+    z-index: 2;
+  }
+}
+
+.seats:has(.seat-pick:is(:hover, :focus-visible):not(:disabled))
+  .seat[data-pickable]:not(:has(.seat-pick:is(:hover, :focus-visible))) {
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat[data-pickable]:has(.seat-pick:is(:hover, :focus-visible)) {
+    transform: none;
+  }
+}
+
+.seat-pick {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: inherit;
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
 /* Frost overlay over a frozen seat: icy edges, a snowflake burst, drifting flakes. */
 .frost {
   position: absolute;

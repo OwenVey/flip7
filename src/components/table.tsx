@@ -157,6 +157,18 @@ const canStayById = (room: RoomView, id: string) => {
   return player ? canStay(player) : false;
 };
 
+const choiceVerb = (choice: ActionCardChoice) => {
+  if (choice.card.kind === "freeze") {
+    return "Freeze";
+  }
+
+  if (choice.card.kind === "flipThree") {
+    return "Play Flip Three on";
+  }
+
+  return "Give Second Chance to";
+};
+
 const RoundPlayer = (
   props: TableProps &
     Pick<DealProps, "incomingCardId" | "dealStep"> & {
@@ -191,6 +203,15 @@ const RoundPlayer = (
   const isHost = () => props.room.hostId === props.playerId;
   const hasDecision = () => blockingPlayerId(props.room) === props.player.id;
   const isFrozen = () => props.player.status === "frozen";
+
+  const pickChoice = () => {
+    const { choice } = props.room;
+
+    return choice?.chooserId === props.playerId &&
+      choice.options.includes(props.player.id)
+      ? choice
+      : null;
+  };
 
   const roundResult = () =>
     props.room.phase === "playing" ? null : props.player.lastRound;
@@ -272,8 +293,22 @@ const RoundPlayer = (
       data-turn={hasDecision() ? "" : undefined}
       data-me={isMe() ? "" : undefined}
       data-offline={props.player.connected ? undefined : ""}
+      data-pickable={pickChoice()?.card.kind}
       aria-label={`${props.player.name}, ${props.player.score} points`}
     >
+      <Show when={pickChoice()}>
+        {(choice) => (
+          <button
+            type="button"
+            class="seat-pick"
+            disabled={props.actionsDisabled}
+            aria-label={`${choiceVerb(choice())} ${isMe() ? "yourself" : props.player.name}`}
+            onClick={() => {
+              void props.send({ targetId: props.player.id, type: "choose" });
+            }}
+          />
+        )}
+      </Show>
       <header class="seat-header">
         <div class="seat-name">
           <strong>{props.player.name}</strong>
@@ -402,68 +437,33 @@ const RoundPlayer = (
   );
 };
 
-const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => {
-  const verb = () => {
-    if (props.choice.card.kind === "freeze") {
-      return "Freeze";
-    }
-
-    if (props.choice.card.kind === "flipThree") {
-      return "Play Flip Three on";
-    }
-
-    return "Give Second Chance to";
-  };
-
-  const targetLabel = (targetId: string, capitalized = false) => {
-    if (targetId !== props.playerId) {
-      return nameOf(props.room, targetId);
-    }
-
-    return capitalized ? "Yourself" : "yourself";
-  };
-
-  return (
-    <>
-      <ul class="dealt-action-card" data-choice-card="" aria-hidden="true">
-        <PlayingCard card={props.choice.card} />
-      </ul>
-      <Show
-        when={props.choice.chooserId === props.playerId}
-        fallback={
-          <p class="headline">
-            {nameOf(props.room, props.choice.chooserId)} is choosing who
-            receives {cardLabel(props.choice.card)}.
-            <Show when={isOffline(props.room, props.choice.chooserId)}>
-              <span class="muted">
-                {" "}
-                · Offline, so it will be played for them soon.
-              </span>
-            </Show>
-          </p>
-        }
-      >
-        <p class="headline">{verb()}…</p>
-        <div class="action-buttons">
-          <For each={props.choice.options}>
-            {(targetId) => (
-              <Button
-                disabled={props.actionsDisabled}
-                data-variant={targetId === props.playerId ? undefined : "solid"}
-                aria-label={`${verb()} ${targetLabel(targetId)}`}
-                onClick={async () =>
-                  await props.send({ targetId, type: "choose" })
-                }
-              >
-                {targetLabel(targetId, true)}
-              </Button>
-            )}
-          </For>
-        </div>
-      </Show>
-    </>
-  );
-};
+const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => (
+  <>
+    <ul class="dealt-action-card" data-choice-card="" aria-hidden="true">
+      <PlayingCard card={props.choice.card} />
+    </ul>
+    <Show
+      when={props.choice.chooserId === props.playerId}
+      fallback={
+        <p class="headline">
+          {nameOf(props.room, props.choice.chooserId)} is choosing who receives{" "}
+          {cardLabel(props.choice.card)}.
+          <Show when={isOffline(props.room, props.choice.chooserId)}>
+            <span class="muted">
+              {" "}
+              · Offline, so it will be played for them soon.
+            </span>
+          </Show>
+        </p>
+      }
+    >
+      <p class="headline">
+        {choiceVerb(props.choice)}…{" "}
+        <span class="muted">· Pick a player below</span>
+      </p>
+    </Show>
+  </>
+);
 
 const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
   const ranked = createMemo(() => {
