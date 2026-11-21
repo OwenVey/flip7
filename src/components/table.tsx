@@ -427,10 +427,7 @@ export default function Table(props: TableProps) {
   return (
     <div class="table">
       <header class="table-header">
-        <div>
-          <p class="eyebrow">Room {props.room.code}</p>
-          <h1>Round {props.room.round}</h1>
-        </div>
+        <h1>Round {props.room.round}</h1>
         <dl class="table-stats">
           <div>
             <dt>Deck</dt>

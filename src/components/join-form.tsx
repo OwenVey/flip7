@@ -30,7 +30,6 @@ export default function JoinForm(props: {
 
   return (
     <section class="panel join">
-      <p class="eyebrow">Room {props.room?.code}</p>
       <h1>Take a seat</h1>
       <Show when={props.room?.players.length}>
         <p class="muted">

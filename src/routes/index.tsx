@@ -4,8 +4,8 @@ import { Title } from "@solidjs/meta";
 import { useNavigate } from "@solidjs/router";
 import { Button } from "@ui-sdk/solid/button";
 import { Field, FieldError, FieldLabel } from "@ui-sdk/solid/field";
-import { Input } from "@ui-sdk/solid/input";
-import { createSignal, For } from "solid-js";
+import { OTPInput, OTPInputGroup, OTPInputSlot } from "@ui-sdk/solid/otp-input";
+import { createSignal, For, Repeat } from "solid-js";
 
 import PlayingCard from "../components/playing-card";
 import { ADDITIVE_MODIFIER_KIND } from "../game/cards";
@@ -22,7 +22,10 @@ const HERO_CARDS: Card[] = [
   { id: 5, kind: "number", value: 12 },
 ];
 
-const CODE_PATTERN_ATTR = `[${CODE_ALPHABET}${CODE_ALPHABET.toLowerCase()}]{${CODE_LENGTH}}`;
+const CODE_CHARACTER_PATTERN = new RegExp(
+  `[${CODE_ALPHABET}${CODE_ALPHABET.toLowerCase()}]`,
+  "u"
+);
 
 export default function Home() {
   const navigate = useNavigate();
@@ -45,7 +48,6 @@ export default function Home() {
       <Title>Hot Streak</Title>
       <section class="hero">
         <div class="hero-copy">
-          <p class="eyebrow">A push-your-luck card game</p>
           <h1 class="wordmark">Hot Streak</h1>
           <p class="lede">
             Hit to get another card or Stay to bank your points. Flip 7 unique
@@ -86,23 +88,24 @@ export default function Home() {
           >
             <Field name="code">
               <FieldLabel>Room code</FieldLabel>
-              <Input
-                class="code-input"
-                maxlength={CODE_LENGTH}
-                value={code()}
+              <OTPInput
+                autoComplete="off"
+                inputMode="text"
+                maxLength={CODE_LENGTH}
                 onValueChange={(value) => {
                   setCode(value);
                 }}
-                autocomplete="off"
-                autocapitalize="characters"
-                spellcheck={false}
-                pattern={CODE_PATTERN_ATTR}
-                placeholder="ABCDE"
+                pattern={CODE_CHARACTER_PATTERN}
                 required
-              />
-              <FieldError match="patternMismatch">
-                Room codes are {CODE_LENGTH} letters.
-              </FieldError>
+                value={code()}
+              >
+                <OTPInputGroup class="code-input">
+                  <Repeat count={CODE_LENGTH}>
+                    {(index) => <OTPInputSlot index={index} />}
+                  </Repeat>
+                </OTPInputGroup>
+              </OTPInput>
+              <FieldError>Enter the {CODE_LENGTH}-letter room code.</FieldError>
             </Field>
             <Button type="submit">
               <ArrowRight size={16} />

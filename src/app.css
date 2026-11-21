@@ -113,12 +113,7 @@ p {
 
 .code-input {
   font-weight: 700;
-  letter-spacing: 0.2em;
   text-transform: uppercase;
-
-  &::placeholder {
-    letter-spacing: 0.2em;
-  }
 }
 
 .page-header {
@@ -152,14 +147,6 @@ p {
 
 .invite {
   justify-items: start;
-}
-
-.eyebrow {
-  color: var(--accent);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 .link {
@@ -341,12 +328,6 @@ main {
   display: grid;
   gap: 1rem;
   justify-items: start;
-
-  & .eyebrow {
-    padding-block: 0.25rem;
-    border-block: 1px solid var(--gold);
-    color: var(--gold);
-  }
 }
 
 .hero-cards {

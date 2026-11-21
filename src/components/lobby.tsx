@@ -34,10 +34,7 @@ export default function Lobby(props: {
   return (
     <div class="lobby-page">
       <header class="page-header">
-        <div>
-          <p class="eyebrow">Lobby</p>
-          <h1>Get your table together</h1>
-        </div>
+        <h1>Get your table together</h1>
         <LeaveRoom
           onLeave={() => {
             void props.send({ type: "leave" });
