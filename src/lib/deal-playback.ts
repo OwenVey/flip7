@@ -1,12 +1,12 @@
-import { createEffect, createSignal, flush, onSettled } from "solid-js";
+/* oxlint-disable eslint/no-await-in-loop -- Card flights and Room updates must play in order. */
 
-import type { RoomView } from "../game/protocol";
+import { waitingOn } from "../game/moves";
 import { roundStarted } from "../game/protocol";
-import { dealFrame, leavesTable, planDeal } from "./deal-plan";
+import type { RoomView } from "../game/protocol";
+import { dealFrame, planDeal } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
-import { discardCards, flyCard, riffleDeck, sweepCards } from "./fly-card";
-import { motionAllowed } from "./motion";
-import { bump } from "./table-motion";
+import { roomCues } from "./room-cues";
+import type { RoomCue } from "./room-cues";
 
 const FLIGHT_MS = 460;
 const FLIP_FLIGHT_MS = 560;
@@ -15,61 +15,66 @@ const PAUSE_MS = 70;
 const FLIP_PAUSE_MS = 260;
 const FLIP_LEAD_IN_MS = 320;
 
-interface DealHooks {
-  /** A card landed in its place. */
-  onCardLanded?: (step: DealStep) => void;
-  /** The table caught up with a room update, after dealing `dealt` cards. */
-  onSettled?: (previous: RoomView, current: RoomView, dealt: number) => void;
-  /** A room update with cards to deal arrived at the front of the queue. */
-  onDealStart?: (previous: RoomView, current: RoomView) => void;
+export interface DealMotion {
+  allowed: () => boolean;
+  captureFlight: (
+    step: DealStep,
+    duration: number
+  ) => ((signal: AbortSignal) => Promise<void>) | null;
+  land: (step: DealStep, signal: AbortSignal) => Promise<void>;
+  reshuffle: () => void;
+  sweep: (signal: AbortSignal) => Promise<void>;
 }
 
-const wait = async (ms: number) => {
-  const { promise, resolve } = Promise.withResolvers<unknown>();
-  setTimeout(resolve, ms);
+interface PlaybackInput {
+  canAct: boolean;
+  playerId: string;
+  room: RoomView;
+}
+
+interface Frame {
+  dealing: boolean;
+  incomingCardId: number | null;
+  room: RoomView | null;
+  step: DealStep | null;
+}
+
+export interface DealPlaybackView extends Frame {
+  actionsDisabled: boolean;
+  myMove: boolean;
+}
+
+const emptyFrame: Frame = {
+  dealing: false,
+  incomingCardId: null,
+  room: null,
+  step: null,
+};
+
+export const initialDealPlayback: DealPlaybackView = {
+  ...emptyFrame,
+  actionsDisabled: true,
+  myMove: false,
+};
+
+const wait = async (ms: number, signal: AbortSignal) => {
+  if (ms === 0 || signal.aborted) {
+    return;
+  }
+
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+
+  const done = () => {
+    resolve(undefined);
+  };
+
+  const timer = setTimeout(done, ms);
+  signal.addEventListener("abort", done, { once: true });
   await promise;
+
+  clearTimeout(timer);
+  signal.removeEventListener("abort", done);
 };
-
-const cardAt = (cardId: number | null) =>
-  cardId === null ? "" : ` [data-card-id="${cardId}"]`;
-
-const handCard = (playerId: string, cardId: number | null) =>
-  cardId === null
-    ? null
-    : document.querySelector(
-        `[data-seat="${playerId}"] :is(.hand, .seat-extras)${cardAt(cardId)}`
-      );
-
-const destination = (step: DealStep) => {
-  const { to } = step;
-
-  if (to.kind === "choice") {
-    return document.querySelector(`[data-choice-card]${cardAt(step.card.id)}`);
-  }
-
-  if (to.kind === "held") {
-    return document.querySelector(
-      `[data-seat="${to.playerId}"] [data-held]${cardAt(step.card.id)}`
-    );
-  }
-
-  return handCard(to.playerId, step.card.id);
-};
-
-const origin = (step: DealStep) => {
-  const selectors = {
-    choice: `[data-choice-card]${cardAt(step.card.id)}`,
-    deck: "[data-deck] .card-back",
-    held: `[data-held]${cardAt(step.card.id)}`,
-  } as const;
-
-  return document.querySelector(selectors[step.from]);
-};
-
-const reshuffled = (previous: RoomView, current: RoomView) =>
-  current.round === previous.round &&
-  current.deckCount > previous.deckCount &&
-  current.discardCount < previous.discardCount;
 
 const flightTime = (step: DealStep, hurry: boolean) => {
   if (hurry) {
@@ -87,227 +92,210 @@ const pauseAfter = (step: DealStep, hurry: boolean) => {
   return step.flip ? FLIP_PAUSE_MS : PAUSE_MS;
 };
 
-const fly = async (step: DealStep, from: DOMRect, hurry: boolean) => {
-  const to = destination(step);
-  const layer = document.querySelector("[data-flight-layer]");
-
-  if (!(layer && to instanceof HTMLElement)) {
-    return;
+const ownMove = ({ room, playerId }: PlaybackInput) => {
+  if (waitingOn(room)?.playerId !== playerId) {
+    return null;
   }
 
-  to.dataset.incoming = "";
-  await flyCard({
-    duration: flightTime(step, hurry),
-    faceDown: step.from === "deck",
-    from,
-    layer,
-    to,
-  });
-  to.dataset.flown = "";
-  delete to.dataset.incoming;
-};
-
-const discardAfterLanding = async (step: DealStep) => {
-  if (!leavesTable(step.to)) {
-    return;
+  if (room.choice) {
+    return `${room.round}:choice:${room.choice.card.id}`;
   }
 
-  const cards =
-    step.from === "held"
-      ? [origin(step)]
-      : [
-          handCard(step.to.playerId, step.card.id),
-          handCard(step.to.playerId, step.partnerId),
-        ];
-
-  await discardCards(cards.filter((card) => card !== null));
+  return `${room.round}:turn:${room.drawSeq}`;
 };
 
-const sweepLastRound = async (
-  previous: RoomView,
-  current: RoomView,
-  deck: Element
-) => {
-  if (previous.phase === "lobby" || !roundStarted(previous, current)) {
-    return;
-  }
+const reshuffled = (previous: RoomView, current: RoomView) =>
+  current.round === previous.round &&
+  current.deckCount > previous.deckCount &&
+  current.discardCount < previous.discardCount;
 
-  await sweepCards(
-    [...document.querySelectorAll(".seat .card")],
-    deck.getBoundingClientRect()
-  );
-};
-
-/**
- * Plays room updates back as a dealer would: each new card leaves the deck
- * and flies into its place one at a time, and the rest of the update shows
- * once the last card lands. Updates that arrive meanwhile wait their turn and
- * deal faster so the table never falls far behind.
- */
 export const createDealPlayback = (
-  source: () => RoomView | null,
-  hooks: DealHooks = {}
+  motion: DealMotion,
+  publish: (view: DealPlaybackView) => void,
+  cue: (cue: RoomCue) => void
 ) => {
-  const [room, setRoom] = createSignal<RoomView | null>(null);
-  const [step, setStep] = createSignal<DealStep | null>(null);
-  const [dealing, setDealing] = createSignal(false);
-  const [incoming, setIncoming] = createSignal<number | null>(null);
   const queue: RoomView[] = [];
+  let latest: PlaybackInput | null = null;
   let settled: RoomView | null = null;
-  let running = false;
-  let generation = 0;
+  let run: AbortController | null = null;
+  let frame = emptyFrame;
+  let moveCuePending = false;
 
-  const show = (view: RoomView | null) => {
-    setRoom(view);
-    flush();
+  const show = (patch: Partial<Frame> = {}, sounds: RoomCue[] = []) => {
+    frame = { ...frame, ...patch };
+
+    const actionsDisabled = run !== null || latest?.canAct !== true;
+
+    const myMove =
+      !actionsDisabled && latest !== null && ownMove(latest) !== null;
+
+    publish({ ...frame, actionsDisabled, myMove });
+
+    for (const sound of sounds) {
+      cue(sound);
+    }
+
+    if (myMove && moveCuePending) {
+      moveCuePending = false;
+      cue("turn");
+    }
   };
 
-  const dealFrom = async (
+  const playSteps = async (
     previous: RoomView,
     current: RoomView,
     steps: DealStep[],
-    index: number,
-    run: number
+    signal: AbortSignal
   ) => {
-    const next = steps.at(index);
-
-    if (next === undefined || run !== generation) {
-      return;
-    }
-
-    const hurry = queue.length > 0;
-
-    const announced = index > 0 && steps.at(index - 1)?.to.kind === "played";
-
-    const startsFlip = next.flip?.index === 1 && !hurry && !announced;
-
-    if (startsFlip && next.flip) {
-      setStep({ ...next, flip: { ...next.flip, index: 0 } });
-      flush();
-      await wait(FLIP_LEAD_IN_MS);
-    }
-
-    const from = origin(next)?.getBoundingClientRect();
-    const flies = next.from !== "held" || !leavesTable(next.to);
-    setStep(next);
-    setIncoming(next.card.id);
-    show(dealFrame(previous, current, steps, index + 1));
-
-    if (from && flies) {
-      await fly(next, from, hurry);
-    }
-
-    if (run !== generation) {
-      return;
-    }
-
-    setIncoming(null);
-    flush();
-    hooks.onCardLanded?.(next);
-
-    if (next.from === "choice" && next.to.kind !== "choice") {
-      bump(document.querySelector(`[data-seat="${next.to.playerId}"]`));
-    }
-
-    await discardAfterLanding(next);
-    await wait(pauseAfter(next, hurry));
-    await dealFrom(previous, current, steps, index + 1, run);
-  };
-
-  const playNext = async (run: number) => {
-    const current = queue.shift();
-
-    if (!current) {
-      return;
-    }
-
-    const previous = settled;
-    settled = current;
-
-    if (!previous) {
-      show(current);
-
-      return;
-    }
-
-    const deck = document.querySelector("[data-deck] .card-back");
-
-    if (deck && motionAllowed() && reshuffled(previous, current)) {
-      riffleDeck(deck);
-    }
-
-    const steps = motionAllowed() ? planDeal(previous, current) : [];
-
-    if (steps.length > 0) {
-      setDealing(true);
-      hooks.onDealStart?.(previous, current);
-
-      if (deck && queue.length === 0) {
-        await sweepLastRound(previous, current, deck);
+    for (const [index, step] of steps.entries()) {
+      if (signal.aborted) {
+        return;
       }
 
-      await dealFrom(previous, current, steps, 0, run);
-    }
+      const hurry = queue.length > 0;
+      const announced = index > 0 && steps.at(index - 1)?.to.kind === "played";
 
-    if (run === generation) {
-      setStep(null);
-      show(current);
-      hooks.onSettled?.(previous, current, steps.length);
+      if (step.flip?.index === 1 && !hurry && !announced) {
+        show({ step: { ...step, flip: { ...step.flip, index: 0 } } });
+        await wait(FLIP_LEAD_IN_MS, signal);
+      }
+
+      if (signal.aborted) {
+        return;
+      }
+
+      const fly = motion.captureFlight(step, flightTime(step, hurry));
+      show({
+        incomingCardId: step.card.id,
+        room: dealFrame(previous, current, steps, index + 1),
+        step,
+      });
+      await fly?.(signal);
+
+      if (signal.aborted) {
+        return;
+      }
+
+      show({ incomingCardId: null });
+      cue("reveal");
+      await motion.land(step, signal);
+      await wait(pauseAfter(step, hurry), signal);
     }
   };
 
-  const playQueue = async (run: number) => {
-    if (queue.length === 0 || run !== generation) {
-      return;
+  const playTransition = async (
+    previous: RoomView,
+    current: RoomView,
+    steps: DealStep[],
+    signal: AbortSignal
+  ) => {
+    show({ dealing: true });
+    const newRound = roundStarted(previous, current);
+
+    if (newRound) {
+      cue("deal");
     }
 
-    await playNext(run);
-    await playQueue(run);
+    if (newRound && previous.phase !== "lobby" && queue.length === 0) {
+      await motion.sweep(signal);
+    }
+
+    await playSteps(previous, current, steps, signal);
   };
 
-  const drain = async () => {
-    if (running) {
-      return;
-    }
+  const drain = async (signal: AbortSignal) => {
+    for (let current = queue.shift(); current; current = queue.shift()) {
+      const previous = settled;
+      settled = current;
+      let sounds: RoomCue[] = [];
 
-    running = true;
-    const run = generation;
-    await playQueue(run);
+      if (previous && latest) {
+        const animate = motion.allowed();
+        const steps = animate ? planDeal(previous, current) : [];
 
-    if (run === generation) {
-      running = false;
-      setDealing(false);
+        if (animate && reshuffled(previous, current)) {
+          motion.reshuffle();
+        }
+
+        if (steps.length > 0) {
+          await playTransition(previous, current, steps, signal);
+        }
+
+        if (signal.aborted) {
+          return;
+        }
+
+        sounds = roomCues(previous, current, latest.playerId).filter(
+          (sound) =>
+            steps.length === 0 || (sound !== "deal" && sound !== "reveal")
+        );
+      }
+
+      const caughtUp = queue.length === 0;
+
+      if (caughtUp) {
+        run = null;
+      }
+
+      show(
+        { dealing: !caughtUp && frame.dealing, room: current, step: null },
+        sounds
+      );
     }
   };
 
   const reset = () => {
-    generation += 1;
+    run?.abort();
+    run = null;
     queue.length = 0;
+    latest = null;
     settled = null;
-    running = false;
-    setStep(null);
-    setIncoming(null);
-    setDealing(false);
-    show(null);
+    frame = emptyFrame;
+    moveCuePending = false;
   };
 
-  createEffect(source, (next) => {
-    queueMicrotask(() => {
-      if (next === null) {
-        reset();
+  return {
+    dispose: reset,
+    update: (next: PlaybackInput | null) => {
+      if (!next) {
+        if (latest) {
+          reset();
+          show();
+        }
 
         return;
       }
 
-      queue.push(next);
-      void drain();
-    });
-  });
+      if (
+        latest &&
+        (latest.room.code !== next.room.code ||
+          latest.playerId !== next.playerId)
+      ) {
+        reset();
+      }
 
-  onSettled(() => () => {
-    generation += 1;
-    queue.length = 0;
-  });
+      const previous = latest;
+      latest = next;
+      const move = ownMove(next);
 
-  return { dealing, incoming, room, step };
+      if (move !== (previous && ownMove(previous))) {
+        moveCuePending = move !== null;
+      }
+
+      if (previous?.room === next.room) {
+        if (previous.canAct !== next.canAct && run === null) {
+          show();
+        }
+
+        return;
+      }
+
+      queue.push(next.room);
+
+      if (!run) {
+        run = new AbortController();
+        void drain(run.signal);
+      }
+    },
+  };
 };

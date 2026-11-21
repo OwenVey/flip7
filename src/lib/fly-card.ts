@@ -12,15 +12,10 @@ interface Flight {
   to: HTMLElement;
   faceDown: boolean;
   duration: number;
+  signal: AbortSignal;
   /** A fixed, full-viewport layer the flying copy is drawn in. */
   layer: Element;
 }
-
-const wait = async (ms: number) => {
-  const { promise, resolve } = Promise.withResolvers<unknown>();
-  setTimeout(resolve, ms);
-  await promise;
-};
 
 const centre = (rect: DOMRect) => ({
   x: rect.left + rect.width / 2,
@@ -106,16 +101,37 @@ const placeAt = (element: HTMLElement, rect: DOMRect) => {
   element.style.height = `${rect.height}px`;
 };
 
-const settle = async (animations: Animation[], timeout: number) => {
+const settle = async (
+  animations: Animation[],
+  timeout: number,
+  signal: AbortSignal
+) => {
+  const cancel = () => {
+    for (const animation of animations) {
+      animation.cancel();
+    }
+  };
+
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+
+  const timer = setTimeout(() => {
+    resolve(undefined);
+  }, timeout + SETTLE_GRACE_MS);
+
+  signal.addEventListener("abort", cancel, { once: true });
+
   try {
     await Promise.race([
       Promise.all(
         animations.map(async (animation) => await animation.finished)
       ),
-      wait(timeout + SETTLE_GRACE_MS),
+      promise,
     ]);
   } catch {
-    // WARNING: a cancelled animation rejects `finished`; the card still lands.
+    cancel();
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener("abort", cancel);
   }
 };
 
@@ -124,7 +140,12 @@ const moved = (from: DOMRect, to: DOMRect) =>
   Math.abs(from.top - to.top) > 1 ||
   Math.abs(from.width - to.width) > 1;
 
-const glideTo = async (ghost: HTMLElement, from: DOMRect, to: DOMRect) => {
+const glideTo = async (
+  ghost: HTMLElement,
+  from: DOMRect,
+  to: DOMRect,
+  signal: AbortSignal
+) => {
   placeAt(ghost, to);
 
   const animation = ghost.animate(
@@ -138,7 +159,7 @@ const glideTo = async (ghost: HTMLElement, from: DOMRect, to: DOMRect) => {
     { duration: SETTLE_MS, easing: "ease-out" }
   );
 
-  await settle([animation], SETTLE_MS);
+  await settle([animation], SETTLE_MS, signal);
 };
 
 /**
@@ -152,6 +173,7 @@ export const flyCard = async ({
   faceDown,
   duration,
   layer,
+  signal,
 }: Flight) => {
   const target = to.getBoundingClientRect();
 
@@ -163,57 +185,59 @@ export const flyCard = async ({
   const restingShadow = getComputedStyle(to).boxShadow;
   layer.replaceChildren(ghost);
 
-  const start = centre(from);
-  const end = centre(target);
-  const scale = from.width / target.width;
+  try {
+    const start = centre(from);
+    const end = centre(target);
+    const scale = from.width / target.width;
 
-  const animations = [
-    ghost.animate(
-      [
-        {
-          transform: `translate(${start.x - end.x}px, ${start.y - end.y}px) scale(${scale}) rotate(${FLIGHT_TILT_DEG}deg)`,
-        },
-        { transform: "none" },
-      ],
-      { duration, easing: FLIGHT_EASING }
-    ),
-    face.animate(
-      [
-        { boxShadow: `${restingShadow}, ${LIFT_SHADOW}` },
-        { boxShadow: `${restingShadow}, ${LIFT_SHADOW}`, offset: 0.7 },
-        { boxShadow: restingShadow },
-      ],
-      { duration, easing: "ease-out" }
-    ),
-  ];
-
-  if (faceDown) {
-    animations.push(
-      inner.animate(
+    const animations = [
+      ghost.animate(
         [
-          { transform: "rotateY(180deg)" },
-          { offset: FLIP_START, transform: "rotateY(180deg)" },
-          { transform: "rotateY(0deg)" },
+          {
+            transform: `translate(${start.x - end.x}px, ${start.y - end.y}px) scale(${scale}) rotate(${FLIGHT_TILT_DEG}deg)`,
+          },
+          { transform: "none" },
         ],
-        { duration, easing: "ease-in-out" }
-      )
-    );
+        { duration, easing: FLIGHT_EASING }
+      ),
+      face.animate(
+        [
+          { boxShadow: `${restingShadow}, ${LIFT_SHADOW}` },
+          { boxShadow: `${restingShadow}, ${LIFT_SHADOW}`, offset: 0.7 },
+          { boxShadow: restingShadow },
+        ],
+        { duration, easing: "ease-out" }
+      ),
+    ];
+
+    if (faceDown) {
+      animations.push(
+        inner.animate(
+          [
+            { transform: "rotateY(180deg)" },
+            { offset: FLIP_START, transform: "rotateY(180deg)" },
+            { transform: "rotateY(0deg)" },
+          ],
+          { duration, easing: "ease-in-out" }
+        )
+      );
+    }
+
+    await settle(animations, duration, signal);
+    const landed = to.getBoundingClientRect();
+
+    if (!signal.aborted && landed.width > 0 && moved(target, landed)) {
+      await glideTo(ghost, target, landed, signal);
+    }
+  } finally {
+    ghost.remove();
   }
-
-  await settle(animations, duration);
-  const landed = to.getBoundingClientRect();
-
-  if (landed.width > 0 && moved(target, landed)) {
-    await glideTo(ghost, target, landed);
-  }
-
-  ghost.remove();
 };
 
 const DISCARD_MS = 520;
 
 /** Lifts cards off the table and fades them out, as when Second Chance is used. */
-export const discardCards = async (cards: Element[]) => {
+export const discardCards = async (cards: Element[], signal: AbortSignal) => {
   if (cards.length === 0) {
     return;
   }
@@ -236,7 +260,8 @@ export const discardCards = async (cards: Element[]) => {
         { duration: DISCARD_MS, easing: "ease-in", fill: "forwards" }
       )
     ),
-    DISCARD_MS
+    DISCARD_MS,
+    signal
   );
 };
 
@@ -261,7 +286,11 @@ const SWEEP_STEP_MS = 30;
  * Gathers every card off the table toward the deck, one after another, so a
  * new round reads as a fresh deal instead of hands vanishing at once.
  */
-export const sweepCards = async (cards: Element[], toward: DOMRect) => {
+export const sweepCards = async (
+  cards: Element[],
+  toward: DOMRect,
+  signal: AbortSignal
+) => {
   if (cards.length === 0) {
     return;
   }
@@ -294,5 +323,5 @@ export const sweepCards = async (cards: Element[], toward: DOMRect) => {
     );
   });
 
-  await settle(animations, SWEEP_MS + SWEEP_SPREAD_MS);
+  await settle(animations, SWEEP_MS + SWEEP_SPREAD_MS, signal);
 };
