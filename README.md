@@ -62,7 +62,7 @@ The pre-commit hook runs `ultracite fix` on staged files.
 | `src/routes/` | `/` creates or joins a room; `/room/:code` shows the lobby or the table. |
 | `src/components/` | The lobby, the table, cards and the room controls, built on ui-sdk. |
 
-- **Identity.** Joining returns a random token, kept in `sessionStorage`, so a refresh puts you back in your seat. A new tab counts as a new player. Your display name is remembered in `localStorage`.
+- **Identity.** Joining returns a random token per room, kept in `localStorage`, so a refresh, a second tab or reopening the link puts you back in your seat. In dev, add `?fresh` to the room URL to keep the token per tab instead, so one browser can play several players. Your display name is remembered in `localStorage`.
 - **Host.** The host starts the game and can remove players. If the host disconnects for 20 seconds, the next connected player becomes host.
 - **Offline players.** If the game waits on a player who has gone offline for 30 seconds, it plays for them: they stay on their turn, and an action card they must hand out goes to another player. These clocks only run while someone else is online.
 - **Cleanup.** A room deletes its storage 24 hours after the last move or the last socket closing, whichever is later, once no sockets are left.

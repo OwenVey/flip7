@@ -35,7 +35,14 @@ const HEARTBEAT = {
 const NAME_KEY = "hot-streak:name";
 const STORAGE_PROBE = "hot-streak:probe";
 
+const FRESH_PARAM = "fresh";
+
 const tokenKey = (code: string) => `hot-streak:token:${code}`;
+
+const pickTokenStorage = () =>
+  import.meta.env.DEV && new URLSearchParams(location.search).has(FRESH_PARAM)
+    ? sessionStorage
+    : localStorage;
 
 // WARNING: private windows can throw on any storage access, so fall back to memory.
 const usableStorage = (pick: () => Storage) => {
@@ -70,7 +77,7 @@ export const createRoomConnection = (code: string) => {
     {
       ...plainText,
       name: tokenKey(code),
-      storage: usableStorage(() => sessionStorage),
+      storage: usableStorage(pickTokenStorage),
     }
   );
 
