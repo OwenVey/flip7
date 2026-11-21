@@ -16,7 +16,6 @@ const PACKAGES_ROOT = "src/packages";
 
 // --- derived patterns (no need to edit) -------------------------------------
 const R = PACKAGES_ROOT;
-
 /**
  * A package's private internals: anything nested inside a package subfolder.
  * The package's root files are its entry points and are NOT matched here:
@@ -68,8 +67,7 @@ module.exports = {
     },
     {
       name: "no-circular",
-      comment:
-        "No dependency cycles. Scope to `^${R}/` if you want to allow cycles outside packages.",
+      comment: "No dependency cycles. Scope to `^${R}/` if you want to allow cycles outside packages.",
       severity: "error",
       from: {},
       to: { circular: true },

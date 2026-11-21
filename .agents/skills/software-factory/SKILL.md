@@ -8,25 +8,42 @@ A **software factory** is a system of agents that turns tickets, PRs and schedul
 
 ## Tasks and runs
 
-**Task**: A kind of work the factory performs, defined once and run many times: review, explore, implement, ratchet. A task may work on a ticket, a PR, or the codebase as a whole. _Avoid_: job, workflow, action, as names for the task. A CI vendor's workflow file and its jobs are where a task is wired up, not the task.
+**Task**:
+A kind of work the factory performs, defined once and run many times: review, explore, implement, ratchet. A task may work on a ticket, a PR, or the codebase as a whole.
+_Avoid_: job, workflow, action, as names for the task. A CI vendor's workflow file and its jobs are where a task is wired up, not the task.
 
-**Trigger**: The event that starts a run: a change in the ticket tracker or git host, a clock in the orchestrator, or another run.
+**Trigger**:
+The event that starts a run: a change in the ticket tracker or git host, a clock in the orchestrator, or another run.
 
-**Run**: One execution of a task on one runner, from its trigger to its finish, treated as a black box. A run triggers further runs either directly, through logic in the orchestrator, or by changing the ticket tracker or git host. A run never waits for a human: it ends, and the human's later change to the ticket tracker or git host triggers a new run. _Avoid_: session
+**Run**:
+One execution of a task on one runner, from its trigger to its finish, treated as a black box. A run triggers further runs either directly, through logic in the orchestrator, or by changing the ticket tracker or git host. A run never waits for a human: it ends, and the human's later change to the ticket tracker or git host triggers a new run.
+_Avoid_: session
 
-**Runner**: The disposable machine a run executes on. Nothing on it survives the run, even when the machine itself is long-lived: a run's only memory of earlier runs is the ticket tracker, the git host and the orchestrator. _Avoid_: server, host, box, compute, sandbox
+**Runner**:
+The disposable machine a run executes on. Nothing on it survives the run, even when the machine itself is long-lived: a run's only memory of earlier runs is the ticket tracker, the git host and the orchestrator.
+_Avoid_: server, host, box, compute, sandbox
 
 ## Services
 
-**Ticket tracker**: Where tickets live, and the factory's human interface: humans schedule work by filing tickets, talk to agents in their comments, and their changes to tickets trigger runs. _Avoid_: issue tracker, ticket manager, project board
+**Ticket tracker**:
+Where tickets live, and the factory's human interface: humans schedule work by filing tickets, talk to agents in their comments, and their changes to tickets trigger runs.
+_Avoid_: issue tracker, ticket manager, project board
 
-**Ticket source**: Anything outside the factory that creates tickets in the ticket tracker: a feedback button, a monitor, an error tracker, an inbox. _Avoid_: data source, trigger source, intake
+**Ticket source**:
+Anything outside the factory that creates tickets in the ticket tracker: a feedback button, a monitor, an error tracker, an inbox.
+_Avoid_: data source, trigger source, intake
 
-**Git host**: Where branches, PRs and reviews live. _Avoid_: code host, forge, repo
+**Git host**:
+Where branches, PRs and reviews live.
+_Avoid_: code host, forge, repo
 
-**Orchestrator**: The component that receives triggers, starts runs on runners, and records which runs are queued, in flight or finished. _Avoid_: dispatcher, scheduler, control plane
+**Orchestrator**:
+The component that receives triggers, starts runs on runners, and records which runs are queued, in flight or finished.
+_Avoid_: dispatcher, scheduler, control plane
 
-**Observability platform**: Where runners send logs, traces and status, so a human can see what happened inside each run. Optional: the product filling the runner or orchestrator slot often shows enough on its own. A run never decides on it until something writes it into the ticket tracker or git host. _Avoid_: observability, logs, monitoring, dashboard
+**Observability platform**:
+Where runners send logs, traces and status, so a human can see what happened inside each run. Optional: the product filling the runner or orchestrator slot often shows enough on its own. A run never decides on it until something writes it into the ticket tracker or git host.
+_Avoid_: observability, logs, monitoring, dashboard
 
 ## Designing a factory
 
@@ -48,14 +65,14 @@ Add one automated trigger at a time, throttled at first (one bug report in ten, 
 
 Each service is a slot. One product can fill several slots, and one server can host several services. Three designs, side by side:
 
-| Service | All on GitHub | Linear tickets | Own tracker |
-| --- | --- | --- | --- |
-| Ticket tracker | GitHub Issues | Linear | own app |
-| Ticket source | feedback button | feedback button, monitor | feedback button, monitor |
-| Git host | GitHub | GitHub | GitHub |
-| Orchestrator | GitHub Actions | own server + database | own app |
-| Runner | Actions runner | Actions, E2B, Daytona or a VPS | own app, or sandboxes |
-| Observability platform | none: Actions run pages suffice | an LLM tracing platform | own app |
+| Service                | All on GitHub                   | Linear tickets                 | Own tracker              |
+| ---------------------- | ------------------------------- | ------------------------------ | ------------------------ |
+| Ticket tracker         | GitHub Issues                   | Linear                         | own app                  |
+| Ticket source          | feedback button                 | feedback button, monitor       | feedback button, monitor |
+| Git host               | GitHub                          | GitHub                         | GitHub                   |
+| Orchestrator           | GitHub Actions                  | own server + database          | own app                  |
+| Runner                 | Actions runner                  | Actions, E2B, Daytona or a VPS | own app, or sandboxes    |
+| Observability platform | none: Actions run pages suffice | an LLM tracing platform        | own app                  |
 
 When the user is choosing a product for a slot, read that slot's survey to get oriented, then research the current options yourself; each survey groups the options by type and lists the questions that decide the slot:
 
