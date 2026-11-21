@@ -409,6 +409,63 @@ p {
   border-radius: 0.875rem;
 }
 
+/*
+ * Dropdowns grow out of their trigger and shrink back into it. ui-sdk keeps
+ * the content mounted until the exit transition on data-ending-style ends.
+ */
+:is(
+  [data-slot="popover-content"],
+  [data-slot="menu-content"],
+  [data-slot="select-content"],
+  [data-slot="combobox-content"],
+  [data-slot="autocomplete-content"],
+  [data-slot="trigger-menu-content"],
+  [data-slot="hover-card-content"]
+) {
+  --dropdown-shift: 0.375rem;
+
+  transform-origin: var(--transform-origin, top);
+  transition:
+    opacity 140ms ease-out,
+    scale 160ms cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    translate 160ms cubic-bezier(0.2, 0.9, 0.3, 1);
+
+  &:is([data-starting-style], [data-ending-style]) {
+    opacity: 0;
+    scale: 0.94;
+  }
+
+  &[data-ending-style] {
+    transition-duration: 110ms;
+    transition-timing-function: ease-in;
+  }
+
+  &[data-side="bottom"]:is([data-starting-style], [data-ending-style]) {
+    translate: 0 calc(var(--dropdown-shift) * -1);
+  }
+
+  &[data-side="top"]:is([data-starting-style], [data-ending-style]) {
+    translate: 0 var(--dropdown-shift);
+  }
+
+  &[data-side="left"]:is([data-starting-style], [data-ending-style]) {
+    translate: var(--dropdown-shift) 0;
+  }
+
+  &[data-side="right"]:is([data-starting-style], [data-ending-style]) {
+    translate: calc(var(--dropdown-shift) * -1) 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: opacity 120ms linear;
+
+    &:is([data-starting-style], [data-ending-style]) {
+      scale: none;
+      translate: none;
+    }
+  }
+}
+
 .site-nav {
   display: flex;
   align-items: center;
