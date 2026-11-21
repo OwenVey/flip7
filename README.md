@@ -1,6 +1,6 @@
 # Hot Streak
 
-![Hot Streak banner showing a fan of Number, Freeze, and Score Modifier cards on green felt](public/og-image.jpg)
+![Hot Streak banner showing a fan of Number, Freeze, and Score Modifier cards on green felt](docs/readme-banner.jpg)
 
 A multiplayer push-your-luck card game for **2–12 players**. Share a room link or code and join with a display name. No account is required.
 
