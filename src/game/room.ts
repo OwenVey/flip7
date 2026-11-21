@@ -78,6 +78,39 @@ export interface RoomOutcome {
   alarmAt: number;
 }
 
+/** How a transport carries out effects: reply to the sender, broadcast the table to every seat, or close a connection. */
+export interface RoomTransport {
+  reply: (message: ServerMessage) => void;
+  broadcast: () => void;
+  close: (connectionId: string, code: number, reason: string) => void;
+}
+
+/** Carries out an outcome's effects in order. Save the room before calling this. */
+export const deliver = (outcome: RoomOutcome, transport: RoomTransport) => {
+  for (const effect of outcome.effects) {
+    switch (effect.type) {
+      case "reply": {
+        transport.reply(effect.message);
+        break;
+      }
+
+      case "broadcast": {
+        transport.broadcast();
+        break;
+      }
+
+      case "close": {
+        transport.close(effect.connectionId, effect.code, effect.reason);
+        break;
+      }
+
+      default: {
+        effect satisfies never;
+      }
+    }
+  }
+};
+
 export const newStoredRoom = (code: string, now: number) => {
   const room: StoredRoom = {
     code,

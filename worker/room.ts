@@ -4,7 +4,7 @@ import type { Connection, WSMessage } from "partyserver";
 import { parseClientMessage } from "../src/game/client-message";
 import { HEARTBEAT_PING, HEARTBEAT_PONG } from "../src/game/protocol";
 import type { ServerMessage } from "../src/game/protocol";
-import { createRoom, newStoredRoom } from "../src/game/room";
+import { createRoom, deliver, newStoredRoom } from "../src/game/room";
 import type { RoomOutcome, Seat, Seats, StoredRoom } from "../src/game/room";
 
 const UINT32_RANGE = 2 ** 32;
@@ -154,19 +154,18 @@ export class GameRoom extends Server<Env> {
       ]);
     }
 
-    for (const effect of outcome.effects) {
-      if (effect.type === "reply") {
-        if (sender) {
-          send(sender, effect.message);
-        }
-      } else if (effect.type === "broadcast") {
+    deliver(outcome, {
+      broadcast: () => {
         this.broadcast(state);
-      } else {
-        this.getConnection(effect.connectionId)?.close(
-          effect.code,
-          effect.reason
-        );
-      }
-    }
+      },
+      close: (connectionId, code, reason) => {
+        this.getConnection(connectionId)?.close(code, reason);
+      },
+      reply: (message) => {
+        if (sender) {
+          send(sender, message);
+        }
+      },
+    });
   }
 }
