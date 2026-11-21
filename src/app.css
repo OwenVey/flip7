@@ -34,20 +34,20 @@
   --on-felt-soft: #cfe3d4;
   --shadow-table: 0 0.5rem 1.25rem rgb(4 20 14 / 0.45);
 
-  /* Number cards run cold to hot: the higher the card, the hotter the streak. */
+  /* Each number card has its own color, matched to the printed deck. */
   --heat-0: #e9eef2;
-  --heat-1: #6fa8e8;
-  --heat-2: #5cc0de;
-  --heat-3: #4fc7b0;
-  --heat-4: #72cc7c;
-  --heat-5: #aed453;
-  --heat-6: #e8d544;
-  --heat-7: #f8b93c;
-  --heat-8: #f6973a;
-  --heat-9: #f07642;
-  --heat-10: #e5574c;
-  --heat-11: #d6466b;
-  --heat-12: #b4448a;
+  --heat-1: #bfab90;
+  --heat-2: #d4dc33;
+  --heat-3: #de485f;
+  --heat-4: #4cb8ad;
+  --heat-5: #3bab48;
+  --heat-6: #aa4c8d;
+  --heat-7: #cb7b72;
+  --heat-8: #abcf76;
+  --heat-9: #eb8b30;
+  --heat-10: #d9252a;
+  --heat-11: #759bc5;
+  --heat-12: #8f7f6d;
 
   --font-display: "Bungee", ui-sans-serif, system-ui, sans-serif;
   --font-numeral:
