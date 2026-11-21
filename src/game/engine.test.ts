@@ -797,6 +797,127 @@ describe("Flip Three", () => {
   });
 });
 
+const pendingAssignment = () => {
+  const state = setup(["a", "b", "c", "d"], [num(5), num(3), num(8), num(4)]);
+  const heldFreeze = freeze();
+  const heldFlipThree = flipThree();
+  rig(state, [flipThree(), num(1), heldFreeze, heldFlipThree]);
+
+  hit(state, "a", random);
+  choose(state, "a", "b", random);
+  choose(state, "b", "c", random);
+
+  return { heldFlipThree, heldFreeze, state };
+};
+
+describe("held action cards through eviction", () => {
+  it("discards both assigned and unassigned cards when the chooser leaves", () => {
+    const { heldFlipThree, heldFreeze, state } = pendingAssignment();
+    const before = toRoomView("ABCDE", state);
+    const mark = state.discard.length;
+
+    leave(state, "b", random);
+
+    expect(before).toMatchObject({
+      choice: { card: heldFlipThree, chooserId: "b" },
+      held: [{ card: heldFreeze, ownerId: "c" }],
+    });
+    expect(toRoomView("ABCDE", state)).toMatchObject({
+      choice: null,
+      held: [],
+      phase: "playing",
+    });
+    expect(state.discard.slice(mark)).toContainEqual(heldFreeze);
+    expect(state.discard.slice(mark)).toContainEqual(heldFlipThree);
+    expect(player(state, "c").status).toBe("active");
+  });
+
+  it("retains a target's held card until the assignment reaches its discard slot", () => {
+    const { heldFlipThree, heldFreeze, state } = pendingAssignment();
+    const spareDraws = [num(2), num(6), num(7)];
+    rig(state, spareDraws);
+
+    leave(state, "c", random);
+
+    expect(toRoomView("ABCDE", state)).toMatchObject({
+      choice: { card: heldFlipThree, chooserId: "b", options: ["a", "b", "d"] },
+      held: [{ card: heldFreeze, ownerId: "c" }],
+    });
+    expect(state.discard).not.toContainEqual(heldFreeze);
+
+    choose(state, "b", "a", random);
+
+    expect(state.discard).toContainEqual(heldFreeze);
+    expect(toRoomView("ABCDE", state)).toMatchObject({
+      choice: null,
+      held: [],
+    });
+    expect(state.log).toContainEqual(
+      expect.objectContaining({
+        text: "Freeze for a player who left was discarded, since they're out of the round.",
+      })
+    );
+  });
+
+  it("discards a queued card as soon as its target is kicked during resolution", () => {
+    const state = setup(["a", "b", "c", "d"], [num(5), num(3), num(8), num(4)]);
+    const queuedFreeze = freeze();
+    const nextChoice = freeze();
+    rig(state, [
+      flipThree(),
+      num(1),
+      flipThree(),
+      queuedFreeze,
+      num(2),
+      num(6),
+      nextChoice,
+    ]);
+    hit(state, "a", random);
+    choose(state, "a", "b", random);
+    choose(state, "b", "d", random);
+    choose(state, "b", "c", random);
+
+    expect(toRoomView("ABCDE", state)).toMatchObject({
+      choice: { card: nextChoice, chooserId: "d" },
+      held: [{ card: queuedFreeze, ownerId: "c" }],
+    });
+
+    kick(state, "a", "c", random);
+
+    expect(state.discard).toContainEqual(queuedFreeze);
+    expect(toRoomView("ABCDE", state)).toMatchObject({
+      choice: { card: nextChoice, chooserId: "d", options: ["a", "b", "d"] },
+      held: [],
+    });
+  });
+});
+
+describe("held action cards in saved Rooms", () => {
+  it("opens a choice for the owner of an old queued card without a target", () => {
+    const state = setup(["a", "b", "c"], [num(5), num(3), num(8)]);
+    const card = freeze();
+    delete state.assignment;
+    state.actionQueue = [{ card, ownerId: "b" }];
+
+    expect(toRoomView("ABCDE", state).held).toStrictEqual([
+      { card, ownerId: "b" },
+    ]);
+
+    stay(state, "a", random);
+
+    expect(toRoomView("ABCDE", state)).toMatchObject({
+      choice: { card, chooserId: "b", options: ["b", "c"] },
+      held: [],
+    });
+
+    choose(state, "b", "c", random);
+
+    const target = player(state, "c");
+    expect(target.hand).toContainEqual(card);
+    expect(target.status).toBe("frozen");
+  });
+});
+
 describe("Flip Three during the opening deal", () => {
   it("resolves the chain, then offers Hit or Stay at a flipped player's slot", () => {
     const trigger = flipThree();

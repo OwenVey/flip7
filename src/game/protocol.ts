@@ -1,3 +1,4 @@
+import { projectActionCards } from "./action-card-resolution";
 import { TARGET_SCORE } from "./engine";
 import type { DrawEvent, GameState, HeldCard, Player } from "./engine";
 
@@ -68,35 +69,11 @@ export type ServerMessage =
   | { room: RoomView; type: "state" }
   | { message: string; type: "error" };
 
-const heldCards = (state: GameState) => {
-  const assignment = state.assignment ?? null;
-
-  const held: HeldCard[] = state.flipRuns.flatMap((run) =>
-    run.deferred.map((card) => ({ card, ownerId: run.targetId }))
-  );
-
-  if (assignment) {
-    for (const card of assignment.cards) {
-      if (card.id !== state.choice?.card.id) {
-        held.push({ card, ownerId: assignment.chooserId });
-      }
-    }
-
-    for (const { card, ownerId, targetId } of assignment.assigned) {
-      held.push({ card, ownerId: targetId ?? ownerId });
-    }
-  }
-
-  for (const { card, ownerId, targetId } of state.actionQueue) {
-    held.push({ card, ownerId: targetId ?? ownerId });
-  }
-
-  return held;
-};
-
 export const toRoomView = (code: string, state: GameState) => {
+  const { choice, flips, held } = projectActionCards(state);
+
   const view: RoomView = {
-    choice: state.choice,
+    choice,
     code,
     dealerId:
       state.phase === "lobby"
@@ -106,11 +83,8 @@ export const toRoomView = (code: string, state: GameState) => {
     discardCount: state.discard.length,
     draws: state.draws ?? [],
     drawSeq: state.drawSeq ?? 0,
-    flips: state.flipRuns.map(({ remaining, targetId }) => ({
-      remaining,
-      targetId,
-    })),
-    held: heldCards(state),
+    flips,
+    held,
     hostId: state.hostId,
     log: state.log,
     phase: state.phase,

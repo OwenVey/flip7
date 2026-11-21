@@ -1,6 +1,16 @@
 import {
+  advanceActionCards,
+  chooseActionCard,
+  discardActionCards,
+  evictFromActionCards,
+  initialActionCards,
+  offerActionCardChoice,
+  resetActionCards,
+  startFlipThree,
+} from "./action-card-resolution";
+import type { ActionCardState, FlipDraw } from "./action-card-resolution";
+import {
   buildDeck,
-  cardLabel,
   FLIP_SEVEN_COUNT,
   isActionCard,
   calculateRoundScore,
@@ -13,7 +23,10 @@ import type { Move } from "./moves";
 
 export const TARGET_SCORE = 200;
 export const MAX_PLAYERS = 12;
-export const FLIP_THREE_COUNT = 3;
+
+export { FLIP_THREE_COUNT } from "./action-card-resolution";
+
+export type { ActionCardChoice, HeldCard } from "./action-card-resolution";
 
 /** This status is stored in rooms and sent in WebSocket state messages. */
 export const FLIP_SEVEN_STATUS = "streak";
@@ -48,12 +61,6 @@ export interface Player {
   played?: ActionCard[];
 }
 
-export interface ActionCardChoice {
-  chooserId: string;
-  card: ActionCard;
-  options: string[];
-}
-
 /**
  * What became of a drawn card: kept in the hand, busted the player, cancelled
  * by Second Chance, held until a Flip Three ends, or played as an action.
@@ -66,37 +73,8 @@ export interface DrawEvent {
   card: Card;
   playerId: string;
   /** Set when the card is one of the flips of a Flip Three. */
-  flip: { index: number; total: number } | null;
+  flip: FlipDraw["progress"] | null;
   outcome: DrawOutcome;
-}
-
-/** An action card waiting to be played once a Flip Three ends. */
-export interface HeldCard {
-  card: ActionCard;
-  ownerId: string;
-}
-
-interface FlipThreeSequence {
-  targetId: string;
-  remaining: number;
-  deferred: ActionCard[];
-}
-
-interface QueuedAction {
-  ownerId: string;
-  card: ActionCard;
-  /** Missing on rooms saved before deferred actions were assigned up front. */
-  targetId?: string;
-}
-
-/**
- * The Freeze and Flip Three cards a finished Flip Three set aside. Its target
- * assigns every one, in reveal order, before any of them takes effect.
- */
-interface DeferredAssignment {
-  chooserId: string;
-  cards: ActionCard[];
-  assigned: QueuedAction[];
 }
 
 export type GameCue =
@@ -121,7 +99,7 @@ export interface LogEntry {
   text: string;
 }
 
-export interface GameState {
+export interface GameState extends ActionCardState {
   phase: Phase;
   hostId: string | null;
   players: Player[];
@@ -134,16 +112,12 @@ export interface GameState {
   turnId: string | null;
   turnAnchor: number;
   dealQueue: string[];
-  flipRuns: FlipThreeSequence[];
-  actionQueue: QueuedAction[];
-  choice: ActionCardChoice | null;
   winnerIds: string[];
   log: LogEntry[];
   logSeq: number;
   drawSeq?: number;
   /** The most recent draws, oldest first. Missing on rooms saved before draws were recorded. */
   draws?: DrawEvent[];
-  assignment?: DeferredAssignment | null;
   /** Players dealt Flip Three cards this round, who get Hit or Stay at their opening deal slot. */
   flippedIds?: string[];
   /** The current turn is an opening deal slot, so it doesn't move where play resumes. */
@@ -156,13 +130,11 @@ export class GameError extends Error {
 
 export const createGame = () => {
   const state: GameState = {
-    actionQueue: [],
-    choice: null,
+    ...initialActionCards(),
     dealQueue: [],
     dealerIndex: -1,
     deck: [],
     discard: [],
-    flipRuns: [],
     hostId: null,
     log: [],
     logSeq: 0,
@@ -335,11 +307,7 @@ const applyAction = (
 
   if (card.kind === "flipThree") {
     target.played = [...(target.played ?? []), card];
-    state.flipRuns.push({
-      deferred: [],
-      remaining: FLIP_THREE_COUNT,
-      targetId: target.id,
-    });
+    startFlipThree(state, target.id);
     say(
       state,
       target.id === owner.id
@@ -359,61 +327,34 @@ const applyAction = (
   );
 };
 
-const offerActionCardChoice = (
-  state: GameState,
-  owner: Player,
-  card: ActionCard,
-  options: string[]
-) => {
-  if (options.length === 0) {
-    state.discard.push(card);
-
-    return;
-  }
-
-  const [only] = options;
-
-  if (options.length === 1 && only !== undefined) {
-    applyAction(state, owner, card, only);
-
-    return;
-  }
-
-  state.choice = { card, chooserId: owner.id, options };
-};
-
 const startAction = (state: GameState, owner: Player, card: ActionCard) => {
-  if (card.kind === "secondChance") {
-    if (!hasSecondChance(owner)) {
-      owner.hand.push(card);
-      say(state, `${owner.name} is holding a Second Chance.`, "special");
-
-      return;
-    }
-
-    const options: string[] = [];
-
-    for (const player of activePlayers(state)) {
-      if (player.id !== owner.id && !hasSecondChance(player)) {
-        options.push(player.id);
-      }
-    }
-
-    if (options.length === 0) {
-      say(state, `${owner.name} discarded an extra Second Chance.`);
-    }
-
-    offerActionCardChoice(state, owner, card, options);
+  if (card.kind === "secondChance" && !hasSecondChance(owner)) {
+    owner.hand.push(card);
+    say(state, `${owner.name} is holding a Second Chance.`, "special");
 
     return;
   }
 
-  offerActionCardChoice(
-    state,
-    owner,
-    card,
-    activePlayers(state).map((player) => player.id)
-  );
+  const options: string[] = [];
+
+  for (const player of activePlayers(state)) {
+    if (
+      card.kind !== "secondChance" ||
+      (player.id !== owner.id && !hasSecondChance(player))
+    ) {
+      options.push(player.id);
+    }
+  }
+
+  if (card.kind === "secondChance" && options.length === 0) {
+    say(state, `${owner.name} discarded an extra Second Chance.`);
+  }
+
+  const targetId = offerActionCardChoice(state, owner.id, card, options);
+
+  if (targetId !== null) {
+    applyAction(state, owner, card, targetId);
+  }
 };
 
 const numberOutcome = (player: Player, card: NumberCard) => {
@@ -426,12 +367,7 @@ const numberOutcome = (player: Player, card: NumberCard) => {
     : ("saved" satisfies DrawOutcome);
 };
 
-const placeDealtCard = (
-  state: GameState,
-  player: Player,
-  card: Card,
-  sequence: FlipThreeSequence | null
-) => {
+const placeDealtCard = (state: GameState, player: Player, card: Card) => {
   if (card.kind === "number") {
     placeNumberCard(state, player, card);
 
@@ -444,12 +380,6 @@ const placeDealtCard = (
     return "kept" satisfies DrawOutcome;
   }
 
-  if (sequence && card.kind !== "secondChance") {
-    sequence.deferred.push(card);
-
-    return "held" satisfies DrawOutcome;
-  }
-
   startAction(state, player, card);
 
   return "action" satisfies DrawOutcome;
@@ -459,23 +389,20 @@ const resolveDealtCard = (
   state: GameState,
   player: Player,
   card: Card,
-  sequence: FlipThreeSequence | null
+  flip?: FlipDraw
 ) => {
-  const outcome = placeDealtCard(state, player, card, sequence);
+  const outcome =
+    flip?.held === true ? "held" : placeDealtCard(state, player, card);
+
   const draws = state.draws ?? [];
 
-  if (sequence && state.flippedIds?.includes(player.id) !== true) {
+  if (flip && state.flippedIds?.includes(player.id) !== true) {
     state.flippedIds = [...(state.flippedIds ?? []), player.id];
   }
 
   draws.push({
     card,
-    flip: sequence
-      ? {
-          index: FLIP_THREE_COUNT - sequence.remaining,
-          total: FLIP_THREE_COUNT,
-        }
-      : null,
+    flip: flip?.progress ?? null,
     outcome,
     playerId: player.id,
     seq: state.drawSeq ?? 0,
@@ -502,28 +429,10 @@ const roundIsOver = (state: GameState) =>
   activePlayers(state).length === 0;
 
 const finishRound = (state: GameState) => {
-  for (const sequence of state.flipRuns) {
-    state.discard.push(...sequence.deferred);
-  }
-
-  state.discard.push(...state.actionQueue.map(({ card }) => card));
-
-  if (state.assignment) {
-    state.discard.push(
-      ...state.assignment.cards,
-      ...state.assignment.assigned.map(({ card }) => card)
-    );
-  } else if (state.choice) {
-    state.discard.push(state.choice.card);
-  }
-
+  discardActionCards(state);
   state.turnId = null;
   state.dealQueue = [];
-  state.flipRuns = [];
-  state.actionQueue = [];
-  state.assignment = null;
   state.dealSlotTurn = false;
-  state.choice = null;
 
   for (const player of state.players) {
     if (player.status === "out") {
@@ -561,163 +470,6 @@ const finishRound = (state: GameState) => {
   );
 };
 
-const cardNames = (cards: ActionCard[]) =>
-  cards.map((card) => cardLabel(card)).join(" and ");
-
-const finishFlipThree = (state: GameState, sequence: FlipThreeSequence) => {
-  if (sequence.deferred.length === 0) {
-    return;
-  }
-
-  const target = findPlayer(state, sequence.targetId);
-
-  if (target?.status !== "active") {
-    state.discard.push(...sequence.deferred);
-    say(
-      state,
-      `${cardNames(sequence.deferred)} set aside during the Flip Three ${sequence.deferred.length === 1 ? "was" : "were"} discarded.`
-    );
-
-    return;
-  }
-
-  state.assignment = {
-    assigned: [],
-    cards: [...sequence.deferred],
-    chooserId: target.id,
-  };
-};
-
-const assignDeferred = (
-  state: GameState,
-  assignment: DeferredAssignment,
-  targetId: string
-) => {
-  const card = assignment.cards.shift();
-  const chooser = findPlayer(state, assignment.chooserId);
-  const target = findPlayer(state, targetId);
-
-  if (!card) {
-    return;
-  }
-
-  assignment.assigned.push({ card, ownerId: assignment.chooserId, targetId });
-  say(
-    state,
-    targetId === assignment.chooserId
-      ? `${chooser?.name ?? "Someone"} assigned ${cardLabel(card)} to themselves.`
-      : `${chooser?.name ?? "Someone"} assigned ${cardLabel(card)} to ${target?.name ?? "someone"}.`,
-    "special"
-  );
-};
-
-const stepAssignment = (state: GameState) => {
-  const { assignment } = state;
-
-  if (!assignment) {
-    return false;
-  }
-
-  const [card] = assignment.cards;
-
-  if (card === undefined) {
-    state.actionQueue = [...assignment.assigned, ...state.actionQueue];
-    state.assignment = null;
-
-    return true;
-  }
-
-  const options = activePlayers(state).map((player) => player.id);
-  const [only] = options;
-
-  if (options.length === 0) {
-    state.discard.push(
-      ...assignment.cards,
-      ...assignment.assigned.map((queued) => queued.card)
-    );
-    state.assignment = null;
-  } else if (options.length === 1 && only !== undefined) {
-    assignDeferred(state, assignment, only);
-  } else {
-    state.choice = { card, chooserId: assignment.chooserId, options };
-  }
-
-  return true;
-};
-
-const stepFlipThreeSequence = (state: GameState, random: Random) => {
-  const sequence = state.flipRuns.at(-1);
-
-  if (!sequence) {
-    return false;
-  }
-
-  if (sequence.remaining === 0 || !isActive(state, sequence.targetId)) {
-    state.flipRuns.pop();
-    finishFlipThree(state, sequence);
-
-    return true;
-  }
-
-  const card = draw(state, random);
-
-  if (!card) {
-    sequence.remaining = 0;
-
-    return true;
-  }
-
-  sequence.remaining -= 1;
-  resolveDealtCard(state, getPlayer(state, sequence.targetId), card, sequence);
-
-  return true;
-};
-
-const stepActionQueue = (state: GameState) => {
-  const queued = state.actionQueue.shift();
-
-  if (!queued) {
-    return false;
-  }
-
-  const owner = findPlayer(state, queued.ownerId);
-
-  if (queued.targetId === undefined) {
-    if (owner?.status === "active") {
-      state.assignment = {
-        assigned: [],
-        cards: [queued.card],
-        chooserId: owner.id,
-      };
-    } else {
-      state.discard.push(queued.card);
-    }
-
-    return true;
-  }
-
-  const target = findPlayer(state, queued.targetId);
-
-  if (target?.status !== "active") {
-    state.discard.push(queued.card);
-    say(
-      state,
-      `${cardLabel(queued.card)} for ${target?.name ?? "a player who left"} was discarded, since they're out of the round.`
-    );
-
-    return true;
-  }
-
-  applyAction(
-    state,
-    owner ?? { id: queued.ownerId, name: "Someone" },
-    queued.card,
-    target.id
-  );
-
-  return true;
-};
-
 const stepDeal = (state: GameState, random: Random) => {
   const id = state.dealQueue.shift();
 
@@ -741,13 +493,30 @@ const stepDeal = (state: GameState, random: Random) => {
   const card = draw(state, random);
 
   if (card) {
-    resolveDealtCard(state, player, card, null);
+    resolveDealtCard(state, player, card);
   }
 
   return true;
 };
 
 const advance = (state: GameState, random: Random) => {
+  const effects = {
+    apply: (
+      owner: Pick<Player, "id" | "name">,
+      card: ActionCard,
+      targetId: string
+    ) => {
+      applyAction(state, owner, card, targetId);
+    },
+    draw: () => draw(state, random),
+    flip: (playerId: string, card: Card, flip: FlipDraw) => {
+      resolveDealtCard(state, getPlayer(state, playerId), card, flip);
+    },
+    say: (text: string, cue?: GameCue) => {
+      say(state, text, cue);
+    },
+  };
+
   while (state.phase === "playing" && !state.choice) {
     if (roundIsOver(state)) {
       finishRound(state);
@@ -755,12 +524,7 @@ const advance = (state: GameState, random: Random) => {
       return;
     }
 
-    const resolving =
-      stepFlipThreeSequence(state, random) ||
-      stepAssignment(state) ||
-      stepActionQueue(state);
-
-    if (resolving) {
+    if (advanceActionCards(state, effects)) {
       continue;
     }
 
@@ -806,10 +570,7 @@ const startRound = (state: GameState, random: Random) => {
   state.dealerIndex = (state.dealerIndex + 1) % state.players.length;
   state.turnAnchor = state.dealerIndex;
   state.turnId = null;
-  state.choice = null;
-  state.flipRuns = [];
-  state.actionQueue = [];
-  state.assignment = null;
+  resetActionCards(state);
   state.flippedIds = [];
   state.dealSlotTurn = false;
   state.phase = "playing";
@@ -910,7 +671,7 @@ export const hit = (state: GameState, playerId: string, random: Random) => {
   const card = draw(state, random);
 
   if (card) {
-    resolveDealtCard(state, player, card, null);
+    resolveDealtCard(state, player, card);
   }
 
   advance(state, random);
@@ -945,19 +706,17 @@ export const choose = (
   random: Random
 ) => {
   assertMove(state, playerId, { targetId, type: "choose" });
-  const { choice } = state;
 
-  if (!choice) {
+  if (!state.choice) {
     return;
   }
 
-  state.choice = null;
-  const { assignment } = state;
+  const card = chooseActionCard(state, targetId, (text, cue) => {
+    say(state, text, cue);
+  });
 
-  if (assignment?.cards[0]?.id === choice.card.id) {
-    assignDeferred(state, assignment, targetId);
-  } else {
-    applyAction(state, getPlayer(state, playerId), choice.card, targetId);
+  if (card) {
+    applyAction(state, getPlayer(state, playerId), card, targetId);
   }
 
   advance(state, random);
@@ -989,17 +748,7 @@ export const removePlayer = (
   state.dealerIndex = shiftIndex(state.dealerIndex, index, count);
   state.turnAnchor = shiftIndex(state.turnAnchor, index, count);
   state.dealQueue = state.dealQueue.filter((id) => id !== playerId);
-  state.actionQueue = state.actionQueue.filter(
-    ({ card, ownerId, targetId }) => {
-      const leaving = (targetId ?? ownerId) === playerId;
-
-      if (leaving) {
-        state.discard.push(card);
-      }
-
-      return !leaving;
-    }
-  );
+  evictFromActionCards(state, playerId);
 
   if (state.turnId === playerId) {
     state.turnId = null;
@@ -1013,38 +762,12 @@ export const removePlayer = (
       null;
   }
 
-  const { assignment, choice } = state;
-
-  if (assignment?.chooserId === playerId) {
-    state.discard.push(
-      ...assignment.cards,
-      ...assignment.assigned.map(({ card }) => card)
-    );
-    state.assignment = null;
-    state.choice = null;
-  } else if (assignment) {
-    state.choice = null;
-  } else if (choice?.chooserId === playerId) {
-    state.discard.push(choice.card);
-    state.choice = null;
-  } else if (choice) {
-    choice.options = choice.options.filter((id) => id !== playerId);
-
-    if (choice.options.length === 0) {
-      state.discard.push(choice.card);
-      state.choice = null;
-    }
-  }
-
   const playing = state.phase === "playing" || state.phase === "roundOver";
 
   if (playing && count < MIN_PLAYERS) {
     state.phase = "lobby";
     state.turnId = null;
-    state.choice = null;
-    state.flipRuns = [];
-    state.actionQueue = [];
-    state.assignment = null;
+    resetActionCards(state);
     state.dealSlotTurn = false;
     state.dealQueue = [];
 
