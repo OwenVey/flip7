@@ -23,7 +23,7 @@ const VolumeControl = (props: {
 }) => (
   <Field>
     <Slider value={props.value} onValueChange={props.onValueChange}>
-      <div data-slot="row">
+      <div class="volume-label">
         <FieldLabel>{props.label}</FieldLabel>
         <span aria-hidden="true">{props.value}%</span>
       </div>
@@ -52,13 +52,16 @@ export default function SoundControls(props: {
     <Popover>
       <PopoverTrigger
         aria-label="Audio settings"
-        data-size="sm"
-        data-variant="quiet"
+        data-icon=""
         title="Audio settings"
       >
-        {silent() ? <VolumeX size={18} /> : <Volume2 size={18} />}
+        {silent() ? (
+          <VolumeX size={18} aria-hidden="true" />
+        ) : (
+          <Volume2 size={18} aria-hidden="true" />
+        )}
       </PopoverTrigger>
-      <PopoverContent side="bottom" align="end">
+      <PopoverContent class="audio-settings" side="bottom" align="end">
         <PopoverTitle>Audio settings</PopoverTitle>
         <VolumeControl
           label="Music volume"
