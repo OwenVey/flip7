@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import * as v from "valibot";
 
 import { parseClientMessage } from "../src/game/client-message";
-import type { ClientMessage } from "../src/game/client-message";
+import type { GameCommand } from "../src/game/client-message";
 import {
   addPlayer,
   backToLobby,
@@ -33,6 +33,7 @@ const UINT32_RANGE = 2 ** 32;
 interface StoredRoom extends RoomTimers {
   code: string;
   game: GameState;
+  lastRequests?: Map<string, string>;
   tokens: Map<string, string>;
 }
 
@@ -60,6 +61,25 @@ const attachmentOf = (ws: WebSocket) => {
   return result.success ? result.output : null;
 };
 
+const sendWelcome = (
+  ws: WebSocket,
+  room: StoredRoom,
+  playerId: string,
+  token: string
+) => {
+  const lastRequestId = room.lastRequests?.get(playerId);
+  send(ws, { lastRequestId, playerId, token, type: "welcome" });
+};
+
+const reject = (ws: WebSocket, message: string, requestId?: string) => {
+  send(
+    ws,
+    requestId === undefined
+      ? { message, type: "error" }
+      : { message, requestId, type: "rejected" }
+  );
+};
+
 const joinRoom = (
   ws: WebSocket,
   room: StoredRoom,
@@ -72,7 +92,7 @@ const joinRoom = (
     joinedId === undefined ? undefined : room.tokens.get(joinedId);
 
   if (joinedId !== undefined && joinedToken !== undefined) {
-    send(ws, { playerId: joinedId, token: joinedToken, type: "welcome" });
+    sendWelcome(ws, room, joinedId, joinedToken);
 
     return;
   }
@@ -84,7 +104,7 @@ const joinRoom = (
   if (knownPlayer && token !== null) {
     knownPlayer.connected = true;
     ws.serializeAttachment({ playerId: knownPlayer.id } satisfies Attachment);
-    send(ws, { playerId: knownPlayer.id, token, type: "welcome" });
+    sendWelcome(ws, room, knownPlayer.id, token);
 
     return;
   }
@@ -100,7 +120,7 @@ const joinRoom = (
   addPlayer(room.game, playerId, name);
   room.tokens.set(playerId, newToken);
   ws.serializeAttachment({ playerId } satisfies Attachment);
-  send(ws, { playerId, token: newToken, type: "welcome" });
+  sendWelcome(ws, room, playerId, newToken);
 };
 
 export class GameRoom extends DurableObject<Env> {
@@ -177,28 +197,23 @@ export class GameRoom extends DurableObject<Env> {
     try {
       if (message.type === "join") {
         joinRoom(ws, room, message.name, message.token);
-      } else {
-        const playerId = attachmentOf(ws)?.playerId;
+        await this.commit();
 
-        if (playerId === undefined || !findPlayer(room.game, playerId)) {
-          send(ws, { message: "Join the room first.", type: "error" });
-
-          return;
-        }
-
-        this.act(room, playerId, message);
+        return;
       }
+
+      await this.handleCommand(ws, room, message);
     } catch (error) {
       if (!(error instanceof GameError)) {
         throw error;
       }
 
-      send(ws, { message: error.message, type: "error" });
-
-      return;
+      reject(
+        ws,
+        error.message,
+        message.type === "join" ? undefined : message.requestId
+      );
     }
-
-    await this.commit();
   }
 
   override async webSocketClose(ws: WebSocket) {
@@ -233,48 +248,72 @@ export class GameRoom extends DurableObject<Env> {
     await (changed ? this.commit() : this.save());
   }
 
-  private act(room: StoredRoom, playerId: string, message: ClientMessage) {
+  private async handleCommand(
+    ws: WebSocket,
+    room: StoredRoom,
+    message: GameCommand
+  ) {
+    const playerId = attachmentOf(ws)?.playerId;
+    const { requestId } = message;
+
+    if (playerId === undefined || !findPlayer(room.game, playerId)) {
+      throw new GameError("Join the room first.");
+    }
+
+    const finishEviction = this.act(room, playerId, message);
+
+    if (requestId !== undefined && message.type !== "leave") {
+      room.lastRequests ??= new Map();
+      room.lastRequests.set(playerId, requestId);
+    }
+
+    await this.commit();
+
+    if (requestId !== undefined) {
+      send(ws, { requestId, type: "accepted" });
+    }
+
+    finishEviction?.();
+  }
+
+  private act(room: StoredRoom, playerId: string, message: GameCommand) {
     const { game } = room;
 
     switch (message.type) {
-      case "join": {
-        return;
-      }
-
       case "start": {
         startGame(game, playerId, random);
 
-        return;
+        return null;
       }
 
       case "hit": {
         hit(game, playerId, random);
 
-        return;
+        return null;
       }
 
       case "stay": {
         stay(game, playerId, random);
 
-        return;
+        return null;
       }
 
       case "choose": {
         choose(game, playerId, message.targetId, random);
 
-        return;
+        return null;
       }
 
       case "nextRound": {
         nextRound(game, playerId, random);
 
-        return;
+        return null;
       }
 
       case "lobby": {
         backToLobby(game, playerId);
 
-        return;
+        return null;
       }
 
       case "kick": {
@@ -286,19 +325,17 @@ export class GameRoom extends DurableObject<Env> {
           throw new GameError("Use Leave to leave the room.");
         }
 
-        this.evict(room, message.playerId, "kicked");
-
-        return;
+        return this.evict(room, message.playerId, "kicked");
       }
 
       case "leave": {
-        this.evict(room, playerId, "left");
-
-        return;
+        return this.evict(room, playerId, "left");
       }
 
       default: {
         message satisfies never;
+
+        return null;
       }
     }
   }
@@ -312,6 +349,7 @@ export class GameRoom extends DurableObject<Env> {
 
     removePlayer(room.game, playerId, random);
     room.tokens.delete(playerId);
+    room.lastRequests?.delete(playerId);
     say(
       room.game,
       reason === "kicked"
@@ -319,11 +357,18 @@ export class GameRoom extends DurableObject<Env> {
         : `${player.name} left.`
     );
 
-    for (const socket of this.socketsFor(playerId)) {
-      send(socket, { reason, type: "removed" });
+    const sockets = this.socketsFor(playerId);
+
+    for (const socket of sockets) {
       socket.serializeAttachment(null);
-      socket.close(1000, reason);
     }
+
+    return () => {
+      for (const socket of sockets) {
+        send(socket, { reason, type: "removed" });
+        socket.close(1000, reason);
+      }
+    };
   }
 
   private socketsFor(playerId: string) {
@@ -361,13 +406,14 @@ export class GameRoom extends DurableObject<Env> {
       return;
     }
 
+    const saved = this.save();
     const view = toRoomView(room.code, room.game);
 
     for (const socket of this.ctx.getWebSockets()) {
       send(socket, { room: view, type: "state" });
     }
 
-    await this.save();
+    await saved;
   }
 
   private async save() {
@@ -378,7 +424,9 @@ export class GameRoom extends DurableObject<Env> {
     }
 
     syncTimers(room, Date.now());
-    await this.ctx.storage.put("room", room);
-    await this.ctx.storage.setAlarm(nextAlarmAt(room));
+    await Promise.all([
+      this.ctx.storage.put("room", room),
+      this.ctx.storage.setAlarm(nextAlarmAt(room)),
+    ]);
   }
 }

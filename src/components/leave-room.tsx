@@ -9,10 +9,13 @@ import {
   AlertDialogTrigger,
 } from "@ui-sdk/solid/alert-dialog";
 
-export default function LeaveRoom(props: { onLeave: () => void }) {
+export default function LeaveRoom(props: {
+  disabled?: boolean;
+  onLeave: () => void;
+}) {
   return (
     <AlertDialog>
-      <AlertDialogTrigger data-variant="quiet">
+      <AlertDialogTrigger data-variant="quiet" disabled={props.disabled}>
         <LogOut size={16} />
         Leave room
       </AlertDialogTrigger>
@@ -28,6 +31,7 @@ export default function LeaveRoom(props: { onLeave: () => void }) {
         <div data-slot="row">
           <AlertDialogClose>Stay here</AlertDialogClose>
           <AlertDialogClose
+            disabled={props.disabled}
             value="confirm"
             data-variant="destructive"
             data-agent-confirm="Gives up your seat and points in this room"

@@ -15,6 +15,7 @@ export default function Lobby(props: {
   room: RoomView;
   playerId: string;
   send: RoomConnection["send"];
+  actionsDisabled?: boolean;
 }) {
   const isHost = () => props.room.hostId === props.playerId;
 
@@ -36,6 +37,7 @@ export default function Lobby(props: {
       <header class="page-header">
         <h1>Get your table together</h1>
         <LeaveRoom
+          disabled={props.actionsDisabled}
           onLeave={() => {
             void props.send({ type: "leave" });
           }}
@@ -80,6 +82,7 @@ export default function Lobby(props: {
                   </Show>
                   <Show when={isHost() && player().id !== props.playerId}>
                     <RemovePlayer
+                      disabled={props.actionsDisabled}
                       name={player().name}
                       onRemove={() => {
                         void props.send({
@@ -116,6 +119,7 @@ export default function Lobby(props: {
               }
             >
               <Button
+                disabled={props.actionsDisabled}
                 data-variant="solid"
                 onClick={async () => await props.send({ type: "start" })}
               >

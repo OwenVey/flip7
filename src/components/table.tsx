@@ -31,6 +31,7 @@ interface TableProps {
   room: RoomView;
   playerId: string;
   send: RoomConnection["send"];
+  actionsDisabled?: boolean;
 }
 
 const currentRoundPoints = (player: PlayerView) =>
@@ -116,6 +117,7 @@ const RoundPlayer = (props: TableProps & { player: PlayerView }) => {
         </div>
         <Show when={isHost() && !isMe()}>
           <RemovePlayer
+            disabled={props.actionsDisabled}
             name={props.player.name}
             onRemove={() => {
               void props.send({ playerId: props.player.id, type: "kick" });
@@ -219,6 +221,7 @@ const ActionCardPrompt = (props: TableProps & { choice: ActionCardChoice }) => {
         <For each={props.choice.options}>
           {(targetId) => (
             <Button
+              disabled={props.actionsDisabled}
               data-variant={targetId === props.playerId ? undefined : "solid"}
               onClick={async () =>
                 await props.send({ targetId, type: "choose" })
@@ -337,6 +340,7 @@ const ActionBar = (props: TableProps) => {
           >
             <div class="action-buttons">
               <Button
+                disabled={props.actionsDisabled}
                 data-variant="solid"
                 onClick={async () => await props.send({ type: "lobby" })}
               >
@@ -356,6 +360,7 @@ const ActionBar = (props: TableProps) => {
           >
             <div class="action-buttons">
               <Button
+                disabled={props.actionsDisabled}
                 data-variant="solid"
                 onClick={async () => await props.send({ type: "nextRound" })}
               >
@@ -372,6 +377,7 @@ const ActionBar = (props: TableProps) => {
               room={props.room}
               playerId={props.playerId}
               send={props.send}
+              actionsDisabled={props.actionsDisabled}
             />
           )}
         </Match>
@@ -381,6 +387,7 @@ const ActionBar = (props: TableProps) => {
           </p>
           <div class="action-buttons">
             <Button
+              disabled={props.actionsDisabled}
               data-variant="solid"
               onClick={async () => await props.send({ type: "hit" })}
             >
@@ -388,7 +395,10 @@ const ActionBar = (props: TableProps) => {
               Hit
             </Button>
             <Show when={iCanStay()}>
-              <Button onClick={async () => await props.send({ type: "stay" })}>
+              <Button
+                disabled={props.actionsDisabled}
+                onClick={async () => await props.send({ type: "stay" })}
+              >
                 <Coins size={16} />
                 Stay with {myRound()} points
               </Button>
@@ -441,6 +451,7 @@ export default function Table(props: TableProps) {
         <div class="row">
           <InviteButton />
           <LeaveRoom
+            disabled={props.actionsDisabled}
             onLeave={() => {
               void props.send({ type: "leave" });
             }}
@@ -452,6 +463,7 @@ export default function Table(props: TableProps) {
         room={props.room}
         playerId={props.playerId}
         send={props.send}
+        actionsDisabled={props.actionsDisabled}
       />
 
       <div class="table-body">
@@ -463,6 +475,7 @@ export default function Table(props: TableProps) {
                 room={props.room}
                 playerId={props.playerId}
                 send={props.send}
+                actionsDisabled={props.actionsDisabled}
               />
             )}
           </For>

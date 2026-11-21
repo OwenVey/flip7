@@ -62,8 +62,13 @@ const Room = (props: { code: string }) => {
     (current, previous) => {
       if (current && current.notice !== previous?.notice) {
         const { notice, effectsEnabled } = current;
-        toast.error(notice.message);
-        sounds.play("error", effectsEnabled);
+
+        if (notice.confirmed === true) {
+          toast.success(notice.message);
+        } else {
+          toast.error(notice.message);
+          sounds.play("error", effectsEnabled);
+        }
       }
     }
   );
@@ -169,6 +174,7 @@ const Room = (props: { code: string }) => {
                     room={view().room}
                     playerId={view().playerId}
                     send={connection.send}
+                    actionsDisabled={!connection.canAct()}
                   />
                 }
               >
@@ -176,6 +182,7 @@ const Room = (props: { code: string }) => {
                   room={view().room}
                   playerId={view().playerId}
                   send={connection.send}
+                  actionsDisabled={!connection.canAct()}
                 />
               </Show>
             )}

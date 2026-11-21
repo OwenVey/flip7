@@ -10,12 +10,17 @@ import {
 } from "@ui-sdk/solid/alert-dialog";
 
 export default function RemovePlayer(props: {
+  disabled?: boolean;
   name: string;
   onRemove: () => void;
 }) {
   return (
     <AlertDialog>
-      <AlertDialogTrigger data-variant="quiet" data-size="sm">
+      <AlertDialogTrigger
+        data-variant="quiet"
+        data-size="sm"
+        disabled={props.disabled}
+      >
         <UserMinus size={14} />
         Remove<span class="sr-only"> {props.name}</span>
       </AlertDialogTrigger>
@@ -31,6 +36,7 @@ export default function RemovePlayer(props: {
         <div data-slot="row">
           <AlertDialogClose>Cancel</AlertDialogClose>
           <AlertDialogClose
+            disabled={props.disabled}
             value="confirm"
             data-variant="destructive"
             data-agent-confirm={`Removes ${props.name} from the room`}

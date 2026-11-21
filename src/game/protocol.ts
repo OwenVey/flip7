@@ -39,7 +39,14 @@ export interface RoomView extends Pick<
 }
 
 export type ServerMessage =
-  | { playerId: string; token: string; type: "welcome" }
+  | {
+      lastRequestId?: string;
+      playerId: string;
+      token: string;
+      type: "welcome";
+    }
+  | { requestId: string; type: "accepted" }
+  | { message: string; requestId: string; type: "rejected" }
   | { room: RoomView; type: "state" }
   | { message: string; type: "error" }
   | { reason: "kicked" | "left"; type: "removed" };

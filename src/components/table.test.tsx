@@ -242,6 +242,33 @@ describe("<Table />", () => {
     expect(send).toHaveBeenCalledWith({ type: "hit" });
   });
 
+  it("pauses moves while the room is syncing and resumes once it is ready", () => {
+    const send = vi.fn<RoomConnection["send"]>();
+    const [syncing, setSyncing] = createSignal(true);
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={send}
+        actionsDisabled={syncing()}
+      />
+    ));
+
+    const hit = screen.getByRole("button", { name: "Hit" });
+    const stay = screen.getByRole("button", { name: "Stay with 7 points" });
+    expect(hit).toBeDisabled();
+    expect(stay).toBeDisabled();
+    hit.click();
+    expect(send).not.toHaveBeenCalled();
+
+    setSyncing(false);
+    flush();
+
+    expect(hit).toBeEnabled();
+    hit.click();
+    expect(send).toHaveBeenCalledWith({ type: "hit" });
+  });
+
   it("removing a player needs a person to confirm", async () => {
     const send = vi.fn<RoomConnection["send"]>();
     render(() => <Table room={room()} playerId="a" send={send} />);

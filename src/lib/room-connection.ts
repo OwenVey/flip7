@@ -15,7 +15,7 @@ import {
   untrack,
 } from "solid-js";
 
-import type { ClientMessage } from "../game/client-message";
+import type { ClientMessage, GameCommand } from "../game/client-message";
 import { HEARTBEAT_PING, parseServerMessage } from "../game/protocol";
 import type { RoomView, ServerMessage } from "../game/protocol";
 import { roomExists } from "./room-functions";
@@ -30,13 +30,18 @@ export type ConnectionStatus =
 export interface Notice {
   id: number;
   message: string;
+  confirmed?: boolean;
 }
 
-type GameCommand = Exclude<ClientMessage, { type: "join" }>;
+interface PendingMove {
+  requestId: string;
+  resolve: (accepted: boolean) => void;
+  timeout: ReturnType<typeof setTimeout>;
+}
 
 const RETRY_DELAY_MS = 1500;
 const FAILURES_BEFORE_RECHECK = 3;
-const REPLY_TIMEOUT_MS = 5000;
+const REPLY_TIMEOUT_MS = 6000;
 const HEARTBEAT = { interval: 20_000, message: HEARTBEAT_PING, wait: 5000 };
 const NAME_KEY = "hot-streak:name";
 const STORAGE_PROBE = "hot-streak:probe";
@@ -76,6 +81,8 @@ export const createRoomConnection = (
   const [status, setStatus] = createSignal<ConnectionStatus>("connecting");
   const [needsName, setNeedsName] = createSignal(false);
   const [notice, setNotice] = createSignal<Notice | null>(null);
+  const [ready, setReady] = createSignal(false);
+  const [sending, setSending] = createSignal(false);
 
   const [savedName, setSavedName] = makePersisted(
     createSignal("", { ownedWrite: true }),
@@ -105,31 +112,31 @@ export const createRoomConnection = (
   let cancelRetry: VoidFunction | undefined;
   let noticeId = 0;
   let failures = 0;
-  let replyWaiters: VoidFunction[] = [];
+  let activeSocket: EventTarget | null = null;
+  let lastRequestId: string | undefined;
+  let pendingMove: PendingMove | null = null;
+  let disposed = false;
 
-  const settleReplies = () => {
-    const waiters = replyWaiters;
-    replyWaiters = [];
-
-    for (const resolve of waiters) {
-      resolve();
+  const settleMove = (accepted: boolean) => {
+    if (pendingMove) {
+      clearTimeout(pendingMove.timeout);
+      pendingMove.resolve(accepted);
+      pendingMove = null;
+      setSending(false);
     }
   };
 
-  const nextReply = async () => {
-    const { promise, resolve } = Promise.withResolvers<boolean>();
-    replyWaiters.push(() => {
-      resolve(true);
-    });
+  const startSync = () => {
+    activeSocket = null;
+    previousRoom = null;
+    seatedPlayerId = null;
+    lastRequestId = undefined;
+    awaitingWelcome = false;
+    setReady(false);
 
-    const timer = setTimeout(() => {
-      resolve(false);
-    }, REPLY_TIMEOUT_MS);
-
-    const replied = await promise;
-    clearTimeout(timer);
-
-    return replied;
+    if (pendingMove) {
+      clearTimeout(pendingMove.timeout);
+    }
   };
 
   const raw = (message: ClientMessage) => {
@@ -142,9 +149,9 @@ export const createRoomConnection = (
     return true;
   };
 
-  const notify = (message: string) => {
+  const notify = (message: string, confirmed = false) => {
     noticeId += 1;
-    setNotice({ id: noticeId, message });
+    setNotice({ confirmed, id: noticeId, message });
   };
 
   const forget = () => {
@@ -155,16 +162,30 @@ export const createRoomConnection = (
   };
 
   const handle = (message: ServerMessage) => {
-    settleReplies();
-
     switch (message.type) {
       case "state": {
         const previous = previousRoom;
         previousRoom = seatedPlayerId === null ? null : message.room;
         setRoom(message.room);
 
-        if (previous && seatedPlayerId !== null) {
-          onUpdate(previous, message.room, seatedPlayerId);
+        if (seatedPlayerId !== null) {
+          if (previous) {
+            onUpdate(previous, message.room, seatedPlayerId);
+          } else {
+            if (pendingMove) {
+              const accepted = pendingMove.requestId === lastRequestId;
+              settleMove(accepted);
+              notify(
+                accepted
+                  ? "Reconnected. Your last move counted."
+                  : "Couldn't confirm your last move. The table is up to date.",
+                accepted
+              );
+            }
+
+            setStatus("open");
+            setReady(true);
+          }
         }
 
         return;
@@ -174,8 +195,26 @@ export const createRoomConnection = (
         awaitingWelcome = false;
         setToken(message.token);
         seatedPlayerId = message.playerId;
+        ({ lastRequestId } = message);
         setPlayerId(message.playerId);
         setNeedsName(false);
+
+        return;
+      }
+
+      case "accepted": {
+        if (pendingMove?.requestId === message.requestId) {
+          settleMove(true);
+        }
+
+        return;
+      }
+
+      case "rejected": {
+        if (pendingMove?.requestId === message.requestId) {
+          settleMove(false);
+          notify(message.message);
+        }
 
         return;
       }
@@ -184,7 +223,9 @@ export const createRoomConnection = (
         if (awaitingWelcome) {
           awaitingWelcome = false;
           forget();
+          settleMove(false);
           setNeedsName(true);
+          setStatus("open");
         }
 
         notify(message.message);
@@ -193,6 +234,8 @@ export const createRoomConnection = (
       }
 
       case "removed": {
+        settleMove(false);
+        startSync();
         forget();
         setStatus("removed");
         socket?.close();
@@ -209,7 +252,9 @@ export const createRoomConnection = (
   const recheckRoom = async () => {
     const exists = await roomExists(code).catch(() => true);
 
-    if (!exists) {
+    if (!exists && !disposed && untrack(status) === "reconnecting") {
+      settleMove(false);
+      startSync();
       setStatus("missing");
       socket?.close();
     }
@@ -224,14 +269,20 @@ export const createRoomConnection = (
     );
 
     socket = ws;
-    ws.addEventListener("open", () => {
-      previousRoom = null;
-      seatedPlayerId = null;
+    ws.addEventListener("open", (event) => {
+      if (disposed) {
+        ws.close();
+
+        return;
+      }
+
+      startSync();
+      activeSocket = event.currentTarget;
       failures = 0;
-      setStatus("open");
       const saved = token();
 
       if (saved === null) {
+        setStatus("open");
         setNeedsName(true);
 
         return;
@@ -241,6 +292,10 @@ export const createRoomConnection = (
       raw({ name: "", token: saved, type: "join" });
     });
     ws.addEventListener("message", (event: MessageEvent<string>) => {
+      if (disposed || event.currentTarget !== activeSocket) {
+        return;
+      }
+
       const message = parseServerMessage(event.data);
 
       if (message) {
@@ -248,11 +303,11 @@ export const createRoomConnection = (
       }
     });
     ws.addEventListener("close", () => {
-      settleReplies();
       const current = status();
 
       // WARNING: a replaced socket can report its close after the new one opened.
       if (
+        disposed ||
         ws.readyState === WebSocket.OPEN ||
         current === "removed" ||
         current === "missing"
@@ -260,6 +315,7 @@ export const createRoomConnection = (
         return;
       }
 
+      startSync();
       setStatus("reconnecting");
       failures += 1;
 
@@ -271,12 +327,22 @@ export const createRoomConnection = (
 
   const start = async () => {
     try {
-      if (await roomExists(code)) {
+      const exists = await roomExists(code);
+
+      if (disposed) {
+        return;
+      }
+
+      if (exists) {
         connect();
       } else {
         setStatus("missing");
       }
     } catch {
+      if (disposed) {
+        return;
+      }
+
       setStatus("reconnecting");
       cancelRetry = makeTimer(
         () => {
@@ -310,12 +376,15 @@ export const createRoomConnection = (
     void start();
 
     return () => {
+      disposed = true;
       cancelRetry?.();
+      settleMove(false);
       socket?.close();
     };
   });
 
   return {
+    canAct: () => online() && ready() && !sending(),
     join: (name: string) => {
       setSavedName(name);
       awaitingWelcome = true;
@@ -332,13 +401,37 @@ export const createRoomConnection = (
     room,
     savedName,
     send: async (command: GameCommand) => {
-      if (!raw(command)) {
+      if (pendingMove) {
+        return false;
+      }
+
+      if (
+        !online() ||
+        previousRoom === null ||
+        socket?.readyState !== WebSocket.OPEN
+      ) {
         notify("Reconnecting. Try again in a moment.");
 
         return false;
       }
 
-      return await nextReply();
+      const requestId = crypto.randomUUID();
+      const { promise, resolve } = Promise.withResolvers<boolean>();
+
+      const timeout = setTimeout(() => {
+        startSync();
+        setStatus("reconnecting");
+        socket?.reconnect();
+      }, REPLY_TIMEOUT_MS);
+
+      pendingMove = { requestId, resolve, timeout };
+      setSending(true);
+
+      if (!raw({ ...command, requestId })) {
+        settleMove(false);
+      }
+
+      return await promise;
     },
     status,
   };
