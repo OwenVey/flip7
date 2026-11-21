@@ -73,6 +73,20 @@ const groupLogByRound = (entries: LogEntry[]) => {
   return groups;
 };
 
+const sameGroups = (a: LogGroup[], b: LogGroup[]) =>
+  a.length === b.length &&
+  a.every((group, index) => {
+    const other = b[index];
+
+    return (
+      other !== undefined &&
+      group.id === other.id &&
+      group.entries.length === other.entries.length &&
+      group.entries[0]?.id === other.entries[0]?.id &&
+      group.entries.at(-1)?.id === other.entries.at(-1)?.id
+    );
+  });
+
 const groupHeading = (group: LogGroup) => {
   if (group.round === 0) {
     return "Lobby";
@@ -115,13 +129,16 @@ const LogTime = (props: {
   everySecond: () => number;
   everyMinute: () => number;
 }) => {
-  const label = createMemo(() => {
-    const coarse = props.everyMinute();
-    const isFresh = coarse - props.at < MINUTE;
-    const now = isFresh ? props.everySecond() : coarse;
+  const label = createMemo(
+    () => {
+      const coarse = props.everyMinute();
+      const isFresh = coarse - props.at < MINUTE;
+      const now = isFresh ? props.everySecond() : coarse;
 
-    return logTimeLabel(props.at, now);
-  });
+      return logTimeLabel(props.at, now);
+    },
+    { equals: (a, b) => a.long === b.long && a.short === b.short }
+  );
 
   return (
     <Tooltip
@@ -200,7 +217,10 @@ export default function GameLog(props: {
   onChat: (text: string) => boolean;
   inSheet?: boolean;
 }) {
-  const groups = createMemo(() => groupLogByRound(props.log));
+  const groups = createMemo(() => groupLogByRound(props.log), {
+    equals: sameGroups,
+  });
+
   const latestId = createMemo(() => props.log.at(-1)?.id ?? 0);
 
   const everySecond = createPolled(Date.now, SECOND);

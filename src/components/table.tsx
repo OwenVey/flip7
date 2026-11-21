@@ -39,10 +39,12 @@ import type { PlayerView, RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
 import type { RoomConnection } from "../lib/room-connection";
+import { rankPlayers } from "../lib/standings";
 import { passDealerChip, pop, slideRows } from "../lib/table-motion";
 import type { ChipSpot } from "../lib/table-motion";
 import CardTooltips from "./card-tooltips";
 import GameLog, { CHAT_AND_GAME_LOG_TITLE } from "./game-log";
+import GameOverDialog from "./game-over-dialog";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
 import PlayingCard from "./playing-card";
@@ -608,18 +610,7 @@ const CountUp = (props: { value: number }) => {
 };
 
 const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
-  const ranked = createMemo(() => {
-    const players = props.room.players.toSorted((a, b) => b.score - a.score);
-    let rank = 1;
-
-    return players.map((player, index) => {
-      if (index > 0 && player.score !== players[index - 1]?.score) {
-        rank = index + 1;
-      }
-
-      return { index, player, rank };
-    });
-  });
+  const ranked = createMemo(() => rankPlayers(props.room.players));
 
   const roundScored = () =>
     props.room.phase === "roundOver" || props.room.phase === "gameOver";
@@ -1193,6 +1184,17 @@ export default function Table(
         <div class="flight-layer" data-chip-layer="" aria-hidden="true" />
         <Show when={props.room.phase === "gameOver"}>
           <Confetti />
+        </Show>
+        <Show when={props.room.phase === "gameOver" && props.dealing !== true}>
+          <GameOverDialog
+            room={props.room}
+            playerId={props.playerId}
+            canReturnToLobby={moves().host.lobby}
+            actionsDisabled={props.actionsDisabled}
+            onReturnToLobby={() => {
+              void props.send({ type: "lobby" });
+            }}
+          />
         </Show>
       </div>
     </CardTooltips>

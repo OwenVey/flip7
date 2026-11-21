@@ -8,6 +8,7 @@ import {
 } from "@ui-sdk/solid/toast";
 import {
   createEffect,
+  createMemo,
   createSignal,
   flush,
   Match,
@@ -141,12 +142,17 @@ const Room = (props: { code: string }) => {
     return "";
   };
 
-  const seated = () => {
-    const { room } = table();
-    const playerId = connection.playerId();
+  const seated = createMemo(
+    () => {
+      const { room } = table();
+      const playerId = connection.playerId();
 
-    return room && playerId !== null ? { playerId, room } : null;
-  };
+      return room && playerId !== null ? { playerId, room } : null;
+    },
+    {
+      equals: (a, b) => a?.room === b?.room && a?.playerId === b?.playerId,
+    }
+  );
 
   return (
     <>
