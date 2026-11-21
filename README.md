@@ -92,4 +92,4 @@ Report bugs and propose changes in [GitHub Issues](https://github.com/OwenVey/ho
 
 ## License
 
-The package metadata declares MIT in [package.json](package.json).
+Hot Streak is released under the [MIT License](LICENSE).
