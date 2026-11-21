@@ -114,6 +114,9 @@ const sameHeldCards = (a: HeldCard[], b: HeldCard[]) =>
   a.length === b.length &&
   a.every((entry, index) => entry.card.id === b[index]?.card.id);
 
+const sameCards = <T extends { id: number }>(a: T[], b: T[]) =>
+  a.length === b.length && a.every((card, index) => card.id === b[index]?.id);
+
 const FlipTracker = (props: { progress: FlipProgress }) => (
   <span class="flip-run" data-waiting={props.progress.waiting ? "" : undefined}>
     <PlayingCardsFan size={12} aria-hidden="true" />
@@ -165,12 +168,14 @@ const RoundPlayer = (
     { equals: sameHeldCards }
   );
 
-  const numberCards = createMemo(() =>
-    props.player.hand.filter((card) => card.kind === "number")
+  const numberCards = createMemo(
+    () => props.player.hand.filter((card) => card.kind === "number"),
+    { equals: sameCards }
   );
 
-  const extraCards = createMemo(() =>
-    props.player.hand.filter((card) => card.kind !== "number")
+  const extraCards = createMemo(
+    () => props.player.hand.filter((card) => card.kind !== "number"),
+    { equals: sameCards }
   );
 
   const bustCard = createMemo(() => props.player.bustCard, {
