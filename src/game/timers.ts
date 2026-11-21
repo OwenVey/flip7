@@ -1,11 +1,7 @@
 import type { Random } from "./cards";
-import {
-  blockingPlayerId,
-  findPlayer,
-  playForAbsent,
-  transferHost,
-} from "./engine";
+import { findPlayer, playForAbsent, transferHost } from "./engine";
 import type { GameState } from "./engine";
+import { waitingOn } from "./moves";
 import { HEARTBEAT_STALE_MS } from "./protocol";
 
 export const HOST_GRACE_MS = 20_000;
@@ -49,7 +45,7 @@ export const syncTimers = (room: RoomTimers, now: number) => {
     room.hostLeftAt = null;
   }
 
-  const blockerId = blockingPlayerId(game);
+  const blockerId = waitingOn(game)?.playerId ?? null;
 
   if (blockerId === null || !offlineWhileOthersOnline(game, blockerId)) {
     room.stall = null;

@@ -12,6 +12,12 @@ A multiplayer push-your-luck card game played in shared rooms, where players joi
 
 **Evict**: To remove a player from the room, either by a **kick** from the host or by the player choosing to **leave**. _Avoid_: remove (when you mean the room-level act)
 
+## Play
+
+**Move**: A hit, stay or choice that the game is waiting on a player to make. The host can make it for an offline player. _Avoid_: decision, action (an action is a kind of card)
+
+**Waiting on**: The one player whose move the game needs next. _Avoid_: blocking player, whose turn (a choice can be owed outside a turn)
+
 ## Clocks
 
 **Stall**: The game is waiting on an offline player while someone else is online. When a stall runs past its grace period, the player's move is played for them automatically. _Avoid_: timeout, AFK

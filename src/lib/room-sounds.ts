@@ -4,6 +4,7 @@ import { makePersisted } from "@solid-primitives/storage";
 import { createSignal, onSettled } from "solid-js";
 
 import type { GameCue, LogEntry } from "../game/engine";
+import { waitingOn } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 
 const GAME_CUE_PRIORITY = [
@@ -40,8 +41,7 @@ const MAX_PERCENT = 100;
 const DEFAULT_MUSIC_VOLUME = 25;
 const MUSIC_GAIN = 0.35;
 
-const waitingOn = (room: RoomView) =>
-  room.phase === "playing" ? (room.choice?.chooserId ?? room.turnId) : null;
+const waitingOnId = (room: RoomView) => waitingOn(room)?.playerId ?? null;
 
 const isChatFromOthers = (entry: LogEntry, playerId: string) =>
   entry.from !== undefined && entry.from.id !== playerId;
@@ -105,8 +105,8 @@ export const roomCues = (
     current.choice.card.id !== previous.choice?.card.id;
 
   if (
-    waitingOn(current) === playerId &&
-    (waitingOn(previous) !== playerId ||
+    waitingOnId(current) === playerId &&
+    (waitingOnId(previous) !== playerId ||
       newChoice ||
       roundStarted(previous, current))
   ) {
