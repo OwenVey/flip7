@@ -275,8 +275,7 @@ p {
 
 /* Panel titles are ribbons: the gold rule closes around a notched tail at each end. */
 .panel > h2,
-.panel-title,
-.rules > summary {
+.panel-title {
   --tail: 0.75rem;
   --edge: 1px;
   /*
@@ -321,8 +320,7 @@ p {
 }
 
 .panel > h2,
-.panel-title h2,
-.rules > summary h2 {
+.panel-title h2 {
   letter-spacing: 0.035em;
 }
 
@@ -416,6 +414,54 @@ p {
   border-radius: 0.875rem;
 }
 
+/* Sheets slide and dim through ui-sdk so their motion follows the swipe gesture. */
+:is(
+  [data-slot="dialog-content"]:not([data-presentation="sheet"]),
+  [data-slot="alert-dialog-content"]
+) {
+  transition:
+    opacity 180ms ease-out,
+    translate 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    scale 220ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  &:is([data-starting-style], [data-ending-style]) {
+    opacity: 0;
+    translate: 0 0.625rem;
+    scale: 0.97;
+  }
+
+  &[data-ending-style] {
+    transition-duration: 140ms;
+    transition-timing-function: ease-in;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: opacity 120ms linear;
+
+    &:is([data-starting-style], [data-ending-style]) {
+      translate: none;
+      scale: none;
+    }
+  }
+}
+
+[data-slot="alert-dialog-backdrop"],
+[data-slot="dialog-content"][data-presentation="dialog"]::backdrop {
+  background: var(--ui-overlay);
+  transition: opacity 140ms ease-out;
+}
+
+[data-slot="alert-dialog-backdrop"]:is(
+  [data-starting-style],
+  [data-ending-style]
+),
+[data-slot="dialog-content"][data-presentation="dialog"]:is(
+    [data-starting-style],
+    [data-ending-style]
+  )::backdrop {
+  opacity: 0;
+}
+
 /*
  * Dropdowns grow out of their trigger and shrink back into it. ui-sdk keeps
  * the content mounted until the exit transition on data-ending-style ends.
@@ -493,7 +539,7 @@ p {
     0 3px 8px rgb(0 0 0 / 0.35);
 
   /* Icon buttons on the rail look carved into the wood, not printed on it. */
-  & > [data-slot="popover-trigger"][data-variant="quiet"] {
+  & .room-nav-actions > [data-slot="popover-trigger"][data-variant="quiet"] {
     inline-size: var(--button-height);
     padding-inline: 0;
     border-color: rgb(0 0 0 / 0.35);
@@ -513,6 +559,12 @@ p {
       box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.5);
     }
   }
+}
+
+.room-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
 }
 
 /* Words and controls that sit straight on the felt. */
@@ -742,66 +794,6 @@ main {
   font-weight: 700;
 }
 
-.rules {
-  grid-column: 1 / -1;
-  gap: 0;
-
-  & > summary {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    justify-content: space-between;
-    list-style: none;
-    cursor: pointer;
-
-    &::-webkit-details-marker {
-      display: none;
-    }
-  }
-
-  &[open] .rules-chevron {
-    rotate: 180deg;
-  }
-}
-
-/* Wide screens have room for the rules, so they always show and the title doesn't toggle. */
-@media (width > 40rem) and (height > 30rem) {
-  .rules {
-    &::details-content {
-      content-visibility: visible;
-    }
-
-    & > summary {
-      pointer-events: none;
-    }
-
-    & .rules-chevron {
-      display: none;
-    }
-  }
-}
-
-.rules ul {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0.875rem 0 0;
-  padding-left: 1.125rem;
-  color: var(--ink-soft);
-
-  @media (min-width: 52rem) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 2.5rem;
-  }
-
-  & li::marker {
-    color: var(--rule);
-  }
-
-  & strong {
-    color: var(--ink);
-  }
-}
-
 .table {
   display: grid;
   gap: 1.25rem;
@@ -912,16 +904,44 @@ main {
   font-weight: 900;
 }
 
-[data-slot="dialog-content"].table-sheet {
+[data-slot="dialog-content"]:is(.table-sheet, .rules-dialog) {
+  gap: 0;
+  max-height: min(85dvh, calc(var(--visual-viewport-height, 100dvh) - 1rem));
+  padding: 0;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+[data-slot="dialog-content"].rules-dialog[data-presentation="dialog"] {
+  width: min(38rem, calc(100% - 2rem));
+  border: 2px solid var(--ink);
+}
+
+.rules-dialog ul {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0;
+  padding-inline-start: 1.125rem;
+  color: var(--ink-soft);
+
+  & li::marker {
+    color: var(--rule);
+  }
+
+  & strong {
+    color: var(--ink);
+  }
+}
+
+[data-slot="dialog-content"]:is(
+  .table-sheet,
+  .rules-dialog[data-presentation="sheet"]
+) {
   --sheet-backdrop: rgb(10 16 28 / 0.52);
   width: 100%;
-  max-height: min(85dvh, calc(var(--visual-viewport-height, 100dvh) - 1rem));
-  gap: 0;
-  padding: 0 0 env(safe-area-inset-bottom);
-  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom);
   border: 0;
   border-radius: 1.5rem 1.5rem 0 0;
-  background: var(--paper);
   box-shadow: 0 -0.375rem 2rem rgb(10 16 28 / 0.24);
 }
 
@@ -935,7 +955,11 @@ main {
   padding: 1.25rem 1rem 0.625rem;
   border-bottom: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
 
-  &::before {
+  .rules-dialog[data-presentation="dialog"] & {
+    padding-top: 0.75rem;
+  }
+
+  [data-presentation="sheet"] &::before {
     position: absolute;
     inset: 0.375rem auto auto 50%;
     width: 2rem;

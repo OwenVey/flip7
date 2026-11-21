@@ -20,9 +20,11 @@ import {
 import JoinForm from "../../components/join-form";
 import Lobby from "../../components/lobby";
 import PageMeta from "../../components/page-meta";
+import RulesDialog from "../../components/rules-dialog";
 import SiteNav from "../../components/site-nav";
 import SoundControls from "../../components/sound-controls";
 import Table from "../../components/table";
+import { TARGET_SCORE } from "../../game/engine";
 import { normalizeCode } from "../../game/protocol";
 import { createDealMotion } from "../../lib/deal-motion";
 import {
@@ -158,14 +160,19 @@ const Room = (props: { code: string }) => {
         noindex
       />
       <SiteNav>
-        <SoundControls
-          muted={sounds.muted()}
-          effectsVolume={sounds.effectsVolume()}
-          musicVolume={sounds.musicVolume()}
-          onEffectsVolumeChange={sounds.changeEffectsVolume}
-          onMusicVolumeChange={sounds.changeMusicVolume}
-          onToggle={sounds.toggle}
-        />
+        <div class="room-nav-actions">
+          <RulesDialog
+            targetScore={connection.room()?.targetScore ?? TARGET_SCORE}
+          />
+          <SoundControls
+            muted={sounds.muted()}
+            effectsVolume={sounds.effectsVolume()}
+            musicVolume={sounds.musicVolume()}
+            onEffectsVolumeChange={sounds.changeEffectsVolume}
+            onMusicVolumeChange={sounds.changeMusicVolume}
+            onToggle={sounds.toggle}
+          />
+        </div>
       </SiteNav>
       <main
         class="room-page"

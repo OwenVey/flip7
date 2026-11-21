@@ -13,8 +13,24 @@ export default function LeaveRoom(props: {
   disabled?: boolean;
   onLeave: () => void;
 }) {
+  let confirmed = false;
+
   return (
-    <AlertDialog>
+    <AlertDialog
+      onOpenChange={(open, details) => {
+        if (open && confirmed) {
+          details.cancel();
+        } else if (!open) {
+          confirmed = details.returnValue === "confirm";
+        }
+      }}
+      onOpenChangeComplete={(open) => {
+        if (!open && confirmed) {
+          confirmed = false;
+          props.onLeave();
+        }
+      }}
+    >
       <AlertDialogTrigger data-variant="destructive" disabled={props.disabled}>
         <LogOut size={16} aria-hidden="true" />
         <span class="button-label">Leave room</span>
@@ -35,9 +51,6 @@ export default function LeaveRoom(props: {
             value="confirm"
             data-variant="destructive"
             data-agent-confirm="Gives up your seat and points in this room"
-            action={() => {
-              props.onLeave();
-            }}
           >
             Leave and give up seat
           </AlertDialogClose>

@@ -14,8 +14,24 @@ export default function RemovePlayer(props: {
   name: string;
   onRemove: () => void;
 }) {
+  let confirmed = false;
+
   return (
-    <AlertDialog>
+    <AlertDialog
+      onOpenChange={(open, details) => {
+        if (open && confirmed) {
+          details.cancel();
+        } else if (!open) {
+          confirmed = details.returnValue === "confirm";
+        }
+      }}
+      onOpenChangeComplete={(open) => {
+        if (!open && confirmed) {
+          confirmed = false;
+          props.onRemove();
+        }
+      }}
+    >
       <AlertDialogTrigger
         data-variant="quiet"
         data-size="sm"
@@ -41,9 +57,6 @@ export default function RemovePlayer(props: {
             value="confirm"
             data-variant="destructive"
             data-agent-confirm={`Removes ${props.name} from the room`}
-            action={() => {
-              props.onRemove();
-            }}
           >
             Remove from room
           </AlertDialogClose>
