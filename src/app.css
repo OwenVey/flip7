@@ -1907,14 +1907,17 @@ main {
 }
 
 .log-scroll {
-  display: grid;
-  gap: 0.875rem;
-  align-content: start;
   max-height: min(22rem, 55svh);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   border-block-end: 1px solid var(--rule);
+}
+
+.log-entries {
+  display: grid;
+  gap: 0.875rem;
+  align-content: start;
 }
 
 .log-jump {

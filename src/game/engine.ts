@@ -112,6 +112,8 @@ export interface LogEntry {
   cue?: GameCue;
   /** Set on chat messages: who sent it, with their name at the time. */
   from?: { id: string; name: string };
+  /** Which game in this room, counting from 1; 0 before the first game starts. Missing on entries saved before games were counted. */
+  game?: number;
   id: number;
   /** Missing on entries saved before rounds were recorded. */
   round?: number;
@@ -125,6 +127,8 @@ export interface GameState {
   deck: Card[];
   discard: Card[];
   round: number;
+  /** Games started in this room. Missing on rooms saved before games were counted. */
+  games?: number;
   dealerIndex: number;
   turnId: string | null;
   turnAnchor: number;
@@ -180,6 +184,7 @@ const record = (
   state.log.push({
     ...entry,
     at: Date.now(),
+    game: state.games ?? 0,
     id: state.logSeq,
     round: state.round,
   });
@@ -188,6 +193,9 @@ const record = (
     state.log.splice(0, state.log.length - LOG_LIMIT);
   }
 };
+
+const pointsLabel = (points: number) =>
+  points === 1 ? "1 point" : `${points} points`;
 
 export const say = (state: GameState, text: string, cue?: GameCue) => {
   record(state, { text, ...(cue && { cue }) });
@@ -312,11 +320,12 @@ const applyAction = (
   if (card.kind === "freeze") {
     target.hand.push(card);
     target.status = "frozen";
+    const banked = pointsLabel(calculateRoundScore(target.hand).total);
     say(
       state,
       target.id === owner.id
-        ? `${owner.name} played Freeze on themselves and banked their points.`
-        : `${owner.name} played Freeze on ${target.name}, who banked their points.`,
+        ? `${owner.name} played Freeze on themselves and banked ${banked}.`
+        : `${owner.name} played Freeze on ${target.name}, who banked ${banked}.`,
       "freeze"
     );
 
@@ -872,6 +881,7 @@ export const startGame = (
 
   state.deck = shuffle(buildDeck(), random);
   state.discard = [];
+  state.games = (state.games ?? 0) + 1;
   state.round = 0;
   state.winnerIds = [];
   state.dealerIndex = Math.floor(random() * state.players.length) - 1;
@@ -933,12 +943,12 @@ const stayAndBankPoints = (
   state: GameState,
   player: Player,
   random: Random,
-  reason = ""
+  describe = (banked: string) => `${player.name} stayed and banked ${banked}.`
 ) => {
   player.status = "stayed";
   say(
     state,
-    `${player.name}${reason} stayed and banked ${calculateRoundScore(player.hand).total} points.`,
+    describe(pointsLabel(calculateRoundScore(player.hand).total)),
     "bank"
   );
   endTurn(state, player);
@@ -1094,6 +1104,7 @@ export const backToLobby = (state: GameState, playerId: string) => {
   }
 
   state.phase = "lobby";
+  state.round = 0;
 
   for (const player of state.players) {
     clearTable(state, player);
@@ -1169,7 +1180,13 @@ export const playForAbsent = (state: GameState, random: Random) => {
     return true;
   }
 
-  stayAndBankPoints(state, player, random, " is offline, so they");
+  stayAndBankPoints(
+    state,
+    player,
+    random,
+    (banked) =>
+      `${player.name} is offline, so they stayed and banked ${banked}.`
+  );
 
   return true;
 };

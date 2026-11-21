@@ -8,6 +8,7 @@ import {
 import type { Card } from "./cards";
 import {
   addPlayer,
+  backToLobby,
   blockingPlayerId,
   CHAT_MAX_LENGTH,
   chat,
@@ -440,6 +441,33 @@ describe("an offline player", () => {
     stay(state, "b", random);
     expect(state.phase).toBe("roundOver");
     expect(blockingPlayerId(state)).toBeNull();
+  });
+});
+
+describe("the game log", () => {
+  it("says how many points a Freeze banks, even none", () => {
+    const state = setup(["a", "b", "c"], [freeze(), num(3), num(4)]);
+
+    choose(state, "a", "b", random);
+
+    expect(
+      state.log.some(
+        (entry) => entry.text === "a played Freeze on b, who banked 0 points."
+      )
+    ).toBeTruthy();
+  });
+
+  it("numbers each game and files lobby entries under round 0", () => {
+    const state = setup(["a", "b"], [num(5), num(3)]);
+    expect(state.log.at(-1)?.game).toBe(1);
+
+    state.phase = "gameOver";
+    backToLobby(state, "a");
+    addPlayer(state, "c", "c");
+    expect(state.log.at(-1)).toMatchObject({ game: 1, round: 0 });
+
+    startGame(state, "a", random);
+    expect(state.log.at(-1)).toMatchObject({ game: 2, round: 1 });
   });
 });
 

@@ -2,7 +2,14 @@ import ArrowDown from "@lucide/solid/icons/arrow-down";
 import { createPolled } from "@solid-primitives/timer";
 import { Button } from "@ui-sdk/solid/button";
 import { Input } from "@ui-sdk/solid/input";
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onSettled,
+  Show,
+} from "solid-js";
 
 import { CHAT_MAX_LENGTH } from "../game/engine";
 import type { LogEntry } from "../game/engine";
@@ -20,6 +27,7 @@ const relativeTime = new Intl.RelativeTimeFormat(undefined, {
 
 interface LogGroup {
   id: number;
+  game: number | undefined;
   round: number | undefined;
   entries: LogEntry[];
 }
@@ -30,14 +38,31 @@ const groupLogByRound = (entries: LogEntry[]) => {
   for (const entry of entries) {
     const group = groups.at(-1);
 
-    if (group && group.round === entry.round) {
+    if (group && group.round === entry.round && group.game === entry.game) {
       group.entries.push(entry);
     } else {
-      groups.push({ entries: [entry], id: entry.id, round: entry.round });
+      groups.push({
+        entries: [entry],
+        game: entry.game,
+        id: entry.id,
+        round: entry.round,
+      });
     }
   }
 
   return groups;
+};
+
+const groupHeading = (group: LogGroup) => {
+  if (group.round === 0) {
+    return "Lobby";
+  }
+
+  const round = `Round ${group.round}`;
+
+  return group.game !== undefined && group.game > 1
+    ? `Game ${group.game} · ${round}`
+    : round;
 };
 
 const logTimeLabel = (at: number, now: number) => {
@@ -54,14 +79,28 @@ const logTimeLabel = (at: number, now: number) => {
   return clockTime.format(at);
 };
 
-const LogTime = (props: { at: number; now: number }) => (
-  <time
-    datetime={new Date(props.at).toISOString()}
-    title={clockTime.format(props.at)}
-  >
-    {logTimeLabel(props.at, props.now)}
-  </time>
-);
+const LogTime = (props: {
+  at: number;
+  everySecond: () => number;
+  everyMinute: () => number;
+}) => {
+  const label = createMemo(() => {
+    const coarse = props.everyMinute();
+    const isFresh = coarse - props.at < MINUTE;
+    const now = isFresh ? props.everySecond() : coarse;
+
+    return logTimeLabel(props.at, now);
+  });
+
+  return (
+    <time
+      datetime={new Date(props.at).toISOString()}
+      title={clockTime.format(props.at)}
+    >
+      {label()}
+    </time>
+  );
+};
 
 const isScrolledToBottom = (element: HTMLElement) =>
   element.scrollHeight - element.scrollTop - element.clientHeight <=
@@ -112,12 +151,15 @@ export default function GameLog(props: {
   const groups = createMemo(() => groupLogByRound(props.log));
   const latestId = createMemo(() => props.log.at(-1)?.id ?? 0);
 
-  const now = createPolled(Date.now, SECOND);
+  const everySecond = createPolled(Date.now, SECOND);
+  const everyMinute = createPolled(Date.now, MINUTE);
+
   const [atBottom, setAtBottom] = createSignal(true);
   const [seenId, setSeenId] = createSignal(0);
   const hasUnseen = () => !atBottom() && latestId() > seenId();
 
   let scroller: HTMLDivElement | undefined;
+  let entries: HTMLDivElement | undefined;
   let pinned = true;
 
   const scrollToLatest = () => {
@@ -136,6 +178,28 @@ export default function GameLog(props: {
       }
     }
   );
+
+  // WARNING: the log also resizes without a new entry (text rewraps as the table reflows), so re-pin on every resize.
+  onSettled(() => {
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            if (pinned) {
+              scrollToLatest();
+            }
+          });
+
+    for (const element of [scroller, entries]) {
+      if (element) {
+        observer?.observe(element);
+      }
+    }
+
+    return () => {
+      observer?.disconnect();
+    };
+  });
 
   return (
     <section class="panel log" aria-labelledby="game-log-title">
@@ -158,49 +222,62 @@ export default function GameLog(props: {
             }
           }}
         >
-          <Show
-            when={groups().length > 0}
-            fallback={<p class="log-empty">Nothing has happened yet.</p>}
+          <div
+            class="log-entries"
+            ref={(element) => {
+              entries = element;
+            }}
           >
-            <For each={groups()} keyed={(group) => group.id}>
-              {(group) => (
-                <section class="log-group">
-                  <Show when={group().round !== undefined}>
-                    <h3>
-                      {group().round === 0 ? "Lobby" : `Round ${group().round}`}
-                    </h3>
-                  </Show>
-                  <ol>
-                    <For each={group().entries} keyed={(entry) => entry.id}>
-                      {(entry) => (
-                        <li
-                          data-cue={entry().cue}
-                          data-kind={entry().from ? "chat" : undefined}
-                          data-own={
-                            entry().from?.id === props.playerId ? "" : undefined
-                          }
-                        >
-                          <span class="log-text">
-                            <Show when={entry().from}>
-                              {(from) => (
-                                <strong class="log-author">
-                                  {from().name}
-                                </strong>
+            <Show
+              when={groups().length > 0}
+              fallback={<p class="log-empty">Nothing has happened yet.</p>}
+            >
+              <For each={groups()} keyed={(group) => group.id}>
+                {(group) => (
+                  <section class="log-group">
+                    <Show when={group().round !== undefined}>
+                      <h3>{groupHeading(group())}</h3>
+                    </Show>
+                    <ol>
+                      <For each={group().entries} keyed={(entry) => entry.id}>
+                        {(entry) => (
+                          <li
+                            data-cue={entry().cue}
+                            data-kind={entry().from ? "chat" : undefined}
+                            data-own={
+                              entry().from?.id === props.playerId
+                                ? ""
+                                : undefined
+                            }
+                          >
+                            <span class="log-text">
+                              <Show when={entry().from}>
+                                {(from) => (
+                                  <strong class="log-author">
+                                    {from().name}
+                                  </strong>
+                                )}
+                              </Show>
+                              {entry().text}
+                            </span>
+                            <Show when={entry().at}>
+                              {(at) => (
+                                <LogTime
+                                  at={at()}
+                                  everySecond={everySecond}
+                                  everyMinute={everyMinute}
+                                />
                               )}
                             </Show>
-                            {entry().text}
-                          </span>
-                          <Show when={entry().at}>
-                            {(at) => <LogTime at={at()} now={now()} />}
-                          </Show>
-                        </li>
-                      )}
-                    </For>
-                  </ol>
-                </section>
-              )}
-            </For>
-          </Show>
+                          </li>
+                        )}
+                      </For>
+                    </ol>
+                  </section>
+                )}
+              </For>
+            </Show>
+          </div>
         </div>
         <Show when={hasUnseen()}>
           <div class="log-jump">

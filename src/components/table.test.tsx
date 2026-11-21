@@ -572,6 +572,29 @@ describe("<Table />", () => {
     expect(screen.queryByRole("button", { name: /Remove/u })).toBeNull();
   });
 
+  it("names later games in the log's round headings", () => {
+    render(() => (
+      <Table
+        room={room({
+          log: [
+            { game: 1, id: 1, round: 1, text: "Round 1 begins. Ben deals." },
+            { game: 1, id: 2, round: 0, text: "Cal joined." },
+            { game: 2, id: 3, round: 1, text: "Round 1 begins. Ana deals." },
+          ],
+        })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+    const log = screen.getByRole("log");
+    expect(
+      within(log)
+        .getAllByRole("heading")
+        .map((heading) => heading.textContent)
+    ).toStrictEqual(["Round 1", "Lobby", "Game 2 · Round 1"]);
+  });
+
   it("says when the player everyone is waiting on is offline", () => {
     const view = room();
     view.players = view.players.map((seat) =>
