@@ -1,5 +1,5 @@
-import { DurableObject } from "cloudflare:workers";
-import * as v from "valibot";
+import { Server } from "partyserver";
+import type { Connection, WSMessage } from "partyserver";
 
 import { parseClientMessage } from "../src/game/client-message";
 import type { GameCommand } from "../src/game/client-message";
@@ -21,14 +21,18 @@ import {
 import type { GameState } from "../src/game/engine";
 import {
   cleanName,
-  HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_PING,
   HEARTBEAT_PONG,
-  HEARTBEAT_STALE_MS,
+  ROOM_REMOVED_CLOSE_CODE,
   toRoomView,
 } from "../src/game/protocol";
 import type { ServerMessage } from "../src/game/protocol";
-import { nextAlarmAt, runTimers, syncTimers } from "../src/game/timers";
+import {
+  heartbeatDeadline,
+  nextAlarmAt,
+  runTimers,
+  syncTimers,
+} from "../src/game/timers";
 import type { RoomTimers } from "../src/game/timers";
 
 const UINT32_RANGE = 2 ** 32;
@@ -40,7 +44,10 @@ interface StoredRoom extends RoomTimers {
   tokens: Map<string, string>;
 }
 
-type Attachment = v.InferOutput<typeof AttachmentSchema>;
+interface Seat {
+  playerId: string;
+  seatedAt: number;
+}
 
 const random = () => {
   const [value = 0] = crypto.getRandomValues(new Uint32Array(1));
@@ -56,22 +63,14 @@ const send = (ws: WebSocket, message: ServerMessage) => {
   }
 };
 
-const AttachmentSchema = v.object({
-  playerId: v.string(),
-  seatedAt: v.optional(v.number()),
-});
+const roomState = (room: StoredRoom) =>
+  ({
+    room: toRoomView(room.code, room.game),
+    type: "state",
+  }) satisfies ServerMessage;
 
-const seatSocket = (ws: WebSocket, playerId: string) => {
-  ws.serializeAttachment({
-    playerId,
-    seatedAt: Date.now(),
-  } satisfies Attachment);
-};
-
-const attachmentOf = (ws: WebSocket) => {
-  const result = v.safeParse(AttachmentSchema, ws.deserializeAttachment());
-
-  return result.success ? result.output : null;
+const seatSocket = (socket: Connection<Seat>, playerId: string) => {
+  socket.setState({ playerId, seatedAt: Date.now() });
 };
 
 const sendWelcome = (
@@ -93,8 +92,8 @@ const reject = (ws: WebSocket, message: string, requestId?: string) => {
   );
 };
 
-const seatedPlayer = (ws: WebSocket, room: StoredRoom) => {
-  const playerId = attachmentOf(ws)?.playerId;
+const seatedPlayer = (ws: Connection<Seat>, room: StoredRoom) => {
+  const playerId = ws.state?.playerId;
 
   if (playerId === undefined || !findPlayer(room.game, playerId)) {
     throw new GameError("Join the room first.");
@@ -104,12 +103,12 @@ const seatedPlayer = (ws: WebSocket, room: StoredRoom) => {
 };
 
 const joinRoom = (
-  ws: WebSocket,
+  ws: Connection<Seat>,
   room: StoredRoom,
   rawName: string,
   token: string | null
 ) => {
-  const joinedId = attachmentOf(ws)?.playerId;
+  const joinedId = ws.state?.playerId;
 
   const joinedToken =
     joinedId === undefined ? undefined : room.tokens.get(joinedId);
@@ -146,7 +145,9 @@ const joinRoom = (
   sendWelcome(ws, room, playerId, newToken);
 };
 
-export class GameRoom extends DurableObject<Env> {
+export class GameRoom extends Server<Env> {
+  static override options = { hibernate: true };
+
   private room: StoredRoom | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -181,29 +182,58 @@ export class GameRoom extends DurableObject<Env> {
     return this.room !== null;
   }
 
-  override fetch(request: Request) {
+  override async fetch(request: Request) {
     if (!this.room) {
       return new Response("Room not found", { status: 404 });
     }
 
-    if (request.headers.get("Upgrade") !== "websocket") {
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return new Response("Expected a WebSocket", { status: 426 });
     }
 
-    const { 0: client, 1: server } = new WebSocketPair();
-    this.ctx.acceptWebSocket(server);
-    send(server, {
-      room: toRoomView(this.room.code, this.room.game),
-      type: "state",
-    });
-
-    return new Response(null, { status: 101, webSocket: client });
+    return await super.fetch(request);
   }
 
-  override async webSocketMessage(ws: WebSocket, data: string | ArrayBuffer) {
+  override async onStart() {
     const { room } = this;
 
-    if (!room || data instanceof ArrayBuffer) {
+    if (!room) {
+      return;
+    }
+
+    const seated = new Set(
+      Array.from(
+        this.getConnections<Seat>(),
+        (socket) => socket.state?.playerId
+      )
+    );
+
+    let changed = false;
+
+    for (const player of room.game.players) {
+      const connected = seated.has(player.id);
+
+      if (connected !== player.connected) {
+        player.connected = connected;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await this.commit();
+    }
+  }
+
+  override onConnect(connection: Connection) {
+    if (this.room) {
+      send(connection, roomState(this.room));
+    }
+  }
+
+  override async onMessage(ws: Connection<Seat>, data: WSMessage) {
+    const { room } = this;
+
+    if (!room || data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
       return;
     }
 
@@ -248,42 +278,47 @@ export class GameRoom extends DurableObject<Env> {
     }
   }
 
-  override async webSocketClose(ws: WebSocket) {
+  override async onClose(ws: Connection<Seat>) {
     await this.disconnect(ws);
   }
 
-  override async webSocketError(ws: WebSocket) {
+  override async onError(ws: Connection<Seat>) {
     await this.disconnect(ws);
   }
 
-  override async alarm() {
+  override async onAlarm() {
     const { room } = this;
 
     if (!room) {
       return;
     }
 
-    await this.dropSilentSockets();
+    const now = Date.now();
+    const presenceChanged = this.dropSilentSockets(room, now);
+
+    if (presenceChanged) {
+      syncTimers(room, now);
+    }
 
     const { changed, expired } = runTimers(
       room,
-      Date.now(),
+      now,
       random,
-      this.ctx.getWebSockets().length > 0
+      this.getConnections()[Symbol.iterator]().next().done === false
     );
 
     if (expired) {
-      this.room = null;
       await this.ctx.storage.deleteAll();
+      this.room = null;
 
       return;
     }
 
-    await (changed ? this.commit() : this.save());
+    await (changed || presenceChanged ? this.commit() : this.save());
   }
 
   private async handleCommand(
-    ws: WebSocket,
+    ws: Connection<Seat>,
     room: StoredRoom,
     message: GameCommand
   ) {
@@ -390,48 +425,37 @@ export class GameRoom extends DurableObject<Env> {
     const sockets = this.socketsFor(playerId);
 
     for (const socket of sockets) {
-      socket.serializeAttachment(null);
+      socket.setState(null);
     }
 
     return () => {
       for (const socket of sockets) {
-        send(socket, { reason, type: "removed" });
-        socket.close(1000, reason);
+        socket.close(ROOM_REMOVED_CLOSE_CODE, reason);
       }
     };
   }
 
+  private heartbeatDeadline(socket: Connection<Seat>, seat: Seat) {
+    const pingedAt = this.ctx.getWebSocketAutoResponseTimestamp(socket);
+
+    return heartbeatDeadline(seat.seatedAt, pingedAt);
+  }
+
   // WARNING: a dropped network never sends a close, so silent sockets look open until TCP gives up.
-  private async dropSilentSockets() {
-    const { room } = this;
-
-    if (!room) {
-      return;
-    }
-
-    const now = Date.now();
+  private dropSilentSockets(room: StoredRoom, now: number) {
     const silentIds = new Set<string>();
 
-    for (const socket of this.ctx.getWebSockets()) {
-      const attachment = attachmentOf(socket);
+    for (const socket of this.getConnections<Seat>()) {
+      const seat = socket.state;
 
-      if (attachment?.seatedAt === undefined) {
+      if (!seat || now < this.heartbeatDeadline(socket, seat)) {
         continue;
       }
 
-      const pingedAt =
-        this.ctx.getWebSocketAutoResponseTimestamp(socket)?.getTime() ?? 0;
+      silentIds.add(seat.playerId);
+      socket.setState(null);
 
-      if (now - Math.max(attachment.seatedAt, pingedAt) < HEARTBEAT_STALE_MS) {
-        continue;
-      }
-
-      silentIds.add(attachment.playerId);
-      socket.serializeAttachment(null);
-
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.close(1001, "Heartbeat timed out");
-      }
+      socket.close(1001, "Heartbeat timed out");
     }
 
     let changed = false;
@@ -445,32 +469,24 @@ export class GameRoom extends DurableObject<Env> {
       }
     }
 
-    if (changed) {
-      await this.commit();
-    }
-  }
-
-  private hasSeatedSockets() {
-    return this.ctx
-      .getWebSockets()
-      .some((socket) => attachmentOf(socket) !== null);
+    return changed;
   }
 
   private socketsFor(playerId: string) {
-    return this.ctx
-      .getWebSockets()
-      .filter((socket) => attachmentOf(socket)?.playerId === playerId);
+    return [...this.getConnections<Seat>()].filter(
+      (socket) => socket.state?.playerId === playerId
+    );
   }
 
-  private async disconnect(ws: WebSocket) {
+  private async disconnect(ws: Connection<Seat>) {
     const { room } = this;
-    const playerId = attachmentOf(ws)?.playerId;
+    const playerId = ws.state?.playerId;
 
     if (!room || playerId === undefined) {
       return;
     }
 
-    ws.serializeAttachment(null);
+    ws.setState(null);
     room.lastActiveAt = Date.now();
     const player = findPlayer(room.game, playerId);
 
@@ -492,11 +508,7 @@ export class GameRoom extends DurableObject<Env> {
     }
 
     const saved = this.save();
-    const view = toRoomView(room.code, room.game);
-
-    for (const socket of this.ctx.getWebSockets()) {
-      send(socket, { room: view, type: "state" });
-    }
+    this.broadcast(JSON.stringify(roomState(room)));
 
     await saved;
   }
@@ -511,13 +523,17 @@ export class GameRoom extends DurableObject<Env> {
     const now = Date.now();
     syncTimers(room, now);
 
-    const alarmAt = this.hasSeatedSockets()
-      ? Math.min(nextAlarmAt(room), now + HEARTBEAT_INTERVAL_MS)
-      : nextAlarmAt(room);
+    const deadlines: number[] = [];
+
+    for (const socket of this.getConnections<Seat>()) {
+      if (socket.state) {
+        deadlines.push(this.heartbeatDeadline(socket, socket.state));
+      }
+    }
 
     await Promise.all([
       this.ctx.storage.put("room", room),
-      this.ctx.storage.setAlarm(alarmAt),
+      this.ctx.storage.setAlarm(nextAlarmAt(room, deadlines)),
     ]);
   }
 }

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { addPlayer, createGame, startGame } from "./engine";
+import { addPlayer, chat, createGame, startGame } from "./engine";
+import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_STALE_MS } from "./protocol";
 import {
   ABSENT_GRACE_MS,
+  heartbeatDeadline,
   HOST_GRACE_MS,
   IDLE_EXPIRY_MS,
   nextAlarmAt,
@@ -44,6 +46,23 @@ const goOffline = (timers: RoomTimers, id: string) => {
 };
 
 describe("room timers", () => {
+  it("keeps the silent seat's alarm deadline during repeated chat and heartbeats from another seat", () => {
+    const timers = room(["active", "silent"]);
+    const silentDeadline = heartbeatDeadline(START, null);
+
+    for (const elapsed of [HEARTBEAT_INTERVAL_MS, 2 * HEARTBEAT_INTERVAL_MS]) {
+      const now = START + elapsed;
+      chat(timers.game, "active", "Still here");
+      timers.lastActiveAt = now;
+      syncTimers(timers, now);
+      const activeDeadline = heartbeatDeadline(START, new Date(now));
+      expect(nextAlarmAt(timers, [activeDeadline, silentDeadline])).toBe(
+        START + HEARTBEAT_STALE_MS
+      );
+      expect(activeDeadline).toBe(now + HEARTBEAT_STALE_MS);
+    }
+  });
+
   it("never schedules an alarm in the past for a room left open", () => {
     const timers = room(["a", "b"]);
     const later = START + IDLE_EXPIRY_MS + 1;

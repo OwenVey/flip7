@@ -1,26 +1,36 @@
+import { routePartykitRequest } from "partyserver";
 import app from "virtual:solid-ssr-handler";
 
-import { normalizeCode } from "../src/game/protocol";
+import { normalizeCode, ROOM_PARTY } from "../src/game/protocol";
 
 export { GameRoom } from "./room";
 
-const ROOM_SOCKET_PATH = /^\/api\/rooms\/(?<code>[^/]+)\/socket$/u;
+const PARTY_PATH = `/parties/${ROOM_PARTY}/`;
 
 export default {
   async fetch(request, env) {
-    const { pathname } = new URL(request.url);
+    const url = new URL(request.url);
+    const { pathname } = url;
 
-    if (pathname.startsWith("/api/")) {
-      const match = ROOM_SOCKET_PATH.exec(pathname);
-      const code = normalizeCode(match?.groups?.code ?? "");
-
-      if (code === null) {
-        return new Response("Not found", { status: 404 });
-      }
-
-      return await env.GAME_ROOM.getByName(code).fetch(request);
+    if (!pathname.startsWith(PARTY_PATH)) {
+      return await app.fetch(request);
     }
 
-    return await app.fetch(request);
+    const code = normalizeCode(pathname.slice(PARTY_PATH.length));
+
+    if (code !== null) {
+      url.pathname = `${PARTY_PATH}${code}`;
+
+      const routed = new Request(url, request);
+      routed.headers.delete("x-partykit-props");
+
+      const response = await routePartykitRequest(routed, env);
+
+      if (response) {
+        return response;
+      }
+    }
+
+    return new Response("Not found", { status: 404 });
   },
 } satisfies ExportedHandler<Env>;

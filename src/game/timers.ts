@@ -6,6 +6,7 @@ import {
   transferHost,
 } from "./engine";
 import type { GameState } from "./engine";
+import { HEARTBEAT_STALE_MS } from "./protocol";
 
 export const HOST_GRACE_MS = 20_000;
 export const ABSENT_GRACE_MS = 30_000;
@@ -57,7 +58,13 @@ export const syncTimers = (room: RoomTimers, now: number) => {
   }
 };
 
-export const nextAlarmAt = (room: RoomTimers) => {
+export const heartbeatDeadline = (seatedAt: number, lastPing: Date | null) =>
+  Math.max(seatedAt, lastPing?.getTime() ?? 0) + HEARTBEAT_STALE_MS;
+
+export const nextAlarmAt = (
+  room: RoomTimers,
+  heartbeatDeadlines: Iterable<number> = []
+) => {
   const deadlines = [room.lastActiveAt + IDLE_EXPIRY_MS];
 
   if (room.hostLeftAt !== null) {
@@ -68,7 +75,13 @@ export const nextAlarmAt = (room: RoomTimers) => {
     deadlines.push(room.stall.since + ABSENT_GRACE_MS);
   }
 
-  return Math.min(...deadlines);
+  let next = Math.min(...deadlines);
+
+  for (const deadline of heartbeatDeadlines) {
+    next = Math.min(next, deadline);
+  }
+
+  return next;
 };
 
 /**

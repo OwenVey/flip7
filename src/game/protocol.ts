@@ -10,6 +10,9 @@ export const HEARTBEAT_INTERVAL_MS = 10_000;
 
 /** A socket that hasn't pinged for this long is treated as gone. */
 export const HEARTBEAT_STALE_MS = 25_000;
+export const ROOM_REMOVED_CLOSE_CODE = 4001;
+export const ROOM_PARTY = "game-room";
+
 export const CODE_LENGTH = 5;
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 const CODE_PATTERN = new RegExp(`^[${CODE_ALPHABET}]{${CODE_LENGTH}}$`, "u");
@@ -58,8 +61,7 @@ export type ServerMessage =
   | { requestId: string; type: "accepted" }
   | { message: string; requestId: string; type: "rejected" }
   | { room: RoomView; type: "state" }
-  | { message: string; type: "error" }
-  | { reason: "kicked" | "left"; type: "removed" };
+  | { message: string; type: "error" };
 
 const heldCards = (state: GameState) => {
   const assignment = state.assignment ?? null;

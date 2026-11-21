@@ -1,11 +1,7 @@
 import { makeConnectivityListener } from "@solid-primitives/connectivity";
 import { usePageVisibility } from "@solid-primitives/page-utilities";
 import { makeObjectStorage, makePersisted } from "@solid-primitives/storage";
-import { makeTimer } from "@solid-primitives/timer";
-import {
-  makeHeartbeatWS,
-  makeReconnectingWS,
-} from "@solid-primitives/websocket";
+import { PartySocket } from "partysocket";
 import {
   createEffect,
   createSignal,
@@ -20,8 +16,11 @@ import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_PING,
   parseServerMessage,
+  ROOM_PARTY,
+  ROOM_REMOVED_CLOSE_CODE,
 } from "../game/protocol";
 import type { RoomView, ServerMessage } from "../game/protocol";
+import { makeSteadyHeartbeat } from "./heartbeat";
 import { roomExists } from "./room-functions";
 
 export type ConnectionStatus =
@@ -76,12 +75,6 @@ const plainText = {
   serialize: (data: string | null) => data ?? "",
 };
 
-const socketUrl = (code: string) => {
-  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-
-  return `${protocol}//${location.host}/api/rooms/${code}/socket`;
-};
-
 export const createRoomConnection = (
   code: string,
   onUpdate?: (previous: RoomView, current: RoomView, playerId: string) => void
@@ -117,15 +110,11 @@ export const createRoomConnection = (
 
   let previousRoom: RoomView | null = null;
   let seatedPlayerId: string | null = null;
-  let socket: ReturnType<typeof makeHeartbeatWS> | null = null;
+  let socket: PartySocket | null = null;
   let awaitingWelcome = false;
-  let cancelRetry: VoidFunction | undefined;
   let noticeId = 0;
-  let failures = 0;
-  let activeSocket: EventTarget | null = null;
   let lastRequestId: string | undefined;
   let pendingMove: PendingMove | null = null;
-  let disposed = false;
 
   const settleMove = (accepted: boolean) => {
     if (pendingMove) {
@@ -137,7 +126,6 @@ export const createRoomConnection = (
   };
 
   const startSync = () => {
-    activeSocket = null;
     previousRoom = null;
     seatedPlayerId = null;
     lastRequestId = undefined;
@@ -149,8 +137,14 @@ export const createRoomConnection = (
     }
   };
 
+  const closeSocket = () => {
+    const closing = socket;
+    socket = null;
+    closing?.close();
+  };
+
   const raw = (message: ClientMessage) => {
-    if (socket?.readyState !== WebSocket.OPEN) {
+    if (socket?.readyState !== PartySocket.OPEN) {
       return false;
     }
 
@@ -243,52 +237,41 @@ export const createRoomConnection = (
         return;
       }
 
-      case "removed": {
-        settleMove(false);
-        startSync();
-        forget();
-        setStatus("removed");
-        socket?.close();
-
-        return;
-      }
-
       default: {
         message satisfies never;
       }
     }
   };
 
-  const recheckRoom = async () => {
+  const recheckRoom = async (ws: PartySocket) => {
     const exists = await roomExists(code).catch(() => true);
 
-    if (!exists && !disposed && untrack(status) === "reconnecting") {
+    if (!exists && ws === socket && untrack(status) === "reconnecting") {
       settleMove(false);
       startSync();
       setStatus("missing");
-      socket?.close();
+      closeSocket();
     }
   };
 
   const connect = () => {
-    const ws = makeHeartbeatWS(
-      makeReconnectingWS(socketUrl(code), undefined, {
-        delay: RETRY_DELAY_MS,
+    const ws = makeSteadyHeartbeat(
+      new PartySocket({
+        host: location.host,
+        maxEnqueuedMessages: 0,
+        minReconnectionDelay: RETRY_DELAY_MS,
+        party: ROOM_PARTY,
+        protocol: location.protocol === "https:" ? "wss" : "ws",
+        room: code,
+        shouldReconnectOnClose: ({ code: closeCode }) =>
+          closeCode !== ROOM_REMOVED_CLOSE_CODE,
       }),
       HEARTBEAT
     );
 
     socket = ws;
-    ws.addEventListener("open", (event) => {
-      if (disposed) {
-        ws.close();
-
-        return;
-      }
-
+    ws.addEventListener("open", () => {
       startSync();
-      activeSocket = event.currentTarget;
-      failures = 0;
       const saved = token();
 
       if (saved === null) {
@@ -302,7 +285,7 @@ export const createRoomConnection = (
       raw({ name: "", token: saved, type: "join" });
     });
     ws.addEventListener("message", (event: MessageEvent<string>) => {
-      if (disposed || event.currentTarget !== activeSocket) {
+      if (ws !== socket || ws.readyState !== PartySocket.OPEN) {
         return;
       }
 
@@ -312,56 +295,32 @@ export const createRoomConnection = (
         handle(message);
       }
     });
-    ws.addEventListener("close", () => {
-      const current = status();
+    ws.addEventListener("close", (event) => {
+      if (ws !== socket) {
+        return;
+      }
 
-      // WARNING: a replaced socket can report its close after the new one opened.
-      if (
-        disposed ||
-        ws.readyState === WebSocket.OPEN ||
-        current === "removed" ||
-        current === "missing"
-      ) {
+      if (event.code === ROOM_REMOVED_CLOSE_CODE) {
+        settleMove(false);
+        startSync();
+        forget();
+        setStatus("removed");
+        closeSocket();
+
         return;
       }
 
       startSync();
       setStatus("reconnecting");
-      failures += 1;
+      const { retryCount } = ws;
 
-      if (failures % FAILURES_BEFORE_RECHECK === 0) {
-        void recheckRoom();
+      if (
+        retryCount === 1 ||
+        (retryCount > 0 && retryCount % FAILURES_BEFORE_RECHECK === 0)
+      ) {
+        void recheckRoom(ws);
       }
     });
-  };
-
-  const start = async () => {
-    try {
-      const exists = await roomExists(code);
-
-      if (disposed) {
-        return;
-      }
-
-      if (exists) {
-        connect();
-      } else {
-        setStatus("missing");
-      }
-    } catch {
-      if (disposed) {
-        return;
-      }
-
-      setStatus("reconnecting");
-      cancelRetry = makeTimer(
-        () => {
-          void start();
-        },
-        RETRY_DELAY_MS,
-        setTimeout
-      );
-    }
   };
 
   const watchConnectivity = () => {
@@ -383,13 +342,11 @@ export const createRoomConnection = (
   onSettled(() => {
     setOnline(navigator.onLine);
     runWithOwner(owner, watchConnectivity);
-    void start();
+    connect();
 
     return () => {
-      disposed = true;
-      cancelRetry?.();
       settleMove(false);
-      socket?.close();
+      closeSocket();
     };
   });
 
@@ -427,7 +384,7 @@ export const createRoomConnection = (
       if (
         !online() ||
         previousRoom === null ||
-        socket?.readyState !== WebSocket.OPEN
+        socket?.readyState !== PartySocket.OPEN
       ) {
         notify("Reconnecting. Try again in a moment.");
 
