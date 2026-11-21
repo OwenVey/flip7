@@ -71,6 +71,7 @@ describe("<Table />", () => {
         room={room()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
       />
     ));
 
@@ -102,6 +103,7 @@ describe("<Table />", () => {
         room={view()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
       />
     ));
 
@@ -156,6 +158,7 @@ describe("<Table />", () => {
         room={view()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
       />
     ));
 
@@ -214,7 +217,14 @@ describe("<Table />", () => {
 
   it("an agent can find every control and hit on its turn", async () => {
     const send = vi.fn<RoomConnection["send"]>();
-    render(() => <Table room={room()} playerId="a" send={send} />);
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
 
     const unnamed = entries()
       .filter((entry) => entry.label === "")
@@ -242,6 +252,37 @@ describe("<Table />", () => {
     expect(send).toHaveBeenCalledWith({ type: "hit" });
   });
 
+  it("sends a chat message and shows chat in the game log", async () => {
+    const chat = vi.fn<RoomConnection["chat"]>();
+    render(() => (
+      <Table
+        room={room({
+          log: [
+            { id: 1, round: 1, text: "Round 1 begins. Ben deals." },
+            { from: { id: "b", name: "Ben" }, id: 2, round: 1, text: "gl" },
+          ],
+        })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={chat}
+      />
+    ));
+
+    const log = screen.getByRole("log", { name: "Game log" });
+    expect(within(log).getByText("Ben")).toBeTruthy();
+    expect(within(log).getByText("gl")).toBeTruthy();
+
+    const result = await agent.act({
+      steps: [
+        { action: "setValue", args: ["  you too "], ref: "Chat message" },
+        { action: "press", ref: "Send" },
+      ],
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(chat).toHaveBeenCalledWith("you too");
+  });
+
   it("pauses moves while the room is syncing and resumes once it is ready", () => {
     const send = vi.fn<RoomConnection["send"]>();
     const [syncing, setSyncing] = createSignal(true);
@@ -250,6 +291,7 @@ describe("<Table />", () => {
         room={room()}
         playerId="a"
         send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
         actionsDisabled={syncing()}
       />
     ));
@@ -271,7 +313,14 @@ describe("<Table />", () => {
 
   it("removing a player needs a person to confirm", async () => {
     const send = vi.fn<RoomConnection["send"]>();
-    render(() => <Table room={room()} playerId="a" send={send} />);
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
 
     const remove = {
       steps: [
@@ -299,7 +348,14 @@ describe("<Table />", () => {
       options: ["a", "b"],
     };
 
-    render(() => <Table room={room({ choice })} playerId="a" send={send} />);
+    render(() => (
+      <Table
+        room={room({ choice })}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
     const seat = screen.getByRole("article", { name: "Ana, 40 points" });
     expect(within(seat).getByText("Choosing…")).toBeVisible();
     screen.getByRole("button", { name: "Freeze Ben" }).click();
@@ -308,7 +364,14 @@ describe("<Table />", () => {
     expect(screen.queryByRole("button", { name: "Hit" })).toBeNull();
     cleanup();
 
-    render(() => <Table room={room({ choice })} playerId="b" send={send} />);
+    render(() => (
+      <Table
+        room={room({ choice })}
+        playerId="b"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
     expect(screen.queryByRole("button", { name: "Freeze Ben" })).toBeNull();
     expect(
       screen.getByText("Ana is choosing who receives Freeze.")
@@ -321,6 +384,7 @@ describe("<Table />", () => {
         room={room()}
         playerId="b"
         send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
       />
     ));
     const seat = screen.getByRole("article", { name: "Ana, 40 points" });
@@ -337,7 +401,12 @@ describe("<Table />", () => {
     );
 
     render(() => (
-      <Table room={view} playerId="b" send={vi.fn<RoomConnection["send"]>()} />
+      <Table
+        room={view}
+        playerId="b"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
     ));
     expect(
       screen.getByText(/Offline, so they'll stay soon/u)

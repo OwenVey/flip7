@@ -2,7 +2,7 @@ import { createAudio } from "@nkzw/audio";
 import type { Audio, Sound as AudioSound } from "@nkzw/audio";
 import { createSignal, onSettled } from "solid-js";
 
-import type { GameCue } from "../game/engine";
+import type { GameCue, LogEntry } from "../game/engine";
 import type { RoomView } from "../game/protocol";
 
 const GAME_CUE_PRIORITY = [
@@ -21,6 +21,7 @@ const SOUND_VOLUMES = [
   ["error", 0.65],
   ["freeze", 0.65],
   ["join", 0.55],
+  ["message", 0.6],
   ["reveal", 0.65],
   ["round", 0.65],
   ["special", 0.65],
@@ -41,6 +42,45 @@ const MUSIC_GAIN = 0.35;
 const waitingOn = (room: RoomView) =>
   room.phase === "playing" ? (room.choice?.chooserId ?? room.turnId) : null;
 
+const isChatFromOthers = (entry: LogEntry, playerId: string) =>
+  entry.from !== undefined && entry.from.id !== playerId;
+
+const roundStarted = (previous: RoomView, current: RoomView) =>
+  current.phase !== "lobby" &&
+  (previous.phase === "lobby" || current.round !== previous.round);
+
+const tableCue = (
+  previous: RoomView,
+  current: RoomView,
+  events: LogEntry[]
+) => {
+  const eventCue = GAME_CUE_PRIORITY.find((cue) =>
+    events.some((entry) => entry.cue === cue)
+  );
+
+  if (current.phase === "gameOver" && previous.phase !== "gameOver") {
+    return "win";
+  }
+
+  if (eventCue) {
+    return eventCue satisfies Sound;
+  }
+
+  if (current.phase === "roundOver" && previous.phase !== "roundOver") {
+    return "round";
+  }
+
+  if (roundStarted(previous, current)) {
+    return "deal";
+  }
+
+  if ((current.drawSeq ?? 0) > (previous.drawSeq ?? 0)) {
+    return "reveal";
+  }
+
+  return null;
+};
+
 export const roomCues = (
   previous: RoomView,
   current: RoomView,
@@ -48,27 +88,15 @@ export const roomCues = (
 ) => {
   const lastId = previous.log.at(-1)?.id ?? 0;
   const events = current.log.filter((entry) => entry.id > lastId);
-
-  const eventCue = GAME_CUE_PRIORITY.find((cue) =>
-    events.some((entry) => entry.cue === cue)
-  );
-
-  const roundStarted =
-    current.phase !== "lobby" &&
-    (previous.phase === "lobby" || current.round !== previous.round);
-
   const cues: Sound[] = [];
+  const cue = tableCue(previous, current, events);
 
-  if (current.phase === "gameOver" && previous.phase !== "gameOver") {
-    cues.push("win");
-  } else if (eventCue) {
-    cues.push(eventCue);
-  } else if (current.phase === "roundOver" && previous.phase !== "roundOver") {
-    cues.push("round");
-  } else if (roundStarted) {
-    cues.push("deal");
-  } else if ((current.drawSeq ?? 0) > (previous.drawSeq ?? 0)) {
-    cues.push("reveal");
+  if (cue) {
+    cues.push(cue);
+  }
+
+  if (events.some((entry) => isChatFromOthers(entry, playerId))) {
+    cues.push("message");
   }
 
   const newChoice =
@@ -77,7 +105,9 @@ export const roomCues = (
 
   if (
     waitingOn(current) === playerId &&
-    (waitingOn(previous) !== playerId || newChoice || roundStarted)
+    (waitingOn(previous) !== playerId ||
+      newChoice ||
+      roundStarted(previous, current))
   ) {
     cues.push("turn");
   }

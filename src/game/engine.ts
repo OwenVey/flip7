@@ -15,7 +15,9 @@ export const FLIP_THREE_COUNT = 3;
 
 /** This status is stored in rooms and sent in WebSocket state messages. */
 export const FLIP_SEVEN_STATUS = "streak";
-const LOG_LIMIT = 30;
+const LOG_LIMIT = 100;
+export const CHAT_MAX_LENGTH = 200;
+const WHITESPACE = /\s+/gu;
 
 export type Phase = "lobby" | "playing" | "roundOver" | "gameOver";
 
@@ -64,8 +66,14 @@ export type GameCue =
   | "streak";
 
 export interface LogEntry {
+  /** Epoch milliseconds. Missing on entries saved before times were recorded. */
+  at?: number;
   cue?: GameCue;
+  /** Set on chat messages: who sent it, with their name at the time. */
+  from?: { id: string; name: string };
   id: number;
+  /** Missing on entries saved before rounds were recorded. */
+  round?: number;
   text: string;
 }
 
@@ -116,13 +124,25 @@ export const createGame = () => {
   return state;
 };
 
-export const say = (state: GameState, text: string, cue?: GameCue) => {
+const record = (
+  state: GameState,
+  entry: Pick<LogEntry, "cue" | "from" | "text">
+) => {
   state.logSeq += 1;
-  state.log.push({ id: state.logSeq, text, ...(cue && { cue }) });
+  state.log.push({
+    ...entry,
+    at: Date.now(),
+    id: state.logSeq,
+    round: state.round,
+  });
 
   if (state.log.length > LOG_LIMIT) {
     state.log.splice(0, state.log.length - LOG_LIMIT);
   }
+};
+
+export const say = (state: GameState, text: string, cue?: GameCue) => {
+  record(state, { text, ...(cue && { cue }) });
 };
 
 export const findPlayer = (state: GameState, id: string) =>
@@ -136,6 +156,17 @@ const getPlayer = (state: GameState, id: string) => {
   }
 
   return player;
+};
+
+export const chat = (state: GameState, playerId: string, raw: string) => {
+  const player = getPlayer(state, playerId);
+  const text = raw.replaceAll(WHITESPACE, " ").trim().slice(0, CHAT_MAX_LENGTH);
+
+  if (text === "") {
+    throw new GameError("Type a message first.");
+  }
+
+  record(state, { from: { id: player.id, name: player.name }, text });
 };
 
 const isActive = (state: GameState, id: string) =>

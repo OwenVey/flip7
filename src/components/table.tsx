@@ -12,12 +12,11 @@ import { blockingPlayerId, canStay, FLIP_SEVEN_STATUS } from "../game/engine";
 import type { ActionCardChoice, RoundStatus } from "../game/engine";
 import type { PlayerView, RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
+import GameLog from "./game-log";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
 import PlayingCard from "./playing-card";
 import RemovePlayer from "./remove-player";
-
-const LOG_VISIBLE = 12;
 
 const STATUS_LABELS = {
   active: "Active",
@@ -435,11 +434,9 @@ const ActionBar = (props: TableProps) => {
   );
 };
 
-export default function Table(props: TableProps) {
-  const recentLog = createMemo(() =>
-    props.room.log.slice(-LOG_VISIBLE).toReversed()
-  );
-
+export default function Table(
+  props: TableProps & { chat: RoomConnection["chat"] }
+) {
   return (
     <div class="table">
       <header class="table-header">
@@ -498,14 +495,11 @@ export default function Table(props: TableProps) {
 
         <div class="stack table-sidebar">
           <Leaderboard room={props.room} playerId={props.playerId} />
-          <section class="panel log" aria-label="Game log">
-            <h2>What happened</h2>
-            <ol aria-live="polite">
-              <For each={recentLog()} keyed={(entry) => entry.id}>
-                {(entry) => <li>{entry().text}</li>}
-              </For>
-            </ol>
-          </section>
+          <GameLog
+            log={props.room.log}
+            playerId={props.playerId}
+            onChat={props.chat}
+          />
         </div>
       </div>
     </div>

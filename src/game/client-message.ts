@@ -26,11 +26,15 @@ const ClientMessageSchema = v.variant("type", [
     type: v.literal("kick"),
   }),
   v.object({ requestId: RequestIdSchema, type: v.literal("leave") }),
+  v.object({
+    text: v.pipe(v.string(), v.maxLength(2000)),
+    type: v.literal("chat"),
+  }),
 ]);
 
 export type ClientMessage = v.InferOutput<typeof ClientMessageSchema>;
 
-export type GameCommand = Exclude<ClientMessage, { type: "join" }>;
+export type GameCommand = Exclude<ClientMessage, { type: "chat" | "join" }>;
 
 const ClientMessageJsonSchema = v.pipe(
   v.string(),

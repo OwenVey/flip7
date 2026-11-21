@@ -174,6 +174,7 @@ const Room = (props: { code: string }) => {
                     room={view().room}
                     playerId={view().playerId}
                     send={connection.send}
+                    chat={connection.chat}
                     actionsDisabled={!connection.canAct()}
                   />
                 }

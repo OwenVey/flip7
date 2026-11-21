@@ -40,4 +40,17 @@ describe(roomCues, () => {
       roomCues(before, { ...bust, phase: "gameOver" }, "me")
     ).toStrictEqual(["win"]);
   });
+
+  it("plays a message sound for other players' chat, not your own", () => {
+    const chat: RoomView = {
+      ...before,
+      log: [
+        ...before.log,
+        { from: { id: "opponent", name: "Opp" }, id: 8, text: "gl" },
+      ],
+    };
+
+    expect(roomCues(before, chat, "me")).toStrictEqual(["message"]);
+    expect(roomCues(before, chat, "opponent")).toStrictEqual([]);
+  });
 });

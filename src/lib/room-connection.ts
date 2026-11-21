@@ -385,6 +385,15 @@ export const createRoomConnection = (
 
   return {
     canAct: () => online() && ready() && !sending(),
+    chat: (text: string) => {
+      if (!online() || previousRoom === null || !raw({ text, type: "chat" })) {
+        notify("Reconnecting. Try again in a moment.");
+
+        return false;
+      }
+
+      return true;
+    },
     join: (name: string) => {
       setSavedName(name);
       awaitingWelcome = true;

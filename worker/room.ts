@@ -6,6 +6,7 @@ import type { GameCommand } from "../src/game/client-message";
 import {
   addPlayer,
   backToLobby,
+  chat,
   choose,
   createGame,
   findPlayer,
@@ -78,6 +79,16 @@ const reject = (ws: WebSocket, message: string, requestId?: string) => {
       ? { message, type: "error" }
       : { message, requestId, type: "rejected" }
   );
+};
+
+const seatedPlayer = (ws: WebSocket, room: StoredRoom) => {
+  const playerId = attachmentOf(ws)?.playerId;
+
+  if (playerId === undefined || !findPlayer(room.game, playerId)) {
+    throw new GameError("Join the room first.");
+  }
+
+  return playerId;
 };
 
 const joinRoom = (
@@ -202,6 +213,13 @@ export class GameRoom extends DurableObject<Env> {
         return;
       }
 
+      if (message.type === "chat") {
+        chat(room.game, seatedPlayer(ws, room), message.text);
+        await this.commit();
+
+        return;
+      }
+
       await this.handleCommand(ws, room, message);
     } catch (error) {
       if (!(error instanceof GameError)) {
@@ -211,7 +229,9 @@ export class GameRoom extends DurableObject<Env> {
       reject(
         ws,
         error.message,
-        message.type === "join" ? undefined : message.requestId
+        message.type === "join" || message.type === "chat"
+          ? undefined
+          : message.requestId
       );
     }
   }
@@ -253,12 +273,8 @@ export class GameRoom extends DurableObject<Env> {
     room: StoredRoom,
     message: GameCommand
   ) {
-    const playerId = attachmentOf(ws)?.playerId;
+    const playerId = seatedPlayer(ws, room);
     const { requestId } = message;
-
-    if (playerId === undefined || !findPlayer(room.game, playerId)) {
-      throw new GameError("Join the room first.");
-    }
 
     const finishEviction = this.act(room, playerId, message);
 

@@ -9,6 +9,8 @@ import type { Card } from "./cards";
 import {
   addPlayer,
   blockingPlayerId,
+  CHAT_MAX_LENGTH,
+  chat,
   choose,
   createGame,
   GameError,
@@ -410,5 +412,40 @@ describe("an offline player", () => {
     stay(state, "b", random);
     expect(state.phase).toBe("roundOver");
     expect(blockingPlayerId(state)).toBeNull();
+  });
+});
+
+describe(chat, () => {
+  it("adds a player's message to the log with their name", () => {
+    const state = createGame();
+    addPlayer(state, "a", "Ana");
+
+    chat(state, "a", "  good   luck\n everyone ");
+
+    expect(state.log.at(-1)).toMatchObject({
+      from: { id: "a", name: "Ana" },
+      round: 0,
+      text: "good luck everyone",
+    });
+  });
+
+  it("rejects empty messages and trims long ones", () => {
+    const state = createGame();
+    addPlayer(state, "a", "Ana");
+
+    expect(() => {
+      chat(state, "a", "   ");
+    }).toThrow(GameError);
+
+    chat(state, "a", "x".repeat(CHAT_MAX_LENGTH + 50));
+    expect(state.log.at(-1)?.text).toHaveLength(CHAT_MAX_LENGTH);
+  });
+
+  it("only accepts messages from players in the room", () => {
+    const state = createGame();
+
+    expect(() => {
+      chat(state, "ghost", "hi");
+    }).toThrow(GameError);
   });
 });
