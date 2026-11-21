@@ -3405,11 +3405,13 @@ main {
 
 /* Game over: the card springs in, the trophy stamps down and throws confetti, then the standings rise in. */
 [data-slot="dialog-content"].game-over-dialog {
-  display: grid;
-  justify-items: center;
+  /* A flex column lets the standings shrink and scroll inside the max height; grid auto rows would not. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 0.375rem;
   width: min(26rem, calc(100% - 2rem));
-  max-height: min(90dvh, calc(var(--visual-viewport-height, 100dvh) - 1rem));
+  max-height: min(80dvh, calc(var(--visual-viewport-height, 100dvh) - 4rem));
   padding: 2rem var(--dialog-inset) var(--dialog-inset);
   overflow: visible;
   background:
@@ -3498,11 +3500,13 @@ main {
 .game-over-standings {
   display: grid;
   gap: 0.375rem;
+  flex: 0 1 auto;
   width: 100%;
-  min-height: 0;
+  min-height: 3rem;
   margin: 0.75rem 0 0.25rem;
   padding: 0.25rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
   list-style: none;
   text-align: start;
 
