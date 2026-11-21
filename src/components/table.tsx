@@ -19,6 +19,7 @@ import {
 } from "../game/engine";
 import type { ActionCardChoice, HeldCard, RoundStatus } from "../game/engine";
 import type { PlayerView, RoomView } from "../game/protocol";
+import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
 import type { RoomConnection } from "../lib/room-connection";
 import GameLog from "./game-log";
@@ -199,8 +200,43 @@ const RoundPlayer = (
       ? props.player.score
       : props.player.score - (roundResult()?.total ?? 0);
 
+  const projectedScore = () => baseScore() + roundPoints();
+
+  const shownBaseScore = createCountUp(baseScore);
+
+  const lostPoints = () =>
+    props.room.phase === "playing" && props.player.status === "busted"
+      ? calculateRoundScore(props.player.hand).total
+      : 0;
+
+  const roundRisk = () => {
+    if (roundPoints() <= 0) {
+      return "none";
+    }
+
+    return props.room.phase === "playing" && props.player.status === "active"
+      ? "at-risk"
+      : "locked";
+  };
+
+  const wouldWin = () => projectedScore() >= props.room.targetScore;
+
   const scorePercent = (score: number) =>
     `${Math.min(100, (score / props.room.targetScore) * 100)}%`;
+
+  const scoreDetails = () => {
+    const details: string[] = [];
+
+    if (roundPoints() > 0) {
+      details.push(`${roundPoints()} this round`);
+    }
+
+    if (wouldWin()) {
+      details.push("enough to win");
+    }
+
+    return details;
+  };
 
   const decisionLabel = () => {
     if (props.room.choice) {
@@ -309,19 +345,20 @@ const RoundPlayer = (
         class="seat-meter"
         value={props.player.score}
         max={props.room.targetScore}
+        data-round={roundRisk()}
+        data-winning={wouldWin() ? "" : undefined}
         style={{
+          "--lost-end": scorePercent(baseScore() + lostPoints()),
+          "--projected-score": scorePercent(projectedScore()),
           "--round-start": scorePercent(baseScore()),
-          "--projected-score": scorePercent(baseScore() + roundPoints()),
         }}
         getValueLabel={(value, details) =>
-          roundPoints() > 0
-            ? `${value} of ${details.max} points, ${roundPoints()} this round`
-            : `${value} of ${details.max} points`
+          [`${value} of ${details.max} points`, ...scoreDetails()].join(", ")
         }
       >
         <div class="seat-scores" aria-hidden="true">
           <span class="seat-score" data-banked="">
-            {baseScore()}
+            {shownBaseScore()}
           </span>
           <Show when={roundPoints() > 0}>
             <span class="seat-score" data-projected="">
@@ -334,6 +371,10 @@ const RoundPlayer = (
         </div>
         <MeterTrack>
           <MeterIndicator />
+          <span class="meter-round" />
+          <Show when={lostPoints() > 0}>
+            <span class="meter-lost" />
+          </Show>
         </MeterTrack>
       </Meter>
     </article>

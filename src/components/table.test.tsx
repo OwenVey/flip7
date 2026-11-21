@@ -60,6 +60,11 @@ const room = (overrides: Partial<RoomView> = {}) => {
   return view;
 };
 
+const meterOf = (name: string) =>
+  within(screen.getByRole("article", { name })).getByRole("meter", {
+    name: "Total score",
+  });
+
 const entries = () =>
   agent
     .snapshot()
@@ -201,6 +206,79 @@ describe("<Table />", () => {
     expect(within(meter).getByText("40")).toBeVisible();
     expect(within(meter).getByText("+7")).toBeVisible();
     expect(within(seat).queryByText(/points this round/u)).toBeNull();
+  });
+
+  it("marks round points at risk and a score that would win", () => {
+    const initial = room();
+    const [view, setView] = createSignal(initial);
+
+    render(() => (
+      <Table
+        room={view()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    expect(meterOf("Ana, 40 points")).toHaveAttribute("data-round", "at-risk");
+    expect(meterOf("Ben, 12 points")).toHaveAttribute(
+      "aria-valuetext",
+      "12 of 200 points, 3 this round"
+    );
+
+    setView(
+      room({
+        players: initial.players.map((player) =>
+          player.id === "a"
+            ? { ...player, score: 195, status: "stayed" }
+            : player
+        ),
+      })
+    );
+    flush();
+
+    const ana = meterOf("Ana, 195 points");
+
+    expect(ana).toHaveAttribute("data-round", "locked");
+    expect(ana).toHaveAttribute("data-winning");
+    expect(ana).toHaveAttribute(
+      "aria-valuetext",
+      "195 of 200 points, 7 this round, enough to win"
+    );
+  });
+
+  it("flashes the points a bust loses", () => {
+    const initial = room();
+    const [view, setView] = createSignal(initial);
+
+    render(() => (
+      <Table
+        room={view()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const meter = within(
+      screen.getByRole("article", { name: "Ana, 40 points" })
+    ).getByRole("meter", { name: "Total score" });
+
+    expect(meter.querySelector(".meter-lost")).toBeNull();
+
+    setView(
+      room({
+        players: initial.players.map((player) =>
+          player.id === "a" ? { ...player, status: "busted" } : player
+        ),
+      })
+    );
+    flush();
+
+    expect(meter.querySelector(".meter-lost")).not.toBeNull();
+    expect(meter.style.getPropertyValue("--lost-end")).toBe("23.5%");
+    expect(meter).toHaveAttribute("data-round", "none");
   });
 
   it("ranks banked scores, shares tied ranks, and updates after scoring", async () => {

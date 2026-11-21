@@ -761,9 +761,17 @@ main {
 }
 
 .seat-meter {
+  --round-fill: color-mix(in srgb, var(--accent) 45%, var(--paper-deep));
+  --round-stripe: color-mix(in srgb, var(--accent) 22%, var(--paper-deep));
+  --meter-ease: 600ms cubic-bezier(0.22, 1, 0.36, 1);
   min-width: 0;
   grid-template-columns: minmax(0, 1fr);
   gap: 0.125rem;
+
+  &[data-winning] {
+    --round-fill: var(--gold);
+    --round-stripe: color-mix(in srgb, var(--gold) 45%, var(--paper-deep));
+  }
 
   & [data-slot="meter-track"] {
     position: relative;
@@ -771,28 +779,47 @@ main {
     overflow: hidden;
     border: 1.5px solid var(--ink);
     background: var(--paper-deep);
-
-    &::after {
-      position: absolute;
-      inset-block: 0;
-      inset-inline-start: var(--round-start);
-      inset-inline-end: calc(100% - var(--projected-score));
-      background: color-mix(in srgb, var(--accent) 45%, var(--paper-deep));
-      content: "";
-    }
   }
 
   & [data-slot="meter-indicator"] {
     background: var(--accent);
   }
 
+  & :is(.meter-round, .meter-lost) {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: var(--round-start);
+  }
+
+  /* This round's points: striped while the player could still bust, solid once they're safe. */
+  & .meter-round {
+    inset-inline-end: calc(100% - var(--projected-score));
+    background: var(--round-fill);
+  }
+
+  &[data-round="at-risk"] .meter-round {
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--round-fill) 0 0.25rem,
+      var(--round-stripe) 0.25rem 0.5rem
+    );
+    background-size: 0.7071rem 0.7071rem;
+  }
+
+  & .meter-lost {
+    inset-inline-end: calc(100% - var(--lost-end));
+    transform-origin: left;
+    background: var(--danger);
+    opacity: 0;
+    animation: meter-bust 900ms ease-in both;
+  }
+
   & .seat-scores {
     --label-width: 2.25rem;
-    --score-label-limit: calc(100% - 2 * var(--label-width));
-    --projected-label-start: clamp(
-      var(--label-width),
-      calc(var(--projected-score) - var(--label-width) / 2),
-      var(--score-label-limit)
+    --banked-label-start: clamp(
+      0rem,
+      calc(var(--round-start) - var(--label-width) / 2),
+      calc(100% - 2 * var(--label-width))
     );
     position: relative;
     block-size: 1em;
@@ -801,9 +828,12 @@ main {
     font-weight: 900;
     line-height: 1;
 
-    &:has([data-projected]) [data-banked] {
-      --banked-label-limit: calc(
-        var(--projected-label-start) - var(--label-width)
+    /* Leave room for the round's label and the goal after the banked score. */
+    &:has([data-projected]) {
+      --banked-label-start: clamp(
+        0rem,
+        calc(var(--round-start) - var(--label-width) / 2),
+        calc(100% - 3 * var(--label-width))
       );
     }
   }
@@ -813,17 +843,19 @@ main {
     inset-block-start: 0;
     inline-size: var(--label-width);
     text-align: center;
+    font-variant-numeric: tabular-nums;
 
     &[data-banked] {
-      inset-inline-start: clamp(
-        0rem,
-        calc(var(--round-start) - var(--label-width) / 2),
-        var(--banked-label-limit, var(--score-label-limit))
-      );
+      inset-inline-start: var(--banked-label-start);
     }
 
+    /* Sits at the end of the round's segment, or just after the banked score when they're close. */
     &[data-projected] {
-      inset-inline-start: var(--projected-label-start);
+      inset-inline-start: clamp(
+        calc(var(--banked-label-start) + var(--label-width)),
+        calc(var(--projected-score) - var(--label-width) / 2),
+        calc(100% - 2 * var(--label-width))
+      );
       color: var(--ink-soft);
     }
 
@@ -833,11 +865,68 @@ main {
       text-align: end;
     }
   }
+
+  &[data-winning] .seat-score:is([data-projected], [data-goal]) {
+    color: var(--ink);
+    text-shadow: 2px 2px 0 var(--gold);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .seat-meter {
+    & [data-slot="meter-indicator"] {
+      transition: width var(--meter-ease);
+    }
+
+    & .meter-round {
+      transition:
+        inset-inline-start var(--meter-ease),
+        inset-inline-end var(--meter-ease),
+        background-color 300ms;
+    }
+
+    &[data-round="at-risk"] .meter-round {
+      animation: meter-risk 900ms linear infinite;
+    }
+
+    & .seat-score:is([data-banked], [data-projected]) {
+      transition: inset-inline-start var(--meter-ease);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat-meter .meter-lost {
+    animation: none;
+  }
+}
+
+@keyframes meter-risk {
+  to {
+    background-position: 0.7071rem 0;
+  }
+}
+
+@keyframes meter-bust {
+  0%,
+  45% {
+    scale: 1 1;
+    opacity: 1;
+  }
+
+  100% {
+    scale: 0 1;
+    opacity: 0;
+  }
 }
 
 @media (max-width: 40rem) {
   .table {
     padding-bottom: 9rem;
+  }
+
+  .seat-meter [data-slot="meter-track"] {
+    height: 0.875rem;
   }
 
   .action-bar {
