@@ -257,7 +257,8 @@ p {
   align-items: center;
 }
 
-.stack {
+.stack,
+[data-slot="alert-dialog-content"] > [data-slot="stack"] {
   display: grid;
   gap: 1rem;
 }

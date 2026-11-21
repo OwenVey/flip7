@@ -45,14 +45,15 @@ export default function LeaveRoom(props: {
           </AlertDialogDescription>
         </div>
         <div data-slot="row">
-          <AlertDialogClose>Stay here</AlertDialogClose>
+          <AlertDialogClose>Stay</AlertDialogClose>
           <AlertDialogClose
             disabled={props.disabled}
             value="confirm"
             data-variant="destructive"
             data-agent-confirm="Gives up your seat and points in this room"
           >
-            Leave and give up seat
+            <LogOut size={16} aria-hidden="true" />
+            <span>Leave</span>
           </AlertDialogClose>
         </div>
       </AlertDialogContent>
