@@ -1,4 +1,11 @@
-import { cleanup, render, screen } from "@solidjs/testing-library";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -6,10 +13,11 @@ import { MAX_PLAYERS } from "../game/engine";
 import type { RoomView } from "../game/protocol";
 import JoinForm from "./join-form";
 
-const roomWith = (names: string[]) => {
+const roomWith = (names: string[], avatar = 1) => {
   const view: Pick<RoomView, "phase" | "players"> = {
     phase: "lobby",
     players: names.map((name, index) => ({
+      avatar,
       bustCard: null,
       connected: true,
       hand: [],
@@ -36,6 +44,7 @@ describe("<JoinForm />", () => {
       <JoinForm
         room={room()}
         savedName="Ben"
+        savedAvatar={1}
         onJoin={vi.fn<(name: string) => void>()}
       />
     ));
@@ -54,6 +63,7 @@ describe("<JoinForm />", () => {
       <JoinForm
         room={room()}
         savedName="Ben"
+        savedAvatar={1}
         onJoin={vi.fn<(name: string) => void>()}
       />
     ));
@@ -79,6 +89,7 @@ describe("<JoinForm />", () => {
       <JoinForm
         room={room}
         savedName=""
+        savedAvatar={1}
         onJoin={vi.fn<(name: string) => void>()}
       />
     ));
@@ -95,6 +106,7 @@ describe("<JoinForm />", () => {
       <JoinForm
         room={{ ...room, phase: phase() }}
         savedName=""
+        savedAvatar={1}
         onJoin={vi.fn<(name: string) => void>()}
       />
     ));
@@ -124,6 +136,7 @@ describe("<JoinForm />", () => {
       <JoinForm
         room={room}
         savedName="Ben"
+        savedAvatar={1}
         onJoin={onJoin}
         joining={joining()}
         error={error()}
@@ -145,5 +158,106 @@ describe("<JoinForm />", () => {
       /Someone here is already called Ben/u
     );
     expect(screen.getByRole("button", { name: "Join room" })).toBeEnabled();
+  });
+
+  it("joins with the avatar picked from the grid", async () => {
+    const onJoin = vi.fn<(name: string, avatar: number) => void>();
+
+    render(() => (
+      <JoinForm
+        room={roomWith(["Ana"])}
+        savedName="Ben"
+        savedAvatar={1}
+        onJoin={onJoin}
+      />
+    ));
+    screen.getByRole("button", { name: "Change avatar" }).click();
+    flush();
+
+    const fifth = await screen.findByRole("radio", {
+      name: "Pink pentagon on yellow",
+    });
+
+    fifth.click();
+    flush();
+    screen.getByRole("button", { name: "Join room" }).click();
+    flush();
+
+    expect(onJoin).toHaveBeenCalledWith("Ben", 5);
+  });
+
+  it.each(["Enter", " "])(
+    "confirms an avatar with %j without submitting the join form",
+    async (key) => {
+      const onJoin = vi.fn<(name: string, avatar: number) => void>();
+      render(() => (
+        <JoinForm
+          room={roomWith([])}
+          savedName="Ben"
+          savedAvatar={1}
+          onJoin={onJoin}
+        />
+      ));
+      const trigger = screen.getByRole("button", { name: "Change avatar" });
+      trigger.click();
+      flush();
+
+      const grid = within(
+        screen.getByRole("radiogroup", { name: "Choose an avatar" })
+      );
+
+      const first = grid.getByRole("radio", {
+        name: "Pink circle on yellow",
+      });
+
+      const second = grid.getByRole("radio", { name: "Green egg on yellow" });
+
+      first.focus();
+      fireEvent.keyDown(first, { key: "ArrowRight" });
+      flush();
+      expect(second).toHaveAttribute("aria-checked", "true");
+
+      expect(fireEvent.keyDown(second, { key })).toBeFalsy();
+      flush();
+      await waitFor(() => {
+        expect(trigger).toHaveFocus();
+      });
+      expect(onJoin).not.toHaveBeenCalled();
+
+      screen.getByRole("button", { name: "Join room" }).click();
+      expect(onJoin).toHaveBeenCalledWith("Ben", 2);
+    }
+  );
+
+  it("keeps the suggested avatar when its tile is clicked", () => {
+    const onJoin = vi.fn<(name: string, avatar: number) => void>();
+    const [room, setRoom] = createSignal(roomWith([]));
+
+    render(() => (
+      <JoinForm
+        room={room()}
+        savedName="Ben"
+        savedAvatar={null}
+        onJoin={onJoin}
+      />
+    ));
+
+    const trigger = screen.getByRole("button", { name: "Change avatar" });
+
+    trigger.click();
+    flush();
+
+    const suggested = screen.getByRole("radio", { checked: true });
+    const avatar = screen.getAllByRole("radio").indexOf(suggested) + 1;
+
+    suggested.click();
+    flush();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(onJoin).not.toHaveBeenCalled();
+
+    setRoom(roomWith(["Ana"], avatar));
+    flush();
+    screen.getByRole("button", { name: "Join room" }).click();
+    expect(onJoin).toHaveBeenCalledWith("Ben", avatar);
   });
 });

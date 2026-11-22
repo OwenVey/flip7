@@ -11,6 +11,7 @@ import {
   untrack,
 } from "solid-js";
 
+import { parseSavedAvatar } from "../game/avatars";
 import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_PING,
@@ -33,6 +34,7 @@ const HEARTBEAT = {
 };
 
 const NAME_KEY = "hot-streak:name";
+const AVATAR_KEY = "hot-streak:avatar";
 const STORAGE_PROBE = "hot-streak:probe";
 
 const FRESH_PARAM = "fresh";
@@ -68,6 +70,16 @@ export const createRoomConnection = (code: string) => {
     {
       ...plainText,
       name: NAME_KEY,
+      storage: usableStorage(() => localStorage),
+    }
+  );
+
+  const [savedAvatar, setSavedAvatar] = makePersisted(
+    createSignal<number | null>(null, { ownedWrite: true }),
+    {
+      deserialize: parseSavedAvatar,
+      name: AVATAR_KEY,
+      serialize: (avatar: number | null) => String(avatar ?? ""),
       storage: usableStorage(() => localStorage),
     }
   );
@@ -189,9 +201,10 @@ export const createRoomConnection = (code: string) => {
     canAct: () => state().canAct,
     chat: client.chat,
     clearJoinError: client.clearJoinError,
-    join: (name: string) => {
+    join: (name: string, avatar: number) => {
       setSavedName(name);
-      client.join(name);
+      setSavedAvatar(avatar);
+      client.join(name, avatar);
     },
     joinError: () => state().joinError,
     joining: () => state().joining,
@@ -200,6 +213,7 @@ export const createRoomConnection = (code: string) => {
     online: () => state().online,
     playerId: () => state().playerId,
     room: () => state().room,
+    savedAvatar,
     savedName,
     send: client.send,
     status: () => state().status,

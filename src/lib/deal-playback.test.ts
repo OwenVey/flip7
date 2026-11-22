@@ -22,8 +22,8 @@ const view = (game: GameState) => structuredClone(toRoomView("ABCDE", game));
 
 const gameAtFirstTurn = () => {
   const game = createGame();
-  addPlayer(game, "a", "Ada");
-  addPlayer(game, "b", "Ben");
+  addPlayer(game, "a", "Ada", 1);
+  addPlayer(game, "b", "Ben", 1);
   startGame(game, "a", random);
   game.phase = "roundOver";
   game.round = 0;
@@ -153,7 +153,7 @@ describe(createDealPlayback, () => {
     const playerCount = 16;
 
     for (let index = 2; index < playerCount; index += 1) {
-      addPlayer(game, `player-${index}`, `Player ${index}`);
+      addPlayer(game, `player-${index}`, `Player ${index}`, 1);
     }
 
     game.phase = "roundOver";

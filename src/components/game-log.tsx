@@ -25,9 +25,11 @@ import {
   untrack,
 } from "solid-js";
 
+import { fallbackAvatar } from "../game/avatars";
 import { CHAT_MAX_LENGTH } from "../game/engine";
 import type { LogEntry } from "../game/engine";
 import { observeScrollEdges } from "../lib/scroll-edges";
+import PlayerAvatar from "./player-avatar";
 import Tooltip from "./tooltip";
 
 export const CHAT_AND_GAME_LOG_TITLE = "Chat & Log";
@@ -667,9 +669,19 @@ export default function GameLog(props: {
                               {(author) => (
                                 <>
                                   <div class="log-message-header">
-                                    <strong class="log-author">
-                                      {author().name}
-                                    </strong>
+                                    <span class="log-author-line">
+                                      <PlayerAvatar
+                                        player={{
+                                          avatar:
+                                            author().avatar ??
+                                            fallbackAvatar(author().id),
+                                        }}
+                                        size="sm"
+                                      />
+                                      <strong class="log-author">
+                                        {author().name}
+                                      </strong>
+                                    </span>
                                     <LogTime at={entry().at} now={now} />
                                   </div>
                                   {entry().text}

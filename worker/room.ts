@@ -111,7 +111,10 @@ export class GameRoom extends Server<Env> {
     }
 
     if (message.type === "join") {
-      await this.carryOut(room.join(ws.id, message.name, message.token), ws);
+      await this.carryOut(
+        room.join(ws.id, message.name, message.token, message.avatar),
+        ws
+      );
     } else if (message.type === "chat") {
       await this.carryOut(room.chat(ws.id, message.text), ws);
     } else {

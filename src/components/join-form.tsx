@@ -8,21 +8,35 @@ import {
 import { Input } from "@ui-sdk/solid/input";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 
+import { pickAvatar } from "../game/avatars";
 import { MAX_PLAYERS } from "../game/engine";
 import { NAME_MAX_LENGTH } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 import { paths } from "../router";
+import AvatarPicker from "./avatar-picker";
 
 export default function JoinForm(props: {
   room: RoomView | null;
   savedName: string;
-  onJoin: (name: string) => void;
+  savedAvatar: number | null;
+  onJoin: (name: string, avatar: number) => void;
   joining?: boolean;
   unavailable?: boolean;
   error?: string;
   onEdit?: () => void;
 }) {
   const [typed, setTyped] = createSignal<string | null>(null);
+  const [picked, setPicked] = createSignal<number | null>(null);
+  const seed = Math.random();
+
+  const avatar = () =>
+    picked() ??
+    props.savedAvatar ??
+    pickAvatar(
+      seed,
+      (props.room?.players ?? []).flatMap((player) => player.avatar ?? [])
+    );
+
   const [emptyName, setEmptyName] = createSignal(false);
   const full = () => (props.room?.players.length ?? 0) >= MAX_PLAYERS;
   const error = () => (emptyName() ? "Enter your name." : (props.error ?? ""));
@@ -42,6 +56,7 @@ export default function JoinForm(props: {
 
   const name = () => typed() ?? suggestion();
   let nameInput: HTMLInputElement | undefined;
+  const [nameField, setNameField] = createSignal<HTMLDivElement>();
 
   onSettled(() => {
     nameInput?.focus();
@@ -106,28 +121,44 @@ export default function JoinForm(props: {
             }
 
             setTyped(trimmed);
-            props.onJoin(trimmed);
+            props.onJoin(trimmed, avatar());
           }}
         >
           <Field name="name" invalid={error() === "" ? undefined : true}>
             <FieldLabel>Your name</FieldLabel>
-            <Input
+            <div
+              class="name-row"
               ref={(element) => {
-                nameInput = element;
+                setNameField(element);
               }}
-              value={name()}
-              onValueChange={(value) => {
-                setTyped(value);
-                setEmptyName(false);
-                props.onEdit?.();
-              }}
-              readonly={props.joining === true}
-              maxlength={NAME_MAX_LENGTH}
-              autocomplete="nickname"
-              required
-            />
+            >
+              <AvatarPicker
+                anchor={nameField()}
+                value={avatar()}
+                onChange={(next) => {
+                  setPicked(next);
+                }}
+                disabled={props.joining === true}
+              />
+              <Input
+                ref={(element) => {
+                  nameInput = element;
+                }}
+                value={name()}
+                onValueChange={(value) => {
+                  setTyped(value);
+                  setEmptyName(false);
+                  props.onEdit?.();
+                }}
+                readonly={props.joining === true}
+                maxlength={NAME_MAX_LENGTH}
+                autocomplete="nickname"
+                placeholder="What should we call you?"
+                required
+              />
+            </div>
             <FieldDescription>
-              No account needed. Other players see this name.
+              No account needed. Tap your avatar to change it.
             </FieldDescription>
             <FieldError role="alert">{error()}</FieldError>
           </Field>

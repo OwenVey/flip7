@@ -20,6 +20,7 @@ import {
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import { rankPlayers } from "../lib/standings";
+import PlayerAvatar from "./player-avatar";
 import ScrollFade from "./scroll-fade";
 
 const OPEN_DELAY_MS = 700;
@@ -171,6 +172,7 @@ export default function GameOverDialog(props: {
                   }
                 >
                   <span class="game-over-rank">{entry().rank}</span>
+                  <PlayerAvatar player={entry().player} />
                   <span class="game-over-name">
                     {entry().player.name}
                     <Show when={entry().player.id === props.playerId}>

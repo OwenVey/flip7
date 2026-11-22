@@ -55,6 +55,8 @@ export interface Player {
   connected: boolean;
   /** Set on players the room plays itself. Missing on rooms saved before bots. */
   bot?: boolean;
+  /** The avatar a person picked. Missing on bots and rooms saved before avatars. */
+  avatar?: number;
   status: RoundStatus;
   hand: Card[];
   bustCard: Card | null;
@@ -95,8 +97,8 @@ export interface LogEntry {
   /** Epoch milliseconds. Missing on entries saved before times were recorded. */
   at?: number;
   cue?: GameCue;
-  /** Set on chat messages: who sent it, with their name at the time. */
-  from?: { id: string; name: string };
+  /** Set on chat messages: who sent it, with their name and avatar at the time. Avatar is missing on messages saved before avatars. */
+  from?: { id: string; name: string; avatar?: number };
   /** Which game in this room, counting from 1; 0 before the first game starts. Missing on entries saved before games were counted. */
   game?: number;
   id: number;
@@ -206,7 +208,10 @@ export const chat = (state: GameState, playerId: string, raw: string) => {
     throw new GameError("Type a message first.");
   }
 
-  record(state, { from: { id: player.id, name: player.name }, text });
+  record(state, {
+    from: { avatar: player.avatar, id: player.id, name: player.name },
+    text,
+  });
 };
 
 const isActive = (state: GameState, id: string) =>
@@ -603,7 +608,12 @@ const startRound = (state: GameState, random: Random) => {
   advance(state, random);
 };
 
-export const addPlayer = (state: GameState, id: string, name: string) => {
+export const addPlayer = (
+  state: GameState,
+  id: string,
+  name: string,
+  avatar: number
+) => {
   if (state.players.length >= MAX_PLAYERS) {
     throw new GameError(`This room is full (${MAX_PLAYERS} players).`);
   }
@@ -617,6 +627,7 @@ export const addPlayer = (state: GameState, id: string, name: string) => {
   }
 
   state.players.push({
+    avatar,
     bustCard: null,
     connected: true,
     hand: [],

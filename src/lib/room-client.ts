@@ -296,7 +296,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       }
     },
 
-    join: (name: string) => {
+    join: (name: string, avatar?: number) => {
       if (!state.needsName || awaitingWelcome || stopped) {
         return;
       }
@@ -311,7 +311,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       update({ joinError: "", joining: true });
       joinTimeout = setTimeout(reconnect, REPLY_TIMEOUT_MS);
 
-      if (!raw({ name, token: null, type: "join" })) {
+      if (!raw({ avatar, name, token: null, type: "join" })) {
         awaitingWelcome = false;
         finishJoin("Not connected yet. Try again in a moment.");
       }

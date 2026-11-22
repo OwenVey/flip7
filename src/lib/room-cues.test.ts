@@ -7,9 +7,9 @@ import { roomCues } from "./room-cues";
 
 const game = createGame();
 
-addPlayer(game, "me", "Me");
+addPlayer(game, "me", "Me", 1);
 
-addPlayer(game, "opponent", "Opp");
+addPlayer(game, "opponent", "Opp", 1);
 
 const before: RoomView = {
   ...toRoomView("ABCDE", game),

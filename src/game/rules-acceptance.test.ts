@@ -66,7 +66,7 @@ const betweenRounds = (names: string[]) => {
   const state = createGame();
 
   for (const name of names) {
-    addPlayer(state, name, name);
+    addPlayer(state, name, name, 1);
   }
 
   startGame(state, "a", random);
@@ -1100,7 +1100,7 @@ const simulateGame = (seed: number, fullDeck: number[]) => {
   let rounds = 0;
 
   for (let index = 0; index < 2 + (seed % 15); index += 1) {
-    addPlayer(state, `p${index}`, `p${index}`);
+    addPlayer(state, `p${index}`, `p${index}`, 1);
   }
 
   startGame(state, "p0", roll);

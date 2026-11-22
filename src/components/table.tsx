@@ -1,6 +1,5 @@
 import ArrowLeft from "@lucide/solid/icons/arrow-left";
 import ArrowRight from "@lucide/solid/icons/arrow-right";
-import BotIcon from "@lucide/solid/icons/bot";
 import CircleX from "@lucide/solid/icons/circle-x";
 import Flame from "@lucide/solid/icons/flame";
 import Hand from "@lucide/solid/icons/hand";
@@ -45,6 +44,7 @@ import GameLog, { CHAT_AND_GAME_LOG_TITLE, countChatsAfter } from "./game-log";
 import GameOverDialog from "./game-over-dialog";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
+import PlayerAvatar from "./player-avatar";
 import PlayingCard from "./playing-card";
 import RemovePlayer from "./remove-player";
 import ScrollFade from "./scroll-fade";
@@ -419,15 +419,7 @@ const RoundPlayer = (
       </Show>
       <header class="seat-header">
         <div class="seat-name">
-          <Show when={props.player.bot}>
-            <Tooltip
-              content="Bot"
-              type="label"
-              trigger={(hint) => <span {...hint} class="bot-avatar" />}
-            >
-              <BotIcon size={16} strokeWidth={2.25} aria-hidden="true" />
-            </Tooltip>
-          </Show>
+          <PlayerAvatar player={props.player} />
           <strong>{props.player.name}</strong>
           <Show when={isMe()}>
             <span class="badge">You</span>

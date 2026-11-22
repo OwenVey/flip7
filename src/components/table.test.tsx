@@ -36,6 +36,7 @@ const room = (overrides: Partial<RoomView> = {}) => {
     phase: "playing",
     players: [
       {
+        avatar: 1,
         bustCard: null,
         connected: true,
         hand: [{ id: 1, kind: "number", value: 7 }],
@@ -46,6 +47,7 @@ const room = (overrides: Partial<RoomView> = {}) => {
         status: "active",
       },
       {
+        avatar: 1,
         bustCard: null,
         connected: true,
         hand: [{ id: 2, kind: "number", value: 3 }],
