@@ -306,8 +306,32 @@ p {
   font-size: 0.875rem;
 }
 
+/* The code, a line of help, then the link button, under a full-width title. */
 .invite {
-  justify-items: start;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem 1.5rem;
+  align-items: center;
+
+  & > h2 {
+    grid-column: 1 / -1;
+  }
+
+  & .room-code {
+    font-size: clamp(2rem, 9vw, 3rem);
+    line-height: 1;
+  }
+}
+
+/* Phones drop the help line so the code and a short link button share one row. */
+@media (max-width: 40rem), (max-height: 30rem) {
+  .invite {
+    grid-template-columns: 1fr auto;
+    gap: 0.75rem 1rem;
+
+    & > .muted {
+      display: none;
+    }
+  }
 }
 
 .link {
@@ -1191,24 +1215,6 @@ main {
 .lobby {
   display: grid;
   gap: 1.25rem;
-}
-
-/* On wider screens the invite is one strip: the code, a line of help, and the link button. */
-@media (min-width: 48rem) {
-  .invite {
-    grid-template-columns: auto 1fr auto;
-    gap: 0.75rem 1.5rem;
-    align-items: center;
-
-    & > h2 {
-      grid-column: 1 / -1;
-    }
-
-    & .room-code {
-      font-size: 3rem;
-      line-height: 1;
-    }
-  }
 }
 
 /* Players fill the width in columns, so a full room of 16 still fits above Start game. */

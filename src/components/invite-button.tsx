@@ -37,6 +37,14 @@ export default function InviteButton(props: { solid?: boolean }) {
     return shares() ? "Share invite link" : "Copy invite link";
   };
 
+  const shortLabel = () => {
+    if (copied()) {
+      return "Copied";
+    }
+
+    return shares() ? "Share" : "Copy link";
+  };
+
   const invite = async () => {
     if (shares()) {
       try {
@@ -78,7 +86,12 @@ export default function InviteButton(props: { solid?: boolean }) {
           <Share2 size={16} />
         </Match>
       </Switch>
-      <span class="button-label">{label()}</span>
+      <span class="button-label">
+        <span class="label-long">{label()}</span>
+        <span class="label-short" aria-hidden="true">
+          {shortLabel()}
+        </span>
+      </span>
     </Tooltip>
   );
 }
