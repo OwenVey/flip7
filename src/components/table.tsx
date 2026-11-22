@@ -10,7 +10,6 @@ import PlayingCardsFan from "@lucide/solid/icons/playing-cards-fan";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import SquarePlus from "@lucide/solid/icons/square-plus";
 import Trophy from "@lucide/solid/icons/trophy";
-import WifiOff from "@lucide/solid/icons/wifi-off";
 import { Button } from "@ui-sdk/solid/button";
 import { Meter, MeterIndicator, MeterTrack } from "@ui-sdk/solid/meter";
 import {
@@ -44,6 +43,7 @@ import GameLog, { CHAT_AND_GAME_LOG_TITLE, countChatsAfter } from "./game-log";
 import GameOverDialog from "./game-over-dialog";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
+import OfflineBadge from "./offline-badge";
 import PlayerAvatar from "./player-avatar";
 import PlayingCard from "./playing-card";
 import RemovePlayer from "./remove-player";
@@ -440,10 +440,7 @@ const RoundPlayer = (
             </span>
           </Show>
           <Show when={!props.player.connected}>
-            <span class="badge" data-tone="danger">
-              <WifiOff size={12} aria-hidden="true" />
-              Offline
-            </span>
+            <OfflineBadge />
           </Show>
         </div>
         <div class="seat-meta">

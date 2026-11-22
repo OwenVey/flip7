@@ -9,6 +9,7 @@ import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
+import OfflineBadge from "./offline-badge";
 import PlayerAvatar from "./player-avatar";
 import RemovePlayer from "./remove-player";
 
@@ -95,9 +96,7 @@ export default function Lobby(props: {
                     <span class="badge">Host</span>
                   </Show>
                   <Show when={!player().connected}>
-                    <span class="badge" data-tone="muted">
-                      Offline
-                    </span>
+                    <OfflineBadge />
                   </Show>
                   <Show when={moves().host.kick.includes(player().id)}>
                     <RemovePlayer
