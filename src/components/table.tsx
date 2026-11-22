@@ -27,11 +27,7 @@ import {
 } from "solid-js";
 import type { ParentProps } from "solid-js";
 
-import {
-  cardLabel,
-  calculateRoundScore,
-  isScoreModifierCard,
-} from "../game/cards";
+import { cardLabel, calculateRoundScore } from "../game/cards";
 import type { Card } from "../game/cards";
 import { FLIP_SEVEN_STATUS, FLIP_THREE_COUNT } from "../game/engine";
 import type { ActionCardChoice, HeldCard, RoundStatus } from "../game/engine";
@@ -278,14 +274,7 @@ const RoundPlayer = (
   );
 
   const extraCards = createMemo(
-    () => {
-      const extras = props.player.hand.filter((card) => card.kind !== "number");
-
-      return [
-        ...extras.filter((card) => !isScoreModifierCard(card)),
-        ...extras.filter((card) => isScoreModifierCard(card)),
-      ];
-    },
+    () => props.player.hand.filter((card) => card.kind !== "number"),
     { equals: sameCards }
   );
 
