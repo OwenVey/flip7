@@ -33,8 +33,14 @@
   /* Score Modifiers: flat points are orange; ×2 inverts to ink with an orange numeral. */
   --modifier: #f0aa43;
   --shadow-print: 3px 3px 0 var(--ink);
-  /* Turn and Flip Three rings are inset shadows, so they follow the border's inner curve and never reach a neighbor. */
-  --ring-width: 3px;
+  /*
+   * The turn ring: a gold band outside the ink border, edged in ink and lifted
+   * by the usual print shadow, so it reads on both paper and felt. It reaches
+   * 6px out and 9px down-right, so the gaps around the action bar and seats
+   * are 1.25rem and 1rem to keep two rings apart. Set --ring-color to recolor it.
+   */
+  --ring-width: 4px;
+  --ring-color: var(--gold);
 
   /* The table: baize felt inside a walnut rail. */
   --felt: #17543f;
@@ -1190,6 +1196,8 @@ main {
 .table {
   display: grid;
   gap: 0.75rem;
+  /* Room between the action bar's turn ring and a seat's turn ring. */
+  row-gap: 1.25rem;
 }
 
 .table-header {
@@ -1312,11 +1320,16 @@ main {
   text-shadow: 2px 2px 0 var(--gold);
 }
 
+/* Declared per element so a local --ring-color recolors it. */
+:is(.action-bar, .seat) {
+  --shadow-ring:
+    0 0 0 var(--ring-width) var(--ring-color),
+    0 0 0 calc(var(--ring-width) + 2px) var(--ink),
+    calc(var(--ring-width) + 3px) calc(var(--ring-width) + 3px) 0 2px var(--ink);
+}
+
 .action-bar[data-turn] {
-  box-shadow:
-    inset 0 0 0 var(--ring-width) var(--gold),
-    4px 4px 0 var(--rule),
-    0 0 1.5rem rgb(255 212 95 / 0.45);
+  box-shadow: var(--shadow-ring);
 }
 
 .leaderboard {
@@ -1456,7 +1469,7 @@ main {
 
 .table-body {
   display: grid;
-  gap: 1rem;
+  gap: 1.25rem;
   align-items: start;
 }
 
@@ -1757,7 +1770,7 @@ main {
 .seats {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .seat {
@@ -1777,18 +1790,13 @@ main {
   }
 
   &[data-turn] {
-    box-shadow:
-      inset 0 0 0 var(--ring-width) var(--gold),
-      4px 4px 0 var(--rule),
-      0 0 1.5rem rgb(255 212 95 / 0.45);
+    box-shadow: var(--shadow-ring);
   }
 
-  /* A Flip Three under way: the seat glows in the Flip Three card's gold. */
+  /* A Flip Three under way: the ring takes the Flip Three card's deeper gold. */
   &[data-flipping] {
-    box-shadow:
-      inset 0 0 0 var(--ring-width) var(--flip),
-      4px 4px 0 var(--flip-ink),
-      0 0 1.5rem color-mix(in srgb, var(--flip) 50%, transparent);
+    --ring-color: var(--flip);
+    box-shadow: var(--shadow-ring);
   }
 
   &[data-status="flipSeven"] .hand {
@@ -1935,12 +1943,11 @@ main {
 
 /*
  * Choosing a target for an action card: a pickable seat looks as usual until
- * the pointer is on it, then it lifts with a ring and glow in the card's color
+ * the pointer is on it, then it lifts with the turn ring in the card's color
  * while the others step back.
  */
 .seat[data-pickable] {
   --pick-color: var(--accent);
-  --pick-glow: rgb(255 246 223 / 0.5);
   cursor: pointer;
   transition:
     transform 140ms ease,
@@ -1949,27 +1956,22 @@ main {
 
   &[data-pickable="freeze"] {
     --pick-color: var(--freeze);
-    --pick-glow: color-mix(in srgb, var(--freeze-glow) 70%, transparent);
   }
 
   &[data-pickable="flipThree"] {
     --pick-color: var(--flip);
-    --pick-glow: color-mix(in srgb, var(--flip-glow) 70%, transparent);
   }
 
   &[data-pickable="secondChance"] {
     --pick-color: var(--second-chance);
-    --pick-glow: color-mix(in srgb, var(--second-chance-glow) 70%, transparent);
   }
 
   &:has(.seat-pick:is(:hover, :focus-visible):not(:disabled)) {
+    --ring-color: var(--pick-color);
     z-index: 1;
     transform: translateY(-6px);
-    outline: 3px solid var(--pick-color);
-    outline-offset: 3px;
     box-shadow:
-      var(--shadow-print),
-      0 0 2rem 0.25rem var(--pick-glow),
+      var(--shadow-ring),
       0 1.25rem 2rem rgb(4 20 14 / 0.5);
   }
 
@@ -3336,13 +3338,34 @@ main {
     }
   }
 
-  /* Picking a target: every seat that can take the card breathes its color. */
-  .seat[data-pickable]:has(.seat-pick:not(:disabled)) {
+  /*
+   * Picking a target: every seat that can take the card breathes its color.
+   * One animation on the seats drives --pick-pulse for all of them, so they
+   * flash in step and hovering one never restarts its beat.
+   */
+  .seats:has(.seat-pick:not(:disabled)) {
     animation: pick-pulse 1600ms ease-in-out infinite;
   }
 
-  .seat[data-pickable]:has(.seat-pick:is(:hover, :focus-visible)) {
-    animation: none;
+  /* The hovered or focused seat drops out and takes the full ring instead. */
+  .seat[data-pickable]:has(.seat-pick:not(:disabled)):not(
+      :has(.seat-pick:is(:hover, :focus-visible))
+    ) {
+    box-shadow:
+      0 0 0 var(--ring-width)
+        color-mix(in srgb, var(--pick-color) var(--pick-pulse), transparent),
+      var(--shadow-print),
+      var(--shadow-table);
+
+    /* Your own seat keeps its turn ring, which breathes toward the card's color. */
+    &[data-turn] {
+      --ring-color: color-mix(
+        in srgb,
+        var(--pick-color) var(--pick-pulse),
+        var(--gold)
+      );
+      box-shadow: var(--shadow-ring);
+    }
   }
 
   /* Round and game over. */
@@ -3444,11 +3467,11 @@ main {
   }
 }
 
-/* A ring closes in from outside the seat and lands on the inset ring. */
+/* A ring closes in from outside the seat and lands on the turn ring. */
 @keyframes turn-ring {
   from {
     outline: var(--ring-width) solid transparent;
-    outline-offset: 14px;
+    outline-offset: 18px;
   }
 
   60% {
@@ -3458,7 +3481,7 @@ main {
 
   to {
     outline: var(--ring-width) solid transparent;
-    outline-offset: -2px;
+    outline-offset: 0;
   }
 }
 
@@ -3516,13 +3539,17 @@ main {
   }
 }
 
+/* How strongly pickable seats show their colored band; 0% is invisible. */
+@property --pick-pulse {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+
+/* Just the colored band, without the ink edge the hovered seat gets. */
 @keyframes pick-pulse {
   50% {
-    box-shadow:
-      var(--shadow-print),
-      var(--shadow-table),
-      0 0 0 3px var(--pick-color),
-      0 0 1.5rem 0.25rem var(--pick-glow);
+    --pick-pulse: 100%;
   }
 }
 
