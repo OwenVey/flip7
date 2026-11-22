@@ -276,6 +276,10 @@ const RoundPlayer = (
 
   const isFrozen = () => props.player.status === "frozen";
 
+  const isWinner = () =>
+    props.room.phase === "gameOver" &&
+    props.room.winnerIds.includes(props.player.id);
+
   const pickChoice = () =>
     props.moves.choice?.targets.includes(props.player.id) === true
       ? props.room.choice
@@ -367,6 +371,7 @@ const RoundPlayer = (
       data-flipping={flip()?.waiting === false ? "" : undefined}
       data-turn={hasDecision() ? "" : undefined}
       data-me={isMe() ? "" : undefined}
+      data-winner={isWinner() ? "" : undefined}
       data-offline={props.player.connected ? undefined : ""}
       data-pickable={pickChoice()?.card.kind}
       aria-label={`${props.player.name}, ${props.player.score} points`}
@@ -413,6 +418,12 @@ const RoundPlayer = (
           </Show>
           <Show when={isMe()}>
             <span class="badge">You</span>
+          </Show>
+          <Show when={isWinner()}>
+            <span class="badge" data-tone="winner">
+              <Trophy size={12} aria-hidden="true" />
+              Winner
+            </span>
           </Show>
           <Show when={!props.player.connected}>
             <span class="badge" data-tone="danger">
@@ -502,12 +513,7 @@ const RoundPlayer = (
         </div>
       </Show>
       <Show when={isFrozen()}>
-        <div class="frost" aria-hidden="true">
-          <Snowflake class="frost-burst" />
-          <Snowflake class="frost-flake" />
-          <Snowflake class="frost-flake" />
-          <Snowflake class="frost-flake" />
-        </div>
+        <Snowflake class="frost-burst" aria-hidden="true" />
       </Show>
       <Meter
         aria-label="Total score"
@@ -668,7 +674,7 @@ const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
               </th>
               <Show when={roundScored()}>
                 <td
-                  class="muted leaderboard-round"
+                  class="leaderboard-round"
                   style={{ "--row": entry().index }}
                 >
                   +{entry().player.lastRound?.total ?? 0}
@@ -916,10 +922,19 @@ const ActionBar = (
       aria-label="Your move"
       data-turn={myTurn() ? "" : undefined}
     >
-      <Deck count={props.room.deckCount} />
+      <Show
+        when={props.room.phase === "gameOver" && props.dealing !== true}
+        fallback={<Deck count={props.room.deckCount} />}
+      >
+        <span class="action-bar-trophy" aria-hidden="true">
+          <Trophy />
+        </span>
+      </Show>
       <Switch>
         <Match when={props.room.phase === "gameOver"}>
-          <p class="headline">{winners()} wins!</p>
+          <p class="headline" data-winner-headline="">
+            {winners()} wins!
+          </p>
           <Show
             when={props.moves.host.lobby}
             fallback={<p class="muted">Waiting for the host.</p>}

@@ -372,6 +372,13 @@ p {
     color: var(--paper);
     white-space: nowrap;
   }
+
+  &[data-tone="winner"] {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    white-space: nowrap;
+  }
 }
 
 /* One base for every button-like part, so neighbors always match. Change looks with data-variant, size with data-size. */
@@ -405,6 +412,15 @@ p {
 
     &:hover:not([data-disabled], [aria-disabled="true"]) {
       color: var(--ink);
+    }
+  }
+
+  /* A paper button whose red ink warns without competing with the main action. */
+  &[data-variant="quiet"][data-tone="danger"] {
+    color: var(--danger);
+
+    &:hover:not([data-disabled], [aria-disabled="true"]) {
+      color: color-mix(in srgb, var(--danger) 80%, black);
     }
   }
 
@@ -1218,6 +1234,31 @@ main {
   }
 }
 
+.action-bar-trophy {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 2px 2px 0 var(--ink);
+  color: var(--ink);
+
+  & svg {
+    width: 1.375rem;
+    height: 1.375rem;
+  }
+}
+
+.headline[data-winner-headline] {
+  font-size: 1.625rem;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+  text-shadow: 2px 2px 0 var(--gold);
+}
+
 .action-bar[data-turn] {
   box-shadow:
     inset 0 0 0 var(--ring-width) var(--gold),
@@ -1253,9 +1294,15 @@ main {
   }
 }
 
-.leaderboard-total {
+.leaderboard-total,
+.leaderboard-round {
   font-family: var(--font-numeral);
+  font-size: 1.0625rem;
   font-weight: 900;
+}
+
+.leaderboard-round {
+  color: var(--ink-soft);
 }
 
 [data-slot="dialog-content"]:is(.table-sheet, .rules-dialog) {
@@ -1350,8 +1397,9 @@ main {
 }
 
 /*
- * Wide screens: the header, action bar and seats share the left column, and
- * the scores and log run down the right from the top.
+ * Wide screens: the header runs across the top, the action bar and seats
+ * share the left column, and the scores and log run down the right, level
+ * with the action bar.
  */
 @media (min-width: 64rem) {
   .table {
@@ -1365,31 +1413,29 @@ main {
     display: contents;
   }
 
-  .table-header,
+  .table-header {
+    grid-column: 1 / -1;
+  }
+
   .action-bar,
   .seats {
     grid-column: 1;
   }
 
   .table-sidebar {
-    grid-row: 1 / span 3;
+    grid-row: 2 / span 2;
     grid-column: 2;
   }
 }
 
 .seat-meter {
-  --round-fill: color-mix(in srgb, var(--accent) 45%, var(--paper-deep));
-  --round-stripe: color-mix(in srgb, var(--accent) 22%, var(--paper-deep));
+  --round-fill: var(--gold);
+  --round-stripe: color-mix(in srgb, var(--gold) 40%, var(--paper-deep));
   --meter-ease: 600ms cubic-bezier(0.22, 1, 0.36, 1);
   display: flex;
   gap: 0.5rem;
   align-items: center;
   min-width: 0;
-
-  &[data-winning] {
-    --round-fill: var(--gold);
-    --round-stripe: color-mix(in srgb, var(--gold) 45%, var(--paper-deep));
-  }
 
   & [data-slot="meter-track"] {
     flex: 1 1 auto;
@@ -1591,22 +1637,21 @@ main {
   &[data-status="flipSeven"] .hand {
     box-shadow:
       inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.45),
+      0 0 0 2px var(--gold);
+  }
+
+  .table:not([data-phase="gameOver"]) &[data-status="flipSeven"] .hand {
+    box-shadow:
+      inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.45),
       0 0 0 2px var(--gold),
       0 0 1rem rgb(255 212 95 / 0.6);
   }
 
-  /* Disconnected: the seat fades so it reads as empty at a glance. */
-  &[data-offline] :is(.hand, .seat-extras, .seat-meta, .seat-meter) {
+  &[data-offline] :is(.seat-meta, .seat-meter) {
     opacity: 0.45;
     filter: grayscale(0.6);
   }
 
-  /*
-   * Stayed, busted, frozen or Flip 7: a stamp on the hand's bottom edge
-   * says how the round ended, leaving the card numbers clear. Out-of-round
-   * states also dim the hand under a haze. The haze is ::before and the stamp
-   * ::after.
-   */
   &:is(
       [data-status="stayed"],
       [data-status="busted"],
@@ -1617,15 +1662,6 @@ main {
     --stamp-color: var(--good);
     position: relative;
     isolation: isolate;
-
-    &::before {
-      position: absolute;
-      z-index: 1;
-      inset: 0;
-      border-radius: inherit;
-      content: "";
-      pointer-events: none;
-    }
 
     &::after {
       position: absolute;
@@ -1649,31 +1685,16 @@ main {
     }
   }
 
-  &[data-status="stayed"] .hand {
-    &::before {
-      background: rgb(14 58 44 / 0.5);
-    }
-
-    &::after {
-      content: "Stayed +" attr(data-banked) / "";
-    }
+  &[data-status="stayed"] .hand::after {
+    content: "Stayed +" attr(data-banked) / "";
   }
 
-  &[data-status="stayed"] .hand .card {
-    filter: saturate(0.5);
-  }
-
-  /* Busted: the mat goes oxblood and the hand fades under a pale haze. */
   &[data-status="busted"] .hand {
     --stamp-color: var(--danger);
     background:
       radial-gradient(rgb(255 255 255 / 0.04) 0.6px, transparent 1px) 0 0 / 4px
         4px,
-      radial-gradient(ellipse at 50% 0%, #8c3a48, #4a1622);
-
-    &::before {
-      background: rgb(255 228 228 / 0.35);
-    }
+      radial-gradient(ellipse at 50% 0%, #6e2533, #3a0f19);
 
     &::after {
       content: "Busted" / "";
@@ -1688,7 +1709,6 @@ main {
     }
   }
 
-  /* Flip 7: no haze, since the run is the prize. The stamp is a gold chip. */
   &[data-status="flipSeven"] .hand::after {
     border-color: var(--ink);
     background: var(--gold);
@@ -1699,72 +1719,53 @@ main {
     content: "Flip 7! +" attr(data-banked) / "";
   }
 
-  &[data-status="busted"] .seat-extras,
-  &[data-status="out"] :is(.hand, .seat-extras) {
-    opacity: 0.6;
-  }
-
-  /*
-   * Stayed, busted or Flip 7: the whole seat takes on the result's color, the
-   * way a frozen seat ices over, so the room reads it at a glance.
-   */
   &:is(
     [data-status="stayed"],
     [data-status="busted"],
+    [data-status="frozen"],
     [data-status="flipSeven"]
   ) {
     border-color: var(--seat-ink);
-    background: linear-gradient(
-      170deg,
-      var(--seat-soft),
-      var(--seat-wash) 45%,
-      var(--paper)
-    );
     box-shadow:
       3px 3px 0 var(--seat-ink),
-      inset 0 0 1.25rem color-mix(in srgb, var(--seat-glow) 55%, transparent),
       var(--shadow-table);
   }
 
   &[data-status="stayed"] {
     --seat-ink: var(--good);
-    --seat-soft: #d9efe4;
-    --seat-wash: #ecf6ee;
-    --seat-glow: var(--second-chance-glow);
   }
 
   &[data-status="busted"] {
     --seat-ink: var(--danger);
-    --seat-soft: #f7d9dc;
-    --seat-wash: #fbebe8;
-    --seat-glow: #eea3ae;
   }
 
   &[data-status="flipSeven"] {
     --seat-ink: var(--rule);
-    --seat-soft: #ffe6a0;
-    --seat-wash: #fff1cc;
-    --seat-glow: var(--gold);
   }
 
-  /* Frozen: the seat ices over with a shiver, so the whole room sees it. */
   &[data-status="frozen"] {
-    border-color: var(--freeze-ink);
-    background: linear-gradient(
-      170deg,
-      var(--freeze-soft),
-      #eef8fb 45%,
-      var(--paper)
-    );
-    box-shadow:
-      3px 3px 0 var(--freeze-ink),
-      inset 0 0 1.25rem color-mix(in srgb, var(--freeze-glow) 55%, transparent),
-      var(--shadow-table);
+    --seat-ink: var(--freeze-ink);
     animation: freeze-shiver 520ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+
+  &[data-winner] {
+    border-color: var(--ink);
+    background: linear-gradient(170deg, #ffe6a0, #fff1cc 55%, var(--paper));
+    box-shadow:
+      inset 0 0 0 var(--ring-width) var(--gold),
+      4px 4px 0 var(--ink),
+      0 0 2rem 0.25rem rgb(255 212 95 / 0.55),
+      var(--shadow-table);
   }
 
   &[data-status="frozen"] .hand {
     background:
+      linear-gradient(
+        125deg,
+        transparent 30%,
+        rgb(255 255 255 / 0.25) 42%,
+        transparent 50%
+      ),
       radial-gradient(rgb(255 255 255 / 0.14) 0.6px, transparent 1px) 0 0 / 4px
         4px,
       radial-gradient(ellipse at 50% 0%, #5f9fbb, #24546b);
@@ -1772,38 +1773,6 @@ main {
       inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.35),
       inset 0 0 0 2px color-mix(in srgb, var(--freeze-glow) 75%, transparent),
       inset 0 0 1.5rem color-mix(in srgb, var(--freeze-soft) 50%, transparent);
-  }
-
-  &[data-status="frozen"] :is(.hand, .seat-extras) .card {
-    filter: saturate(0.45) brightness(1.04);
-  }
-
-  /* A sheet of ice over the cards, the way a bust hazes them gray. */
-  &[data-status="frozen"] .hand::before {
-    background:
-      linear-gradient(
-        125deg,
-        transparent 30%,
-        rgb(255 255 255 / 0.35) 42%,
-        transparent 50%
-      ),
-      radial-gradient(
-        ellipse at 50% 50%,
-        color-mix(in srgb, var(--freeze-soft) 30%, transparent),
-        color-mix(in srgb, var(--freeze-glow) 60%, transparent)
-      );
-    box-shadow:
-      inset 0 0 0 1.5px rgb(255 255 255 / 0.55),
-      inset 0 0 1rem color-mix(in srgb, var(--freeze-soft) 70%, transparent);
-    content: "";
-    pointer-events: none;
-    animation: ice-over 600ms ease-out both;
-  }
-}
-
-@keyframes ice-over {
-  from {
-    opacity: 0;
   }
 }
 
@@ -1884,35 +1853,6 @@ main {
   }
 }
 
-/* Frost overlay over a frozen seat: icy edges, a snowflake burst, drifting flakes. */
-/* The name and score stay crisp above the frost; only the seat and mat ice over. */
-.seat[data-status="frozen"] :is(.seat-header, .seat-meter) {
-  position: relative;
-  z-index: 1;
-}
-
-.frost {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  border-radius: inherit;
-  background:
-    radial-gradient(
-      circle at 0% 0%,
-      rgb(255 255 255 / 0.5),
-      transparent 4.5rem
-    ),
-    radial-gradient(
-      circle at 100% 100%,
-      color-mix(in srgb, var(--freeze-soft) 85%, transparent),
-      transparent 5.5rem
-    );
-  box-shadow: inset 0 0 1.25rem
-    color-mix(in srgb, var(--freeze-glow) 90%, transparent);
-  pointer-events: none;
-  animation: frost-spread 700ms ease-out both;
-}
-
 .frost-burst {
   position: absolute;
   top: 50%;
@@ -1921,41 +1861,10 @@ main {
   height: 6rem;
   margin: -3rem 0 0 -3rem;
   color: #fff;
+  pointer-events: none;
   filter: drop-shadow(0 0 0.5rem var(--freeze-glow))
     drop-shadow(0 0 1px var(--freeze-ink));
   animation: frost-burst 1100ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-.frost-flake {
-  position: absolute;
-  width: 1.125rem;
-  height: 1.125rem;
-  color: var(--freeze-ink);
-  opacity: 0.45;
-  animation: flake-drift 5s ease-in-out infinite alternate;
-
-  &:nth-of-type(2) {
-    top: 0.5rem;
-    right: 42%;
-    animation-delay: -1.5s;
-  }
-
-  /* Clear of the score labels along the bottom edge. */
-  &:nth-of-type(3) {
-    top: 2.5rem;
-    right: 0.75rem;
-    width: 1.5rem;
-    height: 1.5rem;
-    animation-delay: -3s;
-  }
-
-  &:nth-of-type(4) {
-    top: 45%;
-    left: 0.25rem;
-    width: 0.875rem;
-    height: 0.875rem;
-    animation-duration: 6.5s;
-  }
 }
 
 @keyframes freeze-shiver {
@@ -1975,18 +1884,6 @@ main {
   }
 }
 
-@keyframes frost-spread {
-  from {
-    opacity: 0;
-    clip-path: circle(0% at 50% 55%);
-  }
-
-  to {
-    opacity: 1;
-    clip-path: circle(150% at 50% 55%);
-  }
-}
-
 @keyframes frost-burst {
   0% {
     opacity: 0;
@@ -2001,16 +1898,6 @@ main {
   100% {
     opacity: 0;
     transform: scale(1.6) rotate(30deg);
-  }
-}
-
-@keyframes flake-drift {
-  from {
-    transform: translateY(0) rotate(0deg);
-  }
-
-  to {
-    transform: translateY(0.375rem) rotate(60deg);
   }
 }
 
@@ -2048,7 +1935,7 @@ main {
   }
 }
 
-/* Remove is an icon in the seat header; its tooltip carries the label. */
+/* The tooltip labels the icon-only Remove button. */
 .seat-header {
   & :is([data-slot="alert-dialog-trigger"]) {
     inline-size: var(--button-height);
@@ -2284,9 +2171,18 @@ main {
     display: none;
   }
 
-  & [data-score-modifier] .card-label {
-    font-size: 0.75rem;
-    text-shadow: 1px 1px 0 var(--paper);
+  & [data-score-modifier] {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: 0;
+
+    &::before {
+      inset: 1px;
+    }
+
+    & .card-label {
+      font-size: 0.8125rem;
+      text-shadow: none;
+    }
   }
 
   /* Mini action cards show only their icon, so they stay the row's height. */
@@ -2438,6 +2334,24 @@ main {
   &[data-kind="freeze"] {
     --card-color: var(--freeze);
     --card-panel: var(--freeze-soft);
+
+    &::before {
+      background:
+        linear-gradient(
+          145deg,
+          rgb(255 255 255 / 0.55) 0 30%,
+          transparent 30% 70%,
+          rgb(255 255 255 / 0.3) 70%
+        ),
+        linear-gradient(
+          var(--card-panel),
+          color-mix(in srgb, var(--card-color) 22%, var(--card-panel))
+        );
+    }
+
+    & .card-icon {
+      color: var(--freeze-ink);
+    }
   }
 
   &[data-kind="flipThree"] {
@@ -2452,7 +2366,6 @@ main {
 
   &[data-bust] {
     transform: rotate(-7deg);
-    filter: saturate(0.6);
     box-shadow:
       0 0 0 2px var(--danger),
       0 0.25rem 0.5rem rgb(4 20 14 / 0.4);
@@ -2738,12 +2651,9 @@ main {
   gap: 0.375rem;
 
   & h3 {
-    position: sticky;
-    z-index: 1;
-    top: 0;
     margin: 0;
-    padding-block: 0.25rem;
-    background: var(--paper);
+    padding-block: 0.25rem 0.375rem;
+    border-block-end: 1px solid var(--rule);
     color: var(--ink-soft);
     font-size: 0.6875rem;
     font-weight: 700;
@@ -2759,21 +2669,18 @@ main {
   }
 
   & li {
-    --cue: var(--rule);
-
     display: flex;
     gap: 0.5rem;
     align-items: baseline;
     justify-content: space-between;
     padding: 0.375rem 0.5rem;
-    border-inline-start: 3px solid var(--cue);
     color: var(--ink-soft);
     font-size: 0.875rem;
     line-height: 1.35;
 
     & + li {
-      border-block-start: 1px dashed
-        color-mix(in srgb, var(--rule) 40%, transparent);
+      border-block-start: 1px solid
+        color-mix(in srgb, var(--rule) 35%, transparent);
     }
   }
 
@@ -2798,14 +2705,12 @@ main {
   }
 
   & li[data-kind="chat"] {
-    --cue: transparent;
-
     background: rgb(255 255 255 / 0.6);
     color: var(--ink);
   }
 
   & li[data-kind="chat"][data-own] {
-    --cue: var(--accent);
+    background: color-mix(in srgb, var(--accent) 7%, var(--paper));
   }
 
   & .log-author {
@@ -2814,28 +2719,21 @@ main {
     font-weight: 700;
   }
 
-  & li[data-cue="bank"] {
-    --cue: var(--good);
+  & li:is([data-cue="bank"], [data-cue="join"]) .log-text {
+    color: var(--good);
   }
 
-  & li[data-cue="bust"] {
-    --cue: var(--danger);
+  & li[data-cue="bust"] .log-text {
+    color: var(--danger);
   }
 
-  & li[data-cue="freeze"] {
-    --cue: var(--freeze-ink);
+  & li[data-cue="freeze"] .log-text {
+    color: var(--freeze-ink);
   }
 
-  & li[data-cue="streak"] {
-    --cue: var(--gold);
-  }
-
-  & li[data-cue="special"] {
-    --cue: var(--accent);
-  }
-
-  & li[data-cue="join"] {
-    --cue: var(--good);
+  & li:is([data-cue="streak"], [data-cue="special"]) .log-text {
+    color: var(--accent);
+    font-weight: 600;
   }
 }
 
@@ -2861,10 +2759,7 @@ main {
     transition: none;
   }
 
-  .seat[data-status="frozen"],
-  .seat[data-status="frozen"] .hand::before,
-  .frost,
-  .frost-flake {
+  .seat[data-status="frozen"] {
     animation: none;
   }
 

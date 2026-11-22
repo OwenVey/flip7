@@ -426,6 +426,36 @@ describe("<Table />", () => {
     );
   });
 
+  it("keeps the deck through deal playback and highlights the game winner", () => {
+    const [dealing, setDealing] = createSignal(true);
+    const view = room({ phase: "gameOver", winnerIds: ["b"] });
+
+    render(() => (
+      <Table
+        room={view}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        dealing={dealing()}
+      />
+    ));
+
+    const actionBar = within(screen.getByRole("region", { name: "Your move" }));
+    expect(actionBar.getByText("cards left in the deck")).toBeInTheDocument();
+
+    setDealing(false);
+    flush();
+
+    expect(
+      screen.getByRole("article", { name: "Ben, 12 points" })
+    ).toHaveAttribute("data-winner");
+    expect(
+      screen.getByRole("article", { name: "Ana, 40 points" })
+    ).not.toHaveAttribute("data-winner");
+    expect(actionBar.getByText("Ben wins!")).toBeVisible();
+    expect(actionBar.queryByText("cards left in the deck")).toBeNull();
+  });
+
   it("an agent can find every control and hit on its turn", async () => {
     const send = vi.fn<RoomConnection["send"]>();
     render(() => (

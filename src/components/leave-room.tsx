@@ -40,7 +40,8 @@ export default function LeaveRoom(props: {
         trigger={(hint) => (
           <AlertDialogTrigger
             {...hint}
-            data-variant="destructive"
+            data-variant="quiet"
+            data-tone="danger"
             aria-disabled={props.disabled === true ? "true" : undefined}
             onClick={(event) => {
               if (props.disabled === true) {
