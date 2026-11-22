@@ -127,29 +127,21 @@ export default function Home() {
         <div class="hero-copy">
           <h1 class="wordmark">Hot Streak</h1>
           <p class="lede">
-            Hit for another card or Stay to bank your points. Flip 7 unique
-            Number cards for a 15-point bonus.
+            Hit for another card or Stay to bank your points. Flip 7 for a
+            bonus.
           </p>
-          <div class="hero-meta">
-            <ul class="hero-facts">
-              <For each={HERO_FACTS}>{(fact) => <li>{fact}</li>}</For>
-            </ul>
-            <RulesDialog targetScore={TARGET_SCORE} />
-          </div>
+          <ul class="hero-facts">
+            <For each={HERO_FACTS}>{(fact) => <li>{fact}</li>}</For>
+          </ul>
         </div>
         <ul class="hero-cards" aria-hidden="true">
           <For each={HERO_CARDS}>{(card) => <PlayingCard card={card} />}</For>
         </ul>
       </section>
 
-      <div class="home-actions">
-        <section class="panel">
-          <h2>Start a room</h2>
-          <ol class="home-steps">
-            <li>Create a room and pick a name.</li>
-            <li>Share the code or link with friends.</li>
-            <li>Start the game once everyone has a seat.</li>
-          </ol>
+      <section class="panel home-actions" aria-labelledby="play-heading">
+        <h2 id="play-heading">Play</h2>
+        <div class="home-create">
           <Button
             data-variant="solid"
             disabled={pending() !== null}
@@ -158,55 +150,63 @@ export default function Home() {
             <Plus size={16} />
             {pending() === "create" ? "Creating room…" : "Create room"}
           </Button>
+          <p class="home-hint">You'll get a link to share with friends.</p>
           <p class="error" role="alert">
             {createError()}
           </p>
-        </section>
-
-        <section class="panel">
-          <h2>Join a room</h2>
-          <form
-            class="stack"
-            novalidate
-            onSubmit={(event) => {
-              void handleJoinRoom(event);
-            }}
-          >
-            <Field name="code" invalid={codeError() ? true : undefined}>
-              <FieldLabel>Room code</FieldLabel>
-              <OTPInput
-                autoComplete="off"
-                controller={codeInput}
-                inputMode="text"
-                maxLength={CODE_LENGTH}
-                onValueChange={(value) => {
-                  setCode(value);
-                  setCodeError("");
-                }}
-                pattern={CODE_CHARACTER_PATTERN}
-                readOnly={pending() === "join"}
-                required
-                value={code()}
-              >
-                <OTPInputGroup class="code-input">
-                  <Repeat count={CODE_LENGTH}>
-                    {(index) => <OTPInputSlot index={index} />}
-                  </Repeat>
-                </OTPInputGroup>
-              </OTPInput>
-              <FieldError role="alert">{codeError()}</FieldError>
-            </Field>
-            <Button
-              type="submit"
-              data-variant={code().length === CODE_LENGTH ? "solid" : undefined}
-              disabled={pending() !== null}
+        </div>
+        <p class="home-divider" aria-hidden="true">
+          or join with a code
+        </p>
+        <form
+          class="home-join"
+          novalidate
+          onSubmit={(event) => {
+            void handleJoinRoom(event);
+          }}
+        >
+          <Field name="code" invalid={codeError() ? true : undefined}>
+            <FieldLabel class="sr-only">Room code</FieldLabel>
+            <OTPInput
+              autoComplete="off"
+              controller={codeInput}
+              inputMode="text"
+              maxLength={CODE_LENGTH}
+              onValueChange={(value) => {
+                setCode(value);
+                setCodeError("");
+              }}
+              pattern={CODE_CHARACTER_PATTERN}
+              readOnly={pending() === "join"}
+              required
+              value={code()}
             >
-              <ArrowRight size={16} />
-              {pending() === "join" ? "Checking room…" : "Join room"}
-            </Button>
-          </form>
-        </section>
-      </div>
+              <OTPInputGroup class="code-input">
+                <Repeat count={CODE_LENGTH}>
+                  {(index) => <OTPInputSlot index={index} />}
+                </Repeat>
+              </OTPInputGroup>
+            </OTPInput>
+            <FieldError role="alert">{codeError()}</FieldError>
+          </Field>
+          <Button
+            type="submit"
+            data-variant={code().length === CODE_LENGTH ? "solid" : undefined}
+            disabled={pending() !== null}
+          >
+            <ArrowRight size={16} />
+            {pending() === "join" ? "Checking room…" : "Join room"}
+          </Button>
+        </form>
+        <p class="home-rules">
+          New here?
+          <RulesDialog
+            targetScore={TARGET_SCORE}
+            label="How to play"
+            variant="quiet"
+          />
+        </p>
+      </section>
     </main>
   );
 }

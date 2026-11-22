@@ -10,10 +10,19 @@ import {
 import ScrollFade from "./scroll-fade";
 import Tooltip from "./tooltip";
 
-export default function RulesDialog(props: { targetScore: number }) {
+export default function RulesDialog(props: {
+  targetScore: number;
+  label?: string;
+  variant?: "quiet";
+}) {
   return (
     <Dialog presentation="auto">
-      <DialogTrigger>Rules</DialogTrigger>
+      <DialogTrigger
+        data-variant={props.variant}
+        data-size={props.variant ? "sm" : undefined}
+      >
+        {props.label ?? "Rules"}
+      </DialogTrigger>
       <DialogContent class="rules-dialog" initialFocus="content">
         <header class="table-sheet-header">
           <DialogTitle>How to play</DialogTitle>
