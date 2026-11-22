@@ -68,6 +68,19 @@ export default function Lobby(props: {
               {props.room.players.length} / {MAX_PLAYERS}
             </span>
           </div>
+          <Show when={isHost()}>
+            <div class="add-bot">
+              <Button
+                disabled={
+                  props.actionsDisabled === true || !moves().host.addBot
+                }
+                onClick={async () => await props.send({ type: "addBot" })}
+              >
+                <BotPlus size={16} aria-hidden="true" />
+                {moves().host.addBot ? "Add bot" : "Table full"}
+              </Button>
+            </div>
+          </Show>
           <ul class="roster">
             <For each={props.room.players} keyed={(player) => player.id}>
               {(player) => (
@@ -109,17 +122,6 @@ export default function Lobby(props: {
               )}
             </Repeat>
           </ul>
-          <Show when={moves().host.addBot}>
-            <div class="add-bot">
-              <Button
-                disabled={props.actionsDisabled}
-                onClick={async () => await props.send({ type: "addBot" })}
-              >
-                <BotPlus size={16} aria-hidden="true" />
-                Add bot
-              </Button>
-            </div>
-          </Show>
           <Show
             when={isHost()}
             fallback={

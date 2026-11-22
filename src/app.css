@@ -432,6 +432,8 @@ p {
   box-shadow: 2px 2px 0 var(--button-ink);
   font-size: var(--ui-font-size);
   font-weight: 700;
+  /* Rapid taps register as taps instead of a double-tap zoom. */
+  touch-action: manipulation;
   transition:
     transform 80ms ease,
     box-shadow 80ms ease;
