@@ -7,7 +7,8 @@ import {
 import { Radio, RadioGroup } from "@ui-sdk/solid/radio";
 import { createSignal, For } from "solid-js";
 
-import { AVATARS, avatarSrc } from "../game/avatars";
+import { AVATARS } from "../game/avatars";
+import AvatarImage from "./avatar-image";
 
 export default function AvatarPicker(props: {
   value: number;
@@ -29,13 +30,7 @@ export default function AvatarPicker(props: {
         aria-label="Change avatar"
         disabled={props.disabled}
       >
-        <img
-          class="avatar"
-          src={avatarSrc(props.value)}
-          alt=""
-          width="28"
-          height="28"
-        />
+        <AvatarImage avatar={props.value} />
       </PopoverTrigger>
       <PopoverContent class="avatar-picker" side="bottom" align="start">
         <PopoverTitle>Choose an avatar</PopoverTitle>
@@ -64,13 +59,7 @@ export default function AvatarPicker(props: {
                 value={String(avatar)}
                 aria-label={`Avatar ${avatar}`}
               >
-                <img
-                  class="avatar"
-                  src={avatarSrc(avatar)}
-                  alt=""
-                  width="40"
-                  height="40"
-                />
+                <AvatarImage avatar={avatar} />
               </Radio>
             )}
           </For>

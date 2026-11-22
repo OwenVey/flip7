@@ -1,8 +1,8 @@
 import BotIcon from "@lucide/solid/icons/bot";
 import { Show } from "solid-js";
 
-import { avatarSrc } from "../game/avatars";
 import type { PlayerView } from "../game/protocol";
+import AvatarImage from "./avatar-image";
 import Tooltip from "./tooltip";
 
 /** A player's avatar, or the bot mark for a bot. */
@@ -23,16 +23,7 @@ export default function PlayerAvatar(props: {
         </Tooltip>
       }
     >
-      {(avatar) => (
-        <img
-          class="avatar"
-          data-size={props.size}
-          src={avatarSrc(avatar())}
-          alt=""
-          width="28"
-          height="28"
-        />
-      )}
+      {(avatar) => <AvatarImage avatar={avatar()} size={props.size} />}
     </Show>
   );
 }
