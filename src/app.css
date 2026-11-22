@@ -1602,10 +1602,17 @@ main {
   }
 
   /*
-   * Stayed, busted or frozen: out of the round, so the hand dims under a haze
-   * and a tilted stamp says why. The haze is ::before and the stamp ::after.
+   * Stayed, busted, frozen or Flip 7: a stamp on the hand's bottom edge
+   * says how the round ended, leaving the card numbers clear. Out-of-round
+   * states also dim the hand under a haze. The haze is ::before and the stamp
+   * ::after.
    */
-  &:is([data-status="stayed"], [data-status="busted"], [data-status="frozen"])
+  &:is(
+      [data-status="stayed"],
+      [data-status="busted"],
+      [data-status="frozen"],
+      [data-status="flipSeven"]
+    )
     .hand {
     --stamp-color: var(--good);
     position: relative;
@@ -1623,10 +1630,9 @@ main {
     &::after {
       position: absolute;
       z-index: 2;
-      inset-block-start: 50%;
+      inset-block-start: 100%;
       inset-inline-start: 50%;
-      translate: -50% -50%;
-      rotate: -6deg;
+      translate: -50% -60%;
       padding: 0.125rem 0.75rem;
       border: 2px solid var(--stamp-color);
       border-radius: 0.375rem;
@@ -1657,12 +1663,16 @@ main {
     filter: saturate(0.5);
   }
 
-  /* Busted: the hand fades toward the paper, as if at 60% opacity. */
+  /* Busted: the mat goes oxblood and the hand fades under a pale haze. */
   &[data-status="busted"] .hand {
     --stamp-color: var(--danger);
+    background:
+      radial-gradient(rgb(255 255 255 / 0.04) 0.6px, transparent 1px) 0 0 / 4px
+        4px,
+      radial-gradient(ellipse at 50% 0%, #8c3a48, #4a1622);
 
     &::before {
-      background: rgb(255 246 223 / 0.4);
+      background: rgb(255 228 228 / 0.35);
     }
 
     &::after {
@@ -1678,9 +1688,63 @@ main {
     }
   }
 
+  /* Flip 7: no haze, since the run is the prize. The stamp is a gold chip. */
+  &[data-status="flipSeven"] .hand::after {
+    border-color: var(--ink);
+    background: var(--gold);
+    box-shadow:
+      2px 2px 0 var(--ink),
+      0 0 1rem rgb(255 212 95 / 0.7);
+    color: var(--ink);
+    content: "Flip 7! +" attr(data-banked) / "";
+  }
+
   &[data-status="busted"] .seat-extras,
   &[data-status="out"] :is(.hand, .seat-extras) {
     opacity: 0.6;
+  }
+
+  /*
+   * Stayed, busted or Flip 7: the whole seat takes on the result's color, the
+   * way a frozen seat ices over, so the room reads it at a glance.
+   */
+  &:is(
+    [data-status="stayed"],
+    [data-status="busted"],
+    [data-status="flipSeven"]
+  ) {
+    border-color: var(--seat-ink);
+    background: linear-gradient(
+      170deg,
+      var(--seat-soft),
+      var(--seat-wash) 45%,
+      var(--paper)
+    );
+    box-shadow:
+      3px 3px 0 var(--seat-ink),
+      inset 0 0 1.25rem color-mix(in srgb, var(--seat-glow) 55%, transparent),
+      var(--shadow-table);
+  }
+
+  &[data-status="stayed"] {
+    --seat-ink: var(--good);
+    --seat-soft: #d9efe4;
+    --seat-wash: #ecf6ee;
+    --seat-glow: var(--second-chance-glow);
+  }
+
+  &[data-status="busted"] {
+    --seat-ink: var(--danger);
+    --seat-soft: #f7d9dc;
+    --seat-wash: #fbebe8;
+    --seat-glow: #eea3ae;
+  }
+
+  &[data-status="flipSeven"] {
+    --seat-ink: var(--rule);
+    --seat-soft: #ffe6a0;
+    --seat-wash: #fff1cc;
+    --seat-glow: var(--gold);
   }
 
   /* Frozen: the seat ices over with a shiver, so the whole room sees it. */
@@ -1694,7 +1758,7 @@ main {
     );
     box-shadow:
       3px 3px 0 var(--freeze-ink),
-      0 0 1.25rem color-mix(in srgb, var(--freeze-glow) 55%, transparent),
+      inset 0 0 1.25rem color-mix(in srgb, var(--freeze-glow) 55%, transparent),
       var(--shadow-table);
     animation: freeze-shiver 520ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
   }
@@ -2165,7 +2229,8 @@ main {
   align-items: center;
   justify-content: start;
   height: calc(var(--hand-card) * 1.4 + 2 * var(--hand-pad) + 0.5rem);
-  margin: 0;
+  /* Room below for the end-of-round stamp that straddles the bottom edge, kept always so seats don't jump. */
+  margin: 0 0 0.375rem;
   /* Room at the end for the last card when the columns squeeze and cards overlap. */
   padding: var(--hand-pad) calc(var(--hand-pad) + var(--hand-card))
     var(--hand-pad) var(--hand-pad);
@@ -2934,6 +2999,11 @@ main {
     )
     .hand::after {
     animation: stamp-in 380ms cubic-bezier(0.5, 1.8, 0.6, 1) both;
+  }
+
+  /* Flip 7 stamps once the run has hopped in and the shine is sweeping. */
+  .seat[data-status="flipSeven"] .hand::after {
+    animation: stamp-in 380ms cubic-bezier(0.5, 1.8, 0.6, 1) 1000ms both;
   }
 
   .seat-meter[data-round="locked"] {

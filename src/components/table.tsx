@@ -65,6 +65,7 @@ const SCORES_TITLE = "Scores";
 
 const STAMPED_STATUSES: ReadonlySet<RoundStatus> = new Set([
   "busted",
+  FLIP_SEVEN_STATUS,
   "frozen",
   "stayed",
 ]);
@@ -473,7 +474,9 @@ const RoundPlayer = (
         class="hand"
         aria-label={`${props.player.name}'s cards`}
         data-banked={
-          props.player.status === "stayed" || props.player.status === "frozen"
+          props.player.status === "stayed" ||
+          props.player.status === "frozen" ||
+          props.player.status === FLIP_SEVEN_STATUS
             ? roundPoints()
             : undefined
         }
