@@ -1,3 +1,4 @@
 "Gaze" by DiceBear (https://www.dicebear.com), licensed CC0 1.0.
 Colors are taken from the Hot Streak palette. Rows of five share a background:
 Flip Three yellow, Second Chance red, felt green, Freeze blue, plum.
+Bodies have a 3px ink (#262451) outline so they stand out on every background.
