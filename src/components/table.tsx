@@ -61,6 +61,7 @@ const STATUS_LABELS = {
 } as const satisfies Record<RoundStatus, string>;
 
 const SCORES_TITLE = "Scores";
+const ROUND_COUNT_MS = 320;
 
 const STAMPED_STATUSES: ReadonlySet<RoundStatus> = new Set([
   "busted",
@@ -326,6 +327,10 @@ const RoundPlayer = (
 
   const shownBaseScore = createCountUp(baseScore);
 
+  const shownRoundPoints = createCountUp(roundPoints, {
+    durationMs: ROUND_COUNT_MS,
+  });
+
   let bankedLabel: HTMLSpanElement | undefined;
 
   createEffect(baseScore, (score, previous) => {
@@ -569,7 +574,7 @@ const RoundPlayer = (
           </Show>
         </MeterTrack>
         <span class="seat-score" data-projected="" aria-hidden="true">
-          +{roundPoints()}
+          +{shownRoundPoints()}
         </span>
       </Meter>
     </article>
@@ -662,6 +667,8 @@ const LeaderboardRound = (props: {
     visibleRoundPoints(props.player, props.phase, props.incomingCardId)
   );
 
+  const shownPoints = createCountUp(points, { durationMs: ROUND_COUNT_MS });
+
   return (
     <td
       class="leaderboard-round"
@@ -677,7 +684,9 @@ const LeaderboardRound = (props: {
         <Show when={state() === "busted"}>
           <CircleX size={12} aria-hidden="true" />
         </Show>
-        {state() === "busted" || state() === "out" ? points() : `+${points()}`}
+        {state() === "busted" || state() === "out"
+          ? shownPoints()
+          : `+${shownPoints()}`}
       </span>
     </td>
   );
@@ -741,7 +750,10 @@ const Leaderboard = (
                 incomingCardId={props.incomingCardId}
                 index={entry().index}
               />
-              <td class="leaderboard-total">
+              <td
+                class="leaderboard-total"
+                aria-label={`${entry().player.score}`}
+              >
                 <CountUp value={entry().player.score} />
               </td>
             </tr>

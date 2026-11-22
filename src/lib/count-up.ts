@@ -1,4 +1,4 @@
-import { createEffect, createSignal, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 
 import { motionAllowed } from "./motion";
 
@@ -7,10 +7,22 @@ const COUNT_MS = 600;
 const easeOut = (progress: number) => 1 - (1 - progress) ** 3;
 
 /** A number that counts toward `target` whenever it changes, instead of jumping. */
-export const createCountUp = (target: () => number) => {
-  const [shown, setShown] = createSignal(untrack(target));
+export const createCountUp = (
+  target: () => number,
+  options: { durationMs?: number; initial?: () => number } = {}
+) => {
+  const duration = options.durationMs ?? COUNT_MS;
+  const destination = createMemo(target);
 
-  createEffect(target, (to) => {
+  const [shown, setShown] = createSignal(
+    untrack(
+      options.initial && typeof document !== "undefined" && motionAllowed()
+        ? options.initial
+        : destination
+    )
+  );
+
+  createEffect(destination, (to) => {
     const from = untrack(shown);
     let frame = 0;
 
@@ -18,7 +30,7 @@ export const createCountUp = (target: () => number) => {
       const start = performance.now();
 
       const tick = (now: number) => {
-        const progress = Math.min(1, (now - start) / COUNT_MS);
+        const progress = Math.min(1, Math.max(0, (now - start) / duration));
         setShown(Math.round(from + (to - from) * easeOut(progress)));
 
         if (progress < 1) {
@@ -28,9 +40,7 @@ export const createCountUp = (target: () => number) => {
 
       frame = requestAnimationFrame(tick);
     } else if (from !== to) {
-      queueMicrotask(() => {
-        setShown(to);
-      });
+      setShown(to);
     }
 
     return () => {

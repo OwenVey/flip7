@@ -18,6 +18,7 @@ import {
 } from "solid-js";
 
 import type { RoomView } from "../game/protocol";
+import { createCountUp } from "../lib/count-up";
 import { rankPlayers } from "../lib/standings";
 import ScrollFade from "./scroll-fade";
 
@@ -46,6 +47,21 @@ const ordinal = (rank: number) =>
   `${rank}${ORDINAL_SUFFIXES.get(ordinalRules.select(rank)) ?? "th"}`;
 
 const points = (score: number) => (score === 1 ? "1 point" : `${score} points`);
+
+const FinalScore = (props: { score: number; roundPoints: number }) => {
+  const shown = createCountUp(() => props.score, {
+    initial: () => props.score - props.roundPoints,
+  });
+
+  return (
+    <>
+      <span class="game-over-score" aria-hidden="true">
+        {shown()}
+      </span>
+      <span class="sr-only">{points(props.score)}</span>
+    </>
+  );
+};
 
 const burstStyle = (index: number) => {
   const angle = (index / BURST_PIECES) * Math.PI * 2;
@@ -162,7 +178,10 @@ export default function GameOverDialog(props: {
                       <span class="badge">You</span>
                     </Show>
                   </span>
-                  <span class="game-over-score">{entry().player.score}</span>
+                  <FinalScore
+                    score={entry().player.score}
+                    roundPoints={entry().player.lastRound?.total ?? 0}
+                  />
                 </li>
               )}
             </For>

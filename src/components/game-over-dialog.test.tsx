@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { calculateRoundScore } from "../game/cards";
 import type { PlayerView, RoomView } from "../game/protocol";
 import GameOverDialog from "./game-over-dialog";
 
@@ -137,5 +138,46 @@ describe("<GameOverDialog />", () => {
     fireEvent.scroll(standings);
     expect(standings).toHaveAttribute("data-scroll-before");
     expect(standings).not.toHaveAttribute("data-scroll-after");
+  });
+
+  it("counts final scores from the previous total when the dialog opens", () => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+
+    try {
+      const view = room();
+
+      const lastRound = calculateRoundScore([
+        { id: 1, kind: "number", value: 12 },
+      ]);
+
+      view.players = view.players.map((entry) =>
+        entry.id === "b" ? { ...entry, lastRound } : entry
+      );
+      render(() => (
+        <GameOverDialog
+          room={view}
+          playerId="a"
+          canReturnToLobby={false}
+          onReturnToLobby={vi.fn<() => void>()}
+        />
+      ));
+
+      openDialog();
+      const shown = screen.getByText("200", { exact: true });
+      expect(shown).toHaveAttribute("aria-hidden", "true");
+
+      vi.advanceTimersByTime(200);
+      flush();
+      const intermediate = Number(shown.textContent);
+      expect(intermediate > 200 && intermediate < 212).toBeTruthy();
+
+      vi.advanceTimersByTime(500);
+      flush();
+      expect(shown).toHaveTextContent("212");
+    } finally {
+      cleanup();
+      vi.unstubAllGlobals();
+    }
   });
 });

@@ -476,6 +476,85 @@ describe("<Table />", () => {
     expect(cell("7 points, in play")).toHaveTextContent("+7");
   });
 
+  it("counts up on a reveal and down on a bust in both round-score displays", () => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
+    });
+
+    try {
+      const [state, setState] = createSignal(room());
+
+      const [incomingCardId, setIncomingCardId] = createSignal<number | null>(
+        1
+      );
+
+      render(() => (
+        <Table
+          room={state()}
+          playerId="a"
+          send={vi.fn<RoomConnection["send"]>()}
+          chat={vi.fn<RoomConnection["chat"]>()}
+          incomingCardId={incomingCardId()}
+        />
+      ));
+
+      const seat = within(
+        screen.getByRole("article", { name: "Ana, 40 points" })
+      );
+
+      const meters = seat.getByRole("meter", { name: "Total score" });
+      const scoreTable = within(screen.getByRole("table", { name: "Scores" }));
+
+      const shown = (label: string) => {
+        const seatPoints =
+          meters.querySelector("[data-projected]")?.textContent;
+
+        const roundCell = scoreTable.getByRole("cell", { name: label });
+
+        return [Number(seatPoints), Number(roundCell.textContent)];
+      };
+
+      setIncomingCardId(null);
+      flush();
+      vi.advanceTimersByTime(64);
+      flush();
+
+      const [seatPoints, roundPoints] = shown("7 points, in play");
+      expect({
+        matched: seatPoints === roundPoints,
+        inMotion: seatPoints > 0 && seatPoints < 7,
+      }).toStrictEqual({
+        matched: true,
+        inMotion: true,
+      });
+
+      setState(
+        room({
+          players: state().players.map((player) =>
+            player.id === "a" ? { ...player, status: "busted" } : player
+          ),
+        })
+      );
+      flush();
+      expect(shown("0 points, busted")).toStrictEqual([seatPoints, seatPoints]);
+
+      vi.advanceTimersByTime(64);
+      flush();
+      const [decreasing] = shown("0 points, busted");
+      expect(decreasing).toBeLessThan(seatPoints);
+
+      vi.advanceTimersByTime(320);
+      flush();
+      expect(shown("0 points, busted")).toStrictEqual([0, 0]);
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("keeps the deck through deal playback and highlights the game winner", () => {
     const [dealing, setDealing] = createSignal(true);
     const view = room({ phase: "gameOver", winnerIds: ["b"] });
