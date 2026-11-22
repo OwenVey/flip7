@@ -229,43 +229,35 @@ describe("<JoinForm />", () => {
     }
   );
 
-  it.each(["suggested tile", "Done button"])(
-    "keeps the suggested avatar when confirmed with the %s",
-    (control) => {
-      const onJoin = vi.fn<(name: string, avatar: number) => void>();
-      const [room, setRoom] = createSignal(roomWith([]));
+  it("keeps the suggested avatar when its tile is clicked", () => {
+    const onJoin = vi.fn<(name: string, avatar: number) => void>();
+    const [room, setRoom] = createSignal(roomWith([]));
 
-      render(() => (
-        <JoinForm
-          room={room()}
-          savedName="Ben"
-          savedAvatar={null}
-          onJoin={onJoin}
-        />
-      ));
+    render(() => (
+      <JoinForm
+        room={room()}
+        savedName="Ben"
+        savedAvatar={null}
+        onJoin={onJoin}
+      />
+    ));
 
-      const trigger = screen.getByRole("button", { name: "Change avatar" });
+    const trigger = screen.getByRole("button", { name: "Change avatar" });
 
-      trigger.click();
-      flush();
+    trigger.click();
+    flush();
 
-      const suggested = screen.getByRole("radio", { checked: true });
-      const avatar = screen.getAllByRole("radio").indexOf(suggested) + 1;
+    const suggested = screen.getByRole("radio", { checked: true });
+    const avatar = screen.getAllByRole("radio").indexOf(suggested) + 1;
 
-      const confirm =
-        control === "suggested tile"
-          ? suggested
-          : screen.getByRole("button", { name: "Done" });
+    suggested.click();
+    flush();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(onJoin).not.toHaveBeenCalled();
 
-      confirm.click();
-      flush();
-      expect(trigger).toHaveAttribute("aria-expanded", "false");
-      expect(onJoin).not.toHaveBeenCalled();
-
-      setRoom(roomWith(["Ana"], avatar));
-      flush();
-      screen.getByRole("button", { name: "Join room" }).click();
-      expect(onJoin).toHaveBeenCalledWith("Ben", avatar);
-    }
-  );
+    setRoom(roomWith(["Ana"], avatar));
+    flush();
+    screen.getByRole("button", { name: "Join room" }).click();
+    expect(onJoin).toHaveBeenCalledWith("Ben", avatar);
+  });
 });

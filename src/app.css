@@ -421,8 +421,7 @@ p {
   [data-slot="alert-dialog-close"],
   [data-slot="dialog-trigger"],
   [data-slot="dialog-close"],
-  [data-slot="popover-trigger"],
-  [data-slot="popover-close"]
+  [data-slot="popover-trigger"]
 ) {
   --button-height: var(--control-height);
   height: auto;
@@ -1290,10 +1289,6 @@ main {
 
   & [data-slot="popover-title"] {
     font-size: 0.875rem;
-  }
-
-  & [data-slot="popover-close"] {
-    justify-self: end;
   }
 }
 

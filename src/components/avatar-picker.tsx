@@ -2,7 +2,6 @@ import { Field } from "@ui-sdk/solid/field";
 import {
   createPopoverController,
   Popover,
-  PopoverClose,
   PopoverContent,
   PopoverTitle,
   PopoverTrigger,
@@ -84,7 +83,7 @@ export default function AvatarPicker(props: {
         anchor={props.anchor}
         side="bottom"
         align="start"
-        sideOffset={8}
+        sideOffset={4}
         finalFocus={() => trigger ?? null}
       >
         <PopoverTitle>
@@ -122,14 +121,6 @@ export default function AvatarPicker(props: {
             </For>
           </RadioGroup>
         </Field>
-        <PopoverClose
-          data-size="sm"
-          onClick={() => {
-            props.onChange(choice());
-          }}
-        >
-          Done
-        </PopoverClose>
       </PopoverContent>
     </Popover>
   );
