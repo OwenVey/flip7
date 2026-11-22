@@ -125,10 +125,7 @@ export default function Home() {
       <script type="application/ld+json" innerHTML={GAME_STRUCTURED_DATA} />
       <section class="hero">
         <div class="hero-copy">
-          <div class="hero-title">
-            <h1 class="wordmark">Hot Streak</h1>
-            <RulesDialog targetScore={TARGET_SCORE} />
-          </div>
+          <h1 class="wordmark">Hot Streak</h1>
           <p class="lede">
             Hit for another card or Stay to bank your points. Flip 7 for a
             bonus.
@@ -153,6 +150,7 @@ export default function Home() {
             <Plus size={16} />
             {pending() === "create" ? "Creating room…" : "Create room"}
           </Button>
+          <p class="home-hint">You'll get a link to share with friends.</p>
           <p class="error" role="alert">
             {createError()}
           </p>
@@ -200,6 +198,14 @@ export default function Home() {
             {pending() === "join" ? "Checking room…" : "Join room"}
           </Button>
         </form>
+        <p class="home-rules">
+          New here?
+          <RulesDialog
+            targetScore={TARGET_SCORE}
+            label="How to play"
+            variant="quiet"
+          />
+        </p>
       </section>
     </main>
   );

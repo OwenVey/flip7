@@ -1184,15 +1184,6 @@ main {
   line-height: 1.45;
 }
 
-/* Rules sits beside the wordmark so it doesn't cost the hero a row of its own. */
-.hero-title {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  justify-content: space-between;
-  justify-self: stretch;
-}
-
 .hero-facts {
   display: flex;
   flex-wrap: wrap;
@@ -1228,6 +1219,21 @@ main {
 .home-join {
   display: grid;
   gap: 0.75rem;
+}
+
+.home-hint {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.home-rules {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
 }
 
 .home-divider {
