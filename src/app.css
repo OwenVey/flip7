@@ -113,7 +113,28 @@
 
 /* The felt fades to --felt-deep at the top and bottom edges, the same color as theme-color, so Safari's status bar and toolbar tint meet it without a seam. */
 html {
+  /* iOS flashes a gray box over tapped controls; buttons have their own press feedback. */
+  -webkit-tap-highlight-color: transparent;
+  /* Keeps iOS from enlarging text when the phone turns to landscape. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   background-color: var(--felt-deep);
+}
+
+/* A pull at the top of the table would reload the page mid-game; the table has its own scrolling areas. */
+:root:has(.table),
+:root:has(.table) body {
+  overscroll-behavior: none;
+}
+
+/* Holding a control too long selects its label or opens the iOS callout. Names, codes, and the log stay selectable. */
+button,
+[role="button"],
+[data-slot="slider"],
+.card {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 body {
@@ -1523,6 +1544,8 @@ main {
 .table {
   display: grid;
   gap: 0.75rem;
+  /* Quick taps between seats and cards would double-tap zoom the page; pinch zoom still works. */
+  touch-action: manipulation;
   /* Room between the action bar's turn ring and a seat's turn ring. */
   row-gap: 1.25rem;
 }
