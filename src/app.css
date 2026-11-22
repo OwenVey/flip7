@@ -117,31 +117,41 @@ html {
 }
 
 body {
+  /* Keeps the fixed texture layer below the content but above this background. */
+  isolation: isolate;
   margin: 0;
   min-height: 100dvh;
   background-color: var(--felt-deep);
-  background-image:
-    radial-gradient(rgb(255 255 255 / 0.035) 0.6px, transparent 1px),
-    radial-gradient(rgb(0 0 0 / 0.08) 0.6px, transparent 1px),
-    linear-gradient(
-      var(--felt-deep),
-      var(--felt) 12%,
-      var(--felt-light) 35%,
-      var(--felt) 65%,
-      var(--felt-deep)
-    );
+  background-image: linear-gradient(
+    var(--felt-deep),
+    var(--felt) 12%,
+    var(--felt-light) 35%,
+    var(--felt) 65%,
+    var(--felt-deep)
+  );
   background-attachment: fixed;
-  background-position:
-    0 0,
-    2px 3px,
-    0 0;
-  background-size:
-    4px 4px,
-    5px 5px,
-    100% 100%;
   color: var(--ink);
   font-family: var(--font-body);
   line-height: 1.5;
+
+  /* The felt's dot texture fades out at the top and bottom, so it doesn't end in a hard line against Safari's flat bars. */
+  &::before {
+    position: fixed;
+    z-index: -1;
+    inset: 0;
+    background-image:
+      radial-gradient(rgb(255 255 255 / 0.035) 0.6px, transparent 1px),
+      radial-gradient(rgb(0 0 0 / 0.08) 0.6px, transparent 1px);
+    background-position:
+      0 0,
+      2px 3px;
+    background-size:
+      4px 4px,
+      5px 5px;
+    mask-image: linear-gradient(transparent, #000 12%, #000 80%, transparent);
+    pointer-events: none;
+    content: "";
+  }
 }
 
 h1,
