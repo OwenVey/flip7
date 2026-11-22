@@ -1,18 +1,66 @@
 import BotPlus from "@lucide/solid/icons/bot-plus";
 import Play from "@lucide/solid/icons/play";
+import UserPlus from "@lucide/solid/icons/user-plus";
 import { Button } from "@ui-sdk/solid/button";
 import { createMemo, For, Repeat, Show } from "solid-js";
 
 import { MAX_PLAYERS } from "../game/engine";
 import { availableMoves, MIN_PLAYERS } from "../game/moves";
 import type { RoomView } from "../game/protocol";
+import { createCopy, createInvite } from "../lib/invite";
 import type { RoomConnection } from "../lib/room-connection";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
+import OfflineBadge from "./offline-badge";
 import PlayerAvatar from "./player-avatar";
 import RemovePlayer from "./remove-player";
 
-const OPEN_SEATS_SHOWN = 2;
+const RoomCode = (props: { code: string }) => {
+  const { copied, copy } = createCopy();
+
+  return (
+    <div class="room-code-copy">
+      <button
+        type="button"
+        class="room-code"
+        aria-label={`Room code ${props.code}. Copy`}
+        onClick={() => {
+          void copy(props.code);
+        }}
+      >
+        {props.code}
+      </button>
+      <output class="badge room-code-status">{copied() ? "Copied" : ""}</output>
+    </div>
+  );
+};
+
+const OpenSeat = () => {
+  const { copied, invite, shares } = createInvite();
+
+  const action = () => {
+    if (copied()) {
+      return "Link copied";
+    }
+
+    return shares() ? "Invite a friend" : "Copy invite link";
+  };
+
+  return (
+    <li class="open-seat">
+      <button
+        type="button"
+        onClick={() => {
+          void invite();
+        }}
+      >
+        <UserPlus size={16} aria-hidden="true" />
+        <span>Open seat</span>
+        <span class="open-seat-action">{action()}</span>
+      </button>
+    </li>
+  );
+};
 
 export default function Lobby(props: {
   room: RoomView;
@@ -25,12 +73,9 @@ export default function Lobby(props: {
 
   const missing = () => Math.max(0, MIN_PLAYERS - props.room.players.length);
 
-  const openSeats = createMemo(() =>
-    Math.min(
-      Math.max(missing(), OPEN_SEATS_SHOWN - props.room.players.length, 1),
-      MAX_PLAYERS - props.room.players.length
-    )
-  );
+  const openSeats = () => (props.room.players.length < MAX_PLAYERS ? 1 : 0);
+
+  const count = () => `${props.room.players.length} / ${MAX_PLAYERS}`;
 
   const hostName = () =>
     props.room.players.find((player) => player.id === props.room.hostId)
@@ -51,9 +96,7 @@ export default function Lobby(props: {
       <div class="lobby">
         <section class="panel invite">
           <h2>Invite friends</h2>
-          <p class="room-code" aria-label={`Room code ${props.room.code}`}>
-            {props.room.code}
-          </p>
+          <RoomCode code={props.room.code} />
           <p class="muted">
             Send the link, or have them enter the code on the home page. No
             accounts needed.
@@ -61,13 +104,32 @@ export default function Lobby(props: {
           <InviteButton solid />
         </section>
 
-        <section class="panel">
+        <section class="panel players">
           <div class="panel-title">
             <h2>Players</h2>
-            <span class="badge" data-tone="muted">
-              {props.room.players.length} / {MAX_PLAYERS}
-            </span>
+            <Show when={!isHost()}>
+              <span class="badge" data-tone="muted">
+                {count()}
+              </span>
+            </Show>
           </div>
+          <Show when={isHost()}>
+            <div class="add-bot">
+              <Button
+                disabled={
+                  props.actionsDisabled === true || !moves().host.addBot
+                }
+                onClick={async () => await props.send({ type: "addBot" })}
+              >
+                <BotPlus size={16} aria-hidden="true" />
+                {moves().host.addBot ? "Add bot" : "Table full"}
+                <span class="badge" data-tone="muted">
+                  <span class="sr-only">Players: </span>
+                  {count()}
+                </span>
+              </Button>
+            </div>
+          </Show>
           <ul class="roster">
             <For each={props.room.players} keyed={(player) => player.id}>
               {(player) => (
@@ -81,13 +143,12 @@ export default function Lobby(props: {
                     <span class="badge">Host</span>
                   </Show>
                   <Show when={!player().connected}>
-                    <span class="badge" data-tone="muted">
-                      Offline
-                    </span>
+                    <OfflineBadge />
                   </Show>
                   <Show when={moves().host.kick.includes(player().id)}>
                     <RemovePlayer
                       bot={player().bot}
+                      confirm={player().bot !== true}
                       disabled={props.actionsDisabled}
                       name={player().name}
                       onRemove={() => {
@@ -101,35 +162,20 @@ export default function Lobby(props: {
                 </li>
               )}
             </For>
-            <Repeat count={openSeats()}>
-              {() => (
-                <li class="open-seat" aria-hidden="true">
-                  Open seat
-                </li>
-              )}
-            </Repeat>
+            <Repeat count={openSeats()}>{() => <OpenSeat />}</Repeat>
           </ul>
-          <Show when={moves().host.addBot}>
-            <div class="add-bot">
-              <Button
-                disabled={props.actionsDisabled}
-                onClick={async () => await props.send({ type: "addBot" })}
-              >
-                <BotPlus size={16} aria-hidden="true" />
-                Add bot
-              </Button>
-            </div>
-          </Show>
           <Show
             when={isHost()}
             fallback={
-              <p class="muted">Waiting for {hostName()} to start the game.</p>
+              <p class="lobby-status">
+                Waiting for {hostName()} to start the game.
+              </p>
             }
           >
             <Show
               when={moves().host.start}
               fallback={
-                <p class="muted">
+                <p class="lobby-status">
                   Waiting for {missing()} more{" "}
                   {missing() === 1 ? "player" : "players"} to join, or add a
                   bot.

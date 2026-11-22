@@ -298,16 +298,103 @@ p {
   justify-content: space-between;
 }
 
+/* The open seat is a button that shares the invite link. */
 .roster .open-seat {
-  justify-content: center;
+  padding: 0;
   border-style: dashed;
   background: transparent;
-  color: var(--ink-soft);
-  font-size: 0.875rem;
+
+  & button {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    padding: 0.5rem 0.75rem;
+    border: 0;
+    border-radius: inherit;
+    background: none;
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+    touch-action: manipulation;
+
+    @media (hover: hover) {
+      &:hover {
+        background: var(--paper-deep);
+        color: var(--ink);
+      }
+    }
+  }
 }
 
+.open-seat-action {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Waiting messages under the roster; phones pin them where Start game sits. */
+.lobby-status {
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+/* Tapping the room code copies it; a stamp says so for a moment. */
+.room-code-copy {
+  position: relative;
+  justify-self: start;
+}
+
+button.room-code {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.room-code-status {
+  position: absolute;
+  inset-block-start: -0.625rem;
+  inset-inline-end: -1.25rem;
+  font-family: var(--font-body);
+  pointer-events: none;
+  rotate: 8deg;
+
+  &:empty {
+    display: none;
+  }
+}
+
+/* The code, a line of help, then the link button, under a full-width title. */
 .invite {
-  justify-items: start;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem 1.5rem;
+  align-items: center;
+
+  & > h2 {
+    grid-column: 1 / -1;
+  }
+
+  & .room-code {
+    font-size: clamp(2rem, 9vw, 3rem);
+    line-height: 1;
+  }
+}
+
+/* Phones drop the help line so the code and a short link button share one row. */
+@media (max-width: 40rem), (max-height: 30rem) {
+  .invite {
+    grid-template-columns: 1fr auto;
+    gap: 0.75rem 1rem;
+
+    & > .muted {
+      display: none;
+    }
+  }
 }
 
 .link {
@@ -432,6 +519,8 @@ p {
   box-shadow: 2px 2px 0 var(--button-ink);
   font-size: var(--ui-font-size);
   font-weight: 700;
+  /* Rapid taps register as taps instead of a double-tap zoom. */
+  touch-action: manipulation;
   transition:
     transform 80ms ease,
     box-shadow 80ms ease;
@@ -444,8 +533,10 @@ p {
   &[data-variant="quiet"] {
     color: var(--ink-soft);
 
-    &:hover:not([data-disabled], [aria-disabled="true"]) {
-      color: var(--ink);
+    @media (hover: hover) {
+      &:hover:not([data-disabled], [aria-disabled="true"]) {
+        color: var(--ink);
+      }
     }
   }
 
@@ -454,8 +545,10 @@ p {
     --button-ink: var(--danger-ink);
     color: var(--danger);
 
-    &:hover:not([data-disabled], [aria-disabled="true"]) {
-      color: color-mix(in srgb, var(--danger) 80%, black);
+    @media (hover: hover) {
+      &:hover:not([data-disabled], [aria-disabled="true"]) {
+        color: color-mix(in srgb, var(--danger) 80%, black);
+      }
     }
   }
 
@@ -465,14 +558,46 @@ p {
     background: var(--danger);
     color: var(--paper);
 
-    &:hover:not([data-disabled], [aria-disabled="true"]) {
-      background: color-mix(in srgb, var(--danger) 85%, black);
+    @media (hover: hover) {
+      &:hover:not([data-disabled], [aria-disabled="true"]) {
+        background: color-mix(in srgb, var(--danger) 85%, black);
+      }
     }
   }
 
-  &[aria-disabled="true"] {
-    opacity: 0.5;
+  /* Disabled buttons stay opaque in a faded version of their own color, so nothing shows through when they float over the page. */
+  &:is([data-disabled], [aria-disabled="true"]) {
+    --button-ink: color-mix(in oklab, var(--ink) 35%, var(--paper-deep));
+    opacity: 1;
+    background: var(--paper-deep);
+    color: color-mix(in oklab, var(--ink-soft) 55%, var(--paper-deep));
     cursor: not-allowed;
+
+    &[data-variant="solid"] {
+      border-color: var(--button-ink);
+      background: color-mix(in oklab, var(--accent) 40%, var(--paper-deep));
+      color: var(--paper);
+    }
+
+    &[data-variant="destructive"] {
+      --button-ink: color-mix(
+        in oklab,
+        var(--danger-ink) 40%,
+        var(--paper-deep)
+      );
+      border-color: var(--button-ink);
+      background: color-mix(in oklab, var(--danger) 40%, var(--paper-deep));
+      color: var(--paper);
+    }
+
+    &[data-variant="quiet"][data-tone="danger"] {
+      --button-ink: color-mix(
+        in oklab,
+        var(--danger-ink) 35%,
+        var(--paper-deep)
+      );
+      color: color-mix(in oklab, var(--danger) 50%, var(--paper-deep));
+    }
   }
 
   &:where([data-size="sm"]) {
@@ -500,6 +625,28 @@ p {
     &:active:not([data-disabled], [aria-disabled="true"]) {
       transform: none;
     }
+  }
+}
+
+/*
+ * Touch screens keep :hover on the last thing tapped, so a button would stay
+ * in its hover color. These undo ui-sdk's button hovers there; :where keeps
+ * them at zero specificity so any button with its own background keeps it.
+ */
+@media (hover: none) {
+  :where(
+    [data-slot="button"],
+    [data-slot="alert-dialog-trigger"],
+    [data-slot="alert-dialog-close"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dialog-close"],
+    [data-slot="popover-trigger"]
+  ):where(:hover) {
+    background: var(--ui-background);
+  }
+
+  :where([data-variant="solid"]):where(:hover) {
+    background: var(--ui-primary);
   }
 }
 
@@ -1130,9 +1277,12 @@ main {
 
 .lobby {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
   gap: 1.25rem;
-  align-items: start;
+}
+
+/* Players fill the width in columns, so a full room of 16 still fits above Start game. */
+.players .roster {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
 }
 
 .room-code {
@@ -1149,11 +1299,13 @@ main {
   padding: 0;
   list-style: none;
 
+  /* Every row is tall enough for a Remove button, so the host's row, players and bots line up. */
   & li {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
     align-items: center;
+    min-height: calc(var(--control-height-sm) + 1rem + 3px);
     padding: 0.5rem 0.75rem;
     border: 1.5px solid var(--ink);
     border-radius: var(--radius-md);
@@ -1168,8 +1320,17 @@ main {
     opacity: 0.6;
   }
 
-  & [data-slot="alert-dialog-trigger"] {
+  /* Remove stays small on touch screens too; an invisible margin keeps the tap area finger sized. */
+  & .remove-player {
+    --button-height: var(--control-height-sm);
+    position: relative;
     margin-left: auto;
+
+    &::after {
+      position: absolute;
+      inset: -0.5rem -0.375rem;
+      content: "";
+    }
   }
 }
 
@@ -3908,14 +4069,24 @@ main {
     order: -1;
   }
 
-  .lobby-page:has(.start-game) {
+  .lobby-page:has(.start-game, .lobby-status) {
     padding-bottom: 5rem;
   }
 
-  .start-game {
+  :is(.start-game, .lobby-status) {
     position: fixed;
     inset: auto 1rem calc(0.75rem + env(safe-area-inset-bottom)) 1rem;
     z-index: 2;
+  }
+
+  .lobby-status {
+    padding: 0.625rem 1rem;
+    border: 2px solid var(--ink);
+    border-radius: var(--radius-xl);
+    background: var(--paper);
+    box-shadow: 3px 3px 0 var(--ink);
+    color: var(--ink);
+    font-weight: 600;
   }
 
   .home {
