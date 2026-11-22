@@ -1198,7 +1198,7 @@ describe("<Table />", () => {
       />
     ));
     expect(
-      screen.getByText(/Move for them now. The game will Stay for them soon/u)
+      screen.getByText(/Play for them, or the game will Stay soon/u)
     ).toBeVisible();
     screen.getByRole("button", { name: "Hit for Ben" }).click();
     flush();

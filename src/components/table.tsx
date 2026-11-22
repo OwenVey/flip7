@@ -909,9 +909,10 @@ const OfflineTurn = (
   return (
     <>
       <p class="headline">
-        {name()} is offline.{" "}
+        {name()} is offline{" "}
         <span class="muted">
-          · Move for them now. {automaticTurnLabel(props.canStay)}
+          · Play for them, or the game will {props.canStay ? "Stay" : "Hit"}{" "}
+          soon
         </span>
       </p>
       <ActionButtons>
@@ -925,7 +926,7 @@ const OfflineTurn = (
           }
         >
           <SquarePlus size={16} />
-          Hit for {name()}
+          Hit
         </Button>
         <Show when={props.canStay}>
           <Button
@@ -937,10 +938,7 @@ const OfflineTurn = (
             }
           >
             <Hand size={16} />
-            <FitLabel
-              long={`Stay for ${name()} · ${bankedPoints()}`}
-              short={`Stay for ${name()}`}
-            />
+            <FitLabel long={`Stay · ${bankedPoints()}`} short="Stay" />
           </Button>
         </Show>
       </ActionButtons>
