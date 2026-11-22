@@ -4125,6 +4125,11 @@ main {
     display: none;
   }
 
+  /* Without the steps row, a third track would leave an empty gap under Create room. */
+  .home-actions .panel {
+    grid-template-rows: auto 1fr;
+  }
+
   .home-actions [data-slot="field-label"] {
     position: absolute;
     width: 1px;
