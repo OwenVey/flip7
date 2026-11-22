@@ -4103,13 +4103,35 @@ main {
     border-radius: 1.25rem;
   }
 
+  .hero-copy {
+    gap: 0.75rem;
+  }
+
   .hero-cards {
     min-height: 0;
-    padding: 0.75rem 0;
+    padding: 0.25rem 0;
   }
 
   .lede {
     font-size: 0.9375rem;
+  }
+
+  .home-actions {
+    gap: 1rem;
+  }
+
+  /* On phones the buttons and panel titles explain themselves, so the steps and code label give up their rows. */
+  .home-steps {
+    display: none;
+  }
+
+  .home-actions [data-slot="field-label"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
