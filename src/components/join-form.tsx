@@ -141,7 +141,7 @@ export default function JoinForm(props: {
               />
             </div>
             <FieldDescription>
-              No account needed. Other players see this name and avatar.
+              No account needed. Tap your avatar to change it.
             </FieldDescription>
             <FieldError role="alert">{error()}</FieldError>
           </Field>
