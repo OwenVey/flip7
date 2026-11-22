@@ -298,12 +298,75 @@ p {
   justify-content: space-between;
 }
 
+/* The open seat is a button that shares the invite link. */
 .roster .open-seat {
-  justify-content: center;
+  padding: 0;
   border-style: dashed;
   background: transparent;
+
+  & button {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    padding: 0.5rem 0.75rem;
+    border: 0;
+    border-radius: inherit;
+    background: none;
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: 0.875rem;
+    cursor: pointer;
+    touch-action: manipulation;
+
+    @media (hover: hover) {
+      &:hover {
+        background: var(--paper-deep);
+        color: var(--ink);
+      }
+    }
+  }
+}
+
+.open-seat-action {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Waiting messages under the roster; phones pin them where Start game sits. */
+.lobby-status {
   color: var(--ink-soft);
-  font-size: 0.875rem;
+  text-align: center;
+}
+
+/* Tapping the room code copies it; a stamp says so for a moment. */
+.room-code-copy {
+  position: relative;
+  justify-self: start;
+}
+
+button.room-code {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.room-code-status {
+  position: absolute;
+  inset-block-start: -0.625rem;
+  inset-inline-end: -1.25rem;
+  font-family: var(--font-body);
+  pointer-events: none;
+  rotate: 8deg;
+
+  &:empty {
+    display: none;
+  }
 }
 
 /* The code, a line of help, then the link button, under a full-width title. */
@@ -1258,7 +1321,7 @@ main {
   }
 
   /* Remove stays small on touch screens too; an invisible margin keeps the tap area finger sized. */
-  & [data-slot="alert-dialog-trigger"] {
+  & .remove-player {
     --button-height: var(--control-height-sm);
     position: relative;
     margin-left: auto;
@@ -4006,14 +4069,24 @@ main {
     order: -1;
   }
 
-  .lobby-page:has(.start-game) {
+  .lobby-page:has(.start-game, .lobby-status) {
     padding-bottom: 5rem;
   }
 
-  .start-game {
+  :is(.start-game, .lobby-status) {
     position: fixed;
     inset: auto 1rem calc(0.75rem + env(safe-area-inset-bottom)) 1rem;
     z-index: 2;
+  }
+
+  .lobby-status {
+    padding: 0.625rem 1rem;
+    border: 2px solid var(--ink);
+    border-radius: var(--radius-xl);
+    background: var(--paper);
+    box-shadow: 3px 3px 0 var(--ink);
+    color: var(--ink);
+    font-weight: 600;
   }
 
   .home {

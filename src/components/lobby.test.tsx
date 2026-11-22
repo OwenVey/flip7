@@ -1,8 +1,8 @@
-import { cleanup, render, screen } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { addPlayer, createGame, MAX_PLAYERS } from "../game/engine";
+import { addBot, addPlayer, createGame, MAX_PLAYERS } from "../game/engine";
 import { toRoomView } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
@@ -14,6 +14,15 @@ const roomOf = (size: number) => {
   for (let index = 0; index < size; index += 1) {
     addPlayer(state, `p${index}`, `Player ${index}`, 1);
   }
+
+  return toRoomView("ABCDE", state);
+};
+
+const roomWithBot = () => {
+  const state = createGame();
+  addPlayer(state, "p0", "Host", 1);
+  addPlayer(state, "p1", "Guest", 1);
+  addBot(state, "p0", "bot", () => 0);
 
   return toRoomView("ABCDE", state);
 };
@@ -77,5 +86,33 @@ describe("<Lobby />", () => {
 
     expect(screen.queryByRole("button", { name: /Add bot/u })).toBeNull();
     expect(screen.getByText(`3 / ${MAX_PLAYERS}`)).toBeInTheDocument();
+  });
+
+  it("removes a bot in one tap but asks before removing a person", () => {
+    const send = vi.fn<RoomConnection["send"]>();
+    render(() => <Lobby room={roomWithBot()} playerId="p0" send={send} />);
+    const [guest, bot] = screen.getAllByRole("button", { name: /^Remove/u });
+
+    fireEvent.click(bot);
+    fireEvent.click(guest);
+
+    expect(send).toHaveBeenCalledExactlyOnceWith({
+      playerId: "bot",
+      type: "kick",
+    });
+  });
+
+  it("offers the invite from the open seat", () => {
+    render(() => (
+      <Lobby
+        room={roomOf(1)}
+        playerId="p0"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+
+    expect(
+      screen.getByRole("button", { name: /Open seat.*invite/iu })
+    ).toBeInTheDocument();
   });
 });
