@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { avatarImage } from "../lib/avatar-images";
 import PlayerAvatar from "./player-avatar";
 
 describe("<PlayerAvatar />", () => {
@@ -11,7 +12,7 @@ describe("<PlayerAvatar />", () => {
 
     expect(container.querySelector("img.avatar")).toHaveAttribute(
       "src",
-      "/avatars/sprite.svg#a6"
+      avatarImage(6)
     );
     expect(screen.queryByRole("img")).toBeNull();
   });

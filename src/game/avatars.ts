@@ -50,8 +50,6 @@ export const parseSavedAvatar = (data: string) => {
   return isAvatar(avatar) ? avatar : null;
 };
 
-export const avatarSrc = (avatar: number) => `/avatars/sprite.svg#a${avatar}`;
-
 interface AvatarHolder {
   id: string;
   bot?: boolean;
