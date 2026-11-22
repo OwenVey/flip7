@@ -56,6 +56,7 @@ export default function JoinForm(props: {
 
   const name = () => typed() ?? suggestion();
   let nameInput: HTMLInputElement | undefined;
+  const [nameField, setNameField] = createSignal<HTMLDivElement>();
 
   onSettled(() => {
     nameInput?.focus();
@@ -125,8 +126,14 @@ export default function JoinForm(props: {
         >
           <Field name="name" invalid={error() === "" ? undefined : true}>
             <FieldLabel>Your name</FieldLabel>
-            <div class="name-row">
+            <div
+              class="name-row"
+              ref={(element) => {
+                setNameField(element);
+              }}
+            >
               <AvatarPicker
+                anchor={nameField()}
                 value={avatar()}
                 onChange={(next) => {
                   setPicked(next);

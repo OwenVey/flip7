@@ -421,7 +421,8 @@ p {
   [data-slot="alert-dialog-close"],
   [data-slot="dialog-trigger"],
   [data-slot="dialog-close"],
-  [data-slot="popover-trigger"]
+  [data-slot="popover-trigger"],
+  [data-slot="popover-close"]
 ) {
   --button-height: var(--control-height);
   height: auto;
@@ -1290,6 +1291,10 @@ main {
   & [data-slot="popover-title"] {
     font-size: 0.875rem;
   }
+
+  & [data-slot="popover-close"] {
+    justify-self: end;
+  }
 }
 
 .avatar-grid {
@@ -1307,8 +1312,8 @@ main {
   place-items: center;
   width: 2.5rem;
   height: 2.5rem;
-  padding: 0.125rem;
-  border: 2px solid transparent;
+  padding: 0.25rem;
+  border: 0;
   border-radius: calc(var(--radius-md) + 3px);
   background: none;
   cursor: pointer;
@@ -1323,15 +1328,20 @@ main {
     height: 100%;
   }
 
-  &:hover:not([data-checked]) {
-    border-color: var(--ink-soft);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover:not([data-checked]) .avatar {
+      transform: translate(-1px, -1px);
+      box-shadow: 2px 2px 0 var(--ink);
+    }
   }
 
-  /* The chosen avatar sits on a raised gold tile, like a button. */
-  &[data-checked] {
-    border-color: var(--ink);
-    background: var(--gold);
-    box-shadow: 2px 2px 0 var(--ink);
+  &[data-checked] .avatar {
+    transform: translate(-1px, -1px);
+    border-color: var(--gold);
+    box-shadow:
+      0 0 0 2px var(--gold),
+      0 0 0 3px var(--ink),
+      2px 2px 0 2px var(--ink);
   }
 
   &:focus-visible {
