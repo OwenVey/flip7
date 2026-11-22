@@ -1,5 +1,5 @@
 import { projectActionCards } from "./action-card-resolution";
-import { fallbackAvatar } from "./avatars";
+import { avatarOf } from "./avatars";
 import { TARGET_SCORE } from "./engine";
 import type { DrawEvent, GameState, HeldCard, Player } from "./engine";
 
@@ -93,10 +93,7 @@ export const toRoomView = (code: string, state: GameState) => {
     log: state.log,
     phase: state.phase,
     players: state.players.map((player) => ({
-      avatar:
-        player.bot === true
-          ? null
-          : (player.avatar ?? fallbackAvatar(player.id)),
+      avatar: avatarOf(player),
       bot: player.bot === true,
       bustCard: player.bustCard,
       connected: player.connected,

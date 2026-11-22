@@ -11,7 +11,7 @@ import {
   untrack,
 } from "solid-js";
 
-import { isAvatar, randomAvatar } from "../game/avatars";
+import { parseSavedAvatar } from "../game/avatars";
 import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_PING,
@@ -75,15 +75,11 @@ export const createRoomConnection = (code: string) => {
   );
 
   const [savedAvatar, setSavedAvatar] = makePersisted(
-    createSignal(randomAvatar(Math.random), { ownedWrite: true }),
+    createSignal<number | null>(null, { ownedWrite: true }),
     {
-      deserialize: (data: string) => {
-        const avatar = Number(data);
-
-        return isAvatar(avatar) ? avatar : randomAvatar(Math.random);
-      },
+      deserialize: parseSavedAvatar,
       name: AVATAR_KEY,
-      serialize: String,
+      serialize: (avatar: number | null) => String(avatar ?? ""),
       storage: usableStorage(() => localStorage),
     }
   );

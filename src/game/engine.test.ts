@@ -582,14 +582,14 @@ describe("the game log", () => {
 });
 
 describe(chat, () => {
-  it("adds a player's message to the log with their name", () => {
+  it("adds a player's message to the log with their name and avatar", () => {
     const state = createGame();
-    addPlayer(state, "a", "Ana", 1);
+    addPlayer(state, "a", "Ana", 9);
 
     chat(state, "a", "  good   luck\n everyone ");
 
     expect(state.log.at(-1)).toMatchObject({
-      from: { id: "a", name: "Ana" },
+      from: { avatar: 9, id: "a", name: "Ana" },
       round: 0,
       text: "good luck everyone",
     });

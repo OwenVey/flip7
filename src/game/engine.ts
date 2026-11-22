@@ -97,8 +97,8 @@ export interface LogEntry {
   /** Epoch milliseconds. Missing on entries saved before times were recorded. */
   at?: number;
   cue?: GameCue;
-  /** Set on chat messages: who sent it, with their name at the time. */
-  from?: { id: string; name: string };
+  /** Set on chat messages: who sent it, with their name and avatar at the time. Avatar is missing on messages saved before avatars. */
+  from?: { id: string; name: string; avatar?: number };
   /** Which game in this room, counting from 1; 0 before the first game starts. Missing on entries saved before games were counted. */
   game?: number;
   id: number;
@@ -208,7 +208,10 @@ export const chat = (state: GameState, playerId: string, raw: string) => {
     throw new GameError("Type a message first.");
   }
 
-  record(state, { from: { id: player.id, name: player.name }, text });
+  record(state, {
+    from: { avatar: player.avatar, id: player.id, name: player.name },
+    text,
+  });
 };
 
 const isActive = (state: GameState, id: string) =>

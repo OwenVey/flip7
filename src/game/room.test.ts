@@ -183,7 +183,7 @@ describe("joining a room", () => {
     expect(player(h, playerId).avatar).toBe(7);
   });
 
-  it("assigns a random avatar when the pick is missing or unknown", () => {
+  it("assigns an avatar nobody has when the pick is missing or unknown", () => {
     const h = harness();
     h.connect("ana-tab");
     h.connect("ben-tab");
@@ -192,7 +192,7 @@ describe("joining a room", () => {
     const ben = welcomeOf(h.room.join("ben-tab", "Ben", null, 99));
 
     expect(player(h, ana.playerId).avatar).toBe(13);
-    expect(player(h, ben.playerId).avatar).toBe(13);
+    expect(player(h, ben.playerId).avatar).toBe(14);
   });
 
   it("keeps the first avatar when a player rejoins by token", () => {

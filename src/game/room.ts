@@ -1,4 +1,4 @@
-import { isAvatar, randomAvatar } from "./avatars";
+import { isAvatar, pickAvatar, takenAvatars } from "./avatars";
 import type { Random } from "./cards";
 import type { GameCommand } from "./client-message";
 import {
@@ -258,7 +258,9 @@ export const createRoom = (
       game,
       playerId,
       name,
-      isAvatar(avatar) ? avatar : randomAvatar(deps.random)
+      isAvatar(avatar)
+        ? avatar
+        : pickAvatar(deps.random(), takenAvatars(game.players))
     );
     stored.tokens.set(playerId, newToken);
     seat(connectionId, playerId);

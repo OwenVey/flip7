@@ -8,6 +8,7 @@ import Tooltip from "./tooltip";
 /** A player's avatar, or the bot mark for a bot. */
 export default function PlayerAvatar(props: {
   player: Pick<PlayerView, "avatar">;
+  size?: "sm";
 }) {
   return (
     <Show
@@ -25,6 +26,7 @@ export default function PlayerAvatar(props: {
       {(avatar) => (
         <img
           class="avatar"
+          data-size={props.size}
           src={avatarSrc(avatar())}
           alt=""
           width="28"
