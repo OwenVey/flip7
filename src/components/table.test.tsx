@@ -100,8 +100,8 @@ describe("<Table />", () => {
     const sheet = await screen.findByRole("dialog", { name: "Scores" });
     const standings = within(sheet).getByRole("table", { name: "Scores" });
     expect(
-      within(standings).getByRole("row", { name: /Ana.*40/u })
-    ).toBeVisible();
+      within(standings).getByRole("cell", { name: "7 points, in play" })
+    ).toHaveTextContent("+7");
 
     within(sheet).getByRole("button", { name: "Close" }).click();
     flush();
@@ -364,7 +364,19 @@ describe("<Table />", () => {
 
     const cara = { ...ben, hand: [], id: "c", name: "Cara" };
 
-    const [view, setView] = createSignal(room({ players: [ben, ana, cara] }));
+    const benLive = {
+      ...ben,
+      hand: [
+        ...ben.hand,
+        { id: 3, kind: "number" as const, value: 12 },
+        { id: 4, kind: "number" as const, value: 11 },
+        { id: 5, kind: "number" as const, value: 10 },
+      ],
+    };
+
+    const [view, setView] = createSignal(
+      room({ players: [benLive, ana, cara] })
+    );
 
     render(() => (
       <Table
@@ -384,12 +396,12 @@ describe("<Table />", () => {
         .map((row) => Array.from(row.children, (cell) => cell.textContent));
 
     expect(
-      leaderboard.queryByRole("columnheader", { name: "Round" })
-    ).toBeNull();
+      leaderboard.getAllByRole("columnheader").map((cell) => cell.textContent)
+    ).toStrictEqual(["Rank", "Player", "Round", "Total"]);
     expect(rows()).toStrictEqual([
-      ["1", "Ana You", "40"],
-      ["2", "Ben", "12"],
-      ["2", "Cara", "12"],
+      ["1", "Ana You", "+7", "40"],
+      ["2", "Ben", "+36", "12"],
+      ["2", "Cara", "+0", "12"],
     ]);
 
     const { artifact } = await captureArtifact(
@@ -424,6 +436,44 @@ describe("<Table />", () => {
     expect(leaderboard.getByRole("row", { name: /Ben/u })).toHaveAttribute(
       "data-winner"
     );
+  });
+
+  it("distinguishes live round points and waits for the incoming card to land", () => {
+    const [ana, ben] = room().players;
+    const [incomingCardId, setIncomingCardId] = createSignal<number | null>(1);
+
+    render(() => (
+      <Table
+        room={room({
+          players: [
+            ana,
+            { ...ben, status: "stayed" },
+            { ...ben, id: "c", name: "Cara", status: "busted" },
+          ],
+        })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        incomingCardId={incomingCardId()}
+      />
+    ));
+
+    const leaderboard = within(screen.getByRole("table", { name: "Scores" }));
+    const cell = (name: string) => leaderboard.getByRole("cell", { name });
+
+    expect(cell("0 points, in play")).toHaveAttribute(
+      "data-round-state",
+      "at-risk"
+    );
+    expect(cell("3 points, banked")).toHaveAttribute(
+      "data-round-state",
+      "banked"
+    );
+    expect(cell("0 points, busted")).toHaveTextContent(/^0$/u);
+
+    setIncomingCardId(null);
+    flush();
+    expect(cell("7 points, in play")).toHaveTextContent("+7");
   });
 
   it("keeps the deck through deal playback and highlights the game winner", () => {
@@ -522,6 +572,344 @@ describe("<Table />", () => {
 
     expect(result.error).toBeUndefined();
     expect(chat).toHaveBeenCalledWith("you too");
+  });
+
+  it("groups old game events by clock minute and keeps per-message timestamps", () => {
+    const at = (Math.floor(Date.now() / 60_000) - 120) * 60_000;
+    render(() => (
+      <Table
+        room={room({
+          log: [
+            { id: 1, text: "Round 1 begins. Ben deals." },
+            { at, id: 2, round: 1, text: "Round 1 begins. Ben deals." },
+            {
+              at,
+              cue: "bust",
+              id: 3,
+              round: 1,
+              text: "Ben was dealt a duplicate 6 and busted.",
+            },
+            {
+              at: at + 1000,
+              cue: "bank",
+              id: 4,
+              round: 1,
+              text: "Ana stayed and banked 44 points.",
+            },
+            {
+              at: at + 2000,
+              cue: "freeze",
+              id: 5,
+              round: 2,
+              text: "Ben played Freeze on Ana, who banked 26 points.",
+            },
+            {
+              at: at + 3000,
+              cue: "special",
+              id: 6,
+              round: 2,
+              text: "Ben assigned Flip Three to Ana.",
+            },
+            {
+              at: at + 4000,
+              cue: "special",
+              id: 7,
+              round: 2,
+              text: "Ben is holding a Second Chance.",
+            },
+            {
+              at: at + 60_000,
+              from: { id: "b", name: "Ben" },
+              id: 8,
+              round: 2,
+              text: "Good round",
+            },
+            {
+              at: at + 61_000,
+              from: { id: "a", name: "Ana" },
+              id: 9,
+              round: 2,
+              text: "Thanks!",
+            },
+            { id: 10, round: 2, text: "Round 2 is over." },
+            {
+              id: 11,
+              round: 2,
+              text: "The discard pile was shuffled into a new deck.",
+            },
+            { id: 12, round: 2, text: "Ben wins with 202 points!" },
+          ],
+        })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const log = within(screen.getByRole("log", { name: "Chat & Log" }));
+
+    const rows = log.getAllByRole("listitem").map((row) => {
+      const time = within(row).queryByRole("time");
+
+      return {
+        announcement: row.querySelector("[data-announcement]") !== null,
+        at: time?.getAttribute("datetime"),
+        text: row.textContent?.replace(time?.textContent ?? "", ""),
+      };
+    });
+
+    expect(rows.map((row) => row.at)).toStrictEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new Date(at + 60_000).toISOString(),
+      new Date(at + 61_000).toISOString(),
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    expect(
+      log.getAllByRole("heading").map((heading) => heading.textContent)
+    ).toStrictEqual(["Round 1", "Round 2"]);
+    expect(
+      log.getAllByRole("time").map((time) => time.getAttribute("datetime"))
+    ).toStrictEqual([
+      new Date(at).toISOString(),
+      new Date(at).toISOString(),
+      new Date(at + 60_000).toISOString(),
+      new Date(at + 61_000).toISOString(),
+    ]);
+    expect(rows.slice(0, 7).map((row) => row.text)).toStrictEqual([
+      "Round 1 begins. Ben deals.",
+      "Ben deals.",
+      "Ben busted · duplicate 6",
+      "Ana stayed · +44 pts",
+      "Ana was frozen · +26 pts · by Ben",
+      "Ben assigned Flip Three · to Ana",
+      "Ben got a Second Chance",
+    ]);
+    expect(
+      rows.filter((row) => row.announcement).map((row) => row.text)
+    ).toStrictEqual([
+      "Round 1 begins. Ben deals.",
+      "Ben deals.",
+      "Round 2 is over.",
+      "Deck rebuilt from the discard pile.",
+    ]);
+  });
+
+  it("updates relative times on game events and chat messages", () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+
+    try {
+      const at = Date.now();
+      render(() => (
+        <Table
+          room={room({
+            log: [
+              { at, id: 1, text: "Round 1 begins. Ben deals." },
+              { at, from: { id: "b", name: "Ben" }, id: 2, text: "Good luck!" },
+            ],
+          })}
+          playerId="a"
+          send={vi.fn<RoomConnection["send"]>()}
+          chat={vi.fn<RoomConnection["chat"]>()}
+        />
+      ));
+
+      const log = within(screen.getByRole("log", { name: "Chat & Log" }));
+      const times = log.getAllByRole("time");
+      const labels = () => times.map((time) => time.textContent);
+
+      expect(labels()).toStrictEqual(["now", "now"]);
+
+      vi.advanceTimersByTime(2000);
+      flush();
+      expect(labels()).toStrictEqual(["2s", "2s"]);
+
+      vi.advanceTimersByTime(58_000);
+      flush();
+      expect(labels()).toStrictEqual(["1m", "1m"]);
+
+      vi.setSystemTime(at + 3_599_000);
+      vi.advanceTimersByTime(1000);
+      flush();
+
+      const clock = new Intl.DateTimeFormat(undefined, {
+        timeStyle: "short",
+      }).format(at);
+
+      expect(
+        log.getAllByRole("time").map((time) => time.textContent)
+      ).toStrictEqual([clock, clock]);
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
+  it("filters activity and counts incoming chat while Game is selected", async () => {
+    const [view, setView] = createSignal(room());
+    render(() => (
+      <Table
+        room={view()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const filters = within(
+      screen.getByRole("group", { name: "Filter activity" })
+    );
+
+    expect(
+      filters.getByRole("button", { name: "All", pressed: true })
+    ).toBeVisible();
+
+    filters.getByRole("button", { name: "Game" }).click();
+    flush();
+
+    setView(
+      room({
+        log: [
+          ...view().log,
+          { from: { id: "b", name: "Ben" }, id: 2, text: "gl" },
+          { from: { id: "a", name: "Ana" }, id: 3, text: "you too" },
+        ],
+      })
+    );
+    flush();
+
+    const log = within(screen.getByRole("log", { name: "Chat & Log" }));
+    const unread = screen.getByRole("status", { name: "Unread chat messages" });
+    expect({
+      hiddenMessage: log.queryByText("gl"),
+      unread: unread.textContent,
+    }).toStrictEqual({
+      hiddenMessage: null,
+      unread: "1 unread message",
+    });
+
+    await agent.act({
+      steps: [{ action: "press", ref: "Chat, 1 unread" }],
+    });
+
+    expect(
+      filters.getByRole("button", { name: "Chat", pressed: true })
+    ).toBeVisible();
+    expect({
+      gameEvent: log.queryByText("Round 1 begins. Ben deals."),
+      unread: unread.textContent,
+    }).toStrictEqual({
+      gameEvent: null,
+      unread: "",
+    });
+
+    filters.getByRole("button", { name: "All" }).click();
+    flush();
+    expect(log.getByText("Round 1 begins. Ben deals.")).toBeVisible();
+  });
+
+  it("keeps the scroll position and counts new entries until jumping to latest", () => {
+    const [view, setView] = createSignal(room());
+    render(() => (
+      <Table
+        room={view()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const log = screen.getByRole("log", { name: "Chat & Log" });
+    const unread = screen.getByRole("status", { name: "Unread chat messages" });
+    Object.defineProperties(log, {
+      clientHeight: { value: 200 },
+      scrollHeight: { configurable: true, value: 500 },
+    });
+    log.scrollTop = 100;
+    fireEvent.scroll(log);
+    flush();
+
+    setView(
+      room({
+        log: [
+          ...view().log,
+          { id: 2, text: "Ben stayed." },
+          { id: 3, text: "Round 2 begins." },
+          { from: { id: "b", name: "Ben" }, id: 4, text: "Good luck!" },
+          { from: { id: "a", name: "Ana" }, id: 5, text: "Thanks!" },
+        ],
+      })
+    );
+    flush();
+
+    expect({
+      after: Object.hasOwn(log.dataset, "scrollAfter"),
+      before: Object.hasOwn(log.dataset, "scrollBefore"),
+      top: log.scrollTop,
+      unread: unread.textContent,
+    }).toStrictEqual({
+      after: true,
+      before: true,
+      top: 100,
+      unread: "1 unread message",
+    });
+    screen.getByRole("button", { name: "Jump to latest · 4 new" }).click();
+    flush();
+
+    expect(log.scrollTop).toBe(log.scrollHeight);
+    expect(log).toHaveFocus();
+    expect(
+      screen.queryByRole("button", { name: /Jump to latest/u })
+    ).toBeNull();
+
+    Object.defineProperty(log, "scrollHeight", { value: 600 });
+    setView(
+      room({
+        log: [
+          ...view().log,
+          { from: { id: "b", name: "Ben" }, id: 6, text: "Nice hand." },
+        ],
+      })
+    );
+    flush();
+    expect({ top: log.scrollTop, unread: unread.textContent }).toStrictEqual({
+      top: log.scrollHeight,
+      unread: "",
+    });
+  });
+
+  it("marks the score edges that have more rows to scroll to", () => {
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const scores = screen.getByRole("region", { name: "Scores" });
+    expect(scores).not.toHaveAttribute("data-scroll-after");
+
+    Object.defineProperties(scores, {
+      clientHeight: { value: 120 },
+      scrollHeight: { value: 300 },
+    });
+    fireEvent.scroll(scores);
+    expect(scores).not.toHaveAttribute("data-scroll-before");
+    expect(scores).toHaveAttribute("data-scroll-after");
+
+    scores.scrollTop = 180;
+    fireEvent.scroll(scores);
+    expect(scores).toHaveAttribute("data-scroll-before");
+    expect(scores).not.toHaveAttribute("data-scroll-after");
   });
 
   it("pauses moves while the room is syncing and resumes once it is ready", () => {

@@ -9,6 +9,7 @@ import {
 } from "@ui-sdk/solid/dialog";
 import type { ParentProps } from "solid-js";
 
+import ScrollFade from "./scroll-fade";
 import Tooltip from "./tooltip";
 
 export default function TableSheet(
@@ -59,12 +60,13 @@ export default function TableSheet(
             <X size={16} aria-hidden="true" />
           </Tooltip>
         </header>
-        <div
-          class="table-sheet-body"
-          data-agent-hidden={props.open === false ? "" : undefined}
+        <ScrollFade
+          viewportClass="table-sheet-body"
+          label={props.title}
+          hiddenFromAgent={props.open === false}
         >
           {props.children}
-        </div>
+        </ScrollFade>
       </DialogContent>
     </Dialog>
   );

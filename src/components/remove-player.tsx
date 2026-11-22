@@ -9,6 +9,7 @@ import {
   AlertDialogTrigger,
 } from "@ui-sdk/solid/alert-dialog";
 
+import ScrollFade from "./scroll-fade";
 import Tooltip from "./tooltip";
 
 export default function RemovePlayer(props: {
@@ -59,25 +60,29 @@ export default function RemovePlayer(props: {
       </Tooltip>
       <AlertDialogBackdrop />
       <AlertDialogContent>
-        <div class="alert-dialog-copy">
-          <AlertDialogTitle>Remove {props.name}?</AlertDialogTitle>
-          <AlertDialogDescription>
-            {props.bot === true
-              ? "The bot leaves the table and its points are lost."
-              : "They lose their seat and points. They can come back with the room code as a new player."}
-          </AlertDialogDescription>
-        </div>
-        <div data-slot="row">
-          <AlertDialogClose>Cancel</AlertDialogClose>
-          <AlertDialogClose
-            disabled={props.disabled}
-            value="confirm"
-            data-variant="destructive"
-            data-agent-confirm={`Removes ${props.name} from the room`}
-          >
-            Remove from room
-          </AlertDialogClose>
-        </div>
+        <ScrollFade>
+          <div class="alert-dialog-body">
+            <div class="alert-dialog-copy">
+              <AlertDialogTitle>Remove {props.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {props.bot === true
+                  ? "The bot leaves the table and its points are lost."
+                  : "They lose their seat and points. They can come back with the room code as a new player."}
+              </AlertDialogDescription>
+            </div>
+            <div data-slot="row">
+              <AlertDialogClose>Cancel</AlertDialogClose>
+              <AlertDialogClose
+                disabled={props.disabled}
+                value="confirm"
+                data-variant="destructive"
+                data-agent-confirm={`Removes ${props.name} from the room`}
+              >
+                Remove from room
+              </AlertDialogClose>
+            </div>
+          </div>
+        </ScrollFade>
       </AlertDialogContent>
     </AlertDialog>
   );

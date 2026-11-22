@@ -19,6 +19,7 @@ import {
 
 import type { RoomView } from "../game/protocol";
 import { rankPlayers } from "../lib/standings";
+import ScrollFade from "./scroll-fade";
 
 const OPEN_DELAY_MS = 700;
 
@@ -142,29 +143,31 @@ export default function GameOverDialog(props: {
             </DialogDescription>
           )}
         </Show>
-        <ol class="game-over-standings" aria-label="Final scores">
-          <For each={standings()} keyed={(entry) => entry.player.id}>
-            {(entry) => (
-              <li
-                style={{ "--row": entry().index }}
-                data-rank={entry().rank <= 3 ? entry().rank : undefined}
-                data-winner={
-                  winnerIds().has(entry().player.id) ? "" : undefined
-                }
-              >
-                <span class="game-over-rank">{entry().rank}</span>
-                <span class="game-over-name">
-                  {entry().player.name}
-                  <Show when={entry().player.id === props.playerId}>
-                    {" "}
-                    <span class="badge">You</span>
-                  </Show>
-                </span>
-                <span class="game-over-score">{entry().player.score}</span>
-              </li>
-            )}
-          </For>
-        </ol>
+        <ScrollFade class="game-over-list" label="Final standings">
+          <ol class="game-over-standings" aria-label="Final scores">
+            <For each={standings()} keyed={(entry) => entry.player.id}>
+              {(entry) => (
+                <li
+                  style={{ "--row": entry().index }}
+                  data-rank={entry().rank <= 3 ? entry().rank : undefined}
+                  data-winner={
+                    winnerIds().has(entry().player.id) ? "" : undefined
+                  }
+                >
+                  <span class="game-over-rank">{entry().rank}</span>
+                  <span class="game-over-name">
+                    {entry().player.name}
+                    <Show when={entry().player.id === props.playerId}>
+                      {" "}
+                      <span class="badge">You</span>
+                    </Show>
+                  </span>
+                  <span class="game-over-score">{entry().player.score}</span>
+                </li>
+              )}
+            </For>
+          </ol>
+        </ScrollFade>
         <div class="game-over-actions">
           <Show
             when={props.canReturnToLobby}

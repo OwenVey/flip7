@@ -1,8 +1,10 @@
 import ArrowLeft from "@lucide/solid/icons/arrow-left";
 import ArrowRight from "@lucide/solid/icons/arrow-right";
 import BotIcon from "@lucide/solid/icons/bot";
+import CircleX from "@lucide/solid/icons/circle-x";
 import Flame from "@lucide/solid/icons/flame";
 import Hand from "@lucide/solid/icons/hand";
+import LockKeyhole from "@lucide/solid/icons/lock-keyhole";
 import MessageCircle from "@lucide/solid/icons/message-circle";
 import PlayingCards from "@lucide/solid/icons/playing-cards";
 import PlayingCardsFan from "@lucide/solid/icons/playing-cards-fan";
@@ -23,16 +25,12 @@ import {
   Switch,
   untrack,
 } from "solid-js";
+import type { ParentProps } from "solid-js";
 
 import { cardLabel, calculateRoundScore } from "../game/cards";
 import type { Card } from "../game/cards";
 import { FLIP_SEVEN_STATUS, FLIP_THREE_COUNT } from "../game/engine";
-import type {
-  ActionCardChoice,
-  HeldCard,
-  LogEntry,
-  RoundStatus,
-} from "../game/engine";
+import type { ActionCardChoice, HeldCard, RoundStatus } from "../game/engine";
 import { availableMoves } from "../game/moves";
 import type { AvailableMoves } from "../game/moves";
 import type { PlayerView, RoomView } from "../game/protocol";
@@ -43,12 +41,13 @@ import { rankPlayers } from "../lib/standings";
 import { passDealerChip, pop, slideRows } from "../lib/table-motion";
 import type { ChipSpot } from "../lib/table-motion";
 import CardTooltips from "./card-tooltips";
-import GameLog, { CHAT_AND_GAME_LOG_TITLE } from "./game-log";
+import GameLog, { CHAT_AND_GAME_LOG_TITLE, countChatsAfter } from "./game-log";
 import GameOverDialog from "./game-over-dialog";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
 import PlayingCard from "./playing-card";
 import RemovePlayer from "./remove-player";
+import ScrollFade from "./scroll-fade";
 import TableSheet from "./table-sheet";
 import Tooltip from "./tooltip";
 
@@ -180,8 +179,37 @@ const FlipTracker = (props: { progress: FlipProgress }) => (
   </span>
 );
 
-const currentRoundPoints = (player: PlayerView) =>
-  player.status === "busted" ? 0 : calculateRoundScore(player.hand).total;
+const currentRoundPoints = (
+  player: PlayerView,
+  incomingCardId?: DealProps["incomingCardId"]
+) => {
+  if (player.status === "busted") {
+    return 0;
+  }
+
+  const hand =
+    incomingCardId === null || incomingCardId === undefined
+      ? player.hand
+      : player.hand.filter((card) => card.id !== incomingCardId);
+
+  return calculateRoundScore(hand).total;
+};
+
+const visibleRoundPoints = (
+  player: PlayerView,
+  phase: RoomView["phase"],
+  incomingCardId: DealProps["incomingCardId"]
+) => {
+  if (phase !== "playing") {
+    return player.lastRound?.total ?? 0;
+  }
+
+  if (player.status === "out") {
+    return 0;
+  }
+
+  return currentRoundPoints(player, incomingCardId);
+};
 
 const nameOf = (room: RoomView, id: string | null) =>
   room.players.find((player) => player.id === id)?.name ?? "Someone";
@@ -285,30 +313,19 @@ const RoundPlayer = (
       ? props.room.choice
       : null;
 
-  const roundResult = () =>
-    props.room.phase === "playing" ? null : props.player.lastRound;
-
-  const pendingPoints = createMemo(() =>
-    props.room.phase === "playing" && props.player.status !== "out"
-      ? currentRoundPoints({
-          ...props.player,
-          hand: props.player.hand.filter(
-            (card) => card.id !== props.incomingCardId
-          ),
-        })
-      : 0
+  const roundPoints = createMemo(() =>
+    visibleRoundPoints(props.player, props.room.phase, props.incomingCardId)
   );
-
-  const roundPoints = () => roundResult()?.total ?? pendingPoints();
 
   const baseScore = () =>
     props.room.phase === "playing"
       ? props.player.score
-      : props.player.score - (roundResult()?.total ?? 0);
+      : props.player.score - roundPoints();
 
   const projectedScore = () => baseScore() + roundPoints();
 
   const shownBaseScore = createCountUp(baseScore);
+
   let bankedLabel: HTMLSpanElement | undefined;
 
   createEffect(baseScore, (score, previous) => {
@@ -543,7 +560,10 @@ const RoundPlayer = (
         </span>
         <MeterTrack>
           <MeterIndicator />
-          <span class="meter-round" />
+          <span
+            class="meter-round"
+            data-divider={baseScore() > 0 && roundPoints() > 0 ? "" : undefined}
+          />
           <Show when={lostPoints() > 0}>
             <span class="meter-lost" />
           </Show>
@@ -555,14 +575,6 @@ const RoundPlayer = (
     </article>
   );
 };
-
-const countChatsAfter = (log: LogEntry[], playerId: string, seenId: number) =>
-  log.filter(
-    (entry) =>
-      entry.id > seenId &&
-      entry.from !== undefined &&
-      entry.from.id !== playerId
-  ).length;
 
 const ActionCardPrompt = (
   props: Pick<TableProps, "room"> &
@@ -618,11 +630,64 @@ const CountUp = (props: { value: number }) => {
   return <>{shown()}</>;
 };
 
-const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
-  const ranked = createMemo(() => rankPlayers(props.room.players));
+const roundPointsState = (status: RoundStatus, scored: boolean) => {
+  if (status === "busted" || status === "out") {
+    return status;
+  }
 
-  const roundScored = () =>
-    props.room.phase === "roundOver" || props.room.phase === "gameOver";
+  return scored || status !== "active" ? "banked" : "at-risk";
+};
+
+const roundPointsLabels = {
+  "at-risk": "in play",
+  banked: "banked",
+  busted: "busted",
+  out: "sitting out",
+};
+
+const LeaderboardRound = (props: {
+  player: PlayerView;
+  phase: RoomView["phase"];
+  incomingCardId: DealProps["incomingCardId"];
+  index: number;
+}) => {
+  const scored = () =>
+    props.phase === "roundOver" || props.phase === "gameOver";
+
+  const state = createMemo(() =>
+    roundPointsState(props.player.status, scored())
+  );
+
+  const points = createMemo(() =>
+    visibleRoundPoints(props.player, props.phase, props.incomingCardId)
+  );
+
+  return (
+    <td
+      class="leaderboard-round"
+      data-round-state={state()}
+      data-scored={scored() ? "" : undefined}
+      aria-label={`${points()} ${points() === 1 ? "point" : "points"}, ${roundPointsLabels[state()]}`}
+      style={{ "--row": props.index }}
+    >
+      <span>
+        <Show when={state() === "banked" && !scored()}>
+          <LockKeyhole size={12} aria-hidden="true" />
+        </Show>
+        <Show when={state() === "busted"}>
+          <CircleX size={12} aria-hidden="true" />
+        </Show>
+        {state() === "busted" || state() === "out" ? points() : `+${points()}`}
+      </span>
+    </td>
+  );
+};
+
+const Leaderboard = (
+  props: Pick<TableProps, "room" | "playerId"> &
+    Pick<DealProps, "incomingCardId">
+) => {
+  const ranked = createMemo(() => rankPlayers(props.room.players));
 
   let body: HTMLTableSectionElement | undefined;
   let rowTops = new Map<string, number>();
@@ -643,9 +708,7 @@ const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
         <tr>
           <th scope="col">Rank</th>
           <th scope="col">Player</th>
-          <Show when={roundScored()}>
-            <th scope="col">Round</th>
-          </Show>
+          <th scope="col">Round</th>
           <th scope="col">Total</th>
         </tr>
       </thead>
@@ -672,14 +735,12 @@ const Leaderboard = (props: Pick<TableProps, "room" | "playerId">) => {
                   <span class="badge">You</span>
                 </Show>
               </th>
-              <Show when={roundScored()}>
-                <td
-                  class="leaderboard-round"
-                  style={{ "--row": entry().index }}
-                >
-                  +{entry().player.lastRound?.total ?? 0}
-                </td>
-              </Show>
+              <LeaderboardRound
+                player={entry().player}
+                phase={props.room.phase}
+                incomingCardId={props.incomingCardId}
+                index={entry().index}
+              />
               <td class="leaderboard-total">
                 <CountUp value={entry().player.score} />
               </td>
@@ -794,6 +855,16 @@ const Confetti = () => (
   </div>
 );
 
+const ActionButtons = (props: ParentProps) => (
+  <ScrollFade
+    class="action-buttons"
+    viewportClass="action-buttons-scroll"
+    horizontal
+  >
+    <div class="action-button-items">{props.children}</div>
+  </ScrollFade>
+);
+
 const OfflineTurn = (
   props: Pick<TableProps, "room" | "send" | "actionsDisabled"> & {
     playerId: string;
@@ -820,7 +891,7 @@ const OfflineTurn = (
           · Move for them now. {automaticTurnLabel(props.canStay)}
         </span>
       </p>
-      <div class="action-buttons">
+      <ActionButtons>
         <Button
           data-size="lg"
           disabled={props.actionsDisabled}
@@ -849,7 +920,7 @@ const OfflineTurn = (
             />
           </Button>
         </Show>
-      </div>
+      </ActionButtons>
     </>
   );
 };
@@ -922,130 +993,140 @@ const ActionBar = (
       aria-label="Your move"
       data-turn={myTurn() ? "" : undefined}
     >
-      <Show
-        when={props.room.phase === "gameOver" && props.dealing !== true}
-        fallback={<Deck count={props.room.deckCount} />}
-      >
-        <span class="action-bar-trophy" aria-hidden="true">
-          <Trophy />
-        </span>
-      </Show>
-      <Switch>
-        <Match when={props.room.phase === "gameOver"}>
-          <p class="headline" data-winner-headline="">
-            {winners()} wins!
-          </p>
+      <ScrollFade viewportClass="action-bar-scroll">
+        <div class="action-bar-content">
           <Show
-            when={props.moves.host.lobby}
-            fallback={<p class="muted">Waiting for the host.</p>}
+            when={props.room.phase === "gameOver" && props.dealing !== true}
+            fallback={<Deck count={props.room.deckCount} />}
           >
-            <div class="action-buttons">
-              <Button
-                data-size="lg"
-                disabled={props.actionsDisabled}
-                data-variant="solid"
-                onClick={async () => await props.send({ type: "lobby" })}
-              >
-                <ArrowLeft size={16} />
-                Back to lobby
-              </Button>
-            </div>
-          </Show>
-        </Match>
-        <Match when={props.room.phase === "roundOver"}>
-          <p class="headline">End of round {props.room.round}</p>
-          <Show
-            when={props.moves.host.nextRound}
-            fallback={
-              <p class="muted">Waiting for the host to start the next round.</p>
-            }
-          >
-            <div class="action-buttons">
-              <Button
-                data-size="lg"
-                disabled={props.actionsDisabled}
-                data-variant="solid"
-                onClick={async () => await props.send({ type: "nextRound" })}
-              >
-                <ArrowRight size={16} />
-                Start next round
-              </Button>
-            </div>
-          </Show>
-        </Match>
-        <Match when={props.room.choice}>
-          {(choice) => (
-            <ActionCardPrompt
-              choice={choice()}
-              moves={props.moves}
-              room={props.room}
-            />
-          )}
-        </Match>
-        <Match when={props.dealing}>
-          <p class="headline">{dealingLabel()}</p>
-        </Match>
-        <Match when={myTurn()}>
-          <p class="headline">
-            Your turn{" "}
-            <span class="muted">
-              ·{" "}
-              {iCanStay()
-                ? `${myRound()} points this round`
-                : "Hit for a card before you can stay"}
+            <span class="action-bar-trophy" aria-hidden="true">
+              <Trophy />
             </span>
-          </p>
-          <div class="action-buttons">
-            <Button
-              data-size="lg"
-              disabled={props.actionsDisabled}
-              data-variant="solid"
-              onClick={async () => await props.send({ type: "hit" })}
-            >
-              <SquarePlus size={16} />
-              Hit
-            </Button>
-            <Show when={iCanStay()}>
-              <Button
-                data-size="lg"
-                disabled={props.actionsDisabled}
-                onClick={async () => await props.send({ type: "stay" })}
-              >
-                <Hand size={16} />
-                Stay
-              </Button>
-            </Show>
-          </div>
-        </Match>
-        <Match when={offlineTurn()}>
-          {(turn) => (
-            <OfflineTurn
-              playerId={turn().playerId}
-              canStay={turn().canStay}
-              room={props.room}
-              send={props.send}
-              actionsDisabled={props.actionsDisabled}
-            />
-          )}
-        </Match>
-        <Match when={props.room.turnId}>
-          {(turnId) => (
-            <p class="headline">
-              {nameOf(props.room, turnId())}{" "}
+          </Show>
+          <Switch>
+            <Match when={props.room.phase === "gameOver"}>
+              <p class="headline" data-winner-headline="">
+                {winners()} wins!
+              </p>
               <Show
-                when={props.moves.waitingOn?.offline}
-                fallback="is deciding…"
+                when={props.moves.host.lobby}
+                fallback={<p class="muted">Waiting for the host.</p>}
               >
-                is offline.{" "}
+                <ActionButtons>
+                  <Button
+                    data-size="lg"
+                    disabled={props.actionsDisabled}
+                    data-variant="solid"
+                    onClick={async () => await props.send({ type: "lobby" })}
+                  >
+                    <ArrowLeft size={16} />
+                    Back to lobby
+                  </Button>
+                </ActionButtons>
+              </Show>
+            </Match>
+            <Match when={props.room.phase === "roundOver"}>
+              <p class="headline">End of round {props.room.round}</p>
+              <Show
+                when={props.moves.host.nextRound}
+                fallback={
+                  <p class="muted">
+                    Waiting for the host to start the next round.
+                  </p>
+                }
+              >
+                <ActionButtons>
+                  <Button
+                    data-size="lg"
+                    disabled={props.actionsDisabled}
+                    data-variant="solid"
+                    onClick={async () =>
+                      await props.send({ type: "nextRound" })
+                    }
+                  >
+                    <ArrowRight size={16} />
+                    Start next round
+                  </Button>
+                </ActionButtons>
+              </Show>
+            </Match>
+            <Match when={props.room.choice}>
+              {(choice) => (
+                <ActionCardPrompt
+                  choice={choice()}
+                  moves={props.moves}
+                  room={props.room}
+                />
+              )}
+            </Match>
+            <Match when={props.dealing}>
+              <p class="headline">{dealingLabel()}</p>
+            </Match>
+            <Match when={myTurn()}>
+              <p class="headline">
+                Your turn{" "}
                 <span class="muted">
                   ·{" "}
-                  {automaticTurnLabel(props.moves.waitingOn?.canStay === true)}
+                  {iCanStay()
+                    ? `${myRound()} points this round`
+                    : "Hit for a card before you can stay"}
                 </span>
-              </Show>
-            </p>
-          )}
-        </Match>
-      </Switch>
+              </p>
+              <ActionButtons>
+                <Button
+                  data-size="lg"
+                  disabled={props.actionsDisabled}
+                  data-variant="solid"
+                  onClick={async () => await props.send({ type: "hit" })}
+                >
+                  <SquarePlus size={16} />
+                  Hit
+                </Button>
+                <Show when={iCanStay()}>
+                  <Button
+                    data-size="lg"
+                    disabled={props.actionsDisabled}
+                    onClick={async () => await props.send({ type: "stay" })}
+                  >
+                    <Hand size={16} />
+                    Stay
+                  </Button>
+                </Show>
+              </ActionButtons>
+            </Match>
+            <Match when={offlineTurn()}>
+              {(turn) => (
+                <OfflineTurn
+                  playerId={turn().playerId}
+                  canStay={turn().canStay}
+                  room={props.room}
+                  send={props.send}
+                  actionsDisabled={props.actionsDisabled}
+                />
+              )}
+            </Match>
+            <Match when={props.room.turnId}>
+              {(turnId) => (
+                <p class="headline">
+                  {nameOf(props.room, turnId())}{" "}
+                  <Show
+                    when={props.moves.waitingOn?.offline}
+                    fallback="is deciding…"
+                  >
+                    is offline.{" "}
+                    <span class="muted">
+                      ·{" "}
+                      {automaticTurnLabel(
+                        props.moves.waitingOn?.canStay === true
+                      )}
+                    </span>
+                  </Show>
+                </p>
+              )}
+            </Match>
+          </Switch>
+        </div>
+      </ScrollFade>
     </section>
   );
 };
@@ -1117,7 +1198,11 @@ export default function Table(
                 triggerLabel={SCORES_TITLE}
                 trigger={<Trophy size={16} aria-hidden="true" />}
               >
-                <Leaderboard room={props.room} playerId={props.playerId} />
+                <Leaderboard
+                  room={props.room}
+                  playerId={props.playerId}
+                  incomingCardId={props.incomingCardId}
+                />
               </TableSheet>
             </Show>
             <TableSheet
@@ -1184,12 +1269,19 @@ export default function Table(
           </div>
 
           <div class="stack table-sidebar">
-            <section
-              class="panel leaderboard-panel"
-              aria-labelledby="leaderboard-title"
-            >
-              <h2 id="leaderboard-title">{SCORES_TITLE}</h2>
-              <Leaderboard room={props.room} playerId={props.playerId} />
+            <section class="panel leaderboard-panel">
+              <h2>{SCORES_TITLE}</h2>
+              <ScrollFade
+                class="leaderboard-body"
+                viewportClass="leaderboard-scroll"
+                label={SCORES_TITLE}
+              >
+                <Leaderboard
+                  room={props.room}
+                  playerId={props.playerId}
+                  incomingCardId={props.incomingCardId}
+                />
+              </ScrollFade>
             </section>
             <GameLog
               log={props.room.log}

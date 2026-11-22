@@ -16,6 +16,7 @@ import {
   SliderTrack,
 } from "@ui-sdk/solid/slider";
 
+import ScrollFade from "./scroll-fade";
 import Tooltip from "./tooltip";
 
 const VolumeControl = (props: {
@@ -67,20 +68,28 @@ export default function SoundControls(props: {
         )}
       </Tooltip>
       <PopoverContent class="audio-settings" side="bottom" align="end">
-        <PopoverTitle>Audio settings</PopoverTitle>
-        <VolumeControl
-          label="Music volume"
-          value={props.musicVolume}
-          onValueChange={props.onMusicVolumeChange}
-        />
-        <VolumeControl
-          label="Sound effects volume"
-          value={props.effectsVolume}
-          onValueChange={props.onEffectsVolumeChange}
-        />
-        <Button data-size="sm" data-variant="quiet" onClick={props.onToggle}>
-          {props.muted ? "Unmute all" : "Mute all"}
-        </Button>
+        <ScrollFade>
+          <div class="audio-settings-body">
+            <PopoverTitle>Audio settings</PopoverTitle>
+            <VolumeControl
+              label="Music volume"
+              value={props.musicVolume}
+              onValueChange={props.onMusicVolumeChange}
+            />
+            <VolumeControl
+              label="Sound effects volume"
+              value={props.effectsVolume}
+              onValueChange={props.onEffectsVolumeChange}
+            />
+            <Button
+              data-size="sm"
+              data-variant="quiet"
+              onClick={props.onToggle}
+            >
+              {props.muted ? "Unmute all" : "Mute all"}
+            </Button>
+          </div>
+        </ScrollFade>
       </PopoverContent>
     </Popover>
   );

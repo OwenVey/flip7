@@ -110,4 +110,32 @@ describe("<GameOverDialog />", () => {
 
     expect(onReturnToLobby).toHaveBeenCalledOnce();
   });
+
+  it("marks hidden rows at either edge of the final standings", () => {
+    render(() => (
+      <GameOverDialog
+        room={room()}
+        playerId="a"
+        canReturnToLobby={false}
+        onReturnToLobby={vi.fn<() => void>()}
+      />
+    ));
+
+    openDialog();
+    const standings = screen.getByRole("region", { name: "Final standings" });
+    expect(standings).not.toHaveAttribute("data-scroll-after");
+
+    Object.defineProperties(standings, {
+      clientHeight: { value: 120 },
+      scrollHeight: { value: 300 },
+    });
+    fireEvent.scroll(standings);
+    expect(standings).toHaveAttribute("data-scroll-after");
+    expect(standings).not.toHaveAttribute("data-scroll-before");
+
+    standings.scrollTop = 180;
+    fireEvent.scroll(standings);
+    expect(standings).toHaveAttribute("data-scroll-before");
+    expect(standings).not.toHaveAttribute("data-scroll-after");
+  });
 });

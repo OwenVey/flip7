@@ -7,6 +7,7 @@ import {
   DialogTrigger,
 } from "@ui-sdk/solid/dialog";
 
+import ScrollFade from "./scroll-fade";
 import Tooltip from "./tooltip";
 
 export default function RulesDialog(props: { targetScore: number }) {
@@ -31,7 +32,7 @@ export default function RulesDialog(props: { targetScore: number }) {
             <X size={16} aria-hidden="true" />
           </Tooltip>
         </header>
-        <div class="table-sheet-body">
+        <ScrollFade viewportClass="table-sheet-body" label="Game rules">
           <ul>
             <li>
               On your turn, <strong>Hit</strong> to get dealt another card or{" "}
@@ -70,7 +71,7 @@ export default function RulesDialog(props: { targetScore: number }) {
               everyone who hasn't busted scores what they hold.
             </li>
           </ul>
-        </div>
+        </ScrollFade>
       </DialogContent>
     </Dialog>
   );
