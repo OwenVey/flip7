@@ -137,7 +137,7 @@ describe("<Table />", () => {
     );
   });
 
-  it("keeps only Number cards on the mat and sets the rest beside it", () => {
+  it("keeps only Number cards on the mat and sets the rest beside it, action cards first", () => {
     const view = room();
     const [ana, ben] = view.players;
     view.players = [
@@ -177,7 +177,7 @@ describe("<Table />", () => {
       within(extras)
         .getAllByRole("listitem")
         .map((card) => card.dataset.cardId)
-    ).toStrictEqual(["90", "91"]);
+    ).toStrictEqual(["91", "90"]);
   });
 
   it("updates the score preview on a bust and when the round is scored", () => {

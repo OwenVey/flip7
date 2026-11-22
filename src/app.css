@@ -22,14 +22,16 @@
   --freeze-soft: #e3f4fb;
   --freeze-ink: #22577a;
   --freeze-glow: #a9def0;
-  --flip: #8a68c8;
-  --flip-soft: #efe7fb;
-  --flip-ink: #4b2f86;
-  --flip-glow: #d4c3f0;
-  --second-chance: #2f9a7d;
-  --second-chance-soft: #e2f5ee;
-  --second-chance-ink: #176356;
-  --second-chance-glow: #9edbcb;
+  --flip: #e8b824;
+  --flip-soft: #fff4cf;
+  --flip-ink: #6e5200;
+  --flip-glow: #f7dc84;
+  --second-chance: #e0414f;
+  --second-chance-soft: #fde6e8;
+  --second-chance-ink: #8e1b27;
+  --second-chance-glow: #f5a5ad;
+  /* Score Modifiers: flat points are orange; ×2 inverts to ink with an orange numeral. */
+  --modifier: #f0aa43;
   --shadow-print: 3px 3px 0 var(--ink);
   /* Turn and Flip Three rings are inset shadows, so they follow the border's inner curve and never reach a neighbor. */
   --ring-width: 3px;
@@ -1776,7 +1778,7 @@ main {
       0 0 1.5rem rgb(255 212 95 / 0.45);
   }
 
-  /* A Flip Three under way: the seat glows in the Flip Three card's violet. */
+  /* A Flip Three under way: the seat glows in the Flip Three card's gold. */
   &[data-flipping] {
     box-shadow:
       inset 0 0 0 var(--ring-width) var(--flip),
@@ -2305,34 +2307,84 @@ main {
     display: none;
   }
 
-  /* 1.375rem wide is 1.925rem tall, inside the 2rem header. */
+  /*
+   * Mini cards echo the Number cards without their cream face or shadow: a
+   * printed inner rule and faint sunburst on one color, so the label keeps
+   * the whole card. 1.375rem wide is 1.925rem tall, inside the 2rem header.
+   */
   & .card {
-    width: 1.375rem;
-    padding: 0.2rem;
-    border-radius: 0.3125rem;
+    --mini-color: var(--paper);
+    --mini-ink: var(--ink);
+    --mini-line: rgb(255 255 255 / 0.5);
+    --mini-ray: rgb(255 255 255 / 0.16);
     grid-template-rows: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    width: 1.375rem;
+    padding: 0;
+    border: 1px solid rgb(38 36 81 / 0.6);
+    border-radius: 0.3125rem;
+    background: var(--mini-color);
+    box-shadow: none;
+  }
 
-    &::before {
-      inset: 0.16rem;
-    }
+  /* Doubled up to outrank the full-size face rules that come later. */
+  & .card[data-kind]::before {
+    inset: 2px;
+    border-radius: 0.1875rem;
+    background: repeating-conic-gradient(
+      from -6deg at 50% 50%,
+      var(--mini-ray) 0deg 12deg,
+      transparent 12deg 24deg
+    );
+    box-shadow: inset 0 0 0 1px var(--mini-line);
   }
 
   & .card-corner {
     display: none;
   }
 
-  & [data-score-modifier] {
-    grid-template-columns: minmax(0, 1fr);
-    padding-inline: 0;
+  /* A small gap splits held action cards from the Score Modifiers after them. */
+  & :not([data-score-modifier]) + [data-score-modifier] {
+    margin-inline-start: 0.25rem;
+  }
 
-    &::before {
-      inset: 1px;
-    }
+  /* Doubled up to outrank the full-size label rules that come later. */
+  & .card[data-kind] .card-label {
+    color: var(--mini-ink);
+    font-size: 0.875rem;
+    letter-spacing: -0.03em;
+    /* A one-step print offset, like the Number cards' stacked numerals. */
+    text-shadow: 1px 1px 0 var(--mini-print, rgb(255 255 255 / 0.55));
+  }
 
-    & .card-label {
-      font-size: 0.8125rem;
-      text-shadow: none;
-    }
+  & [data-kind="bonus"] {
+    --mini-color: var(--modifier);
+  }
+
+  /* ×2 multiplies rather than adds, so it inverts: ink chip, orange numeral. */
+  & [data-kind="double"] {
+    --mini-color: var(--ink);
+    --mini-ink: var(--modifier);
+    --mini-line: color-mix(in srgb, var(--modifier) 55%, transparent);
+    --mini-ray: color-mix(in srgb, var(--modifier) 14%, transparent);
+    --mini-print: rgb(0 0 0 / 0.6);
+    border-color: var(--ink);
+  }
+
+  & [data-kind="secondChance"] {
+    --mini-color: var(--second-chance);
+    --mini-ink: #fff;
+    border-color: var(--second-chance-ink);
+  }
+
+  & [data-kind="flipThree"] {
+    --mini-color: var(--flip);
+    --mini-ink: var(--flip-ink);
+  }
+
+  & [data-kind="freeze"] {
+    --mini-color: var(--freeze);
+    --mini-ink: #fff;
   }
 
   /* Mini action cards show only their icon, so they stay the row's height. */
@@ -2346,9 +2398,14 @@ main {
     display: none;
   }
 
-  & .card-icon {
+  & .card[data-kind] .card-icon {
     width: 0.875rem;
     height: 0.875rem;
+    color: var(--mini-ink);
+  }
+
+  & [data-kind="secondChance"] .card-icon {
+    fill: currentcolor;
   }
 }
 
@@ -2459,10 +2516,10 @@ main {
     --card-color: var(--heat-12);
   }
 
-  /* Score Modifiers read as gold chips: dark border, gold face. */
+  /* Score Modifiers read as orange chips: dark border, orange face. */
   &[data-score-modifier] {
     --card-color: var(--ink);
-    --card-panel: var(--gold);
+    --card-panel: var(--modifier);
 
     &::before {
       background:

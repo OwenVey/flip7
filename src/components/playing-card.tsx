@@ -1,5 +1,5 @@
+import Heart from "@lucide/solid/icons/heart";
 import PlayingCardsFan from "@lucide/solid/icons/playing-cards-fan";
-import ShieldCheck from "@lucide/solid/icons/shield-check";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import { TooltipTrigger } from "@ui-sdk/solid/tooltip";
 import { Match, Show, Switch } from "solid-js";
@@ -38,7 +38,7 @@ const ActionIcon = (props: { kind: Card["kind"] }) => (
       <PlayingCardsFan class="card-icon" />
     </Match>
     <Match when={props.kind === "secondChance"}>
-      <ShieldCheck class="card-icon" />
+      <Heart class="card-icon" />
     </Match>
   </Switch>
 );

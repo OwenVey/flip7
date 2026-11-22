@@ -3,10 +3,10 @@ import ArrowRight from "@lucide/solid/icons/arrow-right";
 import CircleX from "@lucide/solid/icons/circle-x";
 import Coins from "@lucide/solid/icons/coins";
 import Flame from "@lucide/solid/icons/flame";
+import Heart from "@lucide/solid/icons/heart";
 import PlayingCards from "@lucide/solid/icons/playing-cards";
 import PlayingCardsFan from "@lucide/solid/icons/playing-cards-fan";
 import Send from "@lucide/solid/icons/send";
-import ShieldCheck from "@lucide/solid/icons/shield-check";
 import Shuffle from "@lucide/solid/icons/shuffle";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import Trophy from "@lucide/solid/icons/trophy";
@@ -168,7 +168,7 @@ const eventCopy = {
       /^(?<player>.+) discarded Second Chance and a duplicate (?<card>\d+)\.$/u,
       "$<player> used Second Chance",
       "duplicate $<card>",
-      ShieldCheck,
+      Heart,
     ],
     [
       /^(?<player>.+) played Flip Three on (?<target>.+)\.$/u,
@@ -186,14 +186,14 @@ const eventCopy = {
       /^(?<player>.+) gave a Second Chance to (?<target>.+)\.$/u,
       "$<target> got Second Chance",
       "from $<player>",
-      ShieldCheck,
+      Heart,
     ],
     [/^.+ must flip three cards\.$/u, "$&", undefined, PlayingCardsFan],
     [
       /^(?<player>.+) is holding a Second Chance\.$/u,
       "$<player> got a Second Chance",
       undefined,
-      ShieldCheck,
+      Heart,
     ],
   ],
   streak: [
