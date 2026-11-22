@@ -1233,8 +1233,9 @@ main {
     background: none;
     box-shadow: none;
 
+    /* The base button rule would press the whole trigger; the avatar presses instead. */
     &:active:not([data-disabled], [aria-disabled="true"]) {
-      transform: scale(0.94);
+      transform: none;
     }
 
     /* Grows the tap area to 44px without moving the picture. */
@@ -1251,6 +1252,33 @@ main {
     width: var(--avatar-size);
     height: var(--avatar-size);
     object-fit: cover;
+    transition:
+      transform 80ms ease,
+      box-shadow 80ms ease;
+  }
+
+  /* Lifts onto an ink shadow like the app's buttons, and stays up while the picker is open. */
+  & .avatar-trigger:is([data-open], :focus-visible) .avatar {
+    transform: translate(-1px, -1px);
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+
+  @media (hover: hover) {
+    & .avatar-trigger:hover:not(:disabled, [data-disabled]) .avatar {
+      transform: translate(-1px, -1px);
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+  }
+
+  & .avatar-trigger:active:not(:disabled, [data-disabled]) .avatar {
+    transform: translate(1px, 1px);
+    box-shadow: 0 0 0 var(--ink);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    & .avatar-trigger .avatar {
+      transition: none;
+    }
   }
 }
 
