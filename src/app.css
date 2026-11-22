@@ -15,6 +15,7 @@
   --gold: #ffd45f;
   --rule: #a37b2d;
   --danger: #a42d43;
+  --danger-ink: #6b1626;
   --good: #176356;
 
   /* One family per action card: base, soft panel, ink, glow. */
@@ -425,9 +426,10 @@ p {
   --button-height: var(--control-height);
   height: auto;
   min-height: var(--button-height);
+  --button-ink: var(--ink);
   padding-inline: 1.125rem;
-  border: 1px solid var(--ink);
-  box-shadow: 2px 2px 0 var(--ink);
+  border: 1px solid var(--button-ink);
+  box-shadow: 2px 2px 0 var(--button-ink);
   font-size: var(--ui-font-size);
   font-weight: 700;
   transition:
@@ -436,7 +438,7 @@ p {
 
   &:active:not([data-disabled], [aria-disabled="true"]) {
     transform: translate(2px, 2px);
-    box-shadow: 0 0 0 var(--ink);
+    box-shadow: 0 0 0 var(--button-ink);
   }
 
   &[data-variant="quiet"] {
@@ -449,6 +451,7 @@ p {
 
   /* A paper button whose red ink warns without competing with the main action. */
   &[data-variant="quiet"][data-tone="danger"] {
+    --button-ink: var(--danger-ink);
     color: var(--danger);
 
     &:hover:not([data-disabled], [aria-disabled="true"]) {
@@ -458,6 +461,7 @@ p {
 
   /* A solid printed red, so it reads as a warning on paper and on felt. */
   &[data-variant="destructive"] {
+    --button-ink: var(--danger-ink);
     background: var(--danger);
     color: var(--paper);
 
