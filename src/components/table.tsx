@@ -440,6 +440,9 @@ const RoundPlayer = (
             </Tooltip>
           </Show>
           <strong>{props.player.name}</strong>
+          <Show when={isMe()}>
+            <span class="badge">You</span>
+          </Show>
           <Show when={isDealer()}>
             <Tooltip
               content="Dealer"
@@ -448,9 +451,6 @@ const RoundPlayer = (
             >
               <PlayingCards size={14} strokeWidth={2.25} aria-hidden="true" />
             </Tooltip>
-          </Show>
-          <Show when={isMe()}>
-            <span class="badge">You</span>
           </Show>
           <Show when={isWinner()}>
             <span class="badge" data-tone="winner">
