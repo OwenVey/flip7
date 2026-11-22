@@ -1232,20 +1232,15 @@ main {
 
   /* Every row is tall enough for a Remove button, so the host's row, players and bots line up. */
   & li {
-    --remove-height: var(--control-height-sm);
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
     align-items: center;
-    min-height: calc(var(--remove-height) + 1rem + 3px);
+    min-height: calc(var(--control-height-sm) + 1rem + 3px);
     padding: 0.5rem 0.75rem;
     border: 1.5px solid var(--ink);
     border-radius: var(--radius-md);
     background: var(--paper-deep);
-
-    @media (pointer: coarse) {
-      --remove-height: var(--control-height-lg);
-    }
   }
 
   & li[data-offline] .roster-name {
@@ -1256,8 +1251,17 @@ main {
     opacity: 0.6;
   }
 
+  /* Remove stays small on touch screens too; an invisible margin keeps the tap area finger sized. */
   & [data-slot="alert-dialog-trigger"] {
+    --button-height: var(--control-height-sm);
+    position: relative;
     margin-left: auto;
+
+    &::after {
+      position: absolute;
+      inset: -0.5rem -0.375rem;
+      content: "";
+    }
   }
 }
 
