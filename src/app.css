@@ -446,8 +446,10 @@ p {
   &[data-variant="quiet"] {
     color: var(--ink-soft);
 
-    &:hover:not([data-disabled], [aria-disabled="true"]) {
-      color: var(--ink);
+    @media (hover: hover) {
+      &:hover:not([data-disabled], [aria-disabled="true"]) {
+        color: var(--ink);
+      }
     }
   }
 
@@ -456,8 +458,10 @@ p {
     --button-ink: var(--danger-ink);
     color: var(--danger);
 
-    &:hover:not([data-disabled], [aria-disabled="true"]) {
-      color: color-mix(in srgb, var(--danger) 80%, black);
+    @media (hover: hover) {
+      &:hover:not([data-disabled], [aria-disabled="true"]) {
+        color: color-mix(in srgb, var(--danger) 80%, black);
+      }
     }
   }
 
@@ -467,8 +471,10 @@ p {
     background: var(--danger);
     color: var(--paper);
 
-    &:hover:not([data-disabled], [aria-disabled="true"]) {
-      background: color-mix(in srgb, var(--danger) 85%, black);
+    @media (hover: hover) {
+      &:hover:not([data-disabled], [aria-disabled="true"]) {
+        background: color-mix(in srgb, var(--danger) 85%, black);
+      }
     }
   }
 
@@ -532,6 +538,28 @@ p {
     &:active:not([data-disabled], [aria-disabled="true"]) {
       transform: none;
     }
+  }
+}
+
+/*
+ * Touch screens keep :hover on the last thing tapped, so a button would stay
+ * in its hover color. These undo ui-sdk's button hovers there; :where keeps
+ * them at zero specificity so any button with its own background keeps it.
+ */
+@media (hover: none) {
+  :where(
+    [data-slot="button"],
+    [data-slot="alert-dialog-trigger"],
+    [data-slot="alert-dialog-close"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dialog-close"],
+    [data-slot="popover-trigger"]
+  ):where(:hover) {
+    background: var(--ui-background);
+  }
+
+  :where([data-variant="solid"]):where(:hover) {
+    background: var(--ui-primary);
   }
 }
 
