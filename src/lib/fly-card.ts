@@ -3,7 +3,6 @@ const FLIGHT_TILT_DEG = -8;
 const FLIP_START = 0.4;
 const SETTLE_GRACE_MS = 250;
 const SETTLE_MS = 120;
-const LIFT_SHADOW = "0 0.75rem 1.5rem rgb(4 20 14 / 0.45)";
 
 interface Flight {
   /** Where the card starts: the deck, or a card already on the table. */
@@ -91,7 +90,7 @@ const buildGhost = (card: HTMLElement, rect: DOMRect, faceDown: boolean) => {
   inner.replaceChildren(...faces);
   ghost.replaceChildren(inner);
 
-  return { face, ghost, inner };
+  return { ghost, inner };
 };
 
 const placeAt = (element: HTMLElement, rect: DOMRect) => {
@@ -181,8 +180,7 @@ export const flyCard = async ({
     return;
   }
 
-  const { face, ghost, inner } = buildGhost(to, target, faceDown);
-  const restingShadow = getComputedStyle(to).boxShadow;
+  const { ghost, inner } = buildGhost(to, target, faceDown);
   layer.replaceChildren(ghost);
 
   try {
@@ -199,14 +197,6 @@ export const flyCard = async ({
           { transform: "none" },
         ],
         { duration, easing: FLIGHT_EASING }
-      ),
-      face.animate(
-        [
-          { boxShadow: `${restingShadow}, ${LIFT_SHADOW}` },
-          { boxShadow: `${restingShadow}, ${LIFT_SHADOW}`, offset: 0.7 },
-          { boxShadow: restingShadow },
-        ],
-        { duration, easing: "ease-out" }
       ),
     ];
 
@@ -234,10 +224,12 @@ export const flyCard = async ({
   }
 };
 
-const DISCARD_MS = 520;
-
 /** Lifts cards off the table and fades them out, as when Second Chance is used. */
-export const discardCards = async (cards: Element[], signal: AbortSignal) => {
+export const discardCards = async (
+  cards: Element[],
+  duration: number,
+  signal: AbortSignal
+) => {
   if (cards.length === 0) {
     return;
   }
@@ -257,10 +249,10 @@ export const discardCards = async (cards: Element[], signal: AbortSignal) => {
             transform: "translateY(-1.25rem) rotate(-10deg) scale(0.85)",
           },
         ],
-        { duration: DISCARD_MS, easing: "ease-in", fill: "forwards" }
+        { duration, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "forwards" }
       )
     ),
-    DISCARD_MS,
+    duration,
     signal
   );
 };
@@ -278,8 +270,8 @@ export const riffleDeck = (deck: Element) => {
   );
 };
 
-const SWEEP_MS = 420;
-const SWEEP_SPREAD_MS = 360;
+const SWEEP_MS = 240;
+const SWEEP_SPREAD_MS = 90;
 const SWEEP_STEP_MS = 30;
 
 /**
@@ -317,7 +309,7 @@ export const sweepCards = async (
       {
         delay: index * step,
         duration: SWEEP_MS,
-        easing: "cubic-bezier(0.5, 0, 0.75, 0)",
+        easing: "cubic-bezier(0.77, 0, 0.175, 1)",
         fill: "forwards",
       }
     );

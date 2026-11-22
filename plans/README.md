@@ -4,7 +4,7 @@ These plans cover all six findings from the motion audit at `e031a95`. Source li
 
 | Order | Plan | Severity | Status | Dependencies |
 | --- | --- | --- | --- | --- |
-| 1 | [Shorten deal playback](001-shorten-deal-playback.md) | High | TODO | Baseline recording |
+| 1 | [Shorten deal playback](001-shorten-deal-playback.md) | High | Implemented. Phone verification pending. | Baseline recording for device comparison |
 | 2 | [Honor reduced motion during play](002-honor-reduced-motion.md) | High | TODO | Rebase the playback edits on 001 |
 | 3 | [Replace continuous table motion](003-replace-continuous-table-motion.md) | Medium | TODO | Extend the target selectors from 002 |
 | 4 | [Simplify turn and bust cues](004-simplify-turn-and-bust-cues.md) | Medium | TODO | Apply after 002 to keep the Room route edits small |

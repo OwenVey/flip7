@@ -143,6 +143,63 @@ describe(createDealPlayback, () => {
     ]);
   });
 
+  it("reveals a 16-player opening deal in 2240 ms", async () => {
+    const game = gameAtFirstTurn();
+    const playerCount = 16;
+
+    for (let index = 2; index < playerCount; index += 1) {
+      addPlayer(game, `player-${index}`, `Player ${index}`);
+    }
+
+    game.phase = "roundOver";
+    game.deck = Array.from({ length: playerCount }, (_, index) => ({
+      id: 2000 + index,
+      kind: "number",
+      value: 7,
+    }));
+    const before = view(game);
+    nextRound(game, "a", random);
+    const after = view(game);
+    const table = playback();
+    table.show(before);
+    table.show(after);
+
+    await vi.advanceTimersByTimeAsync(2239);
+    expect(table.shown.actionsDisabled).toBeTruthy();
+    expect(table.flights).toHaveLength(playerCount);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(table.shown).toMatchObject({ actionsDisabled: false, room: after });
+    expect(
+      table.flights.every(({ duration }) => duration === 140)
+    ).toBeTruthy();
+  });
+
+  it("ends the pause after a reveal when a newer Room update queues", async () => {
+    const game = gameAtFirstTurn();
+    const table = playback(true, "b");
+    table.show(view(game));
+    game.deck = [number];
+    hit(game, "a", random);
+    const afterHit = view(game);
+    table.show(afterHit);
+
+    await vi.advanceTimersToNextTimerAsync();
+    expect(table.cues).toStrictEqual(["reveal"]);
+    expect(table.shown.actionsDisabled).toBeTruthy();
+
+    const latest = { ...afterHit };
+    table.show(latest);
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(table.shown).toMatchObject({
+      actionsDisabled: false,
+      myMove: true,
+      room: latest,
+    });
+    expect(table.cues).toStrictEqual(["reveal", "turn"]);
+  });
+
   it("hurries queued updates and skips the cue for a superseded choice", async () => {
     const game = gameAtFirstTurn();
     const table = playback();
@@ -159,8 +216,8 @@ describe(createDealPlayback, () => {
     await vi.runAllTimersAsync();
 
     expect(table.flights).toStrictEqual([
-      { cardId: freeze.id, duration: 460 },
-      { cardId: freeze.id, duration: 220 },
+      { cardId: freeze.id, duration: 280 },
+      { cardId: freeze.id, duration: 140 },
     ]);
     expect(table.shown).toMatchObject({
       actionsDisabled: false,

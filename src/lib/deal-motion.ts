@@ -82,7 +82,7 @@ export const createDealMotion: (
       }
     };
   },
-  land: async (step, signal) => {
+  land: async (step, discardDuration, signal) => {
     const root = table();
 
     if (!root) {
@@ -107,6 +107,7 @@ export const createDealMotion: (
 
     await discardCards(
       cards.filter((card) => card !== null),
+      discardDuration,
       signal
     );
   },

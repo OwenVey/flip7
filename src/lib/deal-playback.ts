@@ -1,5 +1,6 @@
-/* oxlint-disable eslint/no-await-in-loop -- Card flights and Room updates must play in order. */
+/* oxlint-disable eslint/no-await-in-loop, react-doctor/async-await-in-loop -- Card flights and Room updates must play in order. */
 
+import { isActionCard } from "../game/cards";
 import { waitingOn } from "../game/moves";
 import { roundStarted } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
@@ -8,12 +9,14 @@ import type { DealStep } from "./deal-plan";
 import { roomCues } from "./room-cues";
 import type { RoomCue } from "./room-cues";
 
-const FLIGHT_MS = 460;
-const FLIP_FLIGHT_MS = 560;
-const HURRIED_FLIGHT_MS = 220;
-const PAUSE_MS = 70;
-const FLIP_PAUSE_MS = 260;
-const FLIP_LEAD_IN_MS = 320;
+const FLIGHT_MS = 280;
+const HURRIED_FLIGHT_MS = 140;
+const BULK_DEAL_MIN_CARDS = 5;
+const PAUSE_MS = 40;
+const FLIP_PAUSE_MS = 100;
+const FLIP_LEAD_IN_MS = 150;
+const DISCARD_MS = 240;
+const HURRIED_DISCARD_MS = 160;
 
 export interface DealMotion {
   allowed: () => boolean;
@@ -21,7 +24,11 @@ export interface DealMotion {
     step: DealStep,
     duration: number
   ) => ((signal: AbortSignal) => Promise<void>) | null;
-  land: (step: DealStep, signal: AbortSignal) => Promise<void>;
+  land: (
+    step: DealStep,
+    discardDuration: number,
+    signal: AbortSignal
+  ) => Promise<void>;
   reshuffle: () => void;
   sweep: (signal: AbortSignal) => Promise<void>;
 }
@@ -57,40 +64,11 @@ export const initialDealPlayback: DealPlaybackView = {
   myMove: false,
 };
 
-const wait = async (ms: number, signal: AbortSignal) => {
-  if (ms === 0 || signal.aborted) {
-    return;
-  }
+const isDeckToHand = (step: DealStep) =>
+  step.from === "deck" && step.to.kind === "hand";
 
-  const { promise, resolve } = Promise.withResolvers<undefined>();
-
-  const done = () => {
-    resolve(undefined);
-  };
-
-  const timer = setTimeout(done, ms);
-  signal.addEventListener("abort", done, { once: true });
-  await promise;
-
-  clearTimeout(timer);
-  signal.removeEventListener("abort", done);
-};
-
-const flightTime = (step: DealStep, hurry: boolean) => {
-  if (hurry) {
-    return HURRIED_FLIGHT_MS;
-  }
-
-  return step.flip ? FLIP_FLIGHT_MS : FLIGHT_MS;
-};
-
-const pauseAfter = (step: DealStep, hurry: boolean) => {
-  if (hurry) {
-    return 0;
-  }
-
-  return step.flip ? FLIP_PAUSE_MS : PAUSE_MS;
-};
+const isOrdinaryDealCard = (step: DealStep) =>
+  isDeckToHand(step) && !step.flip && !isActionCard(step.card);
 
 const ownMove = ({ room, playerId }: PlaybackInput) => {
   if (waitingOn(room)?.playerId !== playerId) {
@@ -118,8 +96,35 @@ export const createDealPlayback = (
   let latest: PlaybackInput | null = null;
   let settled: RoomView | null = null;
   let run: AbortController | null = null;
+  let pause: AbortController | null = null;
   let frame = emptyFrame;
   let moveCuePending = false;
+
+  const waitForPause = async (ms: number, signal: AbortSignal) => {
+    if (queue.length > 0 || signal.aborted) {
+      return;
+    }
+
+    const controller = new AbortController();
+    pause = controller;
+    const pauseSignal = AbortSignal.any([signal, controller.signal]);
+    const { promise, resolve } = Promise.withResolvers<undefined>();
+
+    const done = () => {
+      resolve(undefined);
+    };
+
+    const timer = setTimeout(done, ms);
+    pauseSignal.addEventListener("abort", done, { once: true });
+    await promise;
+
+    clearTimeout(timer);
+    pauseSignal.removeEventListener("abort", done);
+
+    if (pause === controller) {
+      pause = null;
+    }
+  };
 
   const show = (patch: Partial<Frame> = {}, sounds: RoomCue[] = []) => {
     frame = { ...frame, ...patch };
@@ -145,26 +150,35 @@ export const createDealPlayback = (
     previous: RoomView,
     current: RoomView,
     steps: DealStep[],
+    newRound: boolean,
     signal: AbortSignal
   ) => {
+    const bulkDeal =
+      newRound && steps.filter(isDeckToHand).length >= BULK_DEAL_MIN_CARDS;
+
     for (const [index, step] of steps.entries()) {
       if (signal.aborted) {
         return;
       }
 
-      const hurry = queue.length > 0;
-      const announced = index > 0 && steps.at(index - 1)?.to.kind === "played";
+      const announced = steps[index - 1]?.to.kind === "played";
 
-      if (step.flip?.index === 1 && !hurry && !announced) {
+      if (step.flip?.index === 1 && queue.length === 0 && !announced) {
         show({ step: { ...step, flip: { ...step.flip, index: 0 } } });
-        await wait(FLIP_LEAD_IN_MS, signal);
+        await waitForPause(FLIP_LEAD_IN_MS, signal);
       }
 
       if (signal.aborted) {
         return;
       }
 
-      const fly = motion.captureFlight(step, flightTime(step, hurry));
+      const bulkCard = bulkDeal && isOrdinaryDealCard(step);
+
+      const fly = motion.captureFlight(
+        step,
+        bulkCard || queue.length > 0 ? HURRIED_FLIGHT_MS : FLIGHT_MS
+      );
+
       show({
         incomingCardId: step.card.id,
         room: dealFrame(previous, current, steps, index + 1),
@@ -178,8 +192,15 @@ export const createDealPlayback = (
 
       show({ incomingCardId: null });
       cue("reveal");
-      await motion.land(step, signal);
-      await wait(pauseAfter(step, hurry), signal);
+      await motion.land(
+        step,
+        queue.length > 0 ? HURRIED_DISCARD_MS : DISCARD_MS,
+        signal
+      );
+
+      if (!bulkCard) {
+        await waitForPause(step.flip ? FLIP_PAUSE_MS : PAUSE_MS, signal);
+      }
     }
   };
 
@@ -200,7 +221,7 @@ export const createDealPlayback = (
       await motion.sweep(signal);
     }
 
-    await playSteps(previous, current, steps, signal);
+    await playSteps(previous, current, steps, newRound, signal);
   };
 
   const drain = async (signal: AbortSignal) => {
@@ -247,6 +268,7 @@ export const createDealPlayback = (
   const reset = () => {
     run?.abort();
     run = null;
+    pause = null;
     queue.length = 0;
     latest = null;
     settled = null;
@@ -291,6 +313,7 @@ export const createDealPlayback = (
       }
 
       queue.push(next.room);
+      pause?.abort();
 
       if (!run) {
         run = new AbortController();
