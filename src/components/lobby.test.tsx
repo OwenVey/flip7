@@ -1,0 +1,81 @@
+import { cleanup, render, screen } from "@solidjs/testing-library";
+import { createSignal, flush } from "solid-js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { addPlayer, createGame, MAX_PLAYERS } from "../game/engine";
+import { toRoomView } from "../game/protocol";
+import type { RoomView } from "../game/protocol";
+import type { RoomConnection } from "../lib/room-connection";
+import Lobby from "./lobby";
+
+const roomOf = (size: number) => {
+  const state = createGame();
+
+  for (let index = 0; index < size; index += 1) {
+    addPlayer(state, `p${index}`, `Player ${index}`, 1);
+  }
+
+  return toRoomView("ABCDE", state);
+};
+
+const addBotButton = () =>
+  screen.getByRole("button", { name: /Add bot|Table full/u });
+
+describe("<Lobby />", () => {
+  afterEach(cleanup);
+
+  it("keeps the host's Add bot button mounted and disabled once the room fills", () => {
+    const [room, setRoom] = createSignal<RoomView>(roomOf(MAX_PLAYERS - 1));
+
+    render(() => (
+      <Lobby
+        room={room()}
+        playerId="p0"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+    const button = addBotButton();
+    expect(button).toHaveTextContent(`${MAX_PLAYERS - 1} / ${MAX_PLAYERS}`);
+    expect(button).not.toBeDisabled();
+
+    setRoom(roomOf(MAX_PLAYERS));
+    flush();
+    expect(addBotButton()).toBe(button);
+    expect(button).toHaveTextContent("Table full");
+    expect(button).toBeDisabled();
+  });
+
+  it("shows one open seat until the room is full, then none", () => {
+    const [room, setRoom] = createSignal<RoomView>(roomOf(1));
+
+    render(() => (
+      <Lobby
+        room={room()}
+        playerId="p0"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+    expect(screen.getAllByText("Open seat")).toHaveLength(1);
+
+    setRoom(roomOf(MAX_PLAYERS - 1));
+    flush();
+    expect(screen.getAllByText("Open seat")).toHaveLength(1);
+
+    setRoom(roomOf(MAX_PLAYERS));
+    flush();
+    expect(screen.queryByText("Open seat")).toBeNull();
+  });
+
+  it("shows guests the player count without the Add bot button", () => {
+    render(() => (
+      <Lobby
+        room={roomOf(3)}
+        playerId="p1"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+
+    expect(screen.queryByRole("button", { name: /Add bot/u })).toBeNull();
+    expect(screen.getByText(`3 / ${MAX_PLAYERS}`)).toBeInTheDocument();
+  });
+});

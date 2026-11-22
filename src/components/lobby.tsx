@@ -12,8 +12,6 @@ import LeaveRoom from "./leave-room";
 import PlayerAvatar from "./player-avatar";
 import RemovePlayer from "./remove-player";
 
-const OPEN_SEATS_SHOWN = 2;
-
 export default function Lobby(props: {
   room: RoomView;
   playerId: string;
@@ -25,12 +23,9 @@ export default function Lobby(props: {
 
   const missing = () => Math.max(0, MIN_PLAYERS - props.room.players.length);
 
-  const openSeats = createMemo(() =>
-    Math.min(
-      Math.max(missing(), OPEN_SEATS_SHOWN - props.room.players.length, 1),
-      MAX_PLAYERS - props.room.players.length
-    )
-  );
+  const openSeats = () => (props.room.players.length < MAX_PLAYERS ? 1 : 0);
+
+  const count = () => `${props.room.players.length} / ${MAX_PLAYERS}`;
 
   const hostName = () =>
     props.room.players.find((player) => player.id === props.room.hostId)
@@ -61,12 +56,14 @@ export default function Lobby(props: {
           <InviteButton solid />
         </section>
 
-        <section class="panel">
+        <section class="panel players">
           <div class="panel-title">
             <h2>Players</h2>
-            <span class="badge" data-tone="muted">
-              {props.room.players.length} / {MAX_PLAYERS}
-            </span>
+            <Show when={!isHost()}>
+              <span class="badge" data-tone="muted">
+                {count()}
+              </span>
+            </Show>
           </div>
           <Show when={isHost()}>
             <div class="add-bot">
@@ -78,6 +75,10 @@ export default function Lobby(props: {
               >
                 <BotPlus size={16} aria-hidden="true" />
                 {moves().host.addBot ? "Add bot" : "Table full"}
+                <span class="badge" data-tone="muted">
+                  <span class="sr-only">Players: </span>
+                  {count()}
+                </span>
               </Button>
             </div>
           </Show>

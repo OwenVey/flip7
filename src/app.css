@@ -472,9 +472,39 @@ p {
     }
   }
 
-  &[aria-disabled="true"] {
-    opacity: 0.5;
+  /* Disabled buttons stay opaque in a faded version of their own color, so nothing shows through when they float over the page. */
+  &:is([data-disabled], [aria-disabled="true"]) {
+    --button-ink: color-mix(in oklab, var(--ink) 35%, var(--paper-deep));
+    opacity: 1;
+    background: var(--paper-deep);
+    color: color-mix(in oklab, var(--ink-soft) 55%, var(--paper-deep));
     cursor: not-allowed;
+
+    &[data-variant="solid"] {
+      border-color: var(--button-ink);
+      background: color-mix(in oklab, var(--accent) 40%, var(--paper-deep));
+      color: var(--paper);
+    }
+
+    &[data-variant="destructive"] {
+      --button-ink: color-mix(
+        in oklab,
+        var(--danger-ink) 40%,
+        var(--paper-deep)
+      );
+      border-color: var(--button-ink);
+      background: color-mix(in oklab, var(--danger) 40%, var(--paper-deep));
+      color: var(--paper);
+    }
+
+    &[data-variant="quiet"][data-tone="danger"] {
+      --button-ink: color-mix(
+        in oklab,
+        var(--danger-ink) 35%,
+        var(--paper-deep)
+      );
+      color: color-mix(in oklab, var(--danger) 50%, var(--paper-deep));
+    }
   }
 
   &:where([data-size="sm"]) {
@@ -1132,9 +1162,30 @@ main {
 
 .lobby {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
   gap: 1.25rem;
-  align-items: start;
+}
+
+/* On wider screens the invite is one strip: the code, a line of help, and the link button. */
+@media (min-width: 48rem) {
+  .invite {
+    grid-template-columns: auto 1fr auto;
+    gap: 0.75rem 1.5rem;
+    align-items: center;
+
+    & > h2 {
+      grid-column: 1 / -1;
+    }
+
+    & .room-code {
+      font-size: 3rem;
+      line-height: 1;
+    }
+  }
+}
+
+/* Players fill the width in columns, so a full room of 16 still fits above Start game. */
+.players .roster {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
 }
 
 .room-code {
