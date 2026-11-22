@@ -1212,17 +1212,10 @@ main {
   }
 }
 
-.home-actions {
-  display: grid;
-  gap: 1.25rem;
-
-  @media (min-width: 42rem) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.home-actions .panel {
-  grid-template-rows: auto 1fr auto;
+/* One panel holds both ways in: create a room, or join one with a code. */
+.panel.home-actions {
+  justify-self: center;
+  width: min(100%, 32rem);
   border: 0.3125rem solid var(--rail);
   border-radius: var(--radius-xl);
   box-shadow:
@@ -1231,45 +1224,27 @@ main {
     var(--shadow-table);
 }
 
-.home-steps {
+.home-create,
+.home-join {
   display: grid;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
+  gap: 0.75rem;
+}
+
+.home-divider {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
   color: var(--ink-soft);
-  list-style: none;
-  counter-reset: step;
+  font-size: 0.875rem;
+  font-weight: 600;
 
-  & li {
-    display: flex;
-    gap: 0.625rem;
-    align-items: center;
-    counter-increment: step;
-
-    &::before {
-      display: grid;
-      flex: none;
-      place-items: center;
-      width: 1.5rem;
-      height: 1.5rem;
-      border: 1px solid var(--ink);
-      border-radius: 50%;
-      background: var(--gold);
-      color: var(--ink);
-      font-family: var(--font-display);
-      font-size: 0.8125rem;
-      content: counter(step);
-    }
+  &::before,
+  &::after {
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+    content: "";
   }
-}
-
-.home-actions .panel > [data-slot="button"] {
-  align-self: end;
-}
-
-.home-actions .stack {
-  grid-row: 2 / -1;
-  align-content: end;
 }
 
 .join {
@@ -4114,29 +4089,6 @@ main {
 
   .lede {
     font-size: 0.9375rem;
-  }
-
-  .home-actions {
-    gap: 1rem;
-  }
-
-  /* On phones the buttons and panel titles explain themselves, so the steps and code label give up their rows. */
-  .home-steps {
-    display: none;
-  }
-
-  /* Without the steps row, a third track would leave an empty gap under Create room. */
-  .home-actions .panel {
-    grid-template-rows: auto 1fr;
-  }
-
-  .home-actions [data-slot="field-label"] {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
 }
 
