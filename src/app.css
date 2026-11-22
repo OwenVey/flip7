@@ -1280,15 +1280,15 @@ main {
   width: 2.5rem;
   height: 2.5rem;
   padding: 0.125rem;
+  border: 2px solid transparent;
+  border-radius: calc(var(--radius-md) + 3px);
+  background: none;
+  cursor: pointer;
 
   @media (pointer: coarse) {
     width: 2.75rem;
     height: 2.75rem;
   }
-  border: 2px solid transparent;
-  border-radius: calc(var(--radius-md) + 3px);
-  background: none;
-  cursor: pointer;
 
   & .avatar {
     width: 100%;
@@ -1299,8 +1299,11 @@ main {
     border-color: var(--ink-soft);
   }
 
+  /* The chosen avatar sits on a raised gold tile, like a button. */
   &[data-checked] {
     border-color: var(--ink);
+    background: var(--gold);
+    box-shadow: 2px 2px 0 var(--ink);
   }
 
   &:focus-visible {
