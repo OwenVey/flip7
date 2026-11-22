@@ -174,6 +174,38 @@ describe("joining a room", () => {
     expect(broadcasts(outcome)).toBeFalsy();
   });
 
+  it("seats a player with the avatar they picked", () => {
+    const h = harness();
+    h.connect("tab");
+
+    const { playerId } = welcomeOf(h.room.join("tab", "Ana", null, 7));
+
+    expect(player(h, playerId).avatar).toBe(7);
+  });
+
+  it("assigns a random avatar when the pick is missing or unknown", () => {
+    const h = harness();
+    h.connect("ana-tab");
+    h.connect("ben-tab");
+
+    const ana = welcomeOf(h.room.join("ana-tab", "Ana", null));
+    const ben = welcomeOf(h.room.join("ben-tab", "Ben", null, 99));
+
+    expect(player(h, ana.playerId).avatar).toBe(13);
+    expect(player(h, ben.playerId).avatar).toBe(13);
+  });
+
+  it("keeps the first avatar when a player rejoins by token", () => {
+    const h = harness();
+    h.connect("tab-1");
+    const ana = welcomeOf(h.room.join("tab-1", "Ana", null, 3));
+    h.connect("tab-2");
+
+    h.room.join("tab-2", "", ana.token, 15);
+
+    expect(player(h, ana.playerId).avatar).toBe(3);
+  });
+
   it("welcomes an already seated tab again without adding a player", () => {
     const h = harness();
     const first = joinAs(h, "tab", "Ana");

@@ -227,6 +227,7 @@ const Room = (props: { code: string }) => {
             <JoinForm
               room={connection.room()}
               savedName={connection.savedName()}
+              savedAvatar={connection.savedAvatar()}
               onJoin={connection.join}
               error={connection.joinError()}
               joining={connection.joining()}

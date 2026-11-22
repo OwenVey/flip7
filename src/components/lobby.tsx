@@ -1,4 +1,3 @@
-import BotIcon from "@lucide/solid/icons/bot";
 import BotPlus from "@lucide/solid/icons/bot-plus";
 import Play from "@lucide/solid/icons/play";
 import { Button } from "@ui-sdk/solid/button";
@@ -10,8 +9,8 @@ import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
+import PlayerAvatar from "./player-avatar";
 import RemovePlayer from "./remove-player";
-import Tooltip from "./tooltip";
 
 const OPEN_SEATS_SHOWN = 2;
 
@@ -73,19 +72,7 @@ export default function Lobby(props: {
             <For each={props.room.players} keyed={(player) => player.id}>
               {(player) => (
                 <li data-offline={player().connected ? undefined : ""}>
-                  <Show when={player().bot}>
-                    <Tooltip
-                      content="Bot"
-                      type="label"
-                      trigger={(hint) => <span {...hint} class="bot-avatar" />}
-                    >
-                      <BotIcon
-                        size={16}
-                        strokeWidth={2.25}
-                        aria-hidden="true"
-                      />
-                    </Tooltip>
-                  </Show>
+                  <PlayerAvatar player={player()} />
                   <span class="roster-name">
                     {player().name}
                     {player().id === props.playerId ? " (you)" : ""}

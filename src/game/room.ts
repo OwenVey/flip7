@@ -1,3 +1,4 @@
+import { isAvatar, randomAvatar } from "./avatars";
 import type { Random } from "./cards";
 import type { GameCommand } from "./client-message";
 import {
@@ -225,7 +226,8 @@ export const createRoom = (
   const joinSeat = (
     connectionId: string,
     rawName: string,
-    token: string | null
+    token: string | null,
+    avatar: number | undefined
   ) => {
     const joined = seatOf(connectionId);
     const joinedToken = joined ? stored.tokens.get(joined.playerId) : undefined;
@@ -252,7 +254,12 @@ export const createRoom = (
 
     const playerId = deps.newId();
     const newToken = deps.newId();
-    addPlayer(game, playerId, name);
+    addPlayer(
+      game,
+      playerId,
+      name,
+      isAvatar(avatar) ? avatar : randomAvatar(deps.random)
+    );
     stored.tokens.set(playerId, newToken);
     seat(connectionId, playerId);
 
@@ -466,11 +473,16 @@ export const createRoom = (
       return finish([BROADCAST]);
     },
 
-    join: (connectionId: string, name: string, token: string | null) => {
+    join: (
+      connectionId: string,
+      name: string,
+      token: string | null,
+      avatar?: number
+    ) => {
       touch();
 
       return finish(
-        attempt(() => [joinSeat(connectionId, name, token), BROADCAST])
+        attempt(() => [joinSeat(connectionId, name, token, avatar), BROADCAST])
       );
     },
 

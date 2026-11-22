@@ -55,6 +55,8 @@ export interface Player {
   connected: boolean;
   /** Set on players the room plays itself. Missing on rooms saved before bots. */
   bot?: boolean;
+  /** The avatar a person picked. Missing on bots and rooms saved before avatars. */
+  avatar?: number;
   status: RoundStatus;
   hand: Card[];
   bustCard: Card | null;
@@ -603,7 +605,12 @@ const startRound = (state: GameState, random: Random) => {
   advance(state, random);
 };
 
-export const addPlayer = (state: GameState, id: string, name: string) => {
+export const addPlayer = (
+  state: GameState,
+  id: string,
+  name: string,
+  avatar: number
+) => {
   if (state.players.length >= MAX_PLAYERS) {
     throw new GameError(`This room is full (${MAX_PLAYERS} players).`);
   }
@@ -617,6 +624,7 @@ export const addPlayer = (state: GameState, id: string, name: string) => {
   }
 
   state.players.push({
+    avatar,
     bustCard: null,
     connected: true,
     hand: [],

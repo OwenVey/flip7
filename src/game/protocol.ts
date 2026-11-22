@@ -1,4 +1,5 @@
 import { projectActionCards } from "./action-card-resolution";
+import { fallbackAvatar } from "./avatars";
 import { TARGET_SCORE } from "./engine";
 import type { DrawEvent, GameState, HeldCard, Player } from "./engine";
 
@@ -27,7 +28,10 @@ export const normalizeCode = (raw: string) => {
 export const cleanName = (raw: string) =>
   raw.replaceAll(/\s+/gu, " ").trim().slice(0, NAME_MAX_LENGTH);
 
-export type PlayerView = Player;
+export type PlayerView = Omit<Player, "avatar"> & {
+  /** The person's avatar, or null for a bot. */
+  avatar: number | null;
+};
 
 export interface RoomView extends Pick<
   GameState,
@@ -89,6 +93,10 @@ export const toRoomView = (code: string, state: GameState) => {
     log: state.log,
     phase: state.phase,
     players: state.players.map((player) => ({
+      avatar:
+        player.bot === true
+          ? null
+          : (player.avatar ?? fallbackAvatar(player.id)),
       bot: player.bot === true,
       bustCard: player.bustCard,
       connected: player.connected,

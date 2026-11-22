@@ -33,7 +33,7 @@ const lobby = (names: string[]) => {
   const state = createGame();
 
   for (const name of names) {
-    addPlayer(state, name, name);
+    addPlayer(state, name, name, 1);
   }
 
   return state;

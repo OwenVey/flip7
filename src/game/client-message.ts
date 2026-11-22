@@ -8,6 +8,7 @@ const ForIdSchema = v.optional(IdSchema);
 
 const ClientMessageSchema = v.variant("type", [
   v.object({
+    avatar: v.optional(v.number()),
     name: v.pipe(v.string(), v.maxLength(200)),
     token: v.nullable(IdSchema),
     type: v.literal("join"),

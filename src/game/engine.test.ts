@@ -64,7 +64,7 @@ const finishedRound = (names: string[]) => {
   const state = createGame();
 
   for (const name of names) {
-    addPlayer(state, name, name);
+    addPlayer(state, name, name, 1);
   }
 
   startGame(state, "a", random);
@@ -384,9 +384,9 @@ describe("winning and leaving", () => {
 
   it("rejects a name someone in the room already has", () => {
     const state = createGame();
-    addPlayer(state, "a", "Ana");
+    addPlayer(state, "a", "Ana", 1);
     expect(() => {
-      addPlayer(state, "b", "ana");
+      addPlayer(state, "b", "ana", 1);
     }).toThrow(GameError);
   });
 
@@ -573,7 +573,7 @@ describe("the game log", () => {
 
     state.phase = "gameOver";
     backToLobby(state, "a");
-    addPlayer(state, "c", "c");
+    addPlayer(state, "c", "c", 1);
     expect(state.log.at(-1)).toMatchObject({ game: 1, round: 0 });
 
     startGame(state, "a", random);
@@ -584,7 +584,7 @@ describe("the game log", () => {
 describe(chat, () => {
   it("adds a player's message to the log with their name", () => {
     const state = createGame();
-    addPlayer(state, "a", "Ana");
+    addPlayer(state, "a", "Ana", 1);
 
     chat(state, "a", "  good   luck\n everyone ");
 
@@ -597,7 +597,7 @@ describe(chat, () => {
 
   it("rejects empty messages and trims long ones", () => {
     const state = createGame();
-    addPlayer(state, "a", "Ana");
+    addPlayer(state, "a", "Ana", 1);
 
     expect(() => {
       chat(state, "a", "   ");

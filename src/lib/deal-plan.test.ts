@@ -41,7 +41,7 @@ const finishedRound = (names: string[]) => {
   const state = createGame();
 
   for (const name of names) {
-    addPlayer(state, name, name);
+    addPlayer(state, name, name, 1);
   }
 
   startGame(state, "a", random);

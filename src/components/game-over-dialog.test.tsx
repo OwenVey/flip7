@@ -8,6 +8,7 @@ import GameOverDialog from "./game-over-dialog";
 
 const player = (id: string, name: string, score: number) => {
   const view: PlayerView = {
+    avatar: 1,
     bustCard: null,
     connected: true,
     hand: [],

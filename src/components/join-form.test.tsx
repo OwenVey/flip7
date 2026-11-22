@@ -10,6 +10,7 @@ const roomWith = (names: string[]) => {
   const view: Pick<RoomView, "phase" | "players"> = {
     phase: "lobby",
     players: names.map((name, index) => ({
+      avatar: 1,
       bustCard: null,
       connected: true,
       hand: [],
@@ -36,6 +37,7 @@ describe("<JoinForm />", () => {
       <JoinForm
         room={room()}
         savedName="Ben"
+        savedAvatar={1}
         onJoin={vi.fn<(name: string) => void>()}
       />
     ));
@@ -54,6 +56,7 @@ describe("<JoinForm />", () => {
       <JoinForm
         room={room()}
         savedName="Ben"
+        savedAvatar={1}
         onJoin={vi.fn<(name: string) => void>()}
       />
     ));
@@ -79,6 +82,7 @@ describe("<JoinForm />", () => {
       <JoinForm
         room={room}
         savedName=""
+        savedAvatar={1}
         onJoin={vi.fn<(name: string) => void>()}
       />
     ));
@@ -95,6 +99,7 @@ describe("<JoinForm />", () => {
       <JoinForm
         room={{ ...room, phase: phase() }}
         savedName=""
+        savedAvatar={1}
         onJoin={vi.fn<(name: string) => void>()}
       />
     ));
@@ -124,6 +129,7 @@ describe("<JoinForm />", () => {
       <JoinForm
         room={room}
         savedName="Ben"
+        savedAvatar={1}
         onJoin={onJoin}
         joining={joining()}
         error={error()}
@@ -145,5 +151,27 @@ describe("<JoinForm />", () => {
       /Someone here is already called Ben/u
     );
     expect(screen.getByRole("button", { name: "Join room" })).toBeEnabled();
+  });
+
+  it("joins with the avatar picked from the grid", async () => {
+    const onJoin = vi.fn<(name: string, avatar: number) => void>();
+
+    render(() => (
+      <JoinForm
+        room={roomWith(["Ana"])}
+        savedName="Ben"
+        savedAvatar={1}
+        onJoin={onJoin}
+      />
+    ));
+    screen.getByRole("button", { name: "Change avatar" }).click();
+    flush();
+    const fifth = await screen.findByRole("radio", { name: "Avatar 5" });
+    fifth.click();
+    flush();
+    screen.getByRole("button", { name: "Join room" }).click();
+    flush();
+
+    expect(onJoin).toHaveBeenCalledWith("Ben", 5);
   });
 });

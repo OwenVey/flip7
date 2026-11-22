@@ -22,7 +22,7 @@ const room = (names: string[], playing = false) => {
   const game = createGame();
 
   for (const name of names) {
-    addPlayer(game, name, name);
+    addPlayer(game, name, name, 1);
   }
 
   if (playing) {

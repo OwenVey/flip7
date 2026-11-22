@@ -88,7 +88,10 @@ const network = () => {
     }
 
     if (message.type === "join") {
-      carryOut(room.join(link.id, message.name, message.token), link);
+      carryOut(
+        room.join(link.id, message.name, message.token, message.avatar),
+        link
+      );
     } else if (message.type === "chat") {
       carryOut(room.chat(link.id, message.text), link);
     } else {

@@ -12,6 +12,8 @@ A multiplayer push-your-luck card game played in shared rooms, where players joi
 
 **Bot**: A player the room plays itself. Always present, never host, never stalls. The host adds bots in the lobby. _Avoid_: AI, CPU, computer player
 
+**Avatar**: The small picture a player picks when they join, chosen from a fixed set. It decorates a player and never identifies them, so two players can share one. A bot shows the bot mark instead of an avatar. _Avoid_: icon, profile picture
+
 **Evict**: To remove a player from the room, either by a **kick** from the host or by the player choosing to **leave**. _Avoid_: remove (when you mean the room-level act)
 
 ## Play
