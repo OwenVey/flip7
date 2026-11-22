@@ -1184,11 +1184,13 @@ main {
   line-height: 1.45;
 }
 
-.hero-meta {
+/* Rules sits beside the wordmark so it doesn't cost the hero a row of its own. */
+.hero-title {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1rem;
+  gap: 1rem;
   align-items: center;
+  justify-content: space-between;
+  justify-self: stretch;
 }
 
 .hero-facts {

@@ -125,17 +125,17 @@ export default function Home() {
       <script type="application/ld+json" innerHTML={GAME_STRUCTURED_DATA} />
       <section class="hero">
         <div class="hero-copy">
-          <h1 class="wordmark">Hot Streak</h1>
+          <div class="hero-title">
+            <h1 class="wordmark">Hot Streak</h1>
+            <RulesDialog targetScore={TARGET_SCORE} />
+          </div>
           <p class="lede">
             Hit for another card or Stay to bank your points. Flip 7 unique
             Number cards for a 15-point bonus.
           </p>
-          <div class="hero-meta">
-            <ul class="hero-facts">
-              <For each={HERO_FACTS}>{(fact) => <li>{fact}</li>}</For>
-            </ul>
-            <RulesDialog targetScore={TARGET_SCORE} />
-          </div>
+          <ul class="hero-facts">
+            <For each={HERO_FACTS}>{(fact) => <li>{fact}</li>}</For>
+          </ul>
         </div>
         <ul class="hero-cards" aria-hidden="true">
           <For each={HERO_CARDS}>{(card) => <PlayingCard card={card} />}</For>
