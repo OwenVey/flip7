@@ -153,6 +153,7 @@ export default function JoinForm(props: {
                 readonly={props.joining === true}
                 maxlength={NAME_MAX_LENGTH}
                 autocomplete="nickname"
+                enterkeyhint="go"
                 placeholder="What should we call you?"
                 required
               />

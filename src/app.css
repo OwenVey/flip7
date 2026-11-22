@@ -1544,6 +1544,8 @@ main {
 .table {
   display: grid;
   gap: 0.75rem;
+  /* Quick taps between seats and cards would double-tap zoom the page; pinch zoom still works. */
+  touch-action: manipulation;
   /* Room between the action bar's turn ring and a seat's turn ring. */
   row-gap: 1.25rem;
 }
