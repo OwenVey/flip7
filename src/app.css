@@ -647,31 +647,38 @@ p {
     border-left-width: 1.5px;
   }
 
-  &[data-starting-style] {
+  &:is([data-starting-style], [data-ending-style]) {
     opacity: 0;
-    scale: 0.95;
   }
 
-  &[data-starting-style][data-side="top"] {
-    translate: 0 var(--tooltip-shift);
-  }
-
-  &[data-starting-style][data-side="bottom"] {
-    translate: 0 calc(var(--tooltip-shift) * -1);
-  }
-
-  &[data-starting-style][data-side="left"] {
-    translate: var(--tooltip-shift) 0;
-  }
-
-  &[data-starting-style][data-side="right"] {
-    translate: calc(var(--tooltip-shift) * -1) 0;
-  }
-
-  &[data-ending-style] {
-    opacity: 0;
-    scale: 0.95;
+  &:where([data-ending-style]) {
     transition-timing-function: ease-in;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    &:is([data-starting-style], [data-ending-style]) {
+      scale: 0.95;
+    }
+
+    &[data-starting-style][data-side="top"] {
+      translate: 0 var(--tooltip-shift);
+    }
+
+    &[data-starting-style][data-side="bottom"] {
+      translate: 0 calc(var(--tooltip-shift) * -1);
+    }
+
+    &[data-starting-style][data-side="left"] {
+      translate: var(--tooltip-shift) 0;
+    }
+
+    &[data-starting-style][data-side="right"] {
+      translate: calc(var(--tooltip-shift) * -1) 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: opacity 120ms linear;
   }
 
   &[data-instant] {
@@ -681,13 +688,6 @@ p {
   /* Repeats a button's own label, so it only shows once the label is hidden. */
   &[data-compact-only] {
     visibility: hidden;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    &:is([data-starting-style], [data-ending-style]) {
-      scale: none;
-      translate: none;
-    }
   }
 }
 
@@ -714,7 +714,6 @@ p {
 
   &:is([data-starting-style], [data-ending-style]) {
     opacity: 0;
-    scale: 0.94;
   }
 
   &:where([data-ending-style]) {
@@ -722,29 +721,30 @@ p {
     transition-timing-function: ease-in;
   }
 
-  &[data-side="bottom"]:is([data-starting-style], [data-ending-style]) {
-    translate: 0 calc(var(--dropdown-shift) * -1);
-  }
+  @media (prefers-reduced-motion: no-preference) {
+    &:is([data-starting-style], [data-ending-style]) {
+      scale: 0.94;
+    }
 
-  &[data-side="top"]:is([data-starting-style], [data-ending-style]) {
-    translate: 0 var(--dropdown-shift);
-  }
+    &[data-side="bottom"]:is([data-starting-style], [data-ending-style]) {
+      translate: 0 calc(var(--dropdown-shift) * -1);
+    }
 
-  &[data-side="left"]:is([data-starting-style], [data-ending-style]) {
-    translate: var(--dropdown-shift) 0;
-  }
+    &[data-side="top"]:is([data-starting-style], [data-ending-style]) {
+      translate: 0 var(--dropdown-shift);
+    }
 
-  &[data-side="right"]:is([data-starting-style], [data-ending-style]) {
-    translate: calc(var(--dropdown-shift) * -1) 0;
+    &[data-side="left"]:is([data-starting-style], [data-ending-style]) {
+      translate: var(--dropdown-shift) 0;
+    }
+
+    &[data-side="right"]:is([data-starting-style], [data-ending-style]) {
+      translate: calc(var(--dropdown-shift) * -1) 0;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     transition: opacity 120ms linear;
-
-    &:is([data-starting-style], [data-ending-style]) {
-      scale: none;
-      translate: none;
-    }
   }
 }
 
@@ -1941,18 +1941,27 @@ main {
   }
 }
 
-/*
- * Choosing a target for an action card: a pickable seat looks as usual until
- * the pointer is on it, then it lifts with the turn ring in the card's color
- * while the others step back.
- */
+.seats:has(.seat-pick:focus-visible:not(:disabled)) {
+  --pick-inactive-opacity: 0.7;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .seats:has(.seat-pick:hover:not(:disabled)) {
+    --pick-inactive-opacity: 0.7;
+  }
+}
+
 .seat[data-pickable] {
   --pick-color: var(--accent);
   cursor: pointer;
+  opacity: var(--pick-inactive-opacity, 1);
   transition:
-    transform 140ms ease,
     opacity 140ms ease,
     box-shadow 160ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: opacity 120ms linear;
+  }
 
   &[data-pickable="freeze"] {
     --pick-color: var(--freeze);
@@ -1966,13 +1975,36 @@ main {
     --pick-color: var(--second-chance);
   }
 
-  &:has(.seat-pick:is(:hover, :focus-visible):not(:disabled)) {
-    --ring-color: var(--pick-color);
+  &:has(.seat-pick:focus-visible:not(:disabled)) {
     z-index: 1;
-    transform: translateY(-6px);
-    box-shadow:
-      var(--shadow-ring),
-      0 1.25rem 2rem rgb(4 20 14 / 0.5);
+    outline: 3px solid var(--pick-color);
+    outline-offset: 3px;
+    opacity: 1;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:has(.seat-pick:hover:not(:disabled)) {
+      opacity: 1;
+
+      &:not(:has(.seat-pick:focus-visible)) {
+        --ring-color: var(--pick-color);
+        z-index: 1;
+        box-shadow:
+          var(--shadow-ring),
+          0 1.25rem 2rem rgb(4 20 14 / 0.5);
+
+        @media (prefers-reduced-motion: no-preference) {
+          transform: translateY(-6px);
+        }
+      }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      transition:
+        transform 140ms ease,
+        opacity 140ms ease,
+        box-shadow 160ms ease;
+    }
   }
 
   &:has(.seat-pick:disabled) {
@@ -1983,17 +2015,6 @@ main {
   & [data-slot="alert-dialog-trigger"] {
     position: relative;
     z-index: 2;
-  }
-}
-
-.seats:has(.seat-pick:is(:hover, :focus-visible):not(:disabled))
-  .seat[data-pickable]:not(:has(.seat-pick:is(:hover, :focus-visible))) {
-  opacity: 0.7;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .seat[data-pickable]:has(.seat-pick:is(:hover, :focus-visible)) {
-    transform: none;
   }
 }
 
@@ -3347,9 +3368,9 @@ main {
     animation: pick-pulse 1600ms ease-in-out infinite;
   }
 
-  /* The hovered or focused seat drops out and takes the full ring instead. */
-  .seat[data-pickable]:has(.seat-pick:not(:disabled)):not(
-      :has(.seat-pick:is(:hover, :focus-visible))
+  /* A fine-pointer hover can override this shadow without restarting the pulse. */
+  .seat[data-pickable]:where(
+      :has(.seat-pick:not(:disabled)):not(:has(.seat-pick:focus-visible))
     ) {
     box-shadow:
       0 0 0 var(--ring-width)

@@ -1,6 +1,6 @@
 # 002 — Honor reduced motion during play
 
-- **Status** — TODO
+- **Status** — Implemented. Phone verification pending.
 - **Commit** — `e031a95`
 - **Severity** — HIGH
 - **Category** — Accessibility and interruption

@@ -32,6 +32,7 @@ import {
   createDealPlayback,
   initialDealPlayback,
 } from "../../lib/deal-playback";
+import { MOTION_PREFERENCE_QUERY } from "../../lib/motion";
 import { createRoomConnection } from "../../lib/room-connection";
 import { createRoomSounds } from "../../lib/room-sounds";
 import { nudge, revealSeat } from "../../lib/table-motion";
@@ -124,10 +125,18 @@ const Room = (props: { code: string }) => {
     }
   );
 
-  onSettled(() => () => {
-    disposed = true;
-    playback.dispose();
-    toast.dismiss();
+  onSettled(() => {
+    const motionPreference = globalThis.matchMedia?.(MOTION_PREFERENCE_QUERY);
+    motionPreference?.addEventListener("change", playback.syncMotion);
+    document.addEventListener("visibilitychange", playback.syncMotion);
+
+    return () => {
+      disposed = true;
+      motionPreference?.removeEventListener("change", playback.syncMotion);
+      document.removeEventListener("visibilitychange", playback.syncMotion);
+      playback.dispose();
+      toast.dismiss();
+    };
   });
 
   const connectionProblem = () => {

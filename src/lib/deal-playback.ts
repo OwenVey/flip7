@@ -265,11 +265,15 @@ export const createDealPlayback = (
     }
   };
 
-  const reset = () => {
+  const stopRun = () => {
     run?.abort();
     run = null;
     pause = null;
     queue.length = 0;
+  };
+
+  const reset = () => {
+    stopRun();
     latest = null;
     settled = null;
     frame = emptyFrame;
@@ -278,6 +282,15 @@ export const createDealPlayback = (
 
   return {
     dispose: reset,
+    syncMotion: () => {
+      if (!run || !latest || motion.allowed()) {
+        return;
+      }
+
+      stopRun();
+      settled = latest.room;
+      show({ ...emptyFrame, room: settled });
+    },
     update: (next: PlaybackInput | null) => {
       if (!next) {
         if (latest) {

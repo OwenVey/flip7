@@ -40,12 +40,13 @@ const gameAtFirstTurn = () => {
 
 const playback = (animate = true, playerId = "a") => {
   let shown = initialDealPlayback;
+  let motionEnabled = animate;
   const cues: RoomCue[] = [];
   const readinessAtTurnCue: boolean[] = [];
   const flights: { cardId: number; duration: number }[] = [];
 
   const motion: DealMotion = {
-    allowed: () => animate,
+    allowed: () => motionEnabled,
     captureFlight: (step, duration) => async (signal) => {
       flights.push({ cardId: step.card.id, duration });
       const { promise, resolve } = Promise.withResolvers<undefined>();
@@ -84,6 +85,10 @@ const playback = (animate = true, playerId = "a") => {
     cues,
     flights,
     readinessAtTurnCue,
+    setMotion: (enabled: boolean) => {
+      motionEnabled = enabled;
+      instance.syncMotion();
+    },
     show: (room: RoomView, canAct = true) => {
       instance.update({ canAct, playerId, room });
     },
@@ -225,6 +230,78 @@ describe(createDealPlayback, () => {
       room: finalRoom,
     });
     expect(table.cues).not.toContain("turn");
+  });
+
+  it("catches up to a queued choice when motion is disabled mid-flight", async () => {
+    const game = gameAtFirstTurn();
+    const table = playback(true, "b");
+    table.show(view(game));
+    game.deck = [freeze, number];
+    hit(game, "a", random);
+    table.show(view(game));
+    hit(game, "b", random);
+    const latest = view(game);
+    table.show(latest);
+    expect(table.shown.incomingCardId).toBe(number.id);
+
+    table.setMotion(false);
+    expect(table.shown).toStrictEqual({
+      actionsDisabled: false,
+      dealing: false,
+      incomingCardId: null,
+      myMove: true,
+      room: latest,
+      step: null,
+    });
+    expect([table.cues, table.readinessAtTurnCue]).toStrictEqual([
+      ["turn"],
+      [true],
+    ]);
+
+    const caughtUp = table.shown;
+    await vi.runAllTimersAsync();
+    expect(table.shown).toBe(caughtUp);
+    expect({ flights: table.flights, cues: table.cues }).toStrictEqual({
+      flights: [{ cardId: number.id, duration: 280 }],
+      cues: ["turn"],
+    });
+  });
+
+  it("resumes playback for a new update without reviving the canceled run", async () => {
+    const game = gameAtFirstTurn();
+    const table = playback(true, "b");
+    table.show(view(game));
+    game.deck = [freeze, number];
+    hit(game, "a", random);
+    const afterHit = view(game);
+    table.show(afterHit, false);
+    table.setMotion(false);
+    expect({ frame: table.shown, cues: table.cues }).toMatchObject({
+      frame: { actionsDisabled: true, dealing: false, room: afterHit },
+      cues: [],
+    });
+
+    table.show(afterHit);
+    expect(table.cues).toStrictEqual(["turn"]);
+    table.setMotion(true);
+    hit(game, "b", random);
+    const choice = view(game);
+    table.show(choice);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(table.shown).toMatchObject({
+      actionsDisabled: true,
+      dealing: true,
+      incomingCardId: freeze.id,
+    });
+
+    await vi.runAllTimersAsync();
+    expect(table.shown).toMatchObject({
+      actionsDisabled: false,
+      dealing: false,
+      room: choice,
+    });
+    expect(table.cues).toStrictEqual(["turn", "reveal", "turn"]);
   });
 
   it("cues a fresh choice once across retries, rejoin and target changes", () => {
