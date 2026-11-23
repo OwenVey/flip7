@@ -268,6 +268,14 @@ const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
   };
 };
 
+type EventDetails = ReturnType<typeof eventDetails>;
+
+const sameDetails = (a: EventDetails, b: EventDetails) =>
+  a.announcement === b.announcement &&
+  a.detail === b.detail &&
+  a.icon === b.icon &&
+  a.outcome === b.outcome;
+
 const timeLabel = (at: Date, now: number) => {
   const elapsed = Math.max(0, now - at.getTime());
 
@@ -360,8 +368,9 @@ const GameEvent = (props: {
   previous: LogEntry | undefined;
   now: () => number;
 }) => {
-  const copy = createMemo(() =>
-    eventDetails(props.entry, props.hasRoundHeading)
+  const copy = createMemo(
+    () => eventDetails(props.entry, props.hasRoundHeading),
+    { equals: sameDetails }
   );
 
   const Icon = dynamic(() => copy().icon);
