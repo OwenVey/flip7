@@ -164,4 +164,71 @@ describe("<Lobby />", () => {
       screen.getByRole("button", { name: /Open seat.*invite/iu })
     ).toBeInTheDocument();
   });
+
+  it("sends the host's settings changes and shows the room's saved values", () => {
+    const send = vi.fn<RoomConnection["send"]>();
+    render(() => <Lobby room={roomWithBot()} playerId="p0" send={send} />);
+
+    expect(screen.getByRole("radio", { name: "200" })).toBeChecked();
+    fireEvent.click(screen.getByRole("radio", { name: "300" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Fast" }));
+    fireEvent.click(screen.getByRole("switch", { name: /Lock room/u }));
+
+    expect(send.mock.calls).toStrictEqual([
+      [{ targetScore: 300, type: "configure" }],
+      [{ botSpeed: "fast", type: "configure" }],
+      [{ locked: true, type: "configure" }],
+    ]);
+    expect(screen.getByRole("radio", { name: "200" })).toBeChecked();
+  });
+
+  it("shows guests the settings and a locked seat instead of the invite", () => {
+    render(() => (
+      <Lobby
+        room={{
+          ...roomWithBot(),
+          botSpeed: "fast",
+          locked: true,
+          targetScore: 100,
+        }}
+        playerId="p1"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(
+      screen.getByText("First to 100 · Fast bots · Room locked")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Room locked")).toBeInTheDocument();
+    expect(screen.queryByText("Open seat")).toBeNull();
+  });
+
+  it("offers bot speed only once a bot is seated", () => {
+    render(() => (
+      <Lobby
+        room={roomOf(2)}
+        playerId="p0"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+
+    expect(screen.queryByRole("radiogroup", { name: "Bot speed" })).toBeNull();
+    expect(
+      screen.getByRole("radiogroup", { name: "Winning score" })
+    ).toBeInTheDocument();
+  });
+
+  it("shows the host a disabled Start game that says what it's waiting for", () => {
+    const send = vi.fn<RoomConnection["send"]>();
+    render(() => <Lobby room={roomOf(1)} playerId="p0" send={send} />);
+
+    const start = screen.getByRole("button", { name: "Start game" });
+    expect(start).toHaveAttribute("aria-disabled", "true");
+    expect(start).toHaveAccessibleDescription(
+      "Add a bot or invite 1 more player."
+    );
+    fireEvent.click(start);
+    expect(send).not.toHaveBeenCalled();
+  });
 });

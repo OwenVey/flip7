@@ -1,4 +1,4 @@
-import UserMinus from "@lucide/solid/icons/user-minus";
+import X from "@lucide/solid/icons/x";
 import {
   AlertDialog,
   AlertDialogBackdrop,
@@ -16,7 +16,7 @@ import Tooltip from "./tooltip";
 
 const RemoveLabel = (props: { name: string }) => (
   <>
-    <UserMinus size={14} aria-hidden="true" />
+    <X size={14} aria-hidden="true" />
     <span class="button-label">Remove</span>
     <span class="sr-only"> {props.name}</span>
   </>

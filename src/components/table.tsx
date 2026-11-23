@@ -47,6 +47,7 @@ import OfflineBadge from "./offline-badge";
 import PlayerAvatar from "./player-avatar";
 import PlayingCard from "./playing-card";
 import RemovePlayer from "./remove-player";
+import { RoomSettingsMenu } from "./room-settings";
 import ScrollFade from "./scroll-fade";
 import TableSheet from "./table-sheet";
 import Tooltip from "./tooltip";
@@ -1419,7 +1420,15 @@ export default function Table(
                 onChat={props.chat}
               />
             </TableSheet>
-            <InviteButton />
+            <InviteButton brief />
+            <Show when={moves().host.configure}>
+              <RoomSettingsMenu
+                room={props.room}
+                onChange={(changes) => {
+                  void props.send({ ...changes, type: "configure" });
+                }}
+              />
+            </Show>
             <LeaveRoom
               disabled={props.actionsDisabled}
               onLeave={() => {

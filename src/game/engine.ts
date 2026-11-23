@@ -21,8 +21,11 @@ import {
 import type { ActionCard, Card, NumberCard, Random, RoundScore } from "./cards";
 import { MAX_PLAYERS, MIN_PLAYERS, rejectMove, waitingOn } from "./moves";
 import type { Move } from "./moves";
+import { DEFAULT_SETTINGS, settingsOf } from "./settings";
+import type { RoomSettings } from "./settings";
 
-export const TARGET_SCORE = 200;
+/** The winning score a room starts with. */
+export const TARGET_SCORE = DEFAULT_SETTINGS.targetScore;
 
 export { MAX_PLAYERS } from "./moves";
 
@@ -136,6 +139,8 @@ export interface GameState extends ActionCardState {
    * and every player who hasn't busted scores what they hold.
    */
   outOfCards?: boolean;
+  /** How the host set up the room. Missing on rooms saved before settings. */
+  settings?: RoomSettings;
 }
 
 export class GameError extends Error {
@@ -476,8 +481,9 @@ const finishRound = (state: GameState) => {
   const best = Math.max(...state.players.map((player) => player.score));
   const leaders = state.players.filter((player) => player.score === best);
   const [winner] = leaders;
+  const { targetScore } = settingsOf(state);
 
-  if (best >= TARGET_SCORE && leaders.length === 1 && winner !== undefined) {
+  if (best >= targetScore && leaders.length === 1 && winner !== undefined) {
     state.phase = "gameOver";
     state.winnerIds = [winner.id];
     say(state, `${winner.name} wins with ${best} points!`);
@@ -488,7 +494,7 @@ const finishRound = (state: GameState) => {
   state.phase = "roundOver";
   say(
     state,
-    best >= TARGET_SCORE
+    best >= targetScore
       ? `Round ${state.round} is over. Tied at ${best}, so play continues.`
       : `Round ${state.round} is over.`
   );
@@ -622,6 +628,10 @@ export const addPlayer = (
     throw new GameError(`This room is full (${MAX_PLAYERS} players).`);
   }
 
+  if (settingsOf(state).locked && state.players.length > 0) {
+    throw new GameError("This room is locked. Ask the host to unlock it.");
+  }
+
   const taken = state.players.some(
     (player) => player.name.toLowerCase() === name.toLowerCase()
   );
@@ -718,6 +728,51 @@ export const addBot = (
   say(state, `The host added ${name}, a bot.`, "join");
 
   return name;
+};
+
+const announceSettings = (
+  state: GameState,
+  before: RoomSettings,
+  after: RoomSettings
+) => {
+  if (after.targetScore !== before.targetScore) {
+    say(state, `The host set the winning score to ${after.targetScore}.`);
+  }
+
+  if (after.botSpeed !== before.botSpeed) {
+    say(
+      state,
+      after.botSpeed === "fast"
+        ? "The host sped up the bots."
+        : "The host set the bots back to normal speed."
+    );
+  }
+
+  if (after.locked !== before.locked) {
+    say(
+      state,
+      after.locked
+        ? "The host locked the room. New players can't join."
+        : "The host unlocked the room."
+    );
+  }
+};
+
+/** The host changes how the room is set up. */
+export const configure = (
+  state: GameState,
+  hostId: string,
+  changes: Partial<RoomSettings>
+) => {
+  assertMove(state, hostId, {
+    targetScore: changes.targetScore,
+    type: "configure",
+  });
+
+  const before = settingsOf(state);
+  const after: RoomSettings = { ...before, ...changes };
+  state.settings = after;
+  announceSettings(state, before, after);
 };
 
 /** Whether anyone in the room is a person rather than a bot. */
@@ -1019,7 +1074,11 @@ export const playForBot = (state: GameState, random: Random) => {
   }
 
   const move = decideBotMove(
-    { choice: state.choice, players: state.players, targetScore: TARGET_SCORE },
+    {
+      choice: state.choice,
+      players: state.players,
+      targetScore: settingsOf(state).targetScore,
+    },
     player.id
   );
 

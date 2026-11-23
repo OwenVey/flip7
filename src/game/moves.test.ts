@@ -146,16 +146,20 @@ describe(availableMoves, () => {
     expect(availableMoves(lobby(["a"]), "a").host.start).toBeFalsy();
     expect(availableMoves(lobby(["a", "b"]), "a").host).toStrictEqual({
       addBot: true,
+      configure: true,
       kick: ["b"],
       lobby: false,
       nextRound: false,
+      setTargetScore: true,
       start: true,
     });
     expect(availableMoves(lobby(["a", "b"]), "b").host).toStrictEqual({
       addBot: false,
+      configure: false,
       kick: [],
       lobby: false,
       nextRound: false,
+      setTargetScore: false,
       start: false,
     });
   });
@@ -182,6 +186,26 @@ describe(rejectMove, () => {
 });
 
 describe("bots", () => {
+  it("lets only the host change settings, and the winning score only in the lobby", () => {
+    const state = lobby(["a", "b"]);
+    expect(
+      rejectMove(state, "a", { targetScore: 100, type: "configure" })
+    ).toBeNull();
+    expect(rejectMove(state, "b", { type: "configure" })).toBe(
+      "Only the host can do that."
+    );
+
+    const playing = round(["a", "b"], [num(5), num(3)]);
+    expect(rejectMove(playing, "a", { type: "configure" })).toBeNull();
+    expect(
+      rejectMove(playing, "a", { targetScore: 100, type: "configure" })
+    ).toBe("You can only change the winning score in the lobby.");
+    expect(availableMoves(playing, "a").host).toMatchObject({
+      configure: true,
+      setTargetScore: false,
+    });
+  });
+
   it("lets only the host add bots, and only in the lobby", () => {
     const state = lobby(["a", "b"]);
 
@@ -237,6 +261,8 @@ const candidateMoves = (state: MovesView) => {
     { type: "nextRound" },
     { type: "lobby" },
     { type: "addBot" },
+    { type: "configure" },
+    { targetScore: 100, type: "configure" },
     ...ids.map((playerId) => ({ playerId, type: "kick" }) satisfies Move),
   ];
 
@@ -285,6 +311,12 @@ const offers = (state: MovesView, viewerId: string, move: Move) => {
     case "lobby":
     case "addBot": {
       return moves.host[move.type];
+    }
+
+    case "configure": {
+      return move.targetScore === undefined
+        ? moves.host.configure
+        : moves.host.setTargetScore;
     }
 
     default: {

@@ -540,3 +540,121 @@ describe("bots", () => {
     expect(player(h, h.stored.game.hostId ?? "").name).toBe("Ben");
   });
 });
+
+describe("room settings", () => {
+  it("lets the host change settings, and tells the table", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+
+    const outcome = h.room.command("ana-tab", {
+      botSpeed: "fast",
+      requestId: "00000000-0000-4000-8000-000000000001",
+      targetScore: 100,
+      type: "configure",
+    });
+
+    expect(replies(outcome)).toContainEqual({
+      requestId: "00000000-0000-4000-8000-000000000001",
+      type: "accepted",
+    });
+    expect(h.room.state().room).toMatchObject({
+      botSpeed: "fast",
+      locked: false,
+      targetScore: 100,
+    });
+    expect(h.stored.game.log.map((entry) => entry.text)).toContain(
+      "The host set the winning score to 100."
+    );
+  });
+
+  it("rejects a guest changing settings", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+
+    const outcome = h.room.command("ben-tab", {
+      requestId: "00000000-0000-4000-8000-000000000001",
+      targetScore: 300,
+      type: "configure",
+    });
+
+    expect(replies(outcome)).toContainEqual({
+      message: "Only the host can do that.",
+      requestId: "00000000-0000-4000-8000-000000000001",
+      type: "rejected",
+    });
+    expect(h.room.state().room.targetScore).toBe(200);
+  });
+
+  it("turns new players away from a locked room but lets seated players rejoin", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    const ben = joinAs(h, "ben-tab", "Ben");
+    h.room.command("ana-tab", { locked: true, type: "configure" });
+
+    h.connect("cara-tab");
+    expect(replies(h.room.join("cara-tab", "Cara", null))).toStrictEqual([
+      {
+        message: "This room is locked. Ask the host to unlock it.",
+        type: "error",
+      },
+    ]);
+
+    h.drop("ben-tab");
+    h.connect("ben-phone");
+    expect(welcomeOf(h.room.join("ben-phone", "", ben.token)).playerId).toBe(
+      ben.playerId
+    );
+
+    h.room.command("ana-tab", { locked: false, type: "configure" });
+    expect(welcomeOf(h.room.join("cara-tab", "Cara", null))).toBeTruthy();
+  });
+
+  it("lets the host lock the room and speed up bots mid-game, but not change the winning score", () => {
+    const { h } = roundWhereHostMovesFirst();
+
+    h.room.command("ana-tab", {
+      botSpeed: "fast",
+      locked: true,
+      type: "configure",
+    });
+    expect(h.room.state().room).toMatchObject({
+      botSpeed: "fast",
+      locked: true,
+    });
+
+    const outcome = h.room.command("ana-tab", {
+      requestId: "00000000-0000-4000-8000-000000000002",
+      targetScore: 100,
+      type: "configure",
+    });
+
+    expect(replies(outcome)).toContainEqual({
+      message: "You can only change the winning score in the lobby.",
+      requestId: "00000000-0000-4000-8000-000000000002",
+      type: "rejected",
+    });
+    expect(h.room.state().room.targetScore).toBe(200);
+
+    h.connect("cara-tab");
+    expect(replies(h.room.join("cara-tab", "Cara", null))).toStrictEqual([
+      {
+        message: "This room is locked. Ask the host to unlock it.",
+        type: "error",
+      },
+    ]);
+  });
+
+  it("reads settings as defaults on rooms saved before settings", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    delete h.stored.game.settings;
+
+    expect(h.room.state().room).toMatchObject({
+      botSpeed: "normal",
+      locked: false,
+      targetScore: 200,
+    });
+  });
+});

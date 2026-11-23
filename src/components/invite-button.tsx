@@ -2,12 +2,16 @@ import Check from "@lucide/solid/icons/check";
 import Link2 from "@lucide/solid/icons/link-2";
 import Share2 from "@lucide/solid/icons/share-2";
 import { Button } from "@ui-sdk/solid/button";
-import { Match, Switch } from "solid-js";
+import { Match, Show, Switch } from "solid-js";
 
 import { createInvite } from "../lib/invite";
 import Tooltip from "./tooltip";
 
-export default function InviteButton(props: { solid?: boolean }) {
+/** `brief` shows just "Invite" for crowded headers; the tooltip and accessible name keep the full label. */
+export default function InviteButton(props: {
+  solid?: boolean;
+  brief?: boolean;
+}) {
   const { copied, invite, shares } = createInvite();
 
   const label = () => {
@@ -47,12 +51,21 @@ export default function InviteButton(props: { solid?: boolean }) {
           <Share2 size={16} />
         </Match>
       </Switch>
-      <span class="button-label">
-        <span class="label-long">{label()}</span>
-        <span class="label-short" aria-hidden="true">
-          {shortLabel()}
+      <Show
+        when={props.brief === true}
+        fallback={
+          <span class="button-label">
+            <span class="label-long">{label()}</span>
+            <span class="label-short" aria-hidden="true">
+              {shortLabel()}
+            </span>
+          </span>
+        }
+      >
+        <span class="button-label" aria-hidden="true">
+          {copied() ? "Copied" : "Invite"}
         </span>
-      </span>
+      </Show>
     </Tooltip>
   );
 }

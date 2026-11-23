@@ -7,6 +7,7 @@ import {
   backToLobby,
   chat,
   choose,
+  configure,
   createGame,
   findPlayer,
   GameError,
@@ -331,6 +332,17 @@ export const createRoom = (
 
       case "addBot": {
         addBot(game, playerId, deps.newId(), random);
+
+        return none;
+      }
+
+      case "configure": {
+        const { botSpeed, locked, targetScore } = command;
+        configure(game, playerId, {
+          ...(botSpeed !== undefined && { botSpeed }),
+          ...(locked !== undefined && { locked }),
+          ...(targetScore !== undefined && { targetScore }),
+        });
 
         return none;
       }

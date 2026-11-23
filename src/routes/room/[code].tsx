@@ -265,7 +265,9 @@ const Room = (props: { code: string }) => {
                   room={view().room}
                   playerId={view().playerId}
                   send={connection.send}
-                  actionsDisabled={table().actionsDisabled}
+                  actionsDisabled={
+                    !connection.online() || connection.status() !== "open"
+                  }
                 />
               </Show>
             )}

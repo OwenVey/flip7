@@ -45,6 +45,7 @@ export default function LeaveRoom(props: {
         trigger={(hint) => (
           <AlertDialogTrigger
             {...hint}
+            aria-label="Leave room"
             data-variant="quiet"
             data-tone="danger"
             aria-disabled={props.disabled === true ? "true" : undefined}
@@ -57,7 +58,7 @@ export default function LeaveRoom(props: {
         )}
       >
         <LogOut size={16} aria-hidden="true" />
-        <span class="button-label">Leave room</span>
+        <span class="button-label">Leave</span>
       </Tooltip>
       <AlertDialogBackdrop />
       <AlertDialogContent>

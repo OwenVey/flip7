@@ -3,6 +3,7 @@ import { findPlayer, playForAbsent, playForBot, transferHost } from "./engine";
 import type { GameState } from "./engine";
 import { waitingOn } from "./moves";
 import { HEARTBEAT_STALE_MS } from "./protocol";
+import { settingsOf } from "./settings";
 
 export const HOST_GRACE_MS = 20_000;
 export const ABSENT_GRACE_MS = 30_000;
@@ -10,6 +11,9 @@ export const IDLE_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 /** How long a bot waits before its move. */
 export const BOT_DELAY_MS = 500;
+
+/** How long a bot waits when the host has sped bots up. */
+export const FAST_BOT_DELAY_MS = 200;
 
 export interface Stall {
   playerId: string;
@@ -57,7 +61,10 @@ const syncBotTurn = (
   if (bot?.bot !== true || !humanOnline(game)) {
     room.botTurn = null;
   } else if (room.botTurn?.playerId !== bot.id) {
-    room.botTurn = { at: now + BOT_DELAY_MS, playerId: bot.id };
+    const delay =
+      settingsOf(game).botSpeed === "fast" ? FAST_BOT_DELAY_MS : BOT_DELAY_MS;
+
+    room.botTurn = { at: now + delay, playerId: bot.id };
   }
 };
 
