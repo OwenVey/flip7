@@ -1,6 +1,6 @@
 import { makeObjectStorage, makePersisted } from "@solid-primitives/storage";
 import { PartySocket } from "partysocket";
-import { createSignal, onSettled, untrack } from "solid-js";
+import { createMemo, createSignal, onSettled, untrack } from "solid-js";
 
 import { parseSavedAvatar } from "../game/avatars";
 import {
@@ -205,7 +205,7 @@ export const createRoomConnection = (code: string) => {
   });
 
   return {
-    canAct: () => state().canAct,
+    canAct: createMemo(() => state().canAct),
     chat: client.chat,
     clearJoinError: client.clearJoinError,
     join: (name: string, avatar: number) => {
@@ -215,16 +215,16 @@ export const createRoomConnection = (code: string) => {
     },
     joinError: () => state().joinError,
     joining: () => state().joining,
-    needsName: () => state().needsName,
+    needsName: createMemo(() => state().needsName),
     notice: () => state().notice,
-    online: () => state().online,
-    playerId: () => state().playerId,
-    room: () => state().room,
+    online: createMemo(() => state().online),
+    playerId: createMemo(() => state().playerId),
+    room: createMemo(() => state().room),
     retry: client.retry,
     savedAvatar,
     savedName,
     send: client.send,
-    status: () => state().status,
+    status: createMemo(() => state().status),
   };
 };
 

@@ -175,6 +175,9 @@ const sameHeldCards = (a: HeldCard[], b: HeldCard[]) =>
 const sameCards = <T extends { id: number }>(a: T[], b: T[]) =>
   a.length === b.length && a.every((card, index) => card.id === b[index]?.id);
 
+const samePlayerIds = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((id, index) => id === b[index]);
+
 const FLIP_EXIT_MS = 220;
 
 interface ShownFlip {
@@ -217,52 +220,56 @@ const FlipTracker = (props: {
   progress: FlipProgress;
   leaving: boolean;
   card: Card | null;
-}) => (
-  <div
-    class="flip-run"
-    data-waiting={props.progress.waiting ? "" : undefined}
-    data-leaving={props.leaving ? "" : undefined}
-    style={{ "--flip-exit": `${FLIP_EXIT_MS}ms` }}
-  >
-    <PlayingCardsFan size={12} aria-hidden="true" />
-    <span class="flip-run-label">Flip Three</span>
-    <span class="flip-pips" aria-hidden="true">
-      <Repeat count={props.progress.total}>
-        {(index) => (
-          <span
-            class="flip-pip"
-            data-filled={index < props.progress.flipped ? "" : undefined}
-            data-current={
-              !props.progress.waiting && index === props.progress.flipped - 1
-                ? ""
-                : undefined
-            }
-          />
+}) => {
+  const pipCount = createMemo(() => props.progress.total);
+
+  return (
+    <div
+      class="flip-run"
+      data-waiting={props.progress.waiting ? "" : undefined}
+      data-leaving={props.leaving ? "" : undefined}
+      style={{ "--flip-exit": `${FLIP_EXIT_MS}ms` }}
+    >
+      <PlayingCardsFan size={12} aria-hidden="true" />
+      <span class="flip-run-label">Flip Three</span>
+      <span class="flip-pips" aria-hidden="true">
+        <Repeat count={pipCount()}>
+          {(index) => (
+            <span
+              class="flip-pip"
+              data-filled={index < props.progress.flipped ? "" : undefined}
+              data-current={
+                !props.progress.waiting && index === props.progress.flipped - 1
+                  ? ""
+                  : undefined
+              }
+            />
+          )}
+        </Repeat>
+      </span>
+      <span class="sr-only">
+        {`, ${props.progress.flipped} of ${props.progress.total} flipped`}
+      </span>
+      <Show when={props.card}>
+        {(card) => (
+          <ul class="flip-run-card" aria-hidden="true">
+            <PlayingCard card={card()} size="mini" />
+          </ul>
         )}
-      </Repeat>
-    </span>
-    <span class="sr-only">
-      {`, ${props.progress.flipped} of ${props.progress.total} flipped`}
-    </span>
-    <Show when={props.card}>
-      {(card) => (
-        <ul class="flip-run-card" aria-hidden="true">
-          <PlayingCard card={card()} size="mini" />
-        </ul>
-      )}
-    </Show>
-  </div>
-);
+      </Show>
+    </div>
+  );
+};
 
 const nameOf = (room: RoomView, id: string | null) =>
   room.players.find((player) => player.id === id)?.name ?? "Someone";
 
-const choiceVerb = (choice: ActionCardChoice) => {
-  if (choice.card.kind === "freeze") {
+const choiceVerb = (kind: ActionCardChoice["card"]["kind"]) => {
+  if (kind === "freeze") {
     return "Freeze";
   }
 
-  if (choice.card.kind === "flipThree") {
+  if (kind === "flipThree") {
     return "Play Flip Three on";
   }
 
@@ -272,7 +279,7 @@ const choiceVerb = (choice: ActionCardChoice) => {
 const pickLabel = (
   room: RoomView,
   playerId: string,
-  choice: ActionCardChoice,
+  kind: ActionCardChoice["card"]["kind"],
   targetId: string,
   forId: string | undefined
 ) => {
@@ -284,7 +291,7 @@ const pickLabel = (
     target = "themselves";
   }
 
-  const label = `${choiceVerb(choice)} ${target}`;
+  const label = `${choiceVerb(kind)} ${target}`;
 
   return forId === undefined ? label : `${label} for ${nameOf(room, forId)}`;
 };
@@ -352,7 +359,13 @@ const RoundPlayer = (
   const isMe = () => props.player.id === props.playerId;
   const isHost = () => props.room.hostId === props.player.id;
 
-  const hasDecision = () => props.moves.waitingOn?.playerId === props.player.id;
+  const hasDecision = createMemo(
+    () => props.moves.waitingOn?.playerId === props.player.id
+  );
+
+  const canKick = createMemo(() =>
+    props.moves.host.kick.includes(props.player.id)
+  );
 
   const isFrozen = () => props.player.status === "frozen";
 
@@ -360,18 +373,17 @@ const RoundPlayer = (
     props.room.phase === "gameOver" &&
     props.room.winnerIds.includes(props.player.id);
 
-  const pickChoice = () =>
+  const pickKind = createMemo(() =>
     props.moves.choice?.targets.includes(props.player.id) === true
-      ? props.room.choice
-      : null;
-
-  const roundPoints = createMemo(() =>
-    props.room.phase === "playing" ? props.roundPoints : 0
+      ? props.room.choice?.card.kind
+      : undefined
   );
 
-  const baseScore = () => props.player.score;
+  const playing = createMemo(() => props.room.phase === "playing");
+  const stampedPoints = createMemo(() => props.roundPoints);
+  const roundPoints = createMemo(() => (playing() ? stampedPoints() : 0));
 
-  const stampedPoints = () => props.roundPoints;
+  const baseScore = () => props.player.score;
 
   const projectedScore = () => baseScore() + roundPoints();
 
@@ -445,12 +457,12 @@ const RoundPlayer = (
       data-me={isMe() ? "" : undefined}
       data-winner={isWinner() ? "" : undefined}
       data-offline={props.player.connected ? undefined : ""}
-      data-pickable={pickChoice()?.card.kind}
-      data-unpickable={props.moves.choice && !pickChoice() ? "" : undefined}
+      data-pickable={pickKind()}
+      data-unpickable={props.moves.choice && !pickKind() ? "" : undefined}
       aria-label={`${props.player.name}, ${props.player.score} points`}
     >
-      <Show when={pickChoice()}>
-        {(choice) => (
+      <Show when={pickKind()}>
+        {(kind) => (
           <button
             type="button"
             class="seat-pick"
@@ -458,7 +470,7 @@ const RoundPlayer = (
             aria-label={pickLabel(
               props.room,
               props.playerId,
-              choice(),
+              kind(),
               props.player.id,
               props.moves.choice?.forId
             )}
@@ -552,7 +564,7 @@ const RoundPlayer = (
             {(card) => <PlayingCard card={card()} size="mini" />}
           </For>
         </ul>
-        <Show when={props.moves.host.kick.includes(props.player.id)}>
+        <Show when={canKick()}>
           <RemovePlayer
             bot={props.player.bot}
             disabled={props.offline}
@@ -620,7 +632,7 @@ const RoundPlayer = (
             <span class="meter-lost" />
           </Show>
         </MeterTrack>
-        <Show when={props.room.phase === "playing"}>
+        <Show when={playing()}>
           <span class="seat-score" data-projected="" aria-hidden="true">
             +{shownRoundPoints()}
           </span>
@@ -755,18 +767,16 @@ const Leaderboard = (
 ) => {
   const ranked = createMemo(() => rankPlayers(props.room.players));
 
+  const rankedIds = createMemo(() => ranked().map(({ player }) => player.id), {
+    equals: samePlayerIds,
+  });
+
   let body: HTMLTableSectionElement | undefined;
   let rowTops = new Map<string, number>();
 
-  createEffect(
-    () =>
-      ranked()
-        .map((entry) => entry.player.id)
-        .join(","),
-    () => {
-      rowTops = slideRows(body, rowTops);
-    }
-  );
+  createEffect(rankedIds, () => {
+    rowTops = slideRows(body, rowTops);
+  });
 
   return (
     <table class="leaderboard" aria-label={SCORES_TITLE}>
@@ -783,9 +793,10 @@ const Leaderboard = (
           body = element;
         }}
       >
-        <For each={ranked()} keyed={(entry) => entry.player.id}>
-          {(entry) => {
-            const won = () => props.room.winnerIds.includes(entry().player.id);
+        <For each={rankedIds()}>
+          {(id, index) => {
+            const entry = () => ranked()[index()];
+            const won = () => props.room.winnerIds.includes(id);
 
             const medal = () =>
               props.room.phase === "gameOver" &&
@@ -796,15 +807,15 @@ const Leaderboard = (
 
             return (
               <tr
-                data-key={entry().player.id}
-                data-me={entry().player.id === props.playerId ? "" : undefined}
+                data-key={id}
+                data-me={id === props.playerId ? "" : undefined}
                 data-medal={medal()}
                 data-winner={won() ? "" : undefined}
               >
                 <td>{entry().rank}</td>
                 <th scope="row">
                   {entry().player.name}
-                  <Show when={entry().player.id === props.playerId}>
+                  <Show when={id === props.playerId}>
                     {" "}
                     <span class="badge">You</span>
                   </Show>
@@ -812,7 +823,7 @@ const Leaderboard = (
                 <LeaderboardRound
                   player={entry().player}
                   phase={props.room.phase}
-                  points={pointsOf(props.roundPoints, entry().player.id)}
+                  points={pointsOf(props.roundPoints, id)}
                   index={entry().index}
                 />
                 <td
@@ -1319,6 +1330,11 @@ export default function Table(
     }
 ) {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
+
+  const playerIds = createMemo(() => props.room.players.map(({ id }) => id), {
+    equals: samePlayerIds,
+  });
+
   const settings = createPopoverController();
   const leave = createAlertDialogController();
 
@@ -1476,16 +1492,16 @@ export default function Table(
 
         <div class="table-body">
           <div class="seats">
-            <For each={props.room.players} keyed={(player) => player.id}>
-              {(player) => (
+            <For each={playerIds()}>
+              {(id, index) => (
                 <RoundPlayer
-                  player={player()}
+                  player={props.room.players[index()]}
                   room={props.room}
                   playerId={props.playerId}
                   send={props.send}
                   actionsDisabled={props.actionsDisabled}
                   offline={props.offline}
-                  roundPoints={pointsOf(props.roundPoints, player().id)}
+                  roundPoints={pointsOf(props.roundPoints, id)}
                   dealStep={props.dealStep}
                   moves={moves()}
                   onChoose={chooseTarget}

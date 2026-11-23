@@ -101,6 +101,7 @@ const Room = (props: { code: string }) => {
   );
 
   const toast = createToaster();
+  const hasRoom = createMemo(() => connection.room() !== null);
 
   createEffect(
     () =>
@@ -228,7 +229,7 @@ const Room = (props: { code: string }) => {
               You left, or the host removed you.
             </RoomNotice>
           </Match>
-          <Match when={connection.needsName() && connection.room() !== null}>
+          <Match when={connection.needsName() && hasRoom()}>
             <JoinForm
               room={connection.room()}
               savedName={connection.savedName()}

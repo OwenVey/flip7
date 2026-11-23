@@ -177,6 +177,58 @@ describe("<Table />", () => {
     ).toBeNull();
   });
 
+  it("keeps table lists and Flip Three pips stable across playback updates", async () => {
+    const [view, setView] = createSignal(
+      room({ flips: [{ remaining: 3, targetId: "b" }] })
+    );
+
+    render(() => (
+      <Table
+        room={view()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const { artifact } = await captureArtifact(
+      () => {
+        setView(
+          room({ deckCount: 79, flips: [{ remaining: 2, targetId: "b" }] })
+        );
+        flush();
+        setView(
+          room({ deckCount: 78, flips: [{ remaining: 1, targetId: "b" }] })
+        );
+        flush();
+      },
+      {
+        attribution: {
+          log: false,
+          unstableMemos: 1,
+        },
+        scenario: "table-flip-three-playback",
+      }
+    );
+
+    expect(
+      artifact.diagnostics.filter(
+        (event) =>
+          event.code === "UNSTABLE_MEMO_OUTPUT" &&
+          event.ownerPath?.includes("<Repeat>") === true
+      )
+    ).toStrictEqual([]);
+    expect(
+      artifact.attribution?.reruns.filter(
+        (run) =>
+          run.nodeName === "roundPoints" ||
+          (run.nodeName === "<For>" &&
+            run.causes.some((cause) => cause.name === "ranked"))
+      )
+    ).toStrictEqual([]);
+    expect(screen.getByText(", 2 of 3 flipped")).toBeInTheDocument();
+  });
+
   it("lets the host lock the room mid-game from the header, without the winning score", async () => {
     const send = vi.fn<RoomConnection["send"]>();
     render(() => (
