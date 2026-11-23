@@ -11,6 +11,8 @@ const gameWorker = defineWorker({
   },
   name: "flip7",
   observability: { enabled: true },
+  previewUrls: true,
+  workersDev: false,
 });
 
 export default defineConfig({
