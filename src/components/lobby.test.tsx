@@ -1,3 +1,4 @@
+import { captureArtifact, expectNoDiagnostics } from "@solidjs/diagnostics";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -73,6 +74,32 @@ describe("<Lobby />", () => {
     setRoom(roomOf(MAX_PLAYERS));
     flush();
     expect(screen.queryByText("Open seat")).toBeNull();
+  });
+
+  it("keeps the open seat list quiet while bots join", async () => {
+    const [room, setRoom] = createSignal<RoomView>(roomOf(2));
+
+    render(() => (
+      <Lobby
+        room={room()}
+        playerId="p0"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+    const seat = screen.getByText("Open seat");
+
+    const { artifact } = await captureArtifact(
+      () => {
+        for (let size = 3; size <= 8; size += 1) {
+          setRoom(roomOf(size));
+          flush();
+        }
+      },
+      { scenario: "lobby-bots-join" }
+    );
+
+    expectNoDiagnostics(artifact);
+    expect(screen.getByText("Open seat")).toBe(seat);
   });
 
   it("shows guests the player count without the Add bot button", () => {

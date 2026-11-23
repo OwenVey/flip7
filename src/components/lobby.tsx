@@ -73,7 +73,9 @@ export default function Lobby(props: {
 
   const missing = () => Math.max(0, MIN_PLAYERS - props.room.players.length);
 
-  const openSeats = () => (props.room.players.length < MAX_PLAYERS ? 1 : 0);
+  const openSeats = createMemo(() =>
+    props.room.players.length < MAX_PLAYERS ? 1 : 0
+  );
 
   const count = () => `${props.room.players.length} / ${MAX_PLAYERS}`;
 
