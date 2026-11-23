@@ -1130,6 +1130,9 @@ main {
 }
 
 .hero-copy {
+  /* Sit above the card fan's rays, which reach up behind the pills on phones. */
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 1rem;
   justify-items: center;
@@ -1244,9 +1247,11 @@ main {
     padding: 0.1875rem 0.625rem;
     border: 1px solid rgb(255 212 95 / 0.55);
     border-radius: 999px;
-    background: rgb(0 0 0 / 0.2);
+    background: rgb(0 0 0 / 0.35);
     color: var(--on-felt-soft);
     font-size: 0.8125rem;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     font-weight: 600;
   }
 }
