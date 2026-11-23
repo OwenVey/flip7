@@ -6,9 +6,31 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@ui-sdk/solid/dialog";
+import { For } from "solid-js";
+import type { ParentProps } from "solid-js";
 
+import { ADDITIVE_MODIFIER_KIND, FLIP_SEVEN_BONUS } from "../game/cards";
+import type { Card } from "../game/cards";
+import PlayingCard from "./playing-card";
 import ScrollFade from "./scroll-fade";
 import Tooltip from "./tooltip";
+
+const freeze: Card = { id: 0, kind: "freeze" };
+const flipThree: Card = { id: 1, kind: "flipThree" };
+const secondChance: Card = { id: 2, kind: "secondChance" };
+const double: Card = { id: 3, kind: "double" };
+const plusFour: Card = { id: 4, kind: ADDITIVE_MODIFIER_KIND, value: 4 };
+
+const CardRule = (props: ParentProps<{ cards?: Card[] }>) => (
+  <li class="rules-card-rule">
+    <ul class="rules-cards" aria-hidden="true">
+      <For each={props.cards ?? []}>
+        {(card) => <PlayingCard card={card} />}
+      </For>
+    </ul>
+    <p>{props.children}</p>
+  </li>
+);
 
 export default function RulesDialog(props: {
   targetScore: number;
@@ -42,44 +64,72 @@ export default function RulesDialog(props: {
           </Tooltip>
         </header>
         <ScrollFade viewportClass="table-sheet-body" label="Game rules">
-          <ul>
-            <li>
-              On your turn, <strong>Hit</strong> to get dealt another card or{" "}
-              <strong>Stay</strong> to bank your points and exit the round. You
-              can Stay once you have a card in front of you.
-            </li>
-            <li>
-              If you get a duplicate Number card, you bust and score zero for
-              the round.
-            </li>
-            <li>
-              <strong>Flip 7</strong> unique Number cards to earn 15 bonus
-              points and end the round for everyone. Only Number cards count
-              toward the Flip 7 bonus.
-            </li>
-            <li>
-              <strong>Action cards</strong> are played on active players.{" "}
-              <strong>Freeze</strong> banks the receiving player's points and
-              ends their round. <strong>Flip Three</strong> makes them take the
-              next three cards, one at a time. Any Freeze or Flip Three they
-              reveal waits until all three cards are done.{" "}
-              <strong>Second Chance</strong> is discarded along with your next
-              duplicate Number card.
-            </li>
-            <li>
-              Add up your Number cards, apply the ×2 multiplier if you have it,
-              then add points from any other{" "}
-              <strong>Score Modifier cards</strong> and the Flip 7 bonus.
-            </li>
-            <li>
-              When a round ends with someone at {props.targetScore} or more, the
-              highest score wins. A tie for first plays on.
-            </li>
-            <li>
-              If the deck and the discard pile both run out, the round ends and
-              everyone who hasn't busted scores what they hold.
-            </li>
-          </ul>
+          <div class="rules-sections">
+            <section>
+              <h3>Your turn</h3>
+              <ul class="rules-list">
+                <li>
+                  <strong>Hit</strong> to take another card, or{" "}
+                  <strong>Stay</strong> to bank your points and sit out the
+                  round. You need a card in front of you to Stay.
+                </li>
+                <li>
+                  A duplicate Number card busts you, and you score zero for the
+                  round.
+                </li>
+                <li>
+                  <strong>Flip 7</strong> unique Number cards to earn{" "}
+                  {FLIP_SEVEN_BONUS} bonus points and end the round for
+                  everyone.
+                </li>
+                <li>
+                  When the deck runs out, the discard pile is shuffled into a
+                  new deck. If both are empty, the round ends and everyone who
+                  hasn't busted scores what they hold.
+                </li>
+              </ul>
+            </section>
+            <section>
+              <h3>Action cards</h3>
+              <p>
+                Play Freeze and Flip Three on any active player, including
+                yourself.
+              </p>
+              <ul class="rules-card-list">
+                <CardRule cards={[freeze]}>
+                  <strong>Freeze</strong>: the player banks their points and
+                  exits the round.
+                </CardRule>
+                <CardRule cards={[flipThree]}>
+                  <strong>Flip Three</strong>: the player takes up to three
+                  cards in a row. A Freeze or Flip Three drawn meanwhile is
+                  held. If they survive all three, they assign each held card in
+                  the order drawn. A held card whose target is no longer active
+                  is discarded.
+                </CardRule>
+                <CardRule cards={[secondChance]}>
+                  <strong>Second Chance</strong>: discard it with your next
+                  duplicate Number card and keep playing. If you already have
+                  one, give the extra to an active player without one, or
+                  discard it if nobody can take it.
+                </CardRule>
+              </ul>
+            </section>
+            <section>
+              <h3>Scoring</h3>
+              <ul class="rules-card-list">
+                <CardRule cards={[double, plusFour]}>
+                  Add up your Number cards and apply <strong>×2</strong> if you
+                  have it. Then add any other <strong>Score Modifier</strong>{" "}
+                  points and the Flip 7 bonus.
+                </CardRule>
+                <CardRule>
+                  At the end of a round, the sole leader wins if they have at
+                  least {props.targetScore} points. A tie for first plays on.
+                </CardRule>
+              </ul>
+            </section>
+          </div>
         </ScrollFade>
       </DialogContent>
     </Dialog>

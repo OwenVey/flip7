@@ -1769,19 +1769,67 @@ main {
   width: min(38rem, calc(100% - 2rem));
 }
 
-.rules-dialog ul {
+.rules-sections {
   display: grid;
-  gap: 0.625rem;
-  margin: 0;
-  padding-inline-start: 1.125rem;
+  gap: 1.25rem;
   color: var(--ink-soft);
 
-  & li::marker {
-    color: var(--rule);
+  & section {
+    display: grid;
+    gap: 0.625rem;
+  }
+
+  & h3 {
+    margin: 0;
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  & p {
+    margin: 0;
   }
 
   & strong {
     color: var(--ink);
+  }
+}
+
+.rules-list {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0;
+  padding-inline-start: 1.125rem;
+
+  & li::marker {
+    color: var(--rule);
+  }
+}
+
+/* Each rule's cards stand in for its bullet, and the list's rules share one card column. */
+.rules-card-list {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rules-card-rule {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: start;
+
+  & > p {
+    grid-column: 2;
+  }
+
+  & .card {
+    animation: none;
   }
 }
 
@@ -2688,8 +2736,9 @@ main {
 /*
  * Score Modifiers and Second Chance sit as mini cards at the end of the seat
  * header, so the mat holds only Number cards and shows the run toward Flip 7.
+ * The rules reuse them beside the matching rule.
  */
-.seat-extras {
+:is(.seat-extras, .rules-cards) {
   display: flex;
   flex: none;
   gap: 0.1875rem;
