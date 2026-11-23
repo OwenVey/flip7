@@ -208,7 +208,8 @@ const testPlayer = (players: TestPlayer[]) => {
           player.link = null;
         },
         isOpen: () => player.link?.open === true,
-        reconnect: () => {
+        reconnect: () => {},
+        replace: () => {
           player.reconnects += 1;
         },
         send: (frame) => {
@@ -327,6 +328,26 @@ describe("recovering a stuck connection", () => {
     vi.useRealTimers();
   });
 
+  it("replaces the socket on a return to visibility only while reconnecting", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const hidden = { online: true, visible: false };
+    const visible = { online: true, visible: true };
+
+    ana.client.browserStateChanged(hidden);
+    ana.client.browserStateChanged(visible);
+    expect(ana.reconnects).toBe(0);
+
+    net.drop(ana);
+    ana.client.browserStateChanged(visible);
+    expect(ana.reconnects).toBe(0);
+
+    ana.client.browserStateChanged(hidden);
+    ana.client.browserStateChanged(visible);
+    ana.client.browserStateChanged(visible);
+    expect(ana.reconnects).toBe(1);
+  });
+
   it("starts over when the connection stays down", () => {
     const net = network();
     const ana = net.join("Ana");
@@ -406,21 +427,43 @@ describe("a pending move", () => {
     expect(ana.client.state.room?.phase).toBe("playing");
   });
 
-  it("counts a move the room got before the connection dropped", async () => {
+  it("confirms a pending move after returning to a visible, online page", async () => {
     const net = network();
     const ana = net.join("Ana");
     net.join("Ben");
+    const visibleAndOnline = { online: true, visible: true };
+    ana.client.browserStateChanged(visibleAndOnline);
 
     const sent = ana.client.send({ type: "start" });
     net.flushToServer();
+    ana.client.browserStateChanged({ online: true, visible: false });
     net.drop(ana);
+    ana.client.browserStateChanged({ online: false, visible: true });
+    expect(ana.reconnects).toBe(0);
+
+    ana.client.browserStateChanged(visibleAndOnline);
+    ana.client.browserStateChanged(visibleAndOnline);
+    expect(ana.reconnects).toBe(1);
+    expect(ana.client.state).toMatchObject({ canAct: false, sending: true });
+
     net.connect(ana);
     net.flush();
+    ana.client.browserStateChanged(visibleAndOnline);
 
     await expect(sent).resolves.toBeTruthy();
-    expect(ana.client.state.notice).toMatchObject({
-      confirmed: true,
-      message: "Reconnected. Your last move counted.",
+    expect({
+      reconnects: ana.reconnects,
+      state: ana.client.state,
+    }).toMatchObject({
+      reconnects: 1,
+      state: {
+        canAct: true,
+        notice: {
+          confirmed: true,
+          message: "Reconnected. Your last move counted.",
+        },
+        sending: false,
+      },
     });
   });
 
@@ -488,7 +531,7 @@ describe("a pending move", () => {
   it("isn't sent while offline", async () => {
     const net = network();
     const ana = net.join("Ana");
-    ana.client.setOnline(false);
+    ana.client.browserStateChanged({ online: false, visible: true });
 
     expect(ana.client.state.canAct).toBeFalsy();
     await expect(ana.client.send({ type: "start" })).resolves.toBeFalsy();
@@ -522,6 +565,7 @@ const scripted = (overrides: Partial<RoomClientDeps> = {}) => {
   let token: string | null = "saved-token";
   let closed = false;
   let reconnects = 0;
+  let retries = 0;
 
   const client = createRoomClient({
     newId: () => crypto.randomUUID(),
@@ -532,6 +576,9 @@ const scripted = (overrides: Partial<RoomClientDeps> = {}) => {
       },
       isOpen: () => !closed,
       reconnect: () => {
+        retries += 1;
+      },
+      replace: () => {
         reconnects += 1;
       },
       send: (frame) => {
@@ -554,6 +601,7 @@ const scripted = (overrides: Partial<RoomClientDeps> = {}) => {
     frames,
     isClosed: () => closed,
     reconnects: () => reconnects,
+    retries: () => retries,
     token: () => token,
   };
 };
@@ -620,15 +668,16 @@ describe("the room client on its own", () => {
     expect(checks).toBe(3);
   });
 
-  it("reconnects on resume only while the connection is down", () => {
-    const { client, reconnects } = scripted();
+  it("retries the current socket after a missed heartbeat", () => {
+    const { client, reconnects, retries } = scripted();
     client.opened();
-    client.resume();
+    client.heartbeatMissed();
+    expect(retries()).toBe(1);
     expect(reconnects()).toBe(0);
 
-    client.closed(DROPPED_CLOSE_CODE, 0);
-    client.resume();
-    expect(reconnects()).toBe(1);
+    client.stop();
+    client.heartbeatMissed();
+    expect(retries()).toBe(1);
   });
 
   it("starts a fresh connection on retry until the room is gone", () => {

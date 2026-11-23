@@ -33,12 +33,13 @@ export interface RoomClientState {
 
 /**
  * The socket the room client talks through. `send` returns false when the frame couldn't be sent.
- * `reconnect` starts over on a fresh connection.
+ * `reconnect` retries the current socket. `replace` starts over with a fresh socket.
  */
 export interface RoomSocket {
   isOpen: () => boolean;
   send: (frame: string) => boolean;
   reconnect: () => void;
+  replace: () => void;
   close: () => void;
 }
 
@@ -69,7 +70,7 @@ const shouldRecheck = (retryCount: number) =>
  * The player's side of the room protocol: joining and rejoining by token, the
  * pending move and how it settles (a reply, a timeout, or the welcome after a
  * reconnect), connection status and the notices shown to the player. Feed it
- * socket events; read `state` or subscribe for changes.
+ * browser and socket events; read `state` or subscribe for changes.
  */
 export const createRoomClient = (deps: RoomClientDeps) => {
   const { socket } = deps;
@@ -98,6 +99,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   let lastRequestId: string | undefined;
   let pendingMove: PendingMove | null = null;
   let stopped = false;
+  let visible = false;
 
   const update = (patch: Partial<Omit<RoomClientState, "canAct">>) => {
     const next = { ...state, ...patch };
@@ -266,11 +268,11 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     }
   };
 
-  const reconnect = () => {
+  const replaceConnection = () => {
     stopWatchingSync();
     startSync();
     update({ status: "reconnecting" });
-    socket.reconnect();
+    socket.replace();
   };
 
   // WARNING: iOS Safari can wedge a socket in the background, so replace one that stays unsynced.
@@ -279,18 +281,42 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       resyncTimeout = undefined;
 
       if (!stopped) {
-        reconnect();
+        replaceConnection();
         watchSync();
       }
     }, RESYNC_TIMEOUT_MS);
   };
 
   const startOver = () => {
-    reconnect();
+    replaceConnection();
     watchSync();
   };
 
   return {
+    browserStateChanged: ({
+      online,
+      visible: isVisible,
+    }: {
+      online: boolean;
+      visible: boolean;
+    }) => {
+      if (stopped) {
+        return;
+      }
+
+      const returned = online && isVisible && !(state.online && visible);
+
+      visible = isVisible;
+
+      if (online !== state.online) {
+        update({ online });
+      }
+
+      if (returned && state.status === "reconnecting") {
+        startOver();
+      }
+    },
+
     clearJoinError: () => {
       if (state.joinError) {
         update({ joinError: "" });
@@ -325,6 +351,12 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
       if (shouldRecheck(retryCount)) {
         void recheckRoom();
+      }
+    },
+
+    heartbeatMissed: () => {
+      if (!stopped) {
+        socket.reconnect();
       }
     },
 
@@ -382,12 +414,6 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       }
     },
 
-    resume: () => {
-      if (!stopped && state.status === "reconnecting") {
-        startOver();
-      }
-    },
-
     send: async (command: GameCommand) => {
       if (pendingMove) {
         return false;
@@ -410,10 +436,6 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       }
 
       return await promise;
-    },
-
-    setOnline: (online: boolean) => {
-      update({ online });
     },
 
     get state() {
