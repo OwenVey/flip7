@@ -85,6 +85,11 @@ interface TableProps {
   playerId: string;
   send: RoomConnection["send"];
   actionsDisabled?: boolean;
+  /**
+   * The room can't hear this player. Blocks only Leave and Remove, which stay
+   * open during the deal and while a move waits for the room.
+   */
+  offline?: boolean;
 }
 
 interface MoveControls {
@@ -547,15 +552,10 @@ const RoundPlayer = (
             {(card) => <PlayingCard card={card()} size="mini" />}
           </For>
         </ul>
-        <Show
-          when={
-            props.moves.choice === null &&
-            props.moves.host.kick.includes(props.player.id)
-          }
-        >
+        <Show when={props.moves.host.kick.includes(props.player.id)}>
           <RemovePlayer
             bot={props.player.bot}
-            disabled={props.actionsDisabled}
+            disabled={props.offline}
             name={props.player.name}
             onRemove={() => {
               void props.send({ playerId: props.player.id, type: "kick" });
@@ -1311,8 +1311,11 @@ export default function Table(
     DealProps &
     RoundPointsByPlayer & {
       chat: RoomConnection["chat"];
-      /** Blocks Leave while the room can't hear it. Leave stays open during the deal. */
-      offline?: boolean;
+      /**
+       * The room as last confirmed, ahead of deal playback. Settings read it so
+       * a change shows as soon as the room accepts it, not after the deal.
+       */
+      latestRoom?: RoomView | null;
     }
 ) {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
@@ -1436,7 +1439,7 @@ export default function Table(
             <InviteButton brief collapsible />
             <Show when={moves().host.configure}>
               <RoomSettingsMenu
-                room={props.room}
+                room={props.latestRoom ?? props.room}
                 controller={settings}
                 collapsible
                 onChange={(changes) => {
@@ -1481,6 +1484,7 @@ export default function Table(
                   playerId={props.playerId}
                   send={props.send}
                   actionsDisabled={props.actionsDisabled}
+                  offline={props.offline}
                   roundPoints={pointsOf(props.roundPoints, player().id)}
                   dealStep={props.dealStep}
                   moves={moves()}

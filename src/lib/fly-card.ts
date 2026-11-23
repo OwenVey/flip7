@@ -245,59 +245,175 @@ export const flyCard = async ({
   }
 };
 
-const PX = /px$/u;
-const SCORE_MODIFIER = "[data-score-modifier]";
+const SLOT_MS = 260;
+const SLOT_EASING = FLIGHT_EASING;
 
-const pixels = (value: string) => Number(value.replace(PX, "")) || 0;
+const CLOSE_GAP_DELAY = 0.3;
 
-const startMargin = (element: Element | null) =>
-  element ? pixels(getComputedStyle(element).marginInlineStart) : 0;
+const MINI_ROW = "seat-extras";
+const slotSlides = new WeakMap<Element, () => void>();
 
-const separatorChange = (card: Element) => {
-  const previous = card.previousElementSibling;
-  const next = card.nextElementSibling;
-  const nextMargin = startMargin(next);
-
-  const separatedAfter =
-    next?.matches(SCORE_MODIFIER) === true &&
-    previous !== null &&
-    !previous.matches(SCORE_MODIFIER);
-
-  const marginAfter = separatedAfter ? nextMargin || startMargin(card) : 0;
-
-  return nextMargin - marginAfter;
+const cancelSlotSlide = (piece: Element) => {
+  slotSlides.get(piece)?.();
 };
 
-const closeSlot = (card: Element, duration: number) => {
-  const row = card.parentElement;
+const inMiniRow = (card: Element): card is HTMLElement =>
+  card instanceof HTMLElement &&
+  card.parentElement?.classList.contains(MINI_ROW) === true;
 
-  if (
-    !(
-      card instanceof HTMLElement &&
-      row?.classList.contains("seat-extras") === true
-    )
-  ) {
-    return null;
+const headerPieces = (header: Element) =>
+  [...header.children].flatMap((child) =>
+    child.classList.contains(MINI_ROW) ? [...child.children] : [child]
+  );
+
+export type HeaderLayout = Map<Element, DOMRect>;
+
+/** Where each piece of a seat's header sits, to slide from after it changes. */
+export const measureHeader = (seat: Element | null) => {
+  const header = seat?.querySelector(".seat-header");
+  const pieces = header ? headerPieces(header) : [];
+
+  return new Map(
+    pieces.map((piece) => [piece, piece.getBoundingClientRect()])
+  ) satisfies HeaderLayout;
+};
+
+const slideFrom = (
+  layout: HeaderLayout,
+  {
+    duration,
+    easing,
+    hold = 0,
+    signal,
+    skip,
+  }: {
+    duration: number;
+    easing: string;
+    hold?: number;
+    signal: AbortSignal;
+    skip: Set<Element>;
+  }
+) => {
+  if (signal.aborted) {
+    return [];
   }
 
-  const gap = pixels(getComputedStyle(row).columnGap);
-  const before = card.previousElementSibling !== null;
-  const after = card.nextElementSibling !== null;
-  const side = before || !after ? "marginInlineStart" : "marginInlineEnd";
+  for (const piece of layout.keys()) {
+    cancelSlotSlide(piece);
+  }
 
-  const width =
-    card.offsetWidth + (before || after ? gap : 0) + separatorChange(card);
+  return [...layout].flatMap(([piece, before]) => {
+    if (!piece.isConnected || skip.has(piece)) {
+      return [];
+    }
 
-  const from = getComputedStyle(card)[side];
+    const after = piece.getBoundingClientRect();
+    const dx = before.left - after.left;
+    const dy = before.top - after.top;
 
-  return card.animate(
-    [
-      { [side]: from },
-      { offset: 0.3, [side]: from },
-      { [side]: `${-width}px` },
-    ],
-    { duration, easing: "cubic-bezier(0.45, 0, 0.25, 1)", fill: "forwards" }
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+      return [];
+    }
+
+    const from = `${dx}px ${dy}px`;
+
+    const animation = piece.animate(
+      [
+        { translate: from },
+        ...(hold > 0 ? [{ offset: hold, translate: from }] : []),
+        { translate: "0 0" },
+      ],
+      { duration, easing }
+    );
+
+    const cleanup = () => {
+      signal.removeEventListener("abort", cancel);
+
+      if (slotSlides.get(piece) === cancel) {
+        slotSlides.delete(piece);
+      }
+    };
+
+    const cancel = () => {
+      cleanup();
+      animation.cancel();
+    };
+
+    slotSlides.set(piece, cancel);
+    signal.addEventListener("abort", cancel, { once: true });
+    void animation.finished.then(cleanup).catch(cleanup);
+
+    return [animation];
+  });
+};
+
+/**
+ * Once a mini card is in its row, slides the cards beside it aside from where
+ * they were before, so its slot seems to open. The new card already sits where
+ * it ends up, so its flight lands there.
+ */
+export const openSlot = (
+  card: Element,
+  layout: HeaderLayout,
+  signal: AbortSignal
+) => {
+  if (inMiniRow(card)) {
+    slideFrom(layout, {
+      duration: SLOT_MS,
+      easing: SLOT_EASING,
+      signal,
+      skip: new Set([card]),
+    });
+  }
+};
+
+const closeSlots = (
+  cards: Element[],
+  duration: number,
+  signal: AbortSignal
+) => {
+  const leaving = cards.filter(inMiniRow);
+  const seats = new Set(leaving.map((card) => card.closest(".seat")));
+
+  const layout: HeaderLayout = new Map(
+    [...seats].flatMap((seat) => [...measureHeader(seat)])
   );
+
+  const spots = leaving.map((card) => ({
+    card,
+    rect: card.getBoundingClientRect(),
+    width: card.offsetWidth,
+  }));
+
+  for (const { card, width } of spots) {
+    cancelSlotSlide(card);
+    card.dataset.leaving = "";
+    Object.assign(card.style, {
+      left: "0",
+      margin: "0",
+      position: "absolute",
+      top: "0",
+      width: `${width}px`,
+    });
+  }
+
+  const placed = spots.map((spot) => ({
+    ...spot,
+    origin: spot.card.getBoundingClientRect(),
+  }));
+
+  for (const { card, origin, rect } of placed) {
+    card.style.left = `${rect.left - origin.left}px`;
+    card.style.top = `${rect.top - origin.top}px`;
+  }
+
+  return slideFrom(layout, {
+    duration,
+    easing: GROW_EASING,
+    hold: CLOSE_GAP_DELAY,
+    signal,
+    skip: new Set(leaving),
+  });
 };
 
 /** Lifts cards off the table and fades them out, as when Second Chance is used. */
@@ -328,7 +444,7 @@ export const discardCards = async (
     )
   );
 
-  const closes = cards.flatMap((card) => closeSlot(card, duration) ?? []);
+  const closes = closeSlots(cards, duration, signal);
 
   await settle([...lifts, ...closes], duration, signal);
 };

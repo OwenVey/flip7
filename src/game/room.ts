@@ -1,5 +1,6 @@
 import { isAvatar, pickAvatar, takenAvatars } from "./avatars";
 import type { Random } from "./cards";
+import { isRoomCommand } from "./client-message";
 import type { GameCommand } from "./client-message";
 import {
   addBot,
@@ -459,7 +460,7 @@ export const createRoom = (
             return [BROADCAST, ...closes];
           }
 
-          if (command.type !== "leave") {
+          if (!isRoomCommand(command)) {
             stored.lastRequests ??= new Map();
             stored.lastRequests.set(playerId, requestId);
           }

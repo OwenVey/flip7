@@ -5,6 +5,8 @@ import {
   absorbCard,
   discardCards,
   flyCard,
+  measureHeader,
+  openSlot,
   riffleDeck,
   sweepCards,
 } from "./fly-card";
@@ -61,6 +63,11 @@ export const createDealMotion: (
 
     const from = start.getBoundingClientRect();
 
+    const header =
+      step.to.kind === "hand"
+        ? measureHeader(root.querySelector(`[data-seat="${step.to.playerId}"]`))
+        : null;
+
     return async (signal) => {
       const to = destination(root, step);
       const layer = root.querySelector("[data-flight-layer]");
@@ -70,6 +77,10 @@ export const createDealMotion: (
       }
 
       to.dataset.incoming = "";
+
+      if (header) {
+        openSlot(to, header, signal);
+      }
 
       try {
         await flyCard({

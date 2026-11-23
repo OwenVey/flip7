@@ -539,15 +539,18 @@ p {
 [data-slot="segmented-control-indicator"] {
   position: absolute;
   z-index: -1;
-  top: var(--segmented-control-indicator-top);
-  left: var(--segmented-control-indicator-left);
+  /* Slides with translate, not top and left, so the browser can run it off the main thread while a deal keeps that thread busy. Every segment has the same width, so the size never needs to animate. */
+  top: 0;
+  left: 0;
   width: var(--segmented-control-indicator-width);
   height: var(--segmented-control-indicator-height);
   border: 1px solid var(--ink);
   border-radius: var(--radius-sm);
   background: var(--gold);
   box-shadow: 1px 1px 0 var(--ink);
-  transition-property: top, left, width, height;
+  translate: var(--segmented-control-indicator-left)
+    var(--segmented-control-indicator-top);
+  transition-property: translate;
   transition-duration: 200ms;
   transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 
@@ -2762,43 +2765,59 @@ main {
     background: var(--paper-deep);
   }
 
-  & [data-slot="meter-indicator"] {
-    background: var(--accent);
+  /*
+   * The banked fill and this round's band are each as wide as the track and
+   * slide in from the left with translate, so they grow off the main thread.
+   * A translate percentage is of the element's own width, the track's here.
+   * The banked fill sits on top and hides the band up to the banked score.
+   */
+  & :is([data-slot="meter-indicator"], .meter-round) {
+    position: absolute;
+    inset: 0;
+    width: auto !important;
   }
 
-  & :is(.meter-round, .meter-lost) {
+  & [data-slot="meter-indicator"] {
+    z-index: 1;
+    background: var(--accent);
+    translate: calc(var(--round-start) - 100%) 0;
+  }
+
+  /* Splits the banked fill from this round's points. */
+  &:has(.meter-round[data-divider]) [data-slot="meter-indicator"]::after {
     position: absolute;
     inset-block: 0;
-    inset-inline-start: var(--round-start);
+    inset-inline-end: 0;
+    width: 1px;
+    background: var(--ink);
+    content: "";
   }
 
   /* This round's points: striped while the player could still bust, solid once they're safe. */
   & .meter-round {
-    inset-inline-end: calc(100% - var(--projected-score));
     overflow: hidden;
     background: var(--round-fill);
-
-    &[data-divider]::before {
-      position: absolute;
-      inset-block: 0;
-      inset-inline-start: 0;
-      width: 1px;
-      background: var(--ink);
-      content: "";
-    }
+    translate: calc(var(--projected-score) - 100%) 0;
   }
 
-  &[data-round="at-risk"] .meter-round {
+  /* One stripe tile wider than the band, so sliding it a tile loops seamlessly. */
+  &[data-round="at-risk"] .meter-round::before {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: -0.7071rem 0;
     background: repeating-linear-gradient(
       -45deg,
       var(--round-fill) 0 0.25rem,
       var(--round-stripe) 0.25rem 0.5rem
     );
     background-size: 0.7071rem 0.7071rem;
+    content: "";
   }
 
   & .meter-lost {
-    inset-inline-end: calc(100% - var(--lost-end));
+    position: absolute;
+    inset-block: 0;
+    inset-inline: var(--round-start) calc(100% - var(--lost-end));
     transform-origin: left;
     background: var(--danger);
     opacity: 0;
@@ -2835,22 +2854,17 @@ main {
 @media (prefers-reduced-motion: no-preference) {
   .seat-meter {
     & [data-slot="meter-indicator"] {
-      transition: width var(--meter-ease);
+      transition: translate var(--meter-ease);
     }
 
     & .meter-round {
       transition:
-        inset-inline-start var(--meter-ease),
-        inset-inline-end var(--meter-ease),
+        translate var(--meter-ease),
         background-color 300ms;
     }
 
-    &[data-round="at-risk"] .meter-round {
+    &[data-round="at-risk"] .meter-round::before {
       animation: meter-risk 900ms linear infinite;
-    }
-
-    & .seat-score:is([data-banked], [data-projected]) {
-      transition: inset-inline-start var(--meter-ease);
     }
   }
 }
@@ -2863,7 +2877,7 @@ main {
 
 @keyframes meter-risk {
   to {
-    background-position: 0.7071rem 0;
+    translate: 0.7071rem 0;
   }
 }
 
@@ -3519,8 +3533,18 @@ main {
     display: none;
   }
 
-  /* A small gap splits held action cards from the Score Modifiers after them. */
-  & :not([data-score-modifier]) + [data-score-modifier] {
+  /*
+   * A small gap splits held action cards from the Score Modifiers after them.
+   * A card on its way out already counts as gone, so the gap doesn't jump
+   * when it's removed.
+   */
+  &
+    :is(
+      :not([data-score-modifier], [data-leaving]) + [data-score-modifier],
+      :not([data-score-modifier], [data-leaving])
+        + [data-leaving]
+        + [data-score-modifier]
+    ) {
     margin-inline-start: 0.25rem;
   }
 }
@@ -4439,8 +4463,18 @@ main {
     animation: seat-flinch 420ms ease-out;
   }
 
-  /* Turn handoff: the ring closes in on the seat that's up. */
-  .seat[data-turn] {
+  /*
+   * Turn handoff: a ring closes in on the seat that's up. It's its own layer,
+   * scaled and faded, so it runs off the main thread.
+   */
+  .seat[data-turn]::before {
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    outline: var(--ring-width) solid var(--gold);
+    opacity: 0;
+    pointer-events: none;
+    content: "";
     animation: turn-ring 600ms cubic-bezier(0.25, 0.8, 0.3, 1);
   }
 
@@ -4460,21 +4494,6 @@ main {
    */
   .seat-meta > .flip-run {
     animation: fade-in 200ms ease-out both;
-  }
-
-  /*
-   * A card joining a seat's mini row opens its slot from nothing, so the cards
-   * beside it slide aside. The row hugs the right, so the newest card already
-   * sits where it ends up and its flight lands there. Only flown-in cards do
-   * this; cards already on the table when the page loads stay put.
-   */
-  .seat-extras > .card:is([data-incoming], [data-flown]) {
-    --slot-gap: 0.1875rem;
-    animation: slot-open 260ms cubic-bezier(0.25, 0.8, 0.3, 1) backwards;
-  }
-
-  .seat-extras > .card:first-child:is([data-incoming], [data-flown]) {
-    --slot-gap: 0rem;
   }
 
   /* Fades rather than grows, so a card flying in lands where it will rest. */
@@ -4566,37 +4585,36 @@ main {
 
   /*
    * Picking a target: every seat that can take the card breathes its color.
-   * One animation on the seats drives --pick-pulse for all of them, so they
-   * flash in step and hovering one never restarts its beat.
+   * The band is its own layer that pulses its opacity, so it runs off the main
+   * thread. It keeps pulsing while it's hidden, so focusing or disabling a
+   * seat never puts it out of step with the others.
    */
-  .seats:has(.seat-pick:not(:disabled)) {
+  .seat[data-pickable]::after {
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    box-shadow: 0 0 0 var(--ring-width) var(--pick-color);
+    opacity: 0;
+    pointer-events: none;
+    content: "";
     animation: pick-pulse 1600ms ease-in-out infinite;
   }
 
-  /* A fine-pointer hover can override this shadow without restarting the pulse. */
   .seat[data-pickable]:where(
+      :not(:has(.seat-pick:not(:disabled))),
+      :has(.seat-pick:focus-visible)
+    )::after {
+    visibility: hidden;
+  }
+
+  /*
+   * Your own seat keeps the turn ring's ink edge, with the felt showing in its
+   * band so the pulse fades into the felt like the other seats.
+   */
+  .seat[data-pickable][data-turn]:where(
       :has(.seat-pick:not(:disabled)):not(:has(.seat-pick:focus-visible))
     ) {
-    box-shadow:
-      0 0 0 var(--ring-width)
-        color-mix(in srgb, var(--pick-color) var(--pick-pulse), transparent),
-      var(--shadow-print),
-      var(--shadow-table);
-
-    /*
-     * Your own seat keeps the turn ring's ink edge, but its band fades into
-     * the felt in step with the other seats. Blending toward gold instead
-     * would barely move for Flip Three, whose color is a deeper gold.
-     * Transparent would show the solid ink shadow beneath the band.
-     */
-    &[data-turn] {
-      --ring-color: color-mix(
-        in srgb,
-        var(--pick-color) var(--pick-pulse),
-        var(--felt)
-      );
-      box-shadow: var(--shadow-ring);
-    }
+    --ring-color: var(--felt);
   }
 
   /* Round and game over. */
@@ -4697,18 +4715,13 @@ main {
 /* A ring closes in from outside the seat and lands on the turn ring. */
 @keyframes turn-ring {
   from {
-    outline: var(--ring-width) solid transparent;
-    outline-offset: 18px;
+    opacity: 0;
+    scale: 1.1;
   }
 
   60% {
-    outline: var(--ring-width) solid var(--gold);
-    outline-offset: 0;
-  }
-
-  to {
-    outline: var(--ring-width) solid transparent;
-    outline-offset: 0;
+    opacity: 1;
+    scale: 1;
   }
 }
 
@@ -4716,12 +4729,6 @@ main {
   from {
     opacity: 0;
     scale: 0.6;
-  }
-}
-
-@keyframes slot-open {
-  from {
-    margin-inline-start: calc(-1 * (var(--w) + var(--slot-gap)));
   }
 }
 
@@ -4785,17 +4792,10 @@ main {
   }
 }
 
-/* How strongly pickable seats show their colored band; 0% is invisible. */
-@property --pick-pulse {
-  syntax: "<percentage>";
-  inherits: true;
-  initial-value: 0%;
-}
-
 /* Just the colored band, without the ink edge the hovered seat gets. */
 @keyframes pick-pulse {
   50% {
-    --pick-pulse: 100%;
+    opacity: 1;
   }
 }
 

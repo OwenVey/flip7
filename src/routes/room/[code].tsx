@@ -256,6 +256,7 @@ const Room = (props: { code: string }) => {
                     offline={
                       !connection.online() || connection.status() !== "open"
                     }
+                    latestRoom={connection.room()}
                     dealing={table().dealing}
                     dealStep={table().step}
                     roundPoints={table().roundPoints}

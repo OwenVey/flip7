@@ -541,7 +541,146 @@ describe("a pending move", () => {
   });
 });
 
+describe("room commands", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("change settings without holding up the player's moves", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    net.join("Ben");
+
+    const configured = ana.client.send({ botSpeed: "fast", type: "configure" });
+    expect(ana.client.state).toMatchObject({ canAct: true, sending: false });
+
+    const started = ana.client.send({ type: "start" });
+    expect(ana.client.state).toMatchObject({ canAct: false, sending: true });
+    net.flush();
+
+    await expect(configured).resolves.toBeTruthy();
+    await expect(started).resolves.toBeTruthy();
+    expect(ana.client.state.room).toMatchObject({
+      botSpeed: "fast",
+      phase: "playing",
+    });
+  });
+
+  it("remove a player while a move waits for the room", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    net.join("Ben");
+    const cara = net.join("Cara");
+    const caraId = cara.client.state.playerId ?? "";
+
+    const started = ana.client.send({ type: "start" });
+    const kicked = ana.client.send({ playerId: caraId, type: "kick" });
+    net.flush();
+
+    await expect(started).resolves.toBeTruthy();
+    await expect(kicked).resolves.toBeTruthy();
+    expect(net.stored.game.players.map((player) => player.name)).toStrictEqual([
+      "Ana",
+      "Ben",
+    ]);
+  });
+
+  it("don't stop a move sent before them from being confirmed after a reconnect", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    net.join("Ben");
+
+    const started = ana.client.send({ type: "start" });
+    const configured = ana.client.send({ locked: true, type: "configure" });
+    net.flushToServer();
+    net.drop(ana);
+    net.connect(ana);
+    net.flush();
+
+    await expect(configured).resolves.toBeFalsy();
+    await expect(started).resolves.toBeTruthy();
+    expect(ana.client.state.notice?.message).toBe(
+      "Reconnected. Your last move counted."
+    );
+  });
+
+  it("say why the room rejected them", async () => {
+    const net = network();
+    net.join("Ana");
+    const ben = net.join("Ben");
+
+    const sent = ben.client.send({ locked: true, type: "configure" });
+    net.flush();
+
+    await expect(sent).resolves.toBeFalsy();
+    expect(ben.client.state.notice?.message).toBe("Only the host can do that.");
+  });
+
+  it("settles a room command whose reply never arrives", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const sent = ana.client.send({ locked: true, type: "configure" });
+
+    net.flushToServer();
+    ana.link?.toClient.splice(0);
+    vi.advanceTimersByTime(REPLY_TIMEOUT_MS);
+
+    await expect(sent).resolves.toBeFalsy();
+    expect(ana.client.state).toMatchObject({
+      canAct: true,
+      notice: { message: "The room couldn't confirm your request." },
+      status: "open",
+    });
+  });
+
+  it("settles all outstanding room commands and clears their timers on stop", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    const configured = ana.client.send({ locked: true, type: "configure" });
+
+    const kicked = ana.client.send({
+      playerId: ben.client.state.playerId ?? "",
+      type: "kick",
+    });
+
+    ana.client.stop();
+
+    await expect(Promise.all([configured, kicked])).resolves.toStrictEqual([
+      false,
+      false,
+    ]);
+    vi.advanceTimersByTime(REPLY_TIMEOUT_MS);
+    expect(ana.client.state.notice).toBeNull();
+  });
+});
+
 describe("leaving the room", () => {
+  it("lets a player leave while a move waits for the room", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    net.join("Ben");
+
+    const started = ana.client.send({ type: "start" });
+    const left = ana.client.send({ type: "leave" });
+    net.flush();
+
+    await expect(started).resolves.toBeTruthy();
+    await expect(left).resolves.toBeTruthy();
+    expect(ana.client.state).toMatchObject({
+      playerId: null,
+      status: "removed",
+    });
+    expect(ana.token).toBeNull();
+    expect(net.stored.game.players.map((player) => player.name)).toStrictEqual([
+      "Ben",
+    ]);
+  });
+
   it("forgets a kicked player and stops", async () => {
     const net = network();
     const ana = net.join("Ana");

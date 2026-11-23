@@ -1,3 +1,4 @@
+import { isRoomCommand } from "../game/client-message";
 import type { ClientMessage, GameCommand } from "../game/client-message";
 import { ROOM_REMOVED_CLOSE_CODE } from "../game/protocol";
 import type { RoomView, ServerMessage } from "../game/protocol";
@@ -57,10 +58,13 @@ export interface RoomClientDeps {
   token: { get: () => string | null; set: (token: string | null) => void };
 }
 
-interface PendingMove {
-  requestId: string;
+interface PendingReply {
   resolve: (accepted: boolean) => void;
   timeout: ReturnType<typeof setTimeout>;
+}
+
+interface PendingMove extends PendingReply {
+  requestId: string;
 }
 
 const REPLY_TIMEOUT_MS = 6000;
@@ -104,6 +108,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   let noticeId = 0;
   let lastRequestId: string | undefined;
   let pendingMove: PendingMove | null = null;
+  const roomCommands = new Map<string, PendingReply>();
   let stopped = false;
   let wasVisible = false;
 
@@ -124,6 +129,22 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
   const raw = (message: ClientMessage) =>
     socket.isOpen() && socket.send(JSON.stringify(message));
+
+  const settleRoomCommand = (requestId: string, accepted: boolean) => {
+    const pending = roomCommands.get(requestId);
+
+    if (pending) {
+      clearTimeout(pending.timeout);
+      roomCommands.delete(requestId);
+      pending.resolve(accepted);
+    }
+  };
+
+  const dropRoomCommands = () => {
+    for (const requestId of roomCommands.keys()) {
+      settleRoomCommand(requestId, false);
+    }
+  };
 
   const settleMove = (accepted: boolean) => {
     if (pendingMove) {
@@ -151,6 +172,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     }
 
     update({ ready: false });
+    dropRoomCommands();
 
     if (pendingMove) {
       clearTimeout(pendingMove.timeout);
@@ -228,12 +250,19 @@ export const createRoomClient = (deps: RoomClientDeps) => {
           settleMove(true);
         }
 
+        settleRoomCommand(message.requestId, true);
+
         return;
       }
 
       case "rejected": {
         if (pendingMove?.requestId === message.requestId) {
           settleMove(false);
+          notify(message.message);
+        }
+
+        if (roomCommands.has(message.requestId)) {
+          settleRoomCommand(message.requestId, false);
           notify(message.message);
         }
 
@@ -415,7 +444,9 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     },
 
     send: async (command: GameCommand) => {
-      if (pendingMove) {
+      const roomCommand = isRoomCommand(command);
+
+      if (stopped || (pendingMove && !roomCommand)) {
         return false;
       }
 
@@ -426,6 +457,24 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       }
 
       const requestId = deps.newId();
+
+      if (roomCommand) {
+        const { promise, resolve } = Promise.withResolvers<boolean>();
+
+        const timeout = setTimeout(() => {
+          settleRoomCommand(requestId, false);
+          notify("The room couldn't confirm your request.");
+        }, REPLY_TIMEOUT_MS);
+
+        roomCommands.set(requestId, { resolve, timeout });
+
+        if (!raw({ ...command, requestId })) {
+          settleRoomCommand(requestId, false);
+        }
+
+        return await promise;
+      }
+
       const { promise, resolve } = Promise.withResolvers<boolean>();
       const timeout = setTimeout(startOver, REPLY_TIMEOUT_MS);
       pendingMove = { requestId, resolve, timeout };
@@ -444,10 +493,11 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
     stop: () => {
       if (!stopped) {
+        stopped = true;
         clearTimeout(joinTimeout);
         stopWatchingSync();
         settleMove(false);
-        stopped = true;
+        dropRoomCommands();
         socket.close();
       }
     },
