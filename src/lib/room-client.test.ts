@@ -9,6 +9,7 @@ import type { RoomClientDeps } from "./room-client";
 
 const START = 1_000_000;
 const REPLY_TIMEOUT_MS = 6000;
+const RESYNC_TIMEOUT_MS = 10_000;
 const DROPPED_CLOSE_CODE = 1006;
 
 type Delivery = ServerMessage | { closeCode: number };
@@ -313,6 +314,71 @@ describe("joining through the room client", () => {
       needsName: false,
       ready: true,
     });
+  });
+});
+
+describe("recovering a stuck connection", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("starts over when the connection stays down", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    net.drop(ana);
+    vi.advanceTimersByTime(RESYNC_TIMEOUT_MS / 2);
+    ana.client.closed(DROPPED_CLOSE_CODE, 1);
+    vi.advanceTimersByTime(RESYNC_TIMEOUT_MS / 2);
+
+    expect(ana.reconnects).toBe(1);
+    expect(ana.client.state.status).toBe("reconnecting");
+
+    vi.advanceTimersByTime(RESYNC_TIMEOUT_MS);
+
+    expect(ana.reconnects).toBe(2);
+  });
+
+  it("starts over when a rejoin gets no reply", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    net.drop(ana);
+    vi.advanceTimersByTime(RESYNC_TIMEOUT_MS - 1);
+    net.connect(ana);
+    vi.advanceTimersByTime(RESYNC_TIMEOUT_MS - 1);
+
+    expect(ana.reconnects).toBe(0);
+
+    vi.advanceTimersByTime(1);
+
+    expect(ana.reconnects).toBe(1);
+    expect(ana.client.state.status).toBe("reconnecting");
+  });
+
+  it("stops watching once the table is back in sync", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    net.drop(ana);
+    net.connect(ana);
+    net.flush();
+    vi.advanceTimersByTime(RESYNC_TIMEOUT_MS * 3);
+
+    expect(ana.reconnects).toBe(0);
+    expect(ana.client.state.status).toBe("open");
+  });
+
+  it("doesn't start over while waiting for a new player's name", () => {
+    const net = network();
+    const ana = net.testPlayer();
+    net.connect(ana);
+    net.flush();
+    vi.advanceTimersByTime(RESYNC_TIMEOUT_MS * 3);
+
+    expect(ana.reconnects).toBe(0);
+    expect(ana.client.state.needsName).toBeTruthy();
   });
 });
 

@@ -105,8 +105,12 @@ export const createRoomConnection = (code: string) => {
         closing?.close();
       },
       isOpen: () => socket?.readyState === PartySocket.OPEN,
+      // WARNING: a PartySocket that sat through iOS backgrounding can stop retrying, so build a new one.
       reconnect: () => {
-        socket?.reconnect();
+        const stale = socket;
+        socket = null;
+        stale?.close();
+        connect();
       },
       send: (frame) => {
         if (socket?.readyState !== PartySocket.OPEN) {
