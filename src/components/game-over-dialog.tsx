@@ -1,5 +1,7 @@
 import ArrowLeft from "@lucide/solid/icons/arrow-left";
+import RotateCcw from "@lucide/solid/icons/rotate-ccw";
 import Trophy from "@lucide/solid/icons/trophy";
+import X from "@lucide/solid/icons/x";
 import { Button } from "@ui-sdk/solid/button";
 import {
   Dialog,
@@ -23,6 +25,7 @@ import { hostName } from "../lib/host";
 import { rankPlayers } from "../lib/standings";
 import PlayerAvatar from "./player-avatar";
 import ScrollFade from "./scroll-fade";
+import Tooltip from "./tooltip";
 
 const OPEN_DELAY_MS = 700;
 
@@ -83,8 +86,10 @@ const burstStyle = (index: number) => {
 export default function GameOverDialog(props: {
   room: RoomView;
   playerId: string;
+  canPlayAgain: boolean;
   canReturnToLobby: boolean;
   actionsDisabled?: boolean;
+  onPlayAgain: () => void;
   onReturnToLobby: () => void;
 }) {
   const [open, setOpen] = createSignal(false);
@@ -141,6 +146,21 @@ export default function GameOverDialog(props: {
       presentation="dialog"
     >
       <DialogContent class="game-over-dialog" initialFocus="content">
+        <Tooltip
+          content="See the table"
+          type="label"
+          trigger={(hint) => (
+            <DialogClose
+              {...hint}
+              class="game-over-close"
+              aria-label="See the table"
+              data-size="sm"
+              data-icon=""
+            />
+          )}
+        >
+          <X size={16} aria-hidden="true" />
+        </Tooltip>
         <div class="game-over-emblem" aria-hidden="true">
           <span class="game-over-rays" />
           <span class="game-over-trophy">
@@ -168,6 +188,9 @@ export default function GameOverDialog(props: {
                 <li
                   style={{ "--row": entry().index }}
                   data-rank={entry().rank <= 3 ? entry().rank : undefined}
+                  data-me={
+                    entry().player.id === props.playerId ? "" : undefined
+                  }
                   data-winner={
                     winnerIds().has(entry().player.id) ? "" : undefined
                   }
@@ -201,21 +224,32 @@ export default function GameOverDialog(props: {
             when={props.canReturnToLobby}
             fallback={
               <p class="muted">
-                Waiting for {hostName(props.room)} to head back to the lobby.
+                Waiting for {hostName(props.room)} to play again or head back to
+                the lobby.
               </p>
             }
           >
             <Button
               data-size="lg"
-              data-variant="solid"
+              data-variant={props.canPlayAgain ? undefined : "solid"}
               disabled={props.actionsDisabled}
               onClick={props.onReturnToLobby}
             >
               <ArrowLeft size={16} />
               Back to lobby
             </Button>
+            <Show when={props.canPlayAgain}>
+              <Button
+                data-size="lg"
+                data-variant="solid"
+                disabled={props.actionsDisabled}
+                onClick={props.onPlayAgain}
+              >
+                <RotateCcw size={16} />
+                Play again
+              </Button>
+            </Show>
           </Show>
-          <DialogClose data-variant="quiet">See the table</DialogClose>
         </div>
       </DialogContent>
     </Dialog>

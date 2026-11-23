@@ -7,6 +7,7 @@ import LockKeyhole from "@lucide/solid/icons/lock-keyhole";
 import MessageCircle from "@lucide/solid/icons/message-circle";
 import PlayingCards from "@lucide/solid/icons/playing-cards";
 import PlayingCardsFan from "@lucide/solid/icons/playing-cards-fan";
+import RotateCcw from "@lucide/solid/icons/rotate-ccw";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import SquarePlus from "@lucide/solid/icons/square-plus";
 import Trophy from "@lucide/solid/icons/trophy";
@@ -815,37 +816,46 @@ const Leaderboard = (
         }}
       >
         <For each={ranked()} keyed={(entry) => entry.player.id}>
-          {(entry) => (
-            <tr
-              data-key={entry().player.id}
-              data-winner={
-                props.room.winnerIds.includes(entry().player.id)
-                  ? ""
-                  : undefined
-              }
-            >
-              <td>{entry().rank}</td>
-              <th scope="row">
-                {entry().player.name}
-                <Show when={entry().player.id === props.playerId}>
-                  {" "}
-                  <span class="badge">You</span>
-                </Show>
-              </th>
-              <LeaderboardRound
-                player={entry().player}
-                phase={props.room.phase}
-                incomingCardId={props.incomingCardId}
-                index={entry().index}
-              />
-              <td
-                class="leaderboard-total"
-                aria-label={`${entry().player.score}`}
+          {(entry) => {
+            const won = () => props.room.winnerIds.includes(entry().player.id);
+
+            const medal = () =>
+              props.room.phase === "gameOver" &&
+              !won() &&
+              (entry().rank === 2 || entry().rank === 3)
+                ? entry().rank
+                : undefined;
+
+            return (
+              <tr
+                data-key={entry().player.id}
+                data-me={entry().player.id === props.playerId ? "" : undefined}
+                data-medal={medal()}
+                data-winner={won() ? "" : undefined}
               >
-                <CountUp value={entry().player.score} />
-              </td>
-            </tr>
-          )}
+                <td>{entry().rank}</td>
+                <th scope="row">
+                  {entry().player.name}
+                  <Show when={entry().player.id === props.playerId}>
+                    {" "}
+                    <span class="badge">You</span>
+                  </Show>
+                </th>
+                <LeaderboardRound
+                  player={entry().player}
+                  phase={props.room.phase}
+                  incomingCardId={props.incomingCardId}
+                  index={entry().index}
+                />
+                <td
+                  class="leaderboard-total"
+                  aria-label={`${entry().player.score}`}
+                >
+                  <CountUp value={entry().player.score} />
+                </td>
+              </tr>
+            );
+          }}
         </For>
       </tbody>
     </table>
@@ -1194,8 +1204,8 @@ const ActionBar = (
                 when={props.moves.host.lobby}
                 fallback={
                   <p class="muted">
-                    Waiting for {hostName(props.room)} to head back to the
-                    lobby.
+                    Waiting for {hostName(props.room)} to play again or head
+                    back to the lobby.
                   </p>
                 }
               >
@@ -1203,12 +1213,23 @@ const ActionBar = (
                   <Button
                     data-size="lg"
                     disabled={props.actionsDisabled}
-                    data-variant="solid"
+                    data-variant={props.moves.host.start ? undefined : "solid"}
                     onClick={async () => await props.send({ type: "lobby" })}
                   >
                     <ArrowLeft size={16} />
                     Back to lobby
                   </Button>
+                  <Show when={props.moves.host.start}>
+                    <Button
+                      data-size="lg"
+                      disabled={props.actionsDisabled}
+                      data-variant="solid"
+                      onClick={async () => await props.send({ type: "start" })}
+                    >
+                      <RotateCcw size={16} />
+                      Play again
+                    </Button>
+                  </Show>
                 </ActionButtons>
               </Show>
             </Match>
@@ -1531,8 +1552,12 @@ export default function Table(
           <GameOverDialog
             room={props.room}
             playerId={props.playerId}
+            canPlayAgain={moves().host.start}
             canReturnToLobby={moves().host.lobby}
             actionsDisabled={props.actionsDisabled}
+            onPlayAgain={() => {
+              void props.send({ type: "start" });
+            }}
             onReturnToLobby={() => {
               void props.send({ type: "lobby" });
             }}

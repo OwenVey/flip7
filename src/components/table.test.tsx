@@ -906,6 +906,68 @@ describe("<Table />", () => {
     expect(actionBar.queryByText("cards left in the deck")).toBeNull();
   });
 
+  it("marks your row and second and third place in the scores once the game is over", () => {
+    const base = room({ phase: "gameOver", winnerIds: ["a"] });
+
+    const view: RoomView = {
+      ...base,
+      players: [
+        ...base.players,
+        {
+          avatar: 1,
+          bustCard: null,
+          connected: true,
+          hand: [],
+          id: "c",
+          lastRound: null,
+          name: "Cara",
+          score: 5,
+          status: "stayed",
+        },
+      ],
+    };
+
+    render(() => (
+      <Table
+        room={view}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const rows = within(
+      screen.getByRole("table", { name: "Scores" })
+    ).getAllByRole("row");
+
+    expect(rows.slice(1).map((row) => row.dataset.medal ?? null)).toStrictEqual(
+      [null, "2", "3"]
+    );
+    expect(
+      rows.slice(1).map((row) => Object.hasOwn(row.dataset, "me"))
+    ).toStrictEqual([true, false, false]);
+  });
+
+  it("lets the host play again from the action bar once the game is over", () => {
+    const send = vi.fn<RoomConnection["send"]>();
+    render(() => (
+      <Table
+        room={room({ phase: "gameOver", winnerIds: ["b"] })}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const actionBar = within(
+      screen.getByRole("region", { name: "Game status" })
+    );
+
+    fireEvent.click(actionBar.getByRole("button", { name: "Play again" }));
+
+    expect(send).toHaveBeenCalledWith({ type: "start" });
+  });
+
   it("an agent can find every control and hit on its turn", async () => {
     const send = vi.fn<RoomConnection["send"]>();
     render(() => (

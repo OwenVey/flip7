@@ -2439,8 +2439,22 @@ main {
     font-size: 0.75rem;
   }
 
+  /* Your own row, tinted like your seat; a medal at game over takes precedence. */
+  & tr[data-me] {
+    background: #fff0c6;
+  }
+
+  /* At game over, the same gold, silver and bronze as the final standings. */
   & tr[data-winner] {
     background: var(--gold);
+  }
+
+  & tr[data-medal="2"] {
+    background: #dcdfe6;
+  }
+
+  & tr[data-medal="3"] {
+    background: #ebb985;
   }
 }
 
@@ -4570,7 +4584,7 @@ main {
         var(--gold) 60%
       )
       0 0 / 300% 100%;
-    animation: winner-shine 1800ms ease-in-out 3;
+    animation: winner-shine 4500ms ease-in-out infinite;
   }
 
   .confetti-piece {
@@ -4764,11 +4778,13 @@ main {
   }
 }
 
+/* One sweep across the winner's row, then a rest before the next, so the loop glints rather than churns. */
 @keyframes winner-shine {
   from {
     background-position: 100% 0;
   }
 
+  40%,
   to {
     background-position: 0 0;
   }
@@ -5090,10 +5106,28 @@ main {
     background: var(--paper-deep);
   }
 
-  & li[data-winner] {
+  /* Your own row, tinted like your seat at the table so you can find it in a long list. */
+  & li[data-me] {
     border-color: var(--ink);
-    background: var(--gold);
+    background: #fff0c6;
+  }
+
+  /* Medal rows: gold for the winner, silver and bronze for second and third, all printed the same way. */
+  & li:is([data-winner], [data-rank="2"], [data-rank="3"]) {
+    border-color: var(--ink);
     box-shadow: 2px 2px 0 var(--ink);
+  }
+
+  & li[data-winner] {
+    background: var(--gold);
+  }
+
+  & li[data-rank="2"] {
+    background: #dcdfe6;
+  }
+
+  & li[data-rank="3"] {
+    background: #ebb985;
   }
 }
 
@@ -5107,21 +5141,11 @@ main {
   font-family: var(--font-numeral);
   font-weight: 900;
 
+  /* The rank sits on a paper disc so it reads against the medal row behind it. */
   li[data-rank] > & {
     border: 1.5px solid var(--ink);
-    color: var(--ink);
-  }
-
-  li[data-rank="1"] > & {
     background: var(--paper);
-  }
-
-  li[data-rank="2"] > & {
-    background: #dcdfe6;
-  }
-
-  li[data-rank="3"] > & {
-    background: #e2a76f;
+    color: var(--ink);
   }
 }
 
@@ -5137,21 +5161,27 @@ main {
   font-weight: 900;
 }
 
+.game-over-close {
+  position: absolute;
+  inset-block-start: var(--dialog-inset);
+  inset-inline-end: var(--dialog-inset);
+  z-index: 1;
+}
+
+/* Equal columns wide enough for "Back to lobby" on one line; on narrower dialogs the buttons stack full width. A lone button fills the row. */
 .game-over-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(10.5rem, 100%), 1fr));
   gap: var(--button-gap);
   width: 100%;
   margin-block-start: 0.5rem;
 
-  & > :is([data-slot="button"], [data-slot="dialog-close"]) {
-    flex: 1;
-    min-inline-size: 0;
-    white-space: normal;
+  & > [data-slot="button"] {
+    white-space: nowrap;
   }
 
   & > p {
-    flex-basis: 100%;
+    grid-column: 1 / -1;
     margin: 0;
   }
 }
@@ -5209,7 +5239,7 @@ main {
       0 0 / 300% 100%;
     animation:
       rise-in 320ms ease-out 450ms both,
-      winner-shine 1800ms ease-in-out 800ms 3;
+      winner-shine 4500ms ease-in-out 800ms infinite;
   }
 
   .game-over-actions {

@@ -29,6 +29,15 @@ describe(roundStarted, () => {
     ).toBeTruthy();
   });
 
+  it("is true when the host plays again straight from game over", () => {
+    expect(
+      roundStarted(
+        view({ phase: "gameOver", round: 1 }),
+        view({ phase: "playing", round: 1 })
+      )
+    ).toBeTruthy();
+  });
+
   it("is false within a round, in the lobby and when returning to it", () => {
     const playing = view({ phase: "playing", round: 1 });
 
