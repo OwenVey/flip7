@@ -226,7 +226,29 @@ describe(createDealPlayback, () => {
     ).toBeTruthy();
   });
 
-  it("ends the pause after a reveal when a newer Room update queues", async () => {
+  it("ends the pause after a reveal when a newer Room update deals a card", async () => {
+    const game = gameAtFirstTurn();
+    const table = playback(true, "b");
+    const second = { id: 1005, kind: "number", value: 4 } as const;
+    table.show(view(game));
+    game.deck = [second, number];
+    hit(game, "a", random);
+    table.show(view(game));
+
+    await vi.advanceTimersToNextTimerAsync();
+    expect(table.cues).toStrictEqual(["reveal"]);
+
+    hit(game, "b", random);
+    table.show(view(game));
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(table.flights.map(({ cardId }) => cardId)).toStrictEqual([
+      number.id,
+      second.id,
+    ]);
+  });
+
+  it("keeps the pause after a reveal when an update without cards queues", async () => {
     const game = gameAtFirstTurn();
     const table = playback(true, "b");
     table.show(view(game));
@@ -239,10 +261,12 @@ describe(createDealPlayback, () => {
     expect(table.cues).toStrictEqual(["reveal"]);
     expect(table.shown.actionsDisabled).toBeTruthy();
 
-    const latest = { ...afterHit };
+    const latest = { ...afterHit, botSpeed: "fast" } satisfies RoomView;
     table.show(latest);
     await vi.advanceTimersByTimeAsync(1);
+    expect(table.shown.actionsDisabled).toBeTruthy();
 
+    await vi.runAllTimersAsync();
     expect(table.shown).toMatchObject({
       actionsDisabled: false,
       myMove: true,
@@ -251,15 +275,17 @@ describe(createDealPlayback, () => {
     expect(table.cues).toStrictEqual(["reveal", "turn"]);
   });
 
-  it("hurries queued updates and skips the cue for a superseded choice", async () => {
+  it("hurries a deal only while updates with cards wait behind it", async () => {
     const game = gameAtFirstTurn();
     const table = playback();
     table.show(view(game), false);
-    game.deck = [freeze];
+    game.deck = [number, freeze];
     hit(game, "a", random);
     table.show(view(game));
     choose(game, "a", "a", random);
     table.show(view(game));
+    table.show({ ...view(game), locked: true });
+    hit(game, "b", random);
 
     const finalRoom = view(game);
     table.show(finalRoom);
@@ -269,6 +295,7 @@ describe(createDealPlayback, () => {
     expect(table.flights).toStrictEqual([
       { cardId: freeze.id, duration: 280 },
       { cardId: freeze.id, duration: 140 },
+      { cardId: number.id, duration: 280 },
     ]);
     expect(table.shown).toMatchObject({
       actionsDisabled: false,
@@ -276,6 +303,25 @@ describe(createDealPlayback, () => {
       room: finalRoom,
     });
     expect(table.cues).not.toContain("turn");
+  });
+
+  it("doesn't hurry a deal for an update without cards", async () => {
+    const game = gameAtFirstTurn();
+    const table = playback();
+    table.show(view(game), false);
+    game.deck = [freeze];
+    hit(game, "a", random);
+    table.show(view(game));
+    choose(game, "a", "a", random);
+    table.show(view(game));
+    table.show({ ...view(game), botSpeed: "fast" });
+
+    await vi.runAllTimersAsync();
+
+    expect(table.flights).toStrictEqual([
+      { cardId: freeze.id, duration: 280 },
+      { cardId: freeze.id, duration: 280 },
+    ]);
   });
 
   it("catches up to a queued choice when motion is disabled mid-flight", async () => {

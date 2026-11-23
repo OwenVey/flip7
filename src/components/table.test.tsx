@@ -72,6 +72,14 @@ const room = (overrides: Partial<RoomView> = {}) => {
   return view;
 };
 
+const withBot = (overrides: Partial<RoomView> = {}) => {
+  const view = room(overrides);
+  const [ana, ben] = view.players;
+  view.players = [ana, { ...ben, avatar: null, bot: true, name: "Torch" }];
+
+  return view;
+};
+
 const Table = (
   props: Omit<ComponentProps<typeof TableView>, "roundPoints"> &
     Partial<Pick<ComponentProps<typeof TableView>, "roundPoints">>
@@ -197,6 +205,28 @@ describe("<Table />", () => {
       locked: true,
       type: "configure",
     });
+  });
+
+  it("shows a confirmed bot speed in settings while the deal plays back", async () => {
+    render(() => (
+      <Table
+        room={withBot()}
+        latestRoom={withBot({ botSpeed: "fast" })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        actionsDisabled
+        dealing
+      />
+    ));
+
+    fireEvent.click(screen.getByRole("button", { name: "Room settings" }));
+
+    const popover = await screen.findByRole("dialog", {
+      name: "Room settings",
+    });
+
+    expect(within(popover).getByRole("radio", { name: "Fast" })).toBeChecked();
   });
 
   it("offers invite, settings, and leave from the phone menu", async () => {
@@ -1405,6 +1435,28 @@ describe("<Table />", () => {
     expect(hit).toBeEnabled();
     hit.click();
     expect(send).toHaveBeenCalledWith({ type: "hit" });
+  });
+
+  it("keeps Remove steady during the deal and blocks it only while offline", () => {
+    const [offline, setOffline] = createSignal(false);
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        actionsDisabled
+        dealing
+        offline={offline()}
+      />
+    ));
+
+    const remove = screen.getByRole("button", { name: "Remove Ben" });
+    expect(remove).not.toHaveAttribute("aria-disabled");
+
+    setOffline(true);
+    flush();
+    expect(remove).toHaveAttribute("aria-disabled", "true");
   });
 
   it("removing a player needs a person to confirm", async () => {

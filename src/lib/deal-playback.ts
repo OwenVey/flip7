@@ -9,6 +9,11 @@ import type { DealStep } from "./deal-plan";
 import { roomCues } from "./room-cues";
 import type { RoomCue } from "./room-cues";
 
+interface QueuedRoom {
+  room: RoomView;
+  deals: boolean;
+}
+
 const FLIGHT_MS = 280;
 const HURRIED_FLIGHT_MS = 140;
 const BULK_DEAL_MIN_CARDS = 5;
@@ -134,7 +139,7 @@ export const createDealPlayback = (
   publish: (view: DealPlaybackView) => void,
   cue: (cue: RoomCue) => void
 ) => {
-  const queue: RoomView[] = [];
+  const queue: QueuedRoom[] = [];
   let latest: PlaybackInput | null = null;
   let settled: RoomView | null = null;
   let run: AbortController | null = null;
@@ -142,8 +147,10 @@ export const createDealPlayback = (
   let frame = emptyFrame;
   let moveCuePending = false;
 
+  const behind = () => queue.some((queued) => queued.deals);
+
   const waitForPause = async (ms: number, signal: AbortSignal) => {
-    if (queue.length > 0 || signal.aborted) {
+    if (behind() || signal.aborted) {
       return;
     }
 
@@ -205,7 +212,7 @@ export const createDealPlayback = (
 
       const announced = steps[index - 1]?.to.kind === "played";
 
-      if (step.flip?.index === 1 && queue.length === 0 && !announced) {
+      if (step.flip?.index === 1 && !behind() && !announced) {
         show({ step: { ...step, flip: { ...step.flip, index: 0 } } });
         await waitForPause(FLIP_LEAD_IN_MS, signal);
       }
@@ -218,7 +225,7 @@ export const createDealPlayback = (
 
       const fly = motion.captureFlight(
         step,
-        bulkCard || queue.length > 0 ? HURRIED_FLIGHT_MS : FLIGHT_MS
+        bulkCard || behind() ? HURRIED_FLIGHT_MS : FLIGHT_MS
       );
 
       show({
@@ -236,7 +243,7 @@ export const createDealPlayback = (
       cue("reveal");
       await motion.land(
         step,
-        queue.length > 0 ? HURRIED_DISCARD_MS : DISCARD_MS,
+        behind() ? HURRIED_DISCARD_MS : DISCARD_MS,
         signal
       );
 
@@ -259,7 +266,7 @@ export const createDealPlayback = (
       cue("deal");
     }
 
-    if (newRound && previous.phase !== "lobby" && queue.length === 0) {
+    if (newRound && previous.phase !== "lobby" && !behind()) {
       await motion.sweep(signal);
     }
 
@@ -267,7 +274,11 @@ export const createDealPlayback = (
   };
 
   const drain = async (signal: AbortSignal) => {
-    for (let current = queue.shift(); current; current = queue.shift()) {
+    for (
+      let current = queue.shift()?.room;
+      current;
+      current = queue.shift()?.room
+    ) {
       const previous = settled;
       settled = current;
       let sounds: RoomCue[] = [];
@@ -367,8 +378,15 @@ export const createDealPlayback = (
         return;
       }
 
-      queue.push(next.room);
-      pause?.abort();
+      const target = queue.at(-1)?.room ?? settled;
+
+      const deals = target !== null && planDeal(target, next.room).length > 0;
+
+      queue.push({ deals, room: next.room });
+
+      if (deals) {
+        pause?.abort();
+      }
 
       if (!run) {
         run = new AbortController();

@@ -541,6 +541,86 @@ describe("a pending move", () => {
   });
 });
 
+describe("room commands", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("change settings without holding up the player's moves", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    net.join("Ben");
+
+    const configured = ana.client.send({ botSpeed: "fast", type: "configure" });
+    expect(ana.client.state).toMatchObject({ canAct: true, sending: false });
+
+    const started = ana.client.send({ type: "start" });
+    expect(ana.client.state).toMatchObject({ canAct: false, sending: true });
+    net.flush();
+
+    await expect(configured).resolves.toBeTruthy();
+    await expect(started).resolves.toBeTruthy();
+    expect(ana.client.state.room).toMatchObject({
+      botSpeed: "fast",
+      phase: "playing",
+    });
+  });
+
+  it("remove a player while a move waits for the room", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    net.join("Ben");
+    const cara = net.join("Cara");
+    const caraId = cara.client.state.playerId ?? "";
+
+    const started = ana.client.send({ type: "start" });
+    const kicked = ana.client.send({ playerId: caraId, type: "kick" });
+    net.flush();
+
+    await expect(started).resolves.toBeTruthy();
+    await expect(kicked).resolves.toBeTruthy();
+    expect(net.stored.game.players.map((player) => player.name)).toStrictEqual([
+      "Ana",
+      "Ben",
+    ]);
+  });
+
+  it("don't stop a move sent before them from being confirmed after a reconnect", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    net.join("Ben");
+
+    const started = ana.client.send({ type: "start" });
+    const configured = ana.client.send({ locked: true, type: "configure" });
+    net.flushToServer();
+    net.drop(ana);
+    net.connect(ana);
+    net.flush();
+
+    await expect(configured).resolves.toBeFalsy();
+    await expect(started).resolves.toBeTruthy();
+    expect(ana.client.state.notice?.message).toBe(
+      "Reconnected. Your last move counted."
+    );
+  });
+
+  it("say why the room rejected them", async () => {
+    const net = network();
+    net.join("Ana");
+    const ben = net.join("Ben");
+
+    const sent = ben.client.send({ locked: true, type: "configure" });
+    net.flush();
+
+    await expect(sent).resolves.toBeFalsy();
+    expect(ben.client.state.notice?.message).toBe("Only the host can do that.");
+  });
+});
+
 describe("leaving the room", () => {
   it("forgets a kicked player and stops", async () => {
     const net = network();

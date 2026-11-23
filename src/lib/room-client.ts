@@ -1,3 +1,4 @@
+import { isRoomCommand } from "../game/client-message";
 import type { ClientMessage, GameCommand } from "../game/client-message";
 import { ROOM_REMOVED_CLOSE_CODE } from "../game/protocol";
 import type { RoomView, ServerMessage } from "../game/protocol";
@@ -104,6 +105,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   let noticeId = 0;
   let lastRequestId: string | undefined;
   let pendingMove: PendingMove | null = null;
+  const roomCommands = new Map<string, (accepted: boolean) => void>();
   let stopped = false;
   let wasVisible = false;
 
@@ -124,6 +126,17 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
   const raw = (message: ClientMessage) =>
     socket.isOpen() && socket.send(JSON.stringify(message));
+
+  const settleRoomCommand = (requestId: string, accepted: boolean) => {
+    roomCommands.get(requestId)?.(accepted);
+    roomCommands.delete(requestId);
+  };
+
+  const dropRoomCommands = () => {
+    for (const requestId of roomCommands.keys()) {
+      settleRoomCommand(requestId, false);
+    }
+  };
 
   const settleMove = (accepted: boolean) => {
     if (pendingMove) {
@@ -151,6 +164,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     }
 
     update({ ready: false });
+    dropRoomCommands();
 
     if (pendingMove) {
       clearTimeout(pendingMove.timeout);
@@ -228,12 +242,19 @@ export const createRoomClient = (deps: RoomClientDeps) => {
           settleMove(true);
         }
 
+        settleRoomCommand(message.requestId, true);
+
         return;
       }
 
       case "rejected": {
         if (pendingMove?.requestId === message.requestId) {
           settleMove(false);
+          notify(message.message);
+        }
+
+        if (roomCommands.has(message.requestId)) {
+          settleRoomCommand(message.requestId, false);
           notify(message.message);
         }
 
@@ -415,7 +436,9 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     },
 
     send: async (command: GameCommand) => {
-      if (pendingMove) {
+      const roomCommand = isRoomCommand(command);
+
+      if (pendingMove && !roomCommand) {
         return false;
       }
 
@@ -426,6 +449,18 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       }
 
       const requestId = deps.newId();
+
+      if (roomCommand) {
+        const { promise, resolve } = Promise.withResolvers<boolean>();
+        roomCommands.set(requestId, resolve);
+
+        if (!raw({ ...command, requestId })) {
+          settleRoomCommand(requestId, false);
+        }
+
+        return await promise;
+      }
+
       const { promise, resolve } = Promise.withResolvers<boolean>();
       const timeout = setTimeout(startOver, REPLY_TIMEOUT_MS);
       pendingMove = { requestId, resolve, timeout };
