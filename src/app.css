@@ -1626,24 +1626,6 @@ main {
   padding: 0.5rem 1rem 0.5rem 0.875rem;
 }
 
-.action-bar[data-turn-summary] {
-  height: auto;
-  min-height: 4rem;
-}
-
-.turn-message {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.turn-summary {
-  overflow: hidden;
-  font-family: var(--font-body);
-  font-size: 0.875rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .headline {
   display: -webkit-box;
   flex: 1 1 auto;

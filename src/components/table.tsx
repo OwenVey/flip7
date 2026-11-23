@@ -948,45 +948,6 @@ const OfflineTurn = (
   );
 };
 
-const describeTurnOutcomes = (events: (string | undefined)[], verb: string) => {
-  if (events.length === 0) {
-    return "";
-  }
-
-  return (
-    (events.length === 1 ? events[0] : undefined) ?? `${events.length} ${verb}`
-  );
-};
-
-const turnSummary = (room: RoomView, after: number) => {
-  const outcomes: Record<"bust" | "freeze" | "bank", (string | undefined)[]> = {
-    bust: [],
-    freeze: [],
-    bank: [],
-  };
-
-  const game = room.log.at(-1)?.game;
-
-  for (const entry of room.log) {
-    if (
-      entry.id > after &&
-      entry.round === room.round &&
-      entry.game === game &&
-      (entry.cue === "bust" || entry.cue === "freeze" || entry.cue === "bank")
-    ) {
-      outcomes[entry.cue].push(entry.summary);
-    }
-  }
-
-  return [
-    describeTurnOutcomes(outcomes.bust, "busted"),
-    describeTurnOutcomes(outcomes.freeze, "frozen"),
-    describeTurnOutcomes(outcomes.bank, "stayed"),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-};
-
 const ActionBar = (
   props: TableProps & DealProps & Pick<MoveControls, "moves">
 ) => {
@@ -997,21 +958,6 @@ const ActionBar = (
     const { turn } = props.moves;
 
     return turn !== null && turn.forId === undefined && props.dealing !== true;
-  };
-
-  const latestLogId = () => props.room.log.at(-1)?.id ?? 0;
-  const [lastMoveLogId, setLastMoveLogId] = createSignal(untrack(latestLogId));
-
-  const summary = createMemo(() =>
-    myTurn() ? turnSummary(props.room, lastMoveLogId()) : ""
-  );
-
-  const playTurn = async (type: "hit" | "stay") => {
-    const logId = latestLogId();
-
-    if (await props.send({ type })) {
-      setLastMoveLogId(logId);
-    }
   };
 
   const actionBarLabel = () => {
@@ -1090,7 +1036,6 @@ const ActionBar = (
       data-action-bar=""
       aria-label={actionBarLabel()}
       data-turn={myTurn() ? "" : undefined}
-      data-turn-summary={summary() ? "" : undefined}
     >
       <ScrollFade viewportClass="action-bar-scroll">
         <div class="action-bar-content">
@@ -1165,29 +1110,22 @@ const ActionBar = (
               <p class="headline">{dealingLabel()}</p>
             </Match>
             <Match when={myTurn()}>
-              <div class="turn-message">
-                <p class="headline">
-                  Your turn{" "}
-                  <span class="muted">
-                    ·{" "}
-                    {iCanStay()
-                      ? `${myRound()} points this round`
-                      : "Hit for a card before you can stay"}
-                  </span>
-                </p>
-                <Show when={summary()}>
-                  <p class="turn-summary" title={summary()}>
-                    Since your turn · {summary()}
-                  </p>
-                </Show>
-              </div>
+              <p class="headline">
+                Your turn{" "}
+                <span class="muted">
+                  ·{" "}
+                  {iCanStay()
+                    ? `${myRound()} points this round`
+                    : "Hit for a card before you can stay"}
+                </span>
+              </p>
               <ActionButtons>
                 <Button
                   data-size="lg"
                   disabled={props.actionsDisabled}
                   data-variant="solid"
-                  onClick={async () => {
-                    await playTurn("hit");
+                  onClick={() => {
+                    void props.send({ type: "hit" });
                   }}
                 >
                   <SquarePlus size={16} />
@@ -1197,8 +1135,8 @@ const ActionBar = (
                   <Button
                     data-size="lg"
                     disabled={props.actionsDisabled}
-                    onClick={async () => {
-                      await playTurn("stay");
+                    onClick={() => {
+                      void props.send({ type: "stay" });
                     }}
                   >
                     <Hand size={16} />
