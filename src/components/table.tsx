@@ -9,8 +9,10 @@ import PlayingCardsFan from "@lucide/solid/icons/playing-cards-fan";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import SquarePlus from "@lucide/solid/icons/square-plus";
 import Trophy from "@lucide/solid/icons/trophy";
+import { createAlertDialogController } from "@ui-sdk/solid/alert-dialog";
 import { Button } from "@ui-sdk/solid/button";
 import { Meter, MeterIndicator, MeterTrack } from "@ui-sdk/solid/meter";
+import { createPopoverController } from "@ui-sdk/solid/popover";
 import {
   createEffect,
   createMemo,
@@ -50,6 +52,7 @@ import PlayingCard from "./playing-card";
 import RemovePlayer from "./remove-player";
 import { RoomSettingsMenu } from "./room-settings";
 import ScrollFade from "./scroll-fade";
+import TableMoreMenu from "./table-more-menu";
 import TableSheet from "./table-sheet";
 import Tooltip from "./tooltip";
 
@@ -64,7 +67,7 @@ const STATUS_LABELS = {
 
 const SCORES_TITLE = "Scores";
 const ROUND_COUNT_MS = 320;
-const PHONE_TABLE_QUERY = "(max-width: 40rem), (max-height: 30rem)";
+const SHEET_TABLE_QUERY = "(width < 64rem), (max-height: 30rem)";
 
 const STAMPED_STATUSES: ReadonlySet<RoundStatus> = new Set([
   "busted",
@@ -1302,6 +1305,8 @@ export default function Table(
   props: TableProps & DealProps & { chat: RoomConnection["chat"] }
 ) {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
+  const settings = createPopoverController();
+  const leave = createAlertDialogController();
 
   const chooseTarget = (targetId: string) => {
     const { choice } = moves();
@@ -1340,7 +1345,7 @@ export default function Table(
   );
 
   createEffect(resultsRound, (round, previous) => {
-    if (round !== null && globalThis.matchMedia?.(PHONE_TABLE_QUERY).matches) {
+    if (round !== null && globalThis.matchMedia?.(SHEET_TABLE_QUERY).matches) {
       setLogOpen(false);
       setScoresOpen(true);
     } else if (previous !== null && previous !== undefined) {
@@ -1383,6 +1388,7 @@ export default function Table(
               }}
               title={SCORES_TITLE}
               triggerLabel={SCORES_TITLE}
+              shortLabel={SCORES_TITLE}
               trigger={<Trophy size={16} aria-hidden="true" />}
             >
               <Leaderboard
@@ -1394,6 +1400,7 @@ export default function Table(
             <TableSheet
               title={CHAT_AND_GAME_LOG_TITLE}
               triggerLabel={toggleLabel()}
+              shortLabel="Chat"
               keepMounted
               open={logOpen()}
               onOpenChange={onLogOpenChange}
@@ -1415,10 +1422,12 @@ export default function Table(
                 onChat={props.chat}
               />
             </TableSheet>
-            <InviteButton brief />
+            <InviteButton brief collapsible />
             <Show when={moves().host.configure}>
               <RoomSettingsMenu
                 room={props.room}
+                controller={settings}
+                collapsible
                 onChange={(changes) => {
                   void props.send({ ...changes, type: "configure" });
                 }}
@@ -1426,9 +1435,16 @@ export default function Table(
             </Show>
             <LeaveRoom
               disabled={props.actionsDisabled}
+              controller={leave}
+              collapsible
               onLeave={() => {
                 void props.send({ type: "leave" });
               }}
+            />
+            <TableMoreMenu
+              leave={leave}
+              leaveDisabled={props.actionsDisabled}
+              settings={moves().host.configure ? settings : undefined}
             />
           </div>
         </header>

@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@ui-sdk/solid/dialog";
+import { Show } from "solid-js";
 import type { ParentProps } from "solid-js";
 
 import ScrollFade from "./scroll-fade";
@@ -17,6 +18,8 @@ export default function TableSheet(
     title: string;
     triggerLabel: string;
     trigger: JSX.Element;
+    /** A short visible label beside the icon, shown when the header has room. */
+    shortLabel?: string;
     keepMounted?: boolean;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
@@ -32,6 +35,7 @@ export default function TableSheet(
         content={props.triggerLabel}
         type="label"
         side="bottom"
+        compactOnly={props.shortLabel !== undefined}
         trigger={(hint) => (
           <DialogTrigger
             {...hint}
@@ -41,6 +45,11 @@ export default function TableSheet(
         )}
       >
         {props.trigger}
+        <Show when={props.shortLabel}>
+          <span class="button-label" aria-hidden="true">
+            {props.shortLabel}
+          </span>
+        </Show>
       </Tooltip>
       <DialogContent class="table-sheet" keepMounted={props.keepMounted}>
         <header class="table-sheet-header">

@@ -8,18 +8,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@ui-sdk/solid/alert-dialog";
+import type { AlertDialogController } from "@ui-sdk/solid/alert-dialog";
 
 import ScrollFade from "./scroll-fade";
 import Tooltip from "./tooltip";
 
 export default function LeaveRoom(props: {
   disabled?: boolean;
+  /** Lets another control, like the table's phone menu, open the confirmation. */
+  controller?: AlertDialogController;
+  /** Hides the button on narrow screens, where the table's menu offers Leave instead. */
+  collapsible?: boolean;
   onLeave: () => void;
 }) {
   let confirmed = false;
 
   return (
     <AlertDialog
+      controller={props.controller}
       onOpenChange={(open, details) => {
         if (open && confirmed) {
           details.cancel();
@@ -48,6 +54,7 @@ export default function LeaveRoom(props: {
             aria-label="Leave room"
             data-variant="quiet"
             data-tone="danger"
+            data-collapsible={props.collapsible === true ? "" : undefined}
             aria-disabled={props.disabled === true ? "true" : undefined}
             onClick={(event) => {
               if (props.disabled === true) {

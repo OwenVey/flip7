@@ -863,7 +863,8 @@ button.room-code {
   [data-slot="alert-dialog-close"],
   [data-slot="dialog-trigger"],
   [data-slot="dialog-close"],
-  [data-slot="popover-trigger"]
+  [data-slot="popover-trigger"],
+  [data-slot="menu-trigger"]
 ) {
   --button-height: var(--control-height);
   height: auto;
@@ -995,7 +996,8 @@ button.room-code {
     [data-slot="alert-dialog-close"],
     [data-slot="dialog-trigger"],
     [data-slot="dialog-close"],
-    [data-slot="popover-trigger"]
+    [data-slot="popover-trigger"],
+    [data-slot="menu-trigger"]
   ):where(:hover) {
     background: var(--ui-background);
   }
@@ -2126,12 +2128,26 @@ main {
   row-gap: 1.25rem;
 }
 
+/*
+ * The header's controls step down by its own width, so they never wrap:
+ * everything labelled, then Invite, Settings, and Leave fold into ⋯, then
+ * only icons. The steps fit "Round 12" beside touch-size buttons.
+ */
 .table-header {
+  container: table-header / inline-size;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 2rem;
+  gap: 0.75rem;
   align-items: center;
   justify-content: space-between;
+
+  & h1 {
+    min-width: 0;
+  }
+
+  & .row {
+    flex: none;
+    flex-wrap: nowrap;
+  }
 
   /* The lobby heading's size, one step down on phones so it fits beside the touch-size buttons. */
   & h1 {
@@ -2149,7 +2165,8 @@ main {
         [data-slot="button"],
         [data-slot="alert-dialog-trigger"],
         [data-slot="dialog-trigger"],
-        [data-slot="popover-trigger"]
+        [data-slot="popover-trigger"],
+        [data-slot="menu-trigger"]
       ) {
       --button-height: var(--control-height-sm);
       padding-inline: 0.75rem;
@@ -2159,6 +2176,39 @@ main {
   /* The closed chat sheet keeps its viewport mounted to preserve drafts. */
   & .row > [data-slot="dialog-viewport"] {
     position: fixed;
+  }
+}
+
+/* Phones swap Invite, Settings, and Leave for this one menu. */
+.table-more-trigger {
+  display: none;
+}
+
+.table-more-menu {
+  & [data-slot="menu-item"] {
+    min-height: 2.25rem;
+    font-weight: 600;
+
+    &[data-highlighted] {
+      background: color-mix(in oklab, var(--ink) 12%, var(--paper));
+    }
+
+    @media (pointer: coarse) {
+      min-height: 2.75rem;
+    }
+  }
+
+  & [data-slot="menu-separator"] {
+    margin-block: 0.375rem;
+  }
+
+  & [data-slot="menu-item"][data-tone="danger"]:not([data-disabled]) {
+    color: var(--danger);
+
+    &[data-highlighted] {
+      background: color-mix(in oklab, var(--danger) 14%, var(--paper));
+      color: var(--danger-ink);
+    }
   }
 }
 
@@ -2769,8 +2819,9 @@ main {
   display: grid;
   /* A crowded header gives way inside the seat instead of widening it. */
   grid-template-columns: minmax(0, 1fr);
+  /* Seats in a row share the tallest one's height; the mat takes the extra so no blank paper gathers at the bottom. */
+  grid-template-rows: auto 1fr auto;
   gap: 0.5rem;
-  align-content: start;
   padding: 0.625rem 0.75rem 0.75rem;
   border: 2px solid var(--ink);
   border-radius: var(--dialog-radius);
@@ -3155,6 +3206,15 @@ main {
   }
 }
 
+/* The host's Remove button beside mini cards would push them to a second row, so the turn badge makes way first. */
+@container seat-header (width < 20rem) {
+  .seat-header:has(> .seat-extras > *):has(.remove-player)
+    .seat-meta
+    > [data-tone="turn"] {
+    display: none;
+  }
+}
+
 @container seat-header (width < 19rem) {
   .flip-run-label {
     position: absolute;
@@ -3267,6 +3327,7 @@ main {
 
 .hand-area {
   position: relative;
+  display: grid;
   isolation: isolate;
   /* Room below for the end-of-round stamp that straddles the bottom edge, kept always so seats don't jump. */
   margin-block-end: 0.375rem;
@@ -3280,7 +3341,7 @@ main {
   grid-auto-flow: column;
   align-items: center;
   justify-content: start;
-  height: calc(var(--hand-card) * 1.4 + 2 * var(--hand-pad) + 0.5rem);
+  min-height: calc(var(--hand-card) * 1.4 + 2 * var(--hand-pad) + 0.5rem);
   margin: 0;
   /* Room at the end for the last card when the columns squeeze and cards overlap. */
   padding: var(--hand-pad) calc(var(--hand-pad) + var(--hand-card))
@@ -4640,8 +4701,55 @@ main {
   display: none;
 }
 
-[data-table-sheet-trigger] {
+.table-header [data-table-sheet-trigger] {
   position: relative;
+}
+
+/* Without room for the sidebar, scores and the log open as sheets from the header so they stay discoverable. */
+@media (width < 64rem), (max-height: 30rem) {
+  [data-table-sheet-trigger] {
+    display: inline-flex;
+  }
+
+  .table-sidebar {
+    display: none;
+  }
+}
+
+@container table-header (width < 50rem) {
+  .table-header [data-collapsible] {
+    display: none;
+  }
+
+  .table-header .table-more-trigger {
+    display: inline-flex;
+    flex: none;
+    inline-size: var(--button-height);
+    padding-inline: 0;
+  }
+}
+
+@container table-header (width < 30rem) {
+  .table-header {
+    & [data-slot="tooltip-content"][data-compact-only] {
+      visibility: visible;
+    }
+
+    & [data-table-sheet-trigger] {
+      flex: none;
+      inline-size: var(--button-height);
+      padding-inline: 0;
+    }
+
+    & .button-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
 }
 
 .unread-count {
@@ -4665,8 +4773,7 @@ main {
  * header controls as icons, and scores, log, and chat in sheets.
  */
 @media (max-width: 40rem), (max-height: 30rem) {
-  :is(.page-header, .table-header)
-    [data-slot="tooltip-content"][data-compact-only] {
+  .page-header [data-slot="tooltip-content"][data-compact-only] {
     visibility: visible;
   }
 
@@ -4678,7 +4785,7 @@ main {
     display: inline;
   }
 
-  :is(.page-header, .table-header) {
+  .page-header {
     flex-wrap: nowrap;
     gap: 0.75rem;
     align-items: center;
@@ -4693,31 +4800,24 @@ main {
     }
   }
 
-  :is(.page-header, .table-header)
+  .page-header
     :is(
-      [data-table-sheet-trigger],
-      :is(
-        [data-slot="button"],
-        [data-slot="alert-dialog-trigger"],
-        [data-slot="popover-trigger"]
-      ):has(> .button-label)
-    ) {
+      [data-slot="button"],
+      [data-slot="alert-dialog-trigger"],
+      [data-slot="popover-trigger"]
+    ):has(> .button-label) {
     flex: none;
     inline-size: var(--button-height);
     padding-inline: 0;
   }
 
-  :is(.page-header, .table-header) .button-label {
+  .page-header .button-label {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-
-  [data-table-sheet-trigger] {
-    display: inline-flex;
   }
 
   .seats {
@@ -4735,10 +4835,6 @@ main {
   .seat-header {
     height: auto;
     min-height: 2rem;
-  }
-
-  .table-sidebar {
-    display: none;
   }
 
   .home {

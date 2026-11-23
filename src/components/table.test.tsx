@@ -166,6 +166,74 @@ describe("<Table />", () => {
     });
   });
 
+  it("offers invite, settings, and leave from the phone menu", async () => {
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent)
+    ).toStrictEqual(["Copy invite link", "Room settings", "Leave room"]);
+
+    fireEvent.click(
+      within(menu).getByRole("menuitem", { name: "Room settings" })
+    );
+
+    const settings = await screen.findByRole("dialog", {
+      name: "Room settings",
+    });
+
+    await vi.waitFor(() => {
+      expect(screen.queryByRole("menu")).toBeNull();
+    });
+    expect(settings).toBeVisible();
+    expect(settings.contains(document.activeElement)).toBeTruthy();
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(
+      within(await screen.findByRole("menu")).getByRole("menuitem", {
+        name: "Leave room",
+      })
+    );
+
+    await expect(
+      screen.findByRole("alertdialog", { name: "Leave this room?" })
+    ).resolves.toBeVisible();
+  });
+
+  it("leaves room settings out of a guest's phone menu and blocks leaving during the deal", async () => {
+    render(() => (
+      <Table
+        room={room()}
+        playerId="b"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        actionsDisabled
+      />
+    ));
+
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu).queryByRole("menuitem", { name: "Room settings" })
+    ).toBeNull();
+    expect(
+      within(menu).getByRole("menuitem", { name: "Leave after the deal" })
+    ).toHaveAttribute("aria-disabled", "true");
+  });
+
   it("keeps room settings away from guests", () => {
     render(() => (
       <Table
@@ -212,10 +280,10 @@ describe("<Table />", () => {
     expect(scores).toHaveFocus();
   });
 
-  it("opens phone Scores once per round end and lists busted players", async () => {
+  it("opens the Scores sheet once per round end and lists busted players", async () => {
     // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
     vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query.includes("max-width"),
+      matches: query.includes("width < 64rem"),
     }));
 
     try {

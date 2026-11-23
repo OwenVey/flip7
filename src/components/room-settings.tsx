@@ -6,6 +6,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@ui-sdk/solid/popover";
+import type { PopoverController } from "@ui-sdk/solid/popover";
 import {
   SegmentedControl,
   SegmentedControlIndicator,
@@ -133,14 +134,23 @@ export default function RoomSettingsForm(props: {
 /** The host's settings during a game, in a popover from the table header. */
 export const RoomSettingsMenu = (props: {
   room: RoomView;
+  /** Lets another control, like the table's phone menu, open the settings. */
+  controller?: PopoverController;
+  /** Hides the button on narrow screens, where the table's menu offers the settings instead. */
+  collapsible?: boolean;
   onChange: (changes: Partial<RoomSettings>) => void;
 }) => (
-  <Popover>
+  <Popover controller={props.controller}>
     <Tooltip
       content="Room settings"
       type="label"
       compactOnly
-      trigger={(hint) => <PopoverTrigger {...hint} />}
+      trigger={(hint) => (
+        <PopoverTrigger
+          {...hint}
+          data-collapsible={props.collapsible === true ? "" : undefined}
+        />
+      )}
     >
       <SlidersHorizontal size={16} aria-hidden="true" />
       <span class="button-label">Settings</span>

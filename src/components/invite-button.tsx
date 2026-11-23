@@ -11,6 +11,8 @@ import Tooltip from "./tooltip";
 export default function InviteButton(props: {
   solid?: boolean;
   brief?: boolean;
+  /** Hides the button on narrow screens, where the table's menu offers the invite instead. */
+  collapsible?: boolean;
 }) {
   const { copied, invite, shares } = createInvite();
 
@@ -39,6 +41,7 @@ export default function InviteButton(props: {
         <Button
           {...hint}
           data-variant={props.solid === true ? "solid" : undefined}
+          data-collapsible={props.collapsible === true ? "" : undefined}
           onClick={invite}
         />
       )}
