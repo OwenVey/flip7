@@ -111,6 +111,95 @@ describe("<Table />", () => {
     expect(scores).toHaveFocus();
   });
 
+  it("opens phone Scores once per round end and lets players expand busted rows", async () => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("max-width"),
+    }));
+
+    try {
+      const initial = room();
+      const [ana, ben] = initial.players;
+      const [view, setView] = createSignal(initial);
+      render(() => (
+        <Table
+          room={view()}
+          playerId="a"
+          send={vi.fn<RoomConnection["send"]>()}
+          chat={vi.fn<RoomConnection["chat"]>()}
+        />
+      ));
+
+      const result = room({
+        phase: "roundOver",
+        players: [
+          {
+            ...ana,
+            lastRound: calculateRoundScore(ana.hand),
+            score: 47,
+            status: "stayed",
+          },
+          { ...ben, status: "busted" },
+        ],
+      });
+
+      setView(result);
+      flush();
+
+      const scores = within(
+        await screen.findByRole("dialog", { name: "Scores" })
+      );
+
+      expect(scores.getByRole("cell", { name: "47" })).toBeVisible();
+      expect(scores.queryByRole("rowheader", { name: "Ben" })).toBeNull();
+      scores.getByRole("button", { name: "Show 1 busted" }).click();
+      flush();
+      expect(scores.getByRole("rowheader", { name: "Ben" })).toBeVisible();
+      scores.getByRole("button", { name: "Close" }).click();
+      setView({ ...result, deckCount: 79 });
+      flush();
+      expect(screen.queryByRole("dialog", { name: "Scores" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Scores" })).toBeVisible();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("advances only after the host opts in and can cancel the countdown", () => {
+    vi.useFakeTimers();
+
+    try {
+      const send = vi.fn<RoomConnection["send"]>();
+      render(() => (
+        <Table
+          room={room({ phase: "roundOver" })}
+          playerId="a"
+          send={send}
+          chat={vi.fn<RoomConnection["chat"]>()}
+        />
+      ));
+      vi.advanceTimersByTime(10_000);
+      expect(send).not.toHaveBeenCalled();
+
+      screen.getByRole("button", { name: "Enable auto-advance" }).click();
+      flush();
+      screen.getByRole("button", { name: "Cancel auto-advance (10s)" }).click();
+      flush();
+      vi.advanceTimersByTime(10_000);
+      expect(send).not.toHaveBeenCalled();
+
+      screen.getByRole("button", { name: "Enable auto-advance" }).click();
+      flush();
+      vi.advanceTimersByTime(9999);
+      expect(send).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(send).toHaveBeenCalledExactlyOnceWith({ type: "nextRound" });
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
   it("shows the banked and round scores in the same label row", () => {
     render(() => (
       <Table
@@ -125,13 +214,13 @@ describe("<Table />", () => {
     expect(within(seat).getByText("Your turn")).toBeVisible();
 
     const meter = within(seat).getByRole("meter", { name: "Total score" });
-    expect(within(meter).getByText("40")).toBeVisible();
+    expect(within(meter).getByText("40 / 200")).toBeVisible();
     expect(
       Array.from(
         meter.querySelectorAll(".seat-score"),
         (label) => label.textContent
       )
-    ).toStrictEqual(["40", "+7"]);
+    ).toStrictEqual(["40 / 200", "+7"]);
     expect(meter).toHaveAttribute("aria-valuenow", "40");
     expect(meter).toHaveAttribute(
       "aria-valuetext",
@@ -242,13 +331,10 @@ describe("<Table />", () => {
     flush();
 
     expect(projectedScore()).toBe("23.5%");
-    expect(meter).toHaveAttribute(
-      "aria-valuetext",
-      "47 of 200 points, 7 this round"
-    );
+    expect(meter).toHaveAttribute("aria-valuetext", "47 of 200 points");
   });
 
-  it("keeps the scored round's points on the meter until the next round", () => {
+  it("rolls scored points into the seat total", () => {
     const initial = room();
 
     render(() => (
@@ -281,10 +367,10 @@ describe("<Table />", () => {
     const seat = screen.getByRole("article", { name: "Ana, 47 points" });
     const meter = within(seat).getByRole("meter", { name: "Total score" });
 
-    expect(meter.style.getPropertyValue("--round-start")).toBe("20%");
+    expect(meter.style.getPropertyValue("--round-start")).toBe("23.5%");
     expect(meter.style.getPropertyValue("--projected-score")).toBe("23.5%");
-    expect(within(meter).getByText("40")).toBeVisible();
-    expect(within(meter).getByText("+7")).toBeVisible();
+    expect(within(meter).getByText("47 / 200")).toBeVisible();
+    expect(within(meter).queryByText("+7")).toBeNull();
     expect(within(seat).queryByText(/points this round/u)).toBeNull();
   });
 
@@ -395,13 +481,11 @@ describe("<Table />", () => {
       leaderboard
         .getAllByRole("row")
         .slice(1)
-        .map((row) =>
-          Array.from(row.children, (cell) => cell.textContent).slice(0, 4)
-        );
+        .map((row) => Array.from(row.children, (cell) => cell.textContent));
 
     expect(
       leaderboard.getAllByRole("columnheader").map((cell) => cell.textContent)
-    ).toStrictEqual(["Rank", "Player", "Round", "Total", "Remove"]);
+    ).toStrictEqual(["Rank", "Player", "Round", "Total"]);
     expect(rows()).toStrictEqual([
       ["1", "Ana You", "+7", "40"],
       ["2", "Ben", "+36", "12"],
@@ -611,13 +695,7 @@ describe("<Table />", () => {
 
     const labels = entries().map((entry) => entry.label);
     expect(labels).toStrictEqual(
-      expect.arrayContaining([
-        "Hit",
-        "Stay",
-        "Copy invite link",
-        "Leave room",
-        "Remove Ben",
-      ])
+      expect.arrayContaining(["Hit", "Stay", "Copy invite link", "Leave room"])
     );
 
     const result = await agent.act({
@@ -1037,6 +1115,11 @@ describe("<Table />", () => {
       />
     ));
 
+    const ben = within(screen.getByRole("article", { name: "Ben, 12 points" }));
+    expect(ben.getByRole("button", { name: "Remove Ben" })).toBeVisible();
+    const scores = within(screen.getByRole("table", { name: "Scores" }));
+    expect(scores.queryByRole("button", { name: /Remove/u })).toBeNull();
+
     const remove = {
       steps: [
         { action: "press", args: ["Remove from room"], ref: "Remove Ben" },
@@ -1048,13 +1131,12 @@ describe("<Table />", () => {
     expect(refused.ok).toBeFalsy();
     expect(send).not.toHaveBeenCalled();
     approve = true;
-    const confirmed = await agent.act(remove);
-    expect(confirmed.ok).toBeTruthy();
+    await agent.act(remove);
     expect(send).toHaveBeenCalledWith({ playerId: "b", type: "kick" });
     approve = false;
   });
 
-  it("keeps the host's Remove out of seats and in the Scores table during play", () => {
+  it("keeps Remove controls out of seats and Scores while picking a target", () => {
     const choice = {
       card: { id: 9, kind: "freeze" as const },
       chooserId: "a",
@@ -1077,8 +1159,7 @@ describe("<Table />", () => {
     }
 
     const scores = within(screen.getByRole("table", { name: "Scores" }));
-    expect(scores.getByRole("button", { name: "Remove Ben" })).toBeVisible();
-    expect(scores.queryByRole("button", { name: "Remove Ana" })).toBeNull();
+    expect(scores.queryByRole("button", { name: /Remove/u })).toBeNull();
   });
 
   it("labels the action bar as your move only when it is yours", () => {
