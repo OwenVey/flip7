@@ -395,11 +395,13 @@ describe("<Table />", () => {
       leaderboard
         .getAllByRole("row")
         .slice(1)
-        .map((row) => Array.from(row.children, (cell) => cell.textContent));
+        .map((row) =>
+          Array.from(row.children, (cell) => cell.textContent).slice(0, 4)
+        );
 
     expect(
       leaderboard.getAllByRole("columnheader").map((cell) => cell.textContent)
-    ).toStrictEqual(["Rank", "Player", "Round", "Total"]);
+    ).toStrictEqual(["Rank", "Player", "Round", "Total", "Remove"]);
     expect(rows()).toStrictEqual([
       ["1", "Ana You", "+7", "40"],
       ["2", "Ben", "+36", "12"],
@@ -571,7 +573,10 @@ describe("<Table />", () => {
       />
     ));
 
-    const actionBar = within(screen.getByRole("region", { name: "Your move" }));
+    const actionBar = within(
+      screen.getByRole("region", { name: "Game status" })
+    );
+
     expect(actionBar.getByText("cards left in the deck")).toBeInTheDocument();
 
     setDealing(false);
@@ -1047,6 +1052,91 @@ describe("<Table />", () => {
     expect(confirmed.ok).toBeTruthy();
     expect(send).toHaveBeenCalledWith({ playerId: "b", type: "kick" });
     approve = false;
+  });
+
+  it("keeps the host's Remove out of seats and in the Scores table during play", () => {
+    const choice = {
+      card: { id: 9, kind: "freeze" as const },
+      chooserId: "a",
+      options: ["a", "b"],
+    };
+
+    render(() => (
+      <Table
+        room={room({ choice })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    for (const seat of screen.getAllByRole("article")) {
+      expect(
+        within(seat).queryByRole("button", { name: /Remove/u })
+      ).toBeNull();
+    }
+
+    const scores = within(screen.getByRole("table", { name: "Scores" }));
+    expect(scores.getByRole("button", { name: "Remove Ben" })).toBeVisible();
+    expect(scores.queryByRole("button", { name: "Remove Ana" })).toBeNull();
+  });
+
+  it("labels the action bar as your move only when it is yours", () => {
+    const [view, setView] = createSignal(room());
+
+    render(() => (
+      <Table
+        room={view()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+    expect(screen.getByRole("region", { name: "Your move" })).toBeVisible();
+
+    setView(room({ turnId: "b" }));
+    flush();
+    expect(screen.getByRole("region", { name: "Game status" })).toBeVisible();
+
+    setView(
+      room({
+        choice: {
+          card: { id: 9, kind: "freeze" as const },
+          chooserId: "a",
+          options: ["a", "b"],
+        },
+      })
+    );
+    flush();
+    expect(screen.getByRole("region", { name: "Your move" })).toBeVisible();
+  });
+
+  it("keeps Leave room focusable with a reason during the deal", () => {
+    const send = vi.fn<RoomConnection["send"]>();
+    const [dealing, setDealing] = createSignal(true);
+
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        actionsDisabled={dealing()}
+      />
+    ));
+    const leave = screen.getByRole("button", { name: "Leave room" });
+    expect(leave).toHaveAttribute("aria-disabled", "true");
+    expect(leave).toHaveAccessibleDescription("You can leave after the deal");
+    leave.click();
+    flush();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+
+    setDealing(false);
+    flush();
+    expect(leave).not.toHaveAttribute("aria-disabled");
+    expect(leave).not.toHaveAccessibleDescription(
+      "You can leave after the deal"
+    );
   });
 
   it("the chooser picks an action card target by clicking a seat", () => {
