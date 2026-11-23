@@ -3,13 +3,22 @@ import Lock from "@lucide/solid/icons/lock";
 import Play from "@lucide/solid/icons/play";
 import UserPlus from "@lucide/solid/icons/user-plus";
 import { Button } from "@ui-sdk/solid/button";
-import { createMemo, createUniqueId, For, Repeat, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createUniqueId,
+  For,
+  onSettled,
+  Repeat,
+  Show,
+} from "solid-js";
 
 import { MAX_PLAYERS } from "../game/engine";
 import { availableMoves, MIN_PLAYERS } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { createCopy, createInvite } from "../lib/invite";
 import type { RoomConnection } from "../lib/room-connection";
+import { pop } from "../lib/table-motion";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
 import OfflineBadge from "./offline-badge";
@@ -93,6 +102,23 @@ export default function Lobby(props: {
 
   const startHintId = createUniqueId();
 
+  // WARNING: CSS can't tell a join from a page load, so only rows added after the first render animate.
+  let rendered = false;
+  let startGame: HTMLDivElement | undefined;
+
+  onSettled(() => {
+    rendered = true;
+  });
+
+  createEffect(
+    () => moves().host.start,
+    (ready, wasReady) => {
+      if (ready && wasReady === false) {
+        pop(startGame, 1.08);
+      }
+    }
+  );
+
   const count = () => `${props.room.players.length} / ${MAX_PLAYERS}`;
 
   const hostName = () =>
@@ -157,7 +183,12 @@ export default function Lobby(props: {
                     {moves().host.addBot ? "Add bot" : "Table full"}
                   </Button>
                 </div>
-                <div class="start-game">
+                <div
+                  class="start-game"
+                  ref={(element) => {
+                    startGame = element;
+                  }}
+                >
                   <Button
                     disabled={props.actionsDisabled}
                     aria-disabled={moves().host.start ? undefined : "true"}
@@ -196,7 +227,10 @@ export default function Lobby(props: {
           <ul class="roster">
             <For each={props.room.players} keyed={(player) => player.id}>
               {(player) => (
-                <li data-offline={player().connected ? undefined : ""}>
+                <li
+                  data-arrived={rendered ? "" : undefined}
+                  data-offline={player().connected ? undefined : ""}
+                >
                   <PlayerAvatar player={player()} />
                   <span class="roster-name">
                     {player().name}

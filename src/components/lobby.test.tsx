@@ -124,6 +124,30 @@ describe("<Lobby />", () => {
     expect(screen.getByText("Open seat")).toBe(seat);
   });
 
+  it("slides in only the players who join after the lobby shows", () => {
+    const [room, setRoom] = createSignal<RoomView>(roomOf(2));
+
+    render(() => (
+      <Lobby
+        room={room()}
+        playerId="p0"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+    setRoom(roomOf(3));
+    flush();
+
+    const rows = screen
+      .getAllByRole("listitem")
+      .filter((row) => !row.classList.contains("open-seat"));
+
+    expect(rows.map((row) => row.dataset.arrived)).toStrictEqual([
+      undefined,
+      undefined,
+      "",
+    ]);
+  });
+
   it("shows guests the player count without the Add bot button", () => {
     render(() => (
       <Lobby

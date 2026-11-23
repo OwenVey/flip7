@@ -21,6 +21,7 @@ import {
 import JoinForm from "../../components/join-form";
 import Lobby from "../../components/lobby";
 import PageMeta from "../../components/page-meta";
+import RoomConnecting from "../../components/room-connecting";
 import RulesDialog from "../../components/rules-dialog";
 import SiteNav from "../../components/site-nav";
 import SoundControls from "../../components/sound-controls";
@@ -147,6 +148,10 @@ const Room = (props: { code: string }) => {
   });
 
   const connectionProblem = () => {
+    if (connection.room() === null) {
+      return "";
+    }
+
     if (!connection.online()) {
       return "You're offline. We'll reconnect when you're back online.";
     }
@@ -205,9 +210,11 @@ const Room = (props: { code: string }) => {
         <output class="connection-banner">{connectionProblem()}</output>
         <Switch
           fallback={
-            <output class="status-message">
-              Connecting to room {props.code}…
-            </output>
+            <RoomConnecting
+              code={props.code}
+              online={connection.online()}
+              onRetry={connection.retry}
+            />
           }
         >
           <Match when={connection.status() === "missing"}>

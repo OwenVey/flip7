@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { parseClientMessage } from "../game/client-message";
+import { ROOM_REMOVED_CLOSE_CODE } from "../game/protocol";
 import type { ServerMessage } from "../game/protocol";
 import { createRoom, deliver, newStoredRoom } from "../game/room";
 import type { RoomOutcome, Seat, Seats } from "../game/room";
@@ -627,6 +628,16 @@ describe("the room client on its own", () => {
 
     client.closed(DROPPED_CLOSE_CODE, 0);
     client.resume();
+    expect(reconnects()).toBe(1);
+  });
+
+  it("starts a fresh connection on retry until the room is gone", () => {
+    const { client, reconnects } = scripted();
+    client.retry();
+    expect(reconnects()).toBe(1);
+
+    client.closed(ROOM_REMOVED_CLOSE_CODE, 0);
+    client.retry();
     expect(reconnects()).toBe(1);
   });
 });
