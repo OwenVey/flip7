@@ -1,5 +1,13 @@
+import {
+  CARD_BACK_MARK_PATH,
+  CARD_BACK_MARK_VIEW_BOX,
+} from "../components/card-back-mark";
+
 const FLIGHT_EASING = "cubic-bezier(0.25, 0.8, 0.3, 1)";
+
+const GROW_EASING = "cubic-bezier(0.45, 0, 0.25, 1)";
 const FLIGHT_TILT_DEG = -8;
+const TILT_PEAK = 0.2;
 const FLIP_START = 0.4;
 const SETTLE_GRACE_MS = 250;
 const SETTLE_MS = 120;
@@ -71,6 +79,26 @@ const cardFace = (card: HTMLElement) => {
   return face;
 };
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+const cardBack = () => {
+  const back = document.createElement("div");
+  back.className = "card-back flying-card-back";
+
+  const mark = document.createElementNS(SVG_NS, "svg");
+  mark.setAttribute("viewBox", CARD_BACK_MARK_VIEW_BOX);
+  mark.setAttribute("aria-hidden", "true");
+
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", CARD_BACK_MARK_PATH);
+  path.setAttribute("fill", "currentColor");
+
+  mark.replaceChildren(path);
+  back.replaceChildren(mark);
+
+  return back;
+};
+
 const buildGhost = (card: HTMLElement, rect: DOMRect, faceDown: boolean) => {
   const ghost = document.createElement("div");
   ghost.className = "flying-card";
@@ -83,9 +111,7 @@ const buildGhost = (card: HTMLElement, rect: DOMRect, faceDown: boolean) => {
   const faces: HTMLElement[] = [face];
 
   if (faceDown) {
-    const back = document.createElement("div");
-    back.className = "flying-card-back";
-    faces.push(back);
+    faces.push(cardBack());
   }
 
   inner.replaceChildren(...faces);
@@ -190,23 +216,42 @@ export const flyCard = async ({
     const end = centre(target);
     const scale = from.width / target.width;
 
+    const offset = { x: start.x - end.x, y: start.y - end.y };
+    const peakScale = Math.max(1.15, scale, 72 / target.width);
+
     const animations = [
       ghost.animate(
         [
-          {
-            transform: `translate(${start.x - end.x}px, ${start.y - end.y}px) scale(${scale}) rotate(${FLIGHT_TILT_DEG}deg)`,
-          },
+          { translate: `${offset.x}px ${offset.y}px` },
           ...(emphasize === true
             ? [
                 {
                   offset: 0.45,
-                  transform: `translate(${(start.x - end.x) * 0.4}px, ${(start.y - end.y) * 0.4}px) scale(${Math.max(1.15, scale, 72 / target.width)})`,
+                  translate: `${offset.x * 0.4}px ${offset.y * 0.4}px`,
                 },
               ]
             : []),
-          { transform: "none" },
+          { translate: "0px 0px" },
         ],
         { duration, easing: FLIGHT_EASING }
+      ),
+      ghost.animate(
+        [
+          { scale: `${scale}` },
+          ...(emphasize === true
+            ? [{ offset: 0.45, scale: `${peakScale}` }]
+            : []),
+          { scale: "1" },
+        ],
+        { duration, easing: GROW_EASING }
+      ),
+      ghost.animate(
+        [
+          { rotate: "0deg" },
+          { offset: TILT_PEAK, rotate: `${FLIGHT_TILT_DEG}deg` },
+          { rotate: "0deg" },
+        ],
+        { duration, easing: "ease-out" }
       ),
     ];
 

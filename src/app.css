@@ -3774,28 +3774,21 @@ main {
   animation: none;
 }
 
+/* Fills the flying card and drops the deck's stacked edge, keeping the deck's look. */
 .flying-card-back {
-  border: 1px solid var(--ink);
+  width: auto;
+  aspect-ratio: auto;
   border-radius: var(--radius-md);
-  background:
-    radial-gradient(circle, var(--gold) 0 18%, transparent 19%),
-    radial-gradient(circle, var(--accent) 0 32%, transparent 33%),
-    repeating-linear-gradient(
-      45deg,
-      transparent 0 4px,
-      rgb(255 212 95 / 0.35) 4px 5px
-    ),
-    repeating-linear-gradient(
-      -45deg,
-      transparent 0 4px,
-      rgb(255 212 95 / 0.35) 4px 5px
-    ),
-    var(--accent);
   box-shadow:
-    inset 0 0 0 3px var(--accent),
-    inset 0 0 0 4px var(--gold),
+    inset 0 0 0 2px var(--accent),
+    inset 0 0 0 3px var(--gold),
     0 0.75rem 1.5rem rgb(4 20 14 / 0.45);
   transform: rotateY(180deg);
+
+  & svg {
+    width: 46%;
+    height: auto;
+  }
 }
 
 @keyframes deal {
