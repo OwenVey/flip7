@@ -61,10 +61,12 @@ export interface RoomView extends Pick<
   targetScore: number;
 }
 
-/** A round was dealt between two views of the room: the game started, or the next round began. */
+/** A round was dealt between two views of the room: a game started, or the next round began. */
 export const roundStarted = (previous: RoomView, current: RoomView) =>
   current.phase !== "lobby" &&
-  (previous.phase === "lobby" || current.round !== previous.round);
+  (previous.phase === "lobby" ||
+    (previous.phase === "gameOver" && current.phase !== "gameOver") ||
+    current.round !== previous.round);
 
 export type ServerMessage =
   | {

@@ -591,6 +591,28 @@ describe("the game log", () => {
   });
 });
 
+describe("playing again", () => {
+  it("starts a fresh game straight from game over", () => {
+    const state = setup(["a", "b"], [num(5), num(3)]);
+    stay(state, "a", random);
+    stay(state, "b", random);
+    state.phase = "gameOver";
+    state.winnerIds = ["a"];
+
+    for (const seat of state.players) {
+      seat.score = 250;
+    }
+
+    startGame(state, "a", random);
+
+    expect(state.phase).toBe("playing");
+    expect(state.round).toBe(1);
+    expect(state.winnerIds).toStrictEqual([]);
+    expect(state.players.map((seat) => seat.score)).toStrictEqual([0, 0]);
+    expect(state.log.at(-1)?.game).toBe(2);
+  });
+});
+
 describe(chat, () => {
   it("adds a player's message to the log with their name and avatar", () => {
     const state = createGame();

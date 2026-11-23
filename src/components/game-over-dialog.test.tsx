@@ -71,7 +71,9 @@ describe("<GameOverDialog />", () => {
       <GameOverDialog
         room={room()}
         playerId="a"
+        canPlayAgain={false}
         canReturnToLobby={false}
+        onPlayAgain={vi.fn<() => void>()}
         onReturnToLobby={vi.fn<() => void>()}
       />
     ));
@@ -90,17 +92,22 @@ describe("<GameOverDialog />", () => {
         .map((item) => item.querySelector(".game-over-name")?.textContent)
     ).toStrictEqual(["Ben", "Ana You", "Cara"]);
     expect(
-      screen.getByText("Waiting for Ana to head back to the lobby.")
+      screen.getByText(
+        "Waiting for Ana to play again or head back to the lobby."
+      )
     ).toBeInTheDocument();
   });
 
-  it("congratulates the winner and lets the host return to the lobby", () => {
+  it("congratulates the winner and lets the host play again or return to the lobby", () => {
+    const onPlayAgain = vi.fn<() => void>();
     const onReturnToLobby = vi.fn<() => void>();
     render(() => (
       <GameOverDialog
         room={room()}
         playerId="b"
+        canPlayAgain
         canReturnToLobby
+        onPlayAgain={onPlayAgain}
         onReturnToLobby={onReturnToLobby}
       />
     ));
@@ -110,9 +117,71 @@ describe("<GameOverDialog />", () => {
     expect(screen.getByRole("dialog", { name: "You win!" })).toBeVisible();
     expect(screen.queryByText(/You finished/u)).toBeNull();
 
+    fireEvent.click(screen.getByRole("button", { name: "Play again" }));
     fireEvent.click(screen.getByRole("button", { name: "Back to lobby" }));
 
+    expect(onPlayAgain).toHaveBeenCalledOnce();
     expect(onReturnToLobby).toHaveBeenCalledOnce();
+  });
+
+  it("only offers the lobby when too few players are left to play again", () => {
+    render(() => (
+      <GameOverDialog
+        room={room()}
+        playerId="b"
+        canPlayAgain={false}
+        canReturnToLobby
+        onPlayAgain={vi.fn<() => void>()}
+        onReturnToLobby={vi.fn<() => void>()}
+      />
+    ));
+
+    openDialog();
+
+    expect(screen.queryByRole("button", { name: "Play again" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Back to lobby" })
+    ).toBeInTheDocument();
+  });
+
+  it("marks your own row in the final standings", () => {
+    render(() => (
+      <GameOverDialog
+        room={room()}
+        playerId="a"
+        canPlayAgain={false}
+        canReturnToLobby={false}
+        onPlayAgain={vi.fn<() => void>()}
+        onReturnToLobby={vi.fn<() => void>()}
+      />
+    ));
+
+    openDialog();
+
+    expect(
+      screen
+        .getAllByRole("listitem")
+        .map((item) => Object.hasOwn(item.dataset, "me"))
+    ).toStrictEqual([false, true, false]);
+  });
+
+  it("closes from the corner button so you can see the table", () => {
+    render(() => (
+      <GameOverDialog
+        room={room()}
+        playerId="a"
+        canPlayAgain={false}
+        canReturnToLobby={false}
+        onPlayAgain={vi.fn<() => void>()}
+        onReturnToLobby={vi.fn<() => void>()}
+      />
+    ));
+
+    openDialog();
+    fireEvent.click(screen.getByRole("button", { name: "See the table" }));
+    flush();
+
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("marks hidden rows at either edge of the final standings", () => {
@@ -120,7 +189,9 @@ describe("<GameOverDialog />", () => {
       <GameOverDialog
         room={room()}
         playerId="a"
+        canPlayAgain={false}
         canReturnToLobby={false}
+        onPlayAgain={vi.fn<() => void>()}
         onReturnToLobby={vi.fn<() => void>()}
       />
     ));
@@ -161,7 +232,9 @@ describe("<GameOverDialog />", () => {
         <GameOverDialog
           room={view}
           playerId="a"
+          canPlayAgain={false}
           canReturnToLobby={false}
+          onPlayAgain={vi.fn<() => void>()}
           onReturnToLobby={vi.fn<() => void>()}
         />
       ));
