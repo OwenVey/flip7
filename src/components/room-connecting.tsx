@@ -1,8 +1,8 @@
-import Flame from "@lucide/solid/icons/flame";
 import { Button } from "@ui-sdk/solid/button";
 import { createSignal, onSettled, Show } from "solid-js";
 
 import { paths } from "../router";
+import CardBackMark from "./card-back-mark";
 
 export const SLOW_CONNECTION_MS = 8000;
 
@@ -59,10 +59,10 @@ const RoomConnecting = (props: {
     <section class="connecting" aria-labelledby="connecting-room">
       <div class="connecting-deck" aria-hidden="true">
         <span class="card-back">
-          <Flame />
+          <CardBackMark />
         </span>
         <span class="card-back" data-dealt="">
-          <Flame />
+          <CardBackMark />
         </span>
       </div>
       <div class="panel connecting-panel">

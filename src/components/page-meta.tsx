@@ -6,7 +6,7 @@ export const SITE_NAME = "Flip 7";
 export const SITE_ORIGIN = "https://flip7.owenvey.com";
 
 export const SITE_DESCRIPTION =
-  "A multiplayer push-your-luck card game for 2 to 16 players. Hit or Stay, dodge duplicates, and flip 7 for a bonus. Share a room code and play in your browser, no accounts.";
+  "Flip 7 is a multiplayer push-your-luck card game for 2 to 16 players. Hit or Stay, dodge duplicates, and earn a bonus for seven unique numbers. Play in your browser with a room code and no account.";
 
 const OG_IMAGE = {
   alt: "Flip 7 wordmark beside a fan of playing cards on green felt",

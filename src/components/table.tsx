@@ -1,7 +1,6 @@
 import ArrowLeft from "@lucide/solid/icons/arrow-left";
 import ArrowRight from "@lucide/solid/icons/arrow-right";
 import CircleX from "@lucide/solid/icons/circle-x";
-import Flame from "@lucide/solid/icons/flame";
 import Hand from "@lucide/solid/icons/hand";
 import LockKeyhole from "@lucide/solid/icons/lock-keyhole";
 import MessageCircle from "@lucide/solid/icons/message-circle";
@@ -38,6 +37,7 @@ import type { RoomConnection } from "../lib/room-connection";
 import { rankPlayers } from "../lib/standings";
 import { passDealerChip, pop, slideRows } from "../lib/table-motion";
 import type { ChipSpot } from "../lib/table-motion";
+import CardBackMark from "./card-back-mark";
 import CardTooltips from "./card-tooltips";
 import GameLog, { CHAT_AND_GAME_LOG_TITLE, countChatsAfter } from "./game-log";
 import GameOverDialog from "./game-over-dialog";
@@ -844,7 +844,7 @@ const Deck = (props: { count: number }) => {
         data-empty={props.count === 0 ? "" : undefined}
         aria-hidden="true"
       >
-        <Flame />
+        <CardBackMark />
       </span>
       <span
         class="deck-count"
