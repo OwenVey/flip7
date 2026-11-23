@@ -5168,22 +5168,20 @@ main {
   z-index: 1;
 }
 
+/* Equal columns wide enough for "Back to lobby" on one line; on narrower dialogs the buttons stack full width. A lone button fills the row. */
 .game-over-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(10.5rem, 100%), 1fr));
   gap: var(--button-gap);
   width: 100%;
   margin-block-start: 0.5rem;
 
-  /* Equal widths side by side when both labels fit on one line, stacked full width when they don't. */
   & > [data-slot="button"] {
-    flex: 1 1 0;
-    min-inline-size: max-content;
     white-space: nowrap;
   }
 
   & > p {
-    flex-basis: 100%;
+    grid-column: 1 / -1;
     margin: 0;
   }
 }

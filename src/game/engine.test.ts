@@ -599,16 +599,15 @@ describe("playing again", () => {
     state.phase = "gameOver";
     state.winnerIds = ["a"];
 
-    for (const seat of state.players) {
-      seat.score = 250;
-    }
+    player(state, "a").score = 250;
+    player(state, "b").score = 210;
 
     startGame(state, "a", random);
 
     expect(state.phase).toBe("playing");
     expect(state.round).toBe(1);
     expect(state.winnerIds).toStrictEqual([]);
-    expect(state.players.map((seat) => seat.score)).toStrictEqual([0, 0]);
+    expect(state.players.map(({ score }) => score)).toStrictEqual([0, 0]);
     expect(state.log.at(-1)?.game).toBe(2);
   });
 });

@@ -816,45 +816,46 @@ const Leaderboard = (
         }}
       >
         <For each={ranked()} keyed={(entry) => entry.player.id}>
-          {(entry) => (
-            <tr
-              data-key={entry().player.id}
-              data-me={entry().player.id === props.playerId ? "" : undefined}
-              data-medal={
-                props.room.phase === "gameOver" &&
-                !props.room.winnerIds.includes(entry().player.id) &&
-                (entry().rank === 2 || entry().rank === 3)
-                  ? entry().rank
-                  : undefined
-              }
-              data-winner={
-                props.room.winnerIds.includes(entry().player.id)
-                  ? ""
-                  : undefined
-              }
-            >
-              <td>{entry().rank}</td>
-              <th scope="row">
-                {entry().player.name}
-                <Show when={entry().player.id === props.playerId}>
-                  {" "}
-                  <span class="badge">You</span>
-                </Show>
-              </th>
-              <LeaderboardRound
-                player={entry().player}
-                phase={props.room.phase}
-                incomingCardId={props.incomingCardId}
-                index={entry().index}
-              />
-              <td
-                class="leaderboard-total"
-                aria-label={`${entry().player.score}`}
+          {(entry) => {
+            const won = () => props.room.winnerIds.includes(entry().player.id);
+
+            const medal = () =>
+              props.room.phase === "gameOver" &&
+              !won() &&
+              (entry().rank === 2 || entry().rank === 3)
+                ? entry().rank
+                : undefined;
+
+            return (
+              <tr
+                data-key={entry().player.id}
+                data-me={entry().player.id === props.playerId ? "" : undefined}
+                data-medal={medal()}
+                data-winner={won() ? "" : undefined}
               >
-                <CountUp value={entry().player.score} />
-              </td>
-            </tr>
-          )}
+                <td>{entry().rank}</td>
+                <th scope="row">
+                  {entry().player.name}
+                  <Show when={entry().player.id === props.playerId}>
+                    {" "}
+                    <span class="badge">You</span>
+                  </Show>
+                </th>
+                <LeaderboardRound
+                  player={entry().player}
+                  phase={props.room.phase}
+                  incomingCardId={props.incomingCardId}
+                  index={entry().index}
+                />
+                <td
+                  class="leaderboard-total"
+                  aria-label={`${entry().player.score}`}
+                >
+                  <CountUp value={entry().player.score} />
+                </td>
+              </tr>
+            );
+          }}
         </For>
       </tbody>
     </table>
