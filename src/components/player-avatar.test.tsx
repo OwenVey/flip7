@@ -10,7 +10,7 @@ describe("<PlayerAvatar />", () => {
   it("shows a person's avatar as decoration", () => {
     const { container } = render(() => <PlayerAvatar player={{ avatar: 6 }} />);
 
-    expect(container.querySelector("img.avatar")).toHaveAttribute(
+    expect(container.querySelector(".avatar img")).toHaveAttribute(
       "src",
       avatarImage(6)
     );
@@ -22,7 +22,10 @@ describe("<PlayerAvatar />", () => {
       <PlayerAvatar player={{ avatar: null }} />
     ));
 
-    expect(container.querySelector(".bot-avatar")).not.toBeNull();
-    expect(container.querySelector("img.avatar")).toBeNull();
+    expect(container.querySelector(".bot-avatar")).toHaveAttribute(
+      "aria-hidden",
+      "true"
+    );
+    expect(container.querySelector(".avatar img")).toBeNull();
   });
 });

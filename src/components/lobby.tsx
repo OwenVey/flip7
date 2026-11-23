@@ -237,6 +237,11 @@ export default function Lobby(props: {
                   <Show when={player().id === props.playerId}>
                     <span class="badge">You</span>
                   </Show>
+                  <Show when={player().bot}>
+                    <span class="badge" data-tone="bot">
+                      Bot
+                    </span>
+                  </Show>
                   <Show when={player().id === props.room.hostId}>
                     <span class="badge" data-tone="host">
                       <Crown size={12} aria-hidden="true" />

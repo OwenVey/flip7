@@ -179,6 +179,12 @@ export default function GameOverDialog(props: {
                       {" "}
                       <span class="badge">You</span>
                     </Show>
+                    <Show when={entry().player.bot}>
+                      {" "}
+                      <span class="badge" data-tone="bot">
+                        Bot
+                      </span>
+                    </Show>
                   </span>
                   <FinalScore
                     score={entry().player.score}

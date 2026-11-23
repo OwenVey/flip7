@@ -83,6 +83,27 @@ const entries = () =>
 describe("<Table />", () => {
   afterEach(cleanup);
 
+  it("labels bot seats beside the player name", () => {
+    const view = room();
+    const [ana, ben] = view.players;
+    view.players = [ana, { ...ben, avatar: null, bot: true, name: "Torch" }];
+
+    render(() => (
+      <Table
+        room={view}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const botSeat = screen.getByRole("article", { name: "Torch, 12 points" });
+    const humanSeat = screen.getByRole("article", { name: "Ana, 40 points" });
+    expect(within(botSeat).getByText("Bot")).toBeVisible();
+    expect(within(humanSeat).queryByText("Bot")).toBeNull();
+    expect(within(humanSeat).getByText("You")).toBeVisible();
+  });
+
   it("distinguishes an opening card from an ordinary hit", () => {
     const [hit, setHit] = createSignal<true | undefined>(undefined);
 

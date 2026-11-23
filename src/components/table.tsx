@@ -495,6 +495,11 @@ const RoundPlayer = (
           <Show when={isMe()}>
             <span class="badge">You</span>
           </Show>
+          <Show when={props.player.bot}>
+            <span class="badge" data-tone="bot">
+              Bot
+            </span>
+          </Show>
           <Show when={isDealer()}>
             <Tooltip
               content="Dealer"
