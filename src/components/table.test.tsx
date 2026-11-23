@@ -15,10 +15,8 @@ import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
 import Table from "./table";
 
-let approve = false;
-
 const agent = createAgent({
-  allow: (step) => (step.confirm ?? "") === "" || approve,
+  allow: (step) => (step.confirm ?? "") === "",
 });
 
 const room = (overrides: Partial<RoomView> = {}) => {
@@ -150,7 +148,7 @@ describe("<Table />", () => {
         await screen.findByRole("dialog", { name: "Scores" })
       );
 
-      expect(scores.getByRole("cell", { name: "153" })).toBeVisible();
+      expect(scores.getByRole("cell", { name: "47" })).toBeVisible();
       expect(scores.queryByRole("rowheader", { name: "Ben" })).toBeNull();
       scores.getByRole("button", { name: "Show 1 busted" }).click();
       flush();
@@ -481,13 +479,11 @@ describe("<Table />", () => {
       leaderboard
         .getAllByRole("row")
         .slice(1)
-        .map((row) =>
-          Array.from(row.children, (cell) => cell.textContent).slice(0, 4)
-        );
+        .map((row) => Array.from(row.children, (cell) => cell.textContent));
 
     expect(
       leaderboard.getAllByRole("columnheader").map((cell) => cell.textContent)
-    ).toStrictEqual(["Rank", "Player", "Round", "Total", "To 200", "Remove"]);
+    ).toStrictEqual(["Rank", "Player", "Round", "Total"]);
     expect(rows()).toStrictEqual([
       ["1", "Ana You", "+7", "40"],
       ["2", "Ben", "+36", "12"],
@@ -697,13 +693,7 @@ describe("<Table />", () => {
 
     const labels = entries().map((entry) => entry.label);
     expect(labels).toStrictEqual(
-      expect.arrayContaining([
-        "Hit",
-        "Stay",
-        "Copy invite link",
-        "Leave room",
-        "Remove Ben",
-      ])
+      expect.arrayContaining(["Hit", "Stay", "Copy invite link", "Leave room"])
     );
 
     const result = await agent.act({
@@ -1112,35 +1102,7 @@ describe("<Table />", () => {
     expect(send).toHaveBeenCalledWith({ type: "hit" });
   });
 
-  it("removing a player needs a person to confirm", async () => {
-    const send = vi.fn<RoomConnection["send"]>();
-    render(() => (
-      <Table
-        room={room()}
-        playerId="a"
-        send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
-    ));
-
-    const remove = {
-      steps: [
-        { action: "press", args: ["Remove from room"], ref: "Remove Ben" },
-      ],
-    };
-
-    approve = false;
-    const refused = await agent.act(remove);
-    expect(refused.ok).toBeFalsy();
-    expect(send).not.toHaveBeenCalled();
-    approve = true;
-    const confirmed = await agent.act(remove);
-    expect(confirmed.ok).toBeTruthy();
-    expect(send).toHaveBeenCalledWith({ playerId: "b", type: "kick" });
-    approve = false;
-  });
-
-  it("keeps the host's Remove out of seats and in the Scores table during play", () => {
+  it("keeps Remove controls out of seats and Scores during play", () => {
     const choice = {
       card: { id: 9, kind: "freeze" as const },
       chooserId: "a",
@@ -1163,8 +1125,7 @@ describe("<Table />", () => {
     }
 
     const scores = within(screen.getByRole("table", { name: "Scores" }));
-    expect(scores.getByRole("button", { name: "Remove Ben" })).toBeVisible();
-    expect(scores.queryByRole("button", { name: "Remove Ana" })).toBeNull();
+    expect(scores.queryByRole("button", { name: /Remove/u })).toBeNull();
   });
 
   it("labels the action bar as your move only when it is yours", () => {

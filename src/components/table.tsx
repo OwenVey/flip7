@@ -46,7 +46,6 @@ import LeaveRoom from "./leave-room";
 import OfflineBadge from "./offline-badge";
 import PlayerAvatar from "./player-avatar";
 import PlayingCard from "./playing-card";
-import RemovePlayer from "./remove-player";
 import ScrollFade from "./scroll-fade";
 import TableSheet from "./table-sheet";
 import Tooltip from "./tooltip";
@@ -674,11 +673,10 @@ const LeaderboardRound = (props: {
 };
 
 const Leaderboard = (
-  props: Pick<TableProps, "room" | "playerId" | "send" | "actionsDisabled"> &
-    Pick<DealProps, "incomingCardId"> & { kick: readonly string[] }
+  props: Pick<TableProps, "room" | "playerId"> &
+    Pick<DealProps, "incomingCardId">
 ) => {
   const ranked = createMemo(() => rankPlayers(props.room.players));
-  const canKick = () => props.kick.length > 0;
   const [showBusted, setShowBusted] = createSignal(false);
 
   const resultsRound = createMemo(() =>
@@ -727,12 +725,6 @@ const Leaderboard = (
           <th scope="col">Player</th>
           <th scope="col">Round</th>
           <th scope="col">Total</th>
-          <th scope="col">To {props.room.targetScore}</th>
-          <Show when={canKick()}>
-            <th scope="col">
-              <span class="sr-only">Remove</span>
-            </th>
-          </Show>
         </tr>
       </thead>
       <tbody
@@ -770,32 +762,12 @@ const Leaderboard = (
               >
                 <CountUp value={entry().player.score} />
               </td>
-              <td>
-                {Math.max(0, props.room.targetScore - entry().player.score)}
-              </td>
-              <Show when={canKick()}>
-                <td class="leaderboard-remove">
-                  <Show when={props.kick.includes(entry().player.id)}>
-                    <RemovePlayer
-                      bot={entry().player.bot}
-                      disabled={props.actionsDisabled}
-                      name={entry().player.name}
-                      onRemove={() => {
-                        void props.send({
-                          playerId: entry().player.id,
-                          type: "kick",
-                        });
-                      }}
-                    />
-                  </Show>
-                </td>
-              </Show>
             </tr>
           )}
         </For>
         <Show when={bustedCount() > 0}>
           <tr>
-            <td colspan={canKick() ? 6 : 5}>
+            <td colspan={4}>
               <Button
                 data-size="sm"
                 data-variant="quiet"
@@ -1374,9 +1346,6 @@ export default function Table(
                 room={props.room}
                 playerId={props.playerId}
                 incomingCardId={props.incomingCardId}
-                kick={moves().host.kick}
-                send={props.send}
-                actionsDisabled={props.actionsDisabled}
               />
             </TableSheet>
             <TableSheet
@@ -1454,9 +1423,6 @@ export default function Table(
                   room={props.room}
                   playerId={props.playerId}
                   incomingCardId={props.incomingCardId}
-                  kick={moves().host.kick}
-                  send={props.send}
-                  actionsDisabled={props.actionsDisabled}
                 />
               </ScrollFade>
             </section>

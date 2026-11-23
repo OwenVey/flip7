@@ -2542,30 +2542,6 @@ main {
   }
 }
 
-/* The tooltip labels the icon-only Remove button. */
-.leaderboard-remove {
-  width: 1%;
-
-  & :is([data-slot="alert-dialog-trigger"]) {
-    --button-height: var(--control-height-sm);
-    inline-size: var(--button-height);
-    padding-inline: 0;
-  }
-
-  & .button-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  & [data-slot="tooltip-content"][data-compact-only] {
-    visibility: visible;
-  }
-}
-
 /* The action bar and the seat's ring already say it's your move. */
 .seat[data-me] .seat-meta > [data-tone="turn"] {
   display: none;
