@@ -709,33 +709,13 @@ const Leaderboard = (
     Pick<DealProps, "incomingCardId">
 ) => {
   const ranked = createMemo(() => rankPlayers(props.room.players));
-  const [showBusted, setShowBusted] = createSignal(false);
-
-  const resultsRound = createMemo(() =>
-    props.room.phase === "roundOver" ? props.room.round : null
-  );
-
-  const bustedCount = () =>
-    resultsRound() === null
-      ? 0
-      : ranked().filter(({ player }) => player.status === "busted").length;
-
-  const visibleRanked = createMemo(() =>
-    resultsRound() === null || showBusted()
-      ? ranked()
-      : ranked().filter(({ player }) => player.status !== "busted")
-  );
-
-  createEffect(resultsRound, () => {
-    setShowBusted(false);
-  });
 
   let body: HTMLTableSectionElement | undefined;
   let rowTops = new Map<string, number>();
 
   createEffect(
     () =>
-      visibleRanked()
+      ranked()
         .map((entry) => entry.player.id)
         .join(","),
     () => {
@@ -745,12 +725,6 @@ const Leaderboard = (
 
   return (
     <table class="leaderboard" aria-label={SCORES_TITLE}>
-      <Show when={props.room.phase === "playing"}>
-        <caption class="scores-legend">
-          <LockKeyhole size={12} aria-hidden="true" /> Lock means banked. Light
-          round points are still in play.
-        </caption>
-      </Show>
       <thead>
         <tr>
           <th scope="col">Rank</th>
@@ -764,7 +738,7 @@ const Leaderboard = (
           body = element;
         }}
       >
-        <For each={visibleRanked()} keyed={(entry) => entry.player.id}>
+        <For each={ranked()} keyed={(entry) => entry.player.id}>
           {(entry) => (
             <tr
               data-key={entry().player.id}
@@ -797,20 +771,6 @@ const Leaderboard = (
             </tr>
           )}
         </For>
-        <Show when={bustedCount() > 0}>
-          <tr>
-            <td colspan={4}>
-              <Button
-                data-size="sm"
-                data-variant="quiet"
-                aria-expanded={showBusted() ? "true" : "false"}
-                onClick={() => setShowBusted((shown) => !shown)}
-              >
-                {showBusted() ? "Hide" : "Show"} {bustedCount()} busted
-              </Button>
-            </td>
-          </tr>
-        </Show>
       </tbody>
     </table>
   );

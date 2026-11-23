@@ -2059,17 +2059,6 @@ main {
   }
 }
 
-.scores-legend {
-  padding-block-end: 0.375rem;
-  color: var(--ink-soft);
-  font-size: 0.75rem;
-  text-align: start;
-
-  & svg {
-    vertical-align: text-bottom;
-  }
-}
-
 .leaderboard-total,
 .leaderboard-round {
   font-family: var(--font-numeral);

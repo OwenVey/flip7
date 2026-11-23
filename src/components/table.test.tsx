@@ -186,7 +186,7 @@ describe("<Table />", () => {
     expect(scores).toHaveFocus();
   });
 
-  it("opens phone Scores once per round end and lets players expand busted rows", async () => {
+  it("opens phone Scores once per round end and lists busted players", async () => {
     // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
     vi.stubGlobal("matchMedia", (query: string) => ({
       matches: query.includes("max-width"),
@@ -226,9 +226,6 @@ describe("<Table />", () => {
       );
 
       expect(scores.getByRole("cell", { name: "47" })).toBeVisible();
-      expect(scores.queryByRole("rowheader", { name: "Ben" })).toBeNull();
-      scores.getByRole("button", { name: "Show 1 busted" }).click();
-      flush();
       expect(scores.getByRole("rowheader", { name: "Ben" })).toBeVisible();
       scores.getByRole("button", { name: "Close" }).click();
       setView({ ...result, deckCount: 79 });
