@@ -449,6 +449,35 @@ describe("<Table />", () => {
     expect(within(seat).queryByText(/points this round/u)).toBeNull();
   });
 
+  it("stamps the points a stayed hand banked after the round is scored", () => {
+    const initial = room();
+
+    render(() => (
+      <Table
+        room={room({
+          phase: "roundOver",
+          players: initial.players.map((player) =>
+            player.id === "a"
+              ? {
+                  ...player,
+                  lastRound: calculateRoundScore(player.hand),
+                  score: 47,
+                  status: "stayed",
+                }
+              : player
+          ),
+        })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const seat = screen.getByRole("article", { name: "Ana, 47 points" });
+
+    expect(seat.querySelector(".hand-stamp")).toHaveTextContent("Stayed+7");
+  });
+
   it("marks round points at risk and a score that would win", () => {
     const initial = room();
     const [view, setView] = createSignal(initial);

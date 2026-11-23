@@ -324,6 +324,10 @@ const RoundPlayer = (
 
   const baseScore = () => props.player.score;
 
+  const stampedPoints = createMemo(() =>
+    visibleRoundPoints(props.player, props.room.phase, props.incomingCardId)
+  );
+
   const projectedScore = () => baseScore() + roundPoints();
 
   const shownBaseScore = createCountUp(baseScore);
@@ -499,24 +503,24 @@ const RoundPlayer = (
           />
         </Show>
       </header>
-      <ul
-        class="hand"
-        aria-label={`${props.player.name}'s cards`}
-        data-banked={
-          props.player.status === "stayed" ||
-          props.player.status === "frozen" ||
-          props.player.status === FLIP_SEVEN_STATUS
-            ? roundPoints()
-            : undefined
-        }
-      >
-        <For each={numberCards()} keyed={(card) => card.id}>
-          {(card) => <PlayingCard card={card()} dupe={isDupe(card())} />}
-        </For>
-        <Show when={bustCard()}>
-          {(card) => <PlayingCard card={card()} bust />}
+      <div class="hand-area">
+        <ul class="hand" aria-label={`${props.player.name}'s cards`}>
+          <For each={numberCards()} keyed={(card) => card.id}>
+            {(card) => <PlayingCard card={card()} dupe={isDupe(card())} />}
+          </For>
+          <Show when={bustCard()}>
+            {(card) => <PlayingCard card={card()} bust />}
+          </Show>
+        </ul>
+        <Show when={STAMPED_STATUSES.has(props.player.status)}>
+          <span class="hand-stamp" aria-hidden="true">
+            <span>{STATUS_LABELS[props.player.status]}</span>
+            <Show when={props.player.status !== "busted"}>
+              <span class="hand-stamp-points">+{stampedPoints()}</span>
+            </Show>
+          </span>
         </Show>
-      </ul>
+      </div>
       <Show when={held().length > 0}>
         <div class="held" data-held="">
           <p class="held-label">Waiting to play</p>
