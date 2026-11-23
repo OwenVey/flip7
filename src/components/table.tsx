@@ -18,6 +18,7 @@ import {
   createSignal,
   For,
   Match,
+  onSettled,
   Repeat,
   Show,
   Switch,
@@ -454,7 +455,11 @@ const RoundPlayer = (
             <span
               class={[
                 "status-pill",
-                { "sr-only": STAMPED_STATUSES.has(props.player.status) },
+                {
+                  "seat-stamped-status": STAMPED_STATUSES.has(
+                    props.player.status
+                  ),
+                },
               ]}
             >
               <Show when={isFrozen()}>
@@ -1335,6 +1340,52 @@ export default function Table(
     }
   );
 
+  const [phoneTable, setPhoneTable] = createSignal(false);
+  onSettled(() => {
+    const media = globalThis.matchMedia?.(PHONE_TABLE_QUERY);
+
+    const update = () => {
+      setPhoneTable(media?.matches ?? false);
+    };
+
+    update();
+    media?.addEventListener?.("change", update);
+
+    return () => {
+      media?.removeEventListener?.("change", update);
+    };
+  });
+
+  const displayedPlayers = createMemo(() => {
+    const { players, dealerId } = props.room;
+
+    if (!phoneTable()) {
+      return players;
+    }
+
+    const dealer = players.findIndex((player) => player.id === dealerId);
+
+    const ordered = [
+      ...players.slice(dealer + 1),
+      ...players.slice(0, dealer + 1),
+    ];
+
+    const me = ordered.find((player) => player.id === props.playerId);
+
+    return me
+      ? [me, ...ordered.filter((player) => player.id !== me.id)]
+      : ordered;
+  });
+
+  const standings = createMemo(() => rankPlayers(props.room.players));
+
+  const myTotal = () =>
+    standings().find(({ player }) => player.id === props.playerId)?.player
+      .score;
+
+  const leader = () => standings()[0]?.player;
+  const tiedForLead = () => standings()[1]?.rank === 1;
+
   const [scoresOpen, setScoresOpen] = createSignal(false);
 
   const resultsRound = createMemo(() =>
@@ -1378,7 +1429,22 @@ export default function Table(
     <CardTooltips>
       <div class="table" data-phase={props.room.phase}>
         <header class="table-header">
-          <h1>Round {props.room.round}</h1>
+          <div class="table-round">
+            <h1>Round {props.room.round}</h1>
+            <div class="phone-round-summary">
+              <Show when={myTotal() !== undefined}>
+                <span>You {myTotal()}</span>
+              </Show>
+              <Show when={leader()}>
+                {(player) => (
+                  <span>
+                    {tiedForLead() ? "Tied lead" : `Leader · ${player().name}`}{" "}
+                    {player().score}
+                  </span>
+                )}
+              </Show>
+            </div>
+          </div>
           <div class="row">
             <TableSheet
               open={scoresOpen()}
@@ -1440,8 +1506,13 @@ export default function Table(
         />
 
         <div class="table-body">
+          <Show when={phoneTable() && props.room.dealerId}>
+            <p class="phone-turn-order">
+              Your hand first · Others in order from the dealer’s left
+            </p>
+          </Show>
           <div class="seats">
-            <For each={props.room.players} keyed={(player) => player.id}>
+            <For each={displayedPlayers()} keyed={(player) => player.id}>
               {(player) => (
                 <RoundPlayer
                   player={player()}

@@ -78,8 +78,45 @@ const entries = () =>
     .snapshot()
     .filter((entry) => entry.offPage !== true && entry.component !== "more");
 
+const seatOrder = () =>
+  screen.getAllByRole("article").map((seat) => seat.dataset.seat);
+
 describe("<Table />", () => {
   afterEach(cleanup);
+
+  it("anchors the local hand and rotates the other phone rows when the dealer changes", () => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+
+    try {
+      const initial = room();
+      const [ana, ben] = initial.players;
+
+      const [view, setView] = createSignal({
+        ...initial,
+        players: [ana, ben, { ...ben, hand: [], id: "c", name: "Cy" }],
+      });
+
+      render(() => (
+        <Table
+          room={view()}
+          playerId="a"
+          send={vi.fn<RoomConnection["send"]>()}
+          chat={vi.fn<RoomConnection["chat"]>()}
+        />
+      ));
+
+      expect(seatOrder()).toStrictEqual(["a", "c", "b"]);
+      expect(screen.getByText("You 40")).toBeInTheDocument();
+      expect(screen.getByText("Leader · Ana 40")).toBeInTheDocument();
+
+      setView({ ...view(), dealerId: "c" });
+      flush();
+      expect(seatOrder()).toStrictEqual(["a", "b", "c"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 
   it("distinguishes an opening card from an ordinary hit", () => {
     const [hit, setHit] = createSignal<true | undefined>(undefined);
