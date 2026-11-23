@@ -35,7 +35,11 @@ import {
 import { MOTION_PREFERENCE_QUERY } from "../../lib/motion";
 import { createRoomConnection } from "../../lib/room-connection";
 import { createRoomSounds } from "../../lib/room-sounds";
-import { nudge, revealSeat } from "../../lib/table-motion";
+import {
+  createTableOpening,
+  nudge,
+  revealOwnSeat,
+} from "../../lib/table-motion";
 import { paths } from "../../router";
 
 const TURN_VIBRATION_MS = 200;
@@ -49,18 +53,21 @@ const Room = (props: { code: string }) => {
   let disposed = false;
   const [table, setTable] = createSignal(initialDealPlayback);
 
+  const openTable = createTableOpening(() => roomPage);
+
   const playback = createDealPlayback(
     createDealMotion(() => roomPage),
     (view) => {
       setTable(view);
       flush();
+      openTable(view.room?.phase ?? null);
     },
     (cue) => {
       sounds.play(cue);
 
       if (cue === "turn") {
         nudge(roomPage?.querySelector("[data-action-bar]") ?? null);
-        revealSeat(roomPage?.querySelector(".seat[data-me]") ?? null);
+        revealOwnSeat(roomPage);
 
         if ("vibrate" in navigator) {
           navigator.vibrate(TURN_VIBRATION_MS);

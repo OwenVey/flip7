@@ -1,3 +1,4 @@
+import type { RoomView } from "../game/protocol";
 import { motionAllowed } from "./motion";
 
 const SLIDE_MS = 420;
@@ -52,12 +53,41 @@ export const nudge = (element: Element | null) => {
   );
 };
 
-/** Brings your own seat into view, clear of the action bar, so you see your cards as you decide. */
-export const revealSeat = (element: Element | null) => {
+const revealSeat = (element: Element | null, { instant = false } = {}) => {
   element?.scrollIntoView({
-    behavior: motionAllowed() ? "smooth" : "auto",
+    behavior: !instant && motionAllowed() ? "smooth" : "auto",
     block: "nearest",
   });
+};
+
+const ownSeat = (root: Element | undefined) =>
+  root?.querySelector(".seat[data-me]") ?? null;
+
+/** Brings your own seat into view, clear of the action bar, so you see your cards as you decide. */
+export const revealOwnSeat = (root: Element | undefined) => {
+  revealSeat(ownSeat(root));
+};
+
+/**
+ * Follows which phase the room page shows, frame by frame. When the table
+ * first replaces the lobby, jumps straight to your own seat so the game
+ * doesn't open wherever the lobby was scrolled to. A smooth scroll there would
+ * only pass other players' seats. It leaves the scroll alone on later
+ * rounds, and when you load or rejoin a game already under way. Call it
+ * right after each frame renders, so the jump lands before the deal measures
+ * where its cards fly.
+ */
+export const createTableOpening = (root: () => Element | undefined) => {
+  let shown: RoomView["phase"] | null = null;
+
+  return (phase: RoomView["phase"] | null) => {
+    const opening = shown === "lobby" && phase !== null && phase !== "lobby";
+    shown = phase;
+
+    if (opening) {
+      revealSeat(ownSeat(root()), { instant: true });
+    }
+  };
 };
 
 /**

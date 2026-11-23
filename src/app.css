@@ -2199,6 +2199,7 @@ main {
   border-radius: var(--dialog-radius);
   background: var(--paper);
   box-shadow: var(--shadow-print), var(--shadow-table);
+  scroll-margin-block-start: 5.5rem;
   transition: box-shadow 160ms ease;
 
   &[data-me] {
