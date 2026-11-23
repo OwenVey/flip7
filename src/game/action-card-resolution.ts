@@ -366,18 +366,6 @@ export const evictFromActionCards = (
   state: ResolutionState,
   playerId: string
 ) => {
-  state.actionQueue = state.actionQueue.filter(
-    ({ card, ownerId, targetId }) => {
-      const leaving = (targetId ?? ownerId) === playerId;
-
-      if (leaving) {
-        state.discard.push(card);
-      }
-
-      return !leaving;
-    }
-  );
-
   const { assignment, choice } = state;
 
   if (assignment?.chooserId === playerId) {

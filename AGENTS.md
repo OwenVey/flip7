@@ -17,6 +17,7 @@ Use the [README](README.md) for setup, game rules, and deployment. Before explor
 
 ## Room and game changes
 
+- Before changing or reviewing game behavior, including move eligibility, eviction, reconnects, or deal playback, read [Flip 7 rules](docs/flip-7-rules.md) and check the affected rules and fixtures. For behavior changes, run `pnpm test --run src/game/rules-acceptance.test.ts` and the relevant engine, room, or UI tests. Update the spec and regression coverage when a rule intentionally changes.
 - Keep the Worker authoritative. Put move eligibility in `src/game/moves.ts` so the engine and UI use the same rules. Keep Cloudflare storage, alarms, and sockets in the Worker adapter so room behavior can be exercised in Vitest.
 - Check persisted rooms and the wire protocol when changing state shapes. Preserve rejoining by token, pending-move confirmation after reconnecting, and presence across multiple seats. Use `toRoomView` to project what the browser can see.
 - When changing a rule, check the in-game rules in `src/components/rules-dialog.tsx` and the README for descriptions that need updating.
