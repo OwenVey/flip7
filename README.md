@@ -16,7 +16,7 @@ A multiplayer push-your-luck card game for **2–16 players**. Share a room link
 
 The dealer rotates each round and deals an opening card to each active player in order, starting on the dealer's left. Action cards interrupt the deal and resolve as soon as they appear. A player who already took cards from a Flip Three before their opening card chooses Hit or Stay instead. The round ends when everyone is out or a player **Flips 7** by collecting seven unique Number cards. A Flip 7 adds 15 bonus points and ends the round for everyone. Everyone who hasn't busted scores what they already have.
 
-Add up your Number cards, apply the ×2 multiplier if you have it, then add any other Score Modifier points and the Flip 7 bonus. At the end of a round, the sole leader wins if they have at least 200 points. Play continues on a tie for first.
+Add up your Number cards, apply the ×2 multiplier if you have it, then add any other Score Modifier points and the Flip 7 bonus. At the end of a round, the sole leader wins if they have at least 200 points. Play continues on a tie for first. After a round, the host can start the next round manually or enable a 10-second auto-advance countdown for their current table session. The host can cancel the countdown at any time before it finishes.
 
 ### Cards
 

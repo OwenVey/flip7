@@ -1728,6 +1728,17 @@ main {
   }
 }
 
+.scores-legend {
+  padding-block-end: 0.375rem;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  text-align: start;
+
+  & svg {
+    vertical-align: text-bottom;
+  }
+}
+
 .leaderboard-total,
 .leaderboard-round {
   font-family: var(--font-numeral);
@@ -4081,8 +4092,7 @@ main {
 
 /*
  * Phones, upright or sideways. One column of compact seats with yours first,
- * header controls as icons, the log and chat in a sheet, and the leaderboard
- * only once a round is scored.
+ * header controls as icons, and scores, log, and chat in sheets.
  */
 @media (max-width: 40rem), (max-height: 30rem) {
   :is(.page-header, .table-header)
@@ -4156,13 +4166,8 @@ main {
     min-height: 2rem;
   }
 
-  .table[data-phase="playing"] .table-sidebar,
-  .table-sidebar .log {
+  .table-sidebar {
     display: none;
-  }
-
-  .table:not([data-phase="playing"]) .table-sidebar {
-    order: -1;
   }
 
   .lobby-page:has(.start-game, .lobby-status) {

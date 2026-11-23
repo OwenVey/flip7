@@ -62,6 +62,8 @@ const STATUS_LABELS = {
 
 const SCORES_TITLE = "Scores";
 const ROUND_COUNT_MS = 320;
+const AUTO_ADVANCE_SECONDS = 10;
+const PHONE_TABLE_QUERY = "(max-width: 40rem), (max-height: 30rem)";
 
 const STAMPED_STATUSES: ReadonlySet<RoundStatus> = new Set([
   "busted",
@@ -314,13 +316,12 @@ const RoundPlayer = (
       : null;
 
   const roundPoints = createMemo(() =>
-    visibleRoundPoints(props.player, props.room.phase, props.incomingCardId)
+    props.room.phase === "playing"
+      ? visibleRoundPoints(props.player, props.room.phase, props.incomingCardId)
+      : 0
   );
 
-  const baseScore = () =>
-    props.room.phase === "playing"
-      ? props.player.score
-      : props.player.score - roundPoints();
+  const baseScore = () => props.player.score;
 
   const projectedScore = () => baseScore() + roundPoints();
 
@@ -539,7 +540,7 @@ const RoundPlayer = (
             bankedLabel = element;
           }}
         >
-          {shownBaseScore()}
+          {shownBaseScore()} / {props.room.targetScore}
         </span>
         <MeterTrack>
           <MeterIndicator />
@@ -551,9 +552,11 @@ const RoundPlayer = (
             <span class="meter-lost" />
           </Show>
         </MeterTrack>
-        <span class="seat-score" data-projected="" aria-hidden="true">
-          +{shownRoundPoints()}
-        </span>
+        <Show when={props.room.phase === "playing"}>
+          <span class="seat-score" data-projected="" aria-hidden="true">
+            +{shownRoundPoints()}
+          </span>
+        </Show>
       </Meter>
     </article>
   );
@@ -676,13 +679,33 @@ const Leaderboard = (
 ) => {
   const ranked = createMemo(() => rankPlayers(props.room.players));
   const canKick = () => props.kick.length > 0;
+  const [showBusted, setShowBusted] = createSignal(false);
+
+  const resultsRound = createMemo(() =>
+    props.room.phase === "roundOver" ? props.room.round : null
+  );
+
+  const bustedCount = () =>
+    resultsRound() === null
+      ? 0
+      : ranked().filter(({ player }) => player.status === "busted").length;
+
+  const visibleRanked = createMemo(() =>
+    resultsRound() === null || showBusted()
+      ? ranked()
+      : ranked().filter(({ player }) => player.status !== "busted")
+  );
+
+  createEffect(resultsRound, () => {
+    setShowBusted(false);
+  });
 
   let body: HTMLTableSectionElement | undefined;
   let rowTops = new Map<string, number>();
 
   createEffect(
     () =>
-      ranked()
+      visibleRanked()
         .map((entry) => entry.player.id)
         .join(","),
     () => {
@@ -692,12 +715,19 @@ const Leaderboard = (
 
   return (
     <table class="leaderboard" aria-label={SCORES_TITLE}>
+      <Show when={props.room.phase === "playing"}>
+        <caption class="scores-legend">
+          <LockKeyhole size={12} aria-hidden="true" /> Lock means banked. Light
+          round points are still in play.
+        </caption>
+      </Show>
       <thead>
         <tr>
           <th scope="col">Rank</th>
           <th scope="col">Player</th>
           <th scope="col">Round</th>
           <th scope="col">Total</th>
+          <th scope="col">To {props.room.targetScore}</th>
           <Show when={canKick()}>
             <th scope="col">
               <span class="sr-only">Remove</span>
@@ -710,7 +740,7 @@ const Leaderboard = (
           body = element;
         }}
       >
-        <For each={ranked()} keyed={(entry) => entry.player.id}>
+        <For each={visibleRanked()} keyed={(entry) => entry.player.id}>
           {(entry) => (
             <tr
               data-key={entry().player.id}
@@ -740,6 +770,9 @@ const Leaderboard = (
               >
                 <CountUp value={entry().player.score} />
               </td>
+              <td>
+                {Math.max(0, props.room.targetScore - entry().player.score)}
+              </td>
               <Show when={canKick()}>
                 <td class="leaderboard-remove">
                   <Show when={props.kick.includes(entry().player.id)}>
@@ -760,6 +793,20 @@ const Leaderboard = (
             </tr>
           )}
         </For>
+        <Show when={bustedCount() > 0}>
+          <tr>
+            <td colspan={canKick() ? 6 : 5}>
+              <Button
+                data-size="sm"
+                data-variant="quiet"
+                aria-expanded={showBusted() ? "true" : "false"}
+                onClick={() => setShowBusted((shown) => !shown)}
+              >
+                {showBusted() ? "Hide" : "Show"} {bustedCount()} busted
+              </Button>
+            </td>
+          </tr>
+        </Show>
       </tbody>
     </table>
   );
@@ -936,9 +983,87 @@ const OfflineTurn = (
   );
 };
 
+const previousScore = (player: PlayerView) =>
+  player.score - (player.lastRound?.total ?? 0);
+
+const roundEndHeadline = (room: RoomView) => {
+  const flippedSeven = room.players.find(
+    (player) => player.status === FLIP_SEVEN_STATUS
+  );
+
+  if (flippedSeven) {
+    return `${flippedSeven.name} Flipped 7! +${flippedSeven.lastRound?.total ?? 0}`;
+  }
+
+  const [first, second] = rankPlayers(room.players);
+
+  if (
+    first !== undefined &&
+    second !== undefined &&
+    first.player.score > second.player.score
+  ) {
+    const tookLead = room.players.some(
+      (player) =>
+        player.id !== first.player.id &&
+        previousScore(player) >= previousScore(first.player)
+    );
+
+    if (tookLead) {
+      return `${first.player.name} takes the lead`;
+    }
+  }
+
+  return `End of round ${room.round}`;
+};
+
 const ActionBar = (
   props: TableProps & DealProps & Pick<MoveControls, "moves">
 ) => {
+  const [autoAdvance, setAutoAdvance] = createSignal(false);
+  const [seconds, setSeconds] = createSignal(AUTO_ADVANCE_SECONDS);
+
+  const countdownRound = createMemo(() =>
+    autoAdvance() &&
+    props.moves.host.nextRound &&
+    props.actionsDisabled !== true &&
+    props.dealing !== true
+      ? props.room.round
+      : null
+  );
+
+  const nextRound = async () => await props.send({ type: "nextRound" });
+
+  createEffect(countdownRound, (round) => {
+    setSeconds(AUTO_ADVANCE_SECONDS);
+
+    let timer: ReturnType<typeof setInterval> | undefined;
+
+    if (round !== null) {
+      const deadline = Date.now() + AUTO_ADVANCE_SECONDS * 1000;
+
+      timer = setInterval(() => {
+        const remaining = Math.max(
+          0,
+          Math.ceil((deadline - Date.now()) / 1000)
+        );
+
+        setSeconds(remaining);
+
+        if (remaining === 0) {
+          clearInterval(timer);
+
+          if (countdownRound() === round) {
+            void nextRound();
+          }
+        }
+      }, 250);
+    }
+
+    return () => {
+      clearInterval(timer);
+    };
+  });
+
   const me = () =>
     props.room.players.find((player) => player.id === props.playerId);
 
@@ -1046,7 +1171,7 @@ const ActionBar = (
               </Show>
             </Match>
             <Match when={props.room.phase === "roundOver"}>
-              <p class="headline">End of round {props.room.round}</p>
+              <p class="headline">{roundEndHeadline(props.room)}</p>
               <Show
                 when={props.moves.host.nextRound}
                 fallback={
@@ -1060,12 +1185,19 @@ const ActionBar = (
                     data-size="lg"
                     disabled={props.actionsDisabled}
                     data-variant="solid"
-                    onClick={async () =>
-                      await props.send({ type: "nextRound" })
-                    }
+                    onClick={nextRound}
                   >
                     <ArrowRight size={16} />
                     Start next round
+                  </Button>
+                  <Button
+                    data-size="lg"
+                    disabled={props.actionsDisabled}
+                    onClick={() => setAutoAdvance((enabled) => !enabled)}
+                  >
+                    {autoAdvance()
+                      ? `Cancel auto-advance (${seconds()}s)`
+                      : "Enable auto-advance"}
                   </Button>
                 </ActionButtons>
               </Show>
@@ -1184,6 +1316,23 @@ export default function Table(
     }
   );
 
+  const [scoresOpen, setScoresOpen] = createSignal(false);
+
+  const resultsRound = createMemo(() =>
+    props.room.phase === "roundOver" && props.dealing !== true
+      ? props.room.round
+      : null
+  );
+
+  createEffect(resultsRound, (round, previous) => {
+    if (round !== null && globalThis.matchMedia?.(PHONE_TABLE_QUERY).matches) {
+      setLogOpen(false);
+      setScoresOpen(true);
+    } else if (previous !== null && previous !== undefined) {
+      setScoresOpen(false);
+    }
+  });
+
   const [logOpen, setLogOpen] = createSignal(false);
   const latestLogId = () => props.room.log.at(-1)?.id ?? 0;
   const [seenLogId, setSeenLogId] = createSignal(untrack(latestLogId));
@@ -1212,22 +1361,24 @@ export default function Table(
         <header class="table-header">
           <h1>Round {props.room.round}</h1>
           <div class="row">
-            <Show when={props.room.phase === "playing"}>
-              <TableSheet
-                title={SCORES_TITLE}
-                triggerLabel={SCORES_TITLE}
-                trigger={<Trophy size={16} aria-hidden="true" />}
-              >
-                <Leaderboard
-                  room={props.room}
-                  playerId={props.playerId}
-                  incomingCardId={props.incomingCardId}
-                  kick={moves().host.kick}
-                  send={props.send}
-                  actionsDisabled={props.actionsDisabled}
-                />
-              </TableSheet>
-            </Show>
+            <TableSheet
+              open={scoresOpen()}
+              onOpenChange={(open) => {
+                setScoresOpen(open);
+              }}
+              title={SCORES_TITLE}
+              triggerLabel={SCORES_TITLE}
+              trigger={<Trophy size={16} aria-hidden="true" />}
+            >
+              <Leaderboard
+                room={props.room}
+                playerId={props.playerId}
+                incomingCardId={props.incomingCardId}
+                kick={moves().host.kick}
+                send={props.send}
+                actionsDisabled={props.actionsDisabled}
+              />
+            </TableSheet>
             <TableSheet
               title={CHAT_AND_GAME_LOG_TITLE}
               triggerLabel={toggleLabel()}
