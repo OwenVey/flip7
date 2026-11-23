@@ -258,7 +258,7 @@ const Room = (props: { code: string }) => {
                     }
                     dealing={table().dealing}
                     dealStep={table().step}
-                    incomingCardId={table().incomingCardId}
+                    roundPoints={table().roundPoints}
                   />
                 }
               >
