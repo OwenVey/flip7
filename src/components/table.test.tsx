@@ -1491,30 +1491,43 @@ describe("<Table />", () => {
     approve = false;
   });
 
-  it("keeps Remove controls out of seats and Scores while picking a target", () => {
+  it("keeps the host's Remove control available while picking a target", async () => {
     const choice = {
       card: { id: 9, kind: "freeze" as const },
       chooserId: "a",
       options: ["a", "b"],
     };
 
+    const sent = Promise.withResolvers<Parameters<RoomConnection["send"]>[0]>();
+
+    const send: RoomConnection["send"] = async (command) => {
+      sent.resolve(command);
+
+      return await Promise.resolve(true);
+    };
+
     render(() => (
       <Table
         room={room({ choice })}
         playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
+        send={send}
         chat={vi.fn<RoomConnection["chat"]>()}
       />
     ));
 
-    for (const seat of screen.getAllByRole("article")) {
-      expect(
-        within(seat).queryByRole("button", { name: /Remove/u })
-      ).toBeNull();
-    }
+    const remove = screen.getByRole("button", { name: "Remove Ben" });
+    expect(remove).not.toHaveAttribute("aria-disabled");
+    fireEvent.click(remove);
+    flush();
 
-    const scores = within(screen.getByRole("table", { name: "Scores" }));
-    expect(scores.queryByRole("button", { name: /Remove/u })).toBeNull();
+    const dialog = await screen.findByRole("alertdialog");
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Remove from room" })
+    );
+    await expect(sent.promise).resolves.toStrictEqual({
+      playerId: "b",
+      type: "kick",
+    });
   });
 
   it("labels the action bar as your move only when it is yours", () => {

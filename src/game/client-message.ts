@@ -58,14 +58,11 @@ export type ClientMessage = v.InferOutput<typeof ClientMessageSchema>;
 
 export type GameCommand = Exclude<ClientMessage, { type: "chat" | "join" }>;
 
-/**
- * Host commands that set up the room rather than play it: changing settings
- * and removing a player. They never hold the pending-move slot, so they don't
- * pause play, and the room doesn't remember them for confirming a move after
- * a reconnect.
- */
+/** Commands that can run alongside a pending move and need no reconnect confirmation. */
 export const isRoomCommand = (command: GameCommand) =>
-  command.type === "configure" || command.type === "kick";
+  command.type === "configure" ||
+  command.type === "kick" ||
+  command.type === "leave";
 
 const ClientMessageJsonSchema = v.pipe(
   v.string(),

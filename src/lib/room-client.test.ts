@@ -619,9 +619,68 @@ describe("room commands", () => {
     await expect(sent).resolves.toBeFalsy();
     expect(ben.client.state.notice?.message).toBe("Only the host can do that.");
   });
+
+  it("settles a room command whose reply never arrives", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const sent = ana.client.send({ locked: true, type: "configure" });
+
+    net.flushToServer();
+    ana.link?.toClient.splice(0);
+    vi.advanceTimersByTime(REPLY_TIMEOUT_MS);
+
+    await expect(sent).resolves.toBeFalsy();
+    expect(ana.client.state).toMatchObject({
+      canAct: true,
+      notice: { message: "The room couldn't confirm your request." },
+      status: "open",
+    });
+  });
+
+  it("settles all outstanding room commands and clears their timers on stop", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    const configured = ana.client.send({ locked: true, type: "configure" });
+
+    const kicked = ana.client.send({
+      playerId: ben.client.state.playerId ?? "",
+      type: "kick",
+    });
+
+    ana.client.stop();
+
+    await expect(Promise.all([configured, kicked])).resolves.toStrictEqual([
+      false,
+      false,
+    ]);
+    vi.advanceTimersByTime(REPLY_TIMEOUT_MS);
+    expect(ana.client.state.notice).toBeNull();
+  });
 });
 
 describe("leaving the room", () => {
+  it("lets a player leave while a move waits for the room", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    net.join("Ben");
+
+    const started = ana.client.send({ type: "start" });
+    const left = ana.client.send({ type: "leave" });
+    net.flush();
+
+    await expect(started).resolves.toBeTruthy();
+    await expect(left).resolves.toBeTruthy();
+    expect(ana.client.state).toMatchObject({
+      playerId: null,
+      status: "removed",
+    });
+    expect(ana.token).toBeNull();
+    expect(net.stored.game.players.map((player) => player.name)).toStrictEqual([
+      "Ben",
+    ]);
+  });
+
   it("forgets a kicked player and stops", async () => {
     const net = network();
     const ana = net.join("Ana");

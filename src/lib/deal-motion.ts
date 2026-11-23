@@ -79,7 +79,7 @@ export const createDealMotion: (
       to.dataset.incoming = "";
 
       if (header) {
-        openSlot(to, header);
+        openSlot(to, header, signal);
       }
 
       try {

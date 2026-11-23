@@ -460,7 +460,7 @@ export const createRoom = (
             return [BROADCAST, ...closes];
           }
 
-          if (command.type !== "leave" && !isRoomCommand(command)) {
+          if (!isRoomCommand(command)) {
             stored.lastRequests ??= new Map();
             stored.lastRequests.set(playerId, requestId);
           }

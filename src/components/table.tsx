@@ -552,12 +552,7 @@ const RoundPlayer = (
             {(card) => <PlayingCard card={card()} size="mini" />}
           </For>
         </ul>
-        <Show
-          when={
-            props.moves.choice === null &&
-            props.moves.host.kick.includes(props.player.id)
-          }
-        >
+        <Show when={props.moves.host.kick.includes(props.player.id)}>
           <RemovePlayer
             bot={props.player.bot}
             disabled={props.offline}

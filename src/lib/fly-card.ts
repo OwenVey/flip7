@@ -251,6 +251,11 @@ const SLOT_EASING = FLIGHT_EASING;
 const CLOSE_GAP_DELAY = 0.3;
 
 const MINI_ROW = "seat-extras";
+const slotSlides = new WeakMap<Element, () => void>();
+
+const cancelSlotSlide = (piece: Element) => {
+  slotSlides.get(piece)?.();
+};
 
 const inMiniRow = (card: Element): card is HTMLElement =>
   card instanceof HTMLElement &&
@@ -279,11 +284,26 @@ const slideFrom = (
     duration,
     easing,
     hold = 0,
+    signal,
     skip,
-  }: { duration: number; easing: string; hold?: number; skip?: Set<Element> }
-) =>
-  [...layout].flatMap(([piece, before]) => {
-    if (!piece.isConnected || skip?.has(piece) === true) {
+  }: {
+    duration: number;
+    easing: string;
+    hold?: number;
+    signal: AbortSignal;
+    skip: Set<Element>;
+  }
+) => {
+  if (signal.aborted) {
+    return [];
+  }
+
+  for (const piece of layout.keys()) {
+    cancelSlotSlide(piece);
+  }
+
+  return [...layout].flatMap(([piece, before]) => {
+    if (!piece.isConnected || skip.has(piece)) {
       return [];
     }
 
@@ -297,34 +317,61 @@ const slideFrom = (
 
     const from = `${dx}px ${dy}px`;
 
-    return [
-      piece.animate(
-        [
-          { translate: from },
-          ...(hold > 0 ? [{ offset: hold, translate: from }] : []),
-          { translate: "0 0" },
-        ],
-        { duration, easing }
-      ),
-    ];
+    const animation = piece.animate(
+      [
+        { translate: from },
+        ...(hold > 0 ? [{ offset: hold, translate: from }] : []),
+        { translate: "0 0" },
+      ],
+      { duration, easing }
+    );
+
+    const cleanup = () => {
+      signal.removeEventListener("abort", cancel);
+
+      if (slotSlides.get(piece) === cancel) {
+        slotSlides.delete(piece);
+      }
+    };
+
+    const cancel = () => {
+      cleanup();
+      animation.cancel();
+    };
+
+    slotSlides.set(piece, cancel);
+    signal.addEventListener("abort", cancel, { once: true });
+    void animation.finished.then(cleanup).catch(cleanup);
+
+    return [animation];
   });
+};
 
 /**
  * Once a mini card is in its row, slides the cards beside it aside from where
  * they were before, so its slot seems to open. The new card already sits where
  * it ends up, so its flight lands there.
  */
-export const openSlot = (card: Element, layout: HeaderLayout) => {
+export const openSlot = (
+  card: Element,
+  layout: HeaderLayout,
+  signal: AbortSignal
+) => {
   if (inMiniRow(card)) {
     slideFrom(layout, {
       duration: SLOT_MS,
       easing: SLOT_EASING,
+      signal,
       skip: new Set([card]),
     });
   }
 };
 
-const closeSlots = (cards: Element[], duration: number) => {
+const closeSlots = (
+  cards: Element[],
+  duration: number,
+  signal: AbortSignal
+) => {
   const leaving = cards.filter(inMiniRow);
   const seats = new Set(leaving.map((card) => card.closest(".seat")));
 
@@ -339,6 +386,7 @@ const closeSlots = (cards: Element[], duration: number) => {
   }));
 
   for (const { card, width } of spots) {
+    cancelSlotSlide(card);
     card.dataset.leaving = "";
     Object.assign(card.style, {
       left: "0",
@@ -363,6 +411,7 @@ const closeSlots = (cards: Element[], duration: number) => {
     duration,
     easing: GROW_EASING,
     hold: CLOSE_GAP_DELAY,
+    signal,
     skip: new Set(leaving),
   });
 };
@@ -395,7 +444,7 @@ export const discardCards = async (
     )
   );
 
-  const closes = closeSlots(cards, duration);
+  const closes = closeSlots(cards, duration, signal);
 
   await settle([...lifts, ...closes], duration, signal);
 };
