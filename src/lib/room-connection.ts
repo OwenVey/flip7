@@ -1,16 +1,6 @@
-import { makeConnectivityListener } from "@solid-primitives/connectivity";
-import { usePageVisibility } from "@solid-primitives/page-utilities";
 import { makeObjectStorage, makePersisted } from "@solid-primitives/storage";
 import { PartySocket } from "partysocket";
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  getOwner,
-  onSettled,
-  runWithOwner,
-  untrack,
-} from "solid-js";
+import { createSignal, onSettled, untrack } from "solid-js";
 
 import { parseSavedAvatar } from "../game/avatars";
 import {
@@ -111,8 +101,11 @@ export const createRoomConnection = (code: string) => {
         closing?.close();
       },
       isOpen: () => socket?.readyState === PartySocket.OPEN,
-      // WARNING: a PartySocket that sat through iOS backgrounding can stop retrying, so build a new one.
       reconnect: () => {
+        socket?.reconnect();
+      },
+      // WARNING: a PartySocket that sat through iOS backgrounding can stop retrying, so build a new one.
+      replace: () => {
         const stale = socket;
         socket = null;
         stale?.close();
@@ -146,24 +139,26 @@ export const createRoomConnection = (code: string) => {
   client.subscribe((next) => {
     setState(next);
   });
-  const owner = getOwner();
 
   const connect = () => {
-    const ws = makeSteadyHeartbeat(
-      new PartySocket({
-        host: location.host,
-        maxEnqueuedMessages: 0,
-        minReconnectionDelay: RETRY_DELAY_MS,
-        party: ROOM_PARTY,
-        protocol: location.protocol === "https:" ? "wss" : "ws",
-        room: code,
-        shouldReconnectOnClose: ({ code: closeCode }) =>
-          closeCode !== ROOM_REMOVED_CLOSE_CODE,
-      }),
-      HEARTBEAT
-    );
+    const ws = new PartySocket({
+      host: location.host,
+      maxEnqueuedMessages: 0,
+      minReconnectionDelay: RETRY_DELAY_MS,
+      party: ROOM_PARTY,
+      protocol: location.protocol === "https:" ? "wss" : "ws",
+      room: code,
+      shouldReconnectOnClose: ({ code: closeCode }) =>
+        closeCode !== ROOM_REMOVED_CLOSE_CODE,
+    });
 
     socket = ws;
+    makeSteadyHeartbeat(ws, HEARTBEAT, () => {
+      if (ws === socket) {
+        client.heartbeatMissed();
+      }
+    });
+
     ws.addEventListener("open", () => {
       if (ws === socket) {
         client.opened();
@@ -187,30 +182,24 @@ export const createRoomConnection = (code: string) => {
     });
   };
 
-  const watchConnectivity = () => {
-    makeConnectivityListener((isOnline) => {
-      client.setOnline(isOnline);
+  const reportBrowserState = () => {
+    client.browserStateChanged({
+      online: navigator.onLine,
+      visible: document.visibilityState === "visible",
     });
-    const visible = usePageVisibility();
-    // WARNING: effects re-run on every state change, and resume() changes state, so only an actual return may resume.
-    const back = createMemo(() => state().online && visible());
-    createEffect(
-      () => back(),
-      (isBack) => {
-        if (isBack) {
-          client.resume();
-        }
-      }
-    );
   };
 
-  // WARNING: browser-only primitives add owners the server render lacks, so start them after hydration.
   onSettled(() => {
-    client.setOnline(navigator.onLine);
-    runWithOwner(owner, watchConnectivity);
+    reportBrowserState();
+    window.addEventListener("online", reportBrowserState);
+    window.addEventListener("offline", reportBrowserState);
+    document.addEventListener("visibilitychange", reportBrowserState);
     connect();
 
     return () => {
+      window.removeEventListener("online", reportBrowserState);
+      window.removeEventListener("offline", reportBrowserState);
+      document.removeEventListener("visibilitychange", reportBrowserState);
       client.stop();
     };
   });

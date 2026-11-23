@@ -3,7 +3,6 @@ export interface HeartbeatSocket {
     type: "open" | "message" | "close",
     listener: () => void
   ) => void;
-  reconnect: () => void;
   send: (message: string) => void;
 }
 
@@ -14,12 +13,13 @@ export interface HeartbeatOptions {
 }
 
 /**
- * Pings on a fixed cadence while the socket is open and reconnects when nothing comes back in time.
+ * Pings on a fixed cadence while the socket is open and reports when nothing comes back in time.
  * Unlike `makeHeartbeatWS`, incoming room traffic never postpones a ping, so the server always sees one.
  */
-export const makeSteadyHeartbeat = <Socket extends HeartbeatSocket>(
-  ws: Socket,
-  options: HeartbeatOptions
+export const makeSteadyHeartbeat = (
+  ws: HeartbeatSocket,
+  options: HeartbeatOptions,
+  onMissedReply: () => void
 ) => {
   let pingTimer: ReturnType<typeof setInterval> | undefined;
   let pongTimer: ReturnType<typeof setTimeout> | undefined;
@@ -39,7 +39,7 @@ export const makeSteadyHeartbeat = <Socket extends HeartbeatSocket>(
     ws.send(options.message);
     pongTimer ??= setTimeout(() => {
       stop();
-      ws.reconnect();
+      onMissedReply();
     }, options.wait);
   };
 
@@ -49,6 +49,4 @@ export const makeSteadyHeartbeat = <Socket extends HeartbeatSocket>(
   });
   ws.addEventListener("message", stopWaiting);
   ws.addEventListener("close", stop);
-
-  return ws;
 };

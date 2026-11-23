@@ -194,7 +194,7 @@ const network = () => {
 interface TestPlayer {
   client: ReturnType<typeof createRoomClient>;
   link: Link | null;
-  reconnects: number;
+  replacements: number;
   token: string | null;
 }
 
@@ -208,8 +208,9 @@ const testPlayer = (players: TestPlayer[]) => {
           player.link = null;
         },
         isOpen: () => player.link?.open === true,
-        reconnect: () => {
-          player.reconnects += 1;
+        reconnect: () => {},
+        replace: () => {
+          player.replacements += 1;
         },
         send: (frame) => {
           if (player.link?.open !== true) {
@@ -229,7 +230,7 @@ const testPlayer = (players: TestPlayer[]) => {
       },
     }),
     link: null,
-    reconnects: 0,
+    replacements: 0,
     token: null,
   };
 
@@ -327,6 +328,26 @@ describe("recovering a stuck connection", () => {
     vi.useRealTimers();
   });
 
+  it("replaces the socket on a return to visibility only while reconnecting", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const hidden = { online: true, visible: false };
+    const visible = { online: true, visible: true };
+
+    ana.client.browserStateChanged(hidden);
+    ana.client.browserStateChanged(visible);
+    expect(ana.replacements).toBe(0);
+
+    net.drop(ana);
+    ana.client.browserStateChanged(visible);
+    expect(ana.replacements).toBe(0);
+
+    ana.client.browserStateChanged(hidden);
+    ana.client.browserStateChanged(visible);
+    ana.client.browserStateChanged(visible);
+    expect(ana.replacements).toBe(1);
+  });
+
   it("starts over when the connection stays down", () => {
     const net = network();
     const ana = net.join("Ana");
@@ -335,12 +356,12 @@ describe("recovering a stuck connection", () => {
     ana.client.closed(DROPPED_CLOSE_CODE, 1);
     vi.advanceTimersByTime(RESYNC_TIMEOUT_MS / 2);
 
-    expect(ana.reconnects).toBe(1);
+    expect(ana.replacements).toBe(1);
     expect(ana.client.state.status).toBe("reconnecting");
 
     vi.advanceTimersByTime(RESYNC_TIMEOUT_MS);
 
-    expect(ana.reconnects).toBe(2);
+    expect(ana.replacements).toBe(2);
   });
 
   it("starts over when a rejoin gets no reply", () => {
@@ -351,11 +372,11 @@ describe("recovering a stuck connection", () => {
     net.connect(ana);
     vi.advanceTimersByTime(RESYNC_TIMEOUT_MS - 1);
 
-    expect(ana.reconnects).toBe(0);
+    expect(ana.replacements).toBe(0);
 
     vi.advanceTimersByTime(1);
 
-    expect(ana.reconnects).toBe(1);
+    expect(ana.replacements).toBe(1);
     expect(ana.client.state.status).toBe("reconnecting");
   });
 
@@ -367,7 +388,7 @@ describe("recovering a stuck connection", () => {
     net.flush();
     vi.advanceTimersByTime(RESYNC_TIMEOUT_MS * 3);
 
-    expect(ana.reconnects).toBe(0);
+    expect(ana.replacements).toBe(0);
     expect(ana.client.state.status).toBe("open");
   });
 
@@ -378,7 +399,7 @@ describe("recovering a stuck connection", () => {
     net.flush();
     vi.advanceTimersByTime(RESYNC_TIMEOUT_MS * 3);
 
-    expect(ana.reconnects).toBe(0);
+    expect(ana.replacements).toBe(0);
     expect(ana.client.state.needsName).toBeTruthy();
   });
 });
@@ -406,21 +427,43 @@ describe("a pending move", () => {
     expect(ana.client.state.room?.phase).toBe("playing");
   });
 
-  it("counts a move the room got before the connection dropped", async () => {
+  it("confirms a pending move after returning to a visible, online page", async () => {
     const net = network();
     const ana = net.join("Ana");
     net.join("Ben");
+    const visibleAndOnline = { online: true, visible: true };
+    ana.client.browserStateChanged(visibleAndOnline);
 
     const sent = ana.client.send({ type: "start" });
     net.flushToServer();
+    ana.client.browserStateChanged({ online: true, visible: false });
     net.drop(ana);
+    ana.client.browserStateChanged({ online: false, visible: true });
+    expect(ana.replacements).toBe(0);
+
+    ana.client.browserStateChanged(visibleAndOnline);
+    ana.client.browserStateChanged(visibleAndOnline);
+    expect(ana.replacements).toBe(1);
+    expect(ana.client.state).toMatchObject({ canAct: false, sending: true });
+
     net.connect(ana);
     net.flush();
+    ana.client.browserStateChanged(visibleAndOnline);
 
     await expect(sent).resolves.toBeTruthy();
-    expect(ana.client.state.notice).toMatchObject({
-      confirmed: true,
-      message: "Reconnected. Your last move counted.",
+    expect({
+      replacements: ana.replacements,
+      state: ana.client.state,
+    }).toMatchObject({
+      replacements: 1,
+      state: {
+        canAct: true,
+        notice: {
+          confirmed: true,
+          message: "Reconnected. Your last move counted.",
+        },
+        sending: false,
+      },
     });
   });
 
@@ -452,7 +495,7 @@ describe("a pending move", () => {
     vi.advanceTimersByTime(REPLY_TIMEOUT_MS);
 
     expect(ana.client.state.status).toBe("reconnecting");
-    expect(ana.reconnects).toBe(1);
+    expect(ana.replacements).toBe(1);
 
     net.drop(ana);
     net.connect(ana);
@@ -488,7 +531,7 @@ describe("a pending move", () => {
   it("isn't sent while offline", async () => {
     const net = network();
     const ana = net.join("Ana");
-    ana.client.setOnline(false);
+    ana.client.browserStateChanged({ online: false, visible: true });
 
     expect(ana.client.state.canAct).toBeFalsy();
     await expect(ana.client.send({ type: "start" })).resolves.toBeFalsy();
@@ -521,7 +564,8 @@ const scripted = (overrides: Partial<RoomClientDeps> = {}) => {
   const frames: string[] = [];
   let token: string | null = "saved-token";
   let closed = false;
-  let reconnects = 0;
+  let replacements = 0;
+  let retries = 0;
 
   const client = createRoomClient({
     newId: () => crypto.randomUUID(),
@@ -532,7 +576,10 @@ const scripted = (overrides: Partial<RoomClientDeps> = {}) => {
       },
       isOpen: () => !closed,
       reconnect: () => {
-        reconnects += 1;
+        retries += 1;
+      },
+      replace: () => {
+        replacements += 1;
       },
       send: (frame) => {
         frames.push(frame);
@@ -553,7 +600,8 @@ const scripted = (overrides: Partial<RoomClientDeps> = {}) => {
     client,
     frames,
     isClosed: () => closed,
-    reconnects: () => reconnects,
+    replacements: () => replacements,
+    retries: () => retries,
     token: () => token,
   };
 };
@@ -620,24 +668,25 @@ describe("the room client on its own", () => {
     expect(checks).toBe(3);
   });
 
-  it("reconnects on resume only while the connection is down", () => {
-    const { client, reconnects } = scripted();
+  it("retries the current socket after a missed heartbeat", () => {
+    const { client, replacements, retries } = scripted();
     client.opened();
-    client.resume();
-    expect(reconnects()).toBe(0);
+    client.heartbeatMissed();
+    expect(retries()).toBe(1);
+    expect(replacements()).toBe(0);
 
-    client.closed(DROPPED_CLOSE_CODE, 0);
-    client.resume();
-    expect(reconnects()).toBe(1);
+    client.stop();
+    client.heartbeatMissed();
+    expect(retries()).toBe(1);
   });
 
   it("starts a fresh connection on retry until the room is gone", () => {
-    const { client, reconnects } = scripted();
+    const { client, replacements } = scripted();
     client.retry();
-    expect(reconnects()).toBe(1);
+    expect(replacements()).toBe(1);
 
     client.closed(ROOM_REMOVED_CLOSE_CODE, 0);
     client.retry();
-    expect(reconnects()).toBe(1);
+    expect(replacements()).toBe(1);
   });
 });

@@ -10,14 +10,11 @@ const CHAT_MESSAGES = 7;
 const fakeSocket = () => {
   const target = new EventTarget();
   const sent: string[] = [];
-  let reconnects = 0;
+  let missedReplies = 0;
 
   const socket = {
     addEventListener: (type: string, listener: () => void) => {
       target.addEventListener(type, listener);
-    },
-    reconnect: () => {
-      reconnects += 1;
     },
     send: (message: string) => {
       sent.push(message);
@@ -26,7 +23,10 @@ const fakeSocket = () => {
 
   return {
     emit: (type: string) => target.dispatchEvent(new Event(type)),
-    reconnects: () => reconnects,
+    missedReplies: () => missedReplies,
+    onMissedReply: () => {
+      missedReplies += 1;
+    },
     sent,
     socket,
   };
@@ -42,12 +42,12 @@ describe(makeSteadyHeartbeat, () => {
   });
 
   it("keeps pinging through sustained room traffic", () => {
-    const { emit, reconnects, sent, socket } = fakeSocket();
-    makeSteadyHeartbeat(socket, {
-      interval: INTERVAL_MS,
-      message: "ping",
-      wait: WAIT_MS,
-    });
+    const { emit, missedReplies, onMissedReply, sent, socket } = fakeSocket();
+    makeSteadyHeartbeat(
+      socket,
+      { interval: INTERVAL_MS, message: "ping", wait: WAIT_MS },
+      onMissedReply
+    );
     emit("open");
 
     for (let index = 0; index < CHAT_MESSAGES; index += 1) {
@@ -56,32 +56,32 @@ describe(makeSteadyHeartbeat, () => {
     }
 
     expect(sent).toStrictEqual(["ping", "ping"]);
-    expect(reconnects()).toBe(0);
+    expect(missedReplies()).toBe(0);
   });
 
-  it("reconnects a socket that stops answering", () => {
-    const { emit, reconnects, socket } = fakeSocket();
-    makeSteadyHeartbeat(socket, {
-      interval: INTERVAL_MS,
-      message: "ping",
-      wait: WAIT_MS,
-    });
+  it("reports once when a socket stops answering", () => {
+    const { emit, missedReplies, onMissedReply, socket } = fakeSocket();
+    makeSteadyHeartbeat(
+      socket,
+      { interval: INTERVAL_MS, message: "ping", wait: WAIT_MS },
+      onMissedReply
+    );
     emit("open");
 
     vi.advanceTimersByTime(INTERVAL_MS + WAIT_MS);
-    expect(reconnects()).toBe(1);
+    expect(missedReplies()).toBe(1);
 
     vi.advanceTimersByTime(INTERVAL_MS * 3);
-    expect(reconnects()).toBe(1);
+    expect(missedReplies()).toBe(1);
   });
 
   it("stops pinging once the socket closes", () => {
-    const { emit, sent, socket } = fakeSocket();
-    makeSteadyHeartbeat(socket, {
-      interval: INTERVAL_MS,
-      message: "ping",
-      wait: WAIT_MS,
-    });
+    const { emit, onMissedReply, sent, socket } = fakeSocket();
+    makeSteadyHeartbeat(
+      socket,
+      { interval: INTERVAL_MS, message: "ping", wait: WAIT_MS },
+      onMissedReply
+    );
     emit("open");
     emit("close");
 
