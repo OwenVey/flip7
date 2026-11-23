@@ -27,7 +27,7 @@ When assigning **Freeze** or **Flip Three**, you can choose any eligible active 
 - **Flip Three** makes the receiving player take up to three cards in a row. A Freeze or Flip Three drawn during that sequence is held. If the player survives all three cards, they assign each held card in the order it was drawn. The cards then take effect in that order, after any effects already waiting. A held card whose target is no longer active is discarded.
 - **Second Chance** saves you from the next duplicate Number card. Discard both cards and keep playing. If you already have a Second Chance, give the extra card to an active player without one, or discard it if nobody can take it.
 
-When the deck runs out, the discard pile is shuffled into a new deck. Cards in front of players stay put. If the deck and the discard pile are both empty, the round ends and everyone who hasn't busted scores what they hold. The in-game **Rules** button has a quick reference.
+When the deck runs out, the discard pile is shuffled into a new deck. Table cards stay out of the deck until round cleanup, even if a player leaves or is kicked. If the deck and the discard pile are both empty, the round ends and everyone who hasn't busted scores what they hold. The in-game **Rules** button has a quick reference.
 
 <details>
 <summary>See all 94 cards in the deck</summary>

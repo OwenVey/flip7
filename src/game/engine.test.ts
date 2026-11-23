@@ -419,6 +419,52 @@ describe("winning and leaving", () => {
 });
 
 describe("evicting a player", () => {
+  it("holds frozen and busted players' table cards until round cleanup", () => {
+    const frozenNumber = num(3);
+    const bustedNumber = num(8);
+
+    const state = setup(
+      ["a", "b", "c", "d"],
+      [num(5), frozenNumber, bustedNumber, num(4)]
+    );
+
+    const freezeCard = freeze();
+    const duplicate = num(8);
+    const eligibleDiscard = num(6);
+    rig(state, [freezeCard, duplicate]);
+    state.discard = [eligibleDiscard];
+
+    hit(state, "a", random);
+    choose(state, "a", "b", random);
+    hit(state, "c", random);
+    leave(state, "b", random);
+    kick(state, "a", "c", random);
+
+    expect(state.discard).toStrictEqual([eligibleDiscard]);
+    hit(state, "d", random);
+
+    expect(player(state, "d").hand).toContainEqual(eligibleDiscard);
+    expect({ deck: state.deck, discard: state.discard }).toStrictEqual({
+      deck: [],
+      discard: [],
+    });
+    stay(state, "a", random);
+    stay(state, "d", random);
+
+    rig(state, [num(1), num(2)]);
+    nextRound(state, "a", random);
+
+    expect(state.discard).toStrictEqual(
+      expect.arrayContaining([
+        frozenNumber,
+        freezeCard,
+        bustedNumber,
+        duplicate,
+      ])
+    );
+    expect(state.evictedCards).toStrictEqual([]);
+  });
+
   it("lets the host kick another player and says so", () => {
     const state = setup(["a", "b", "c"], [num(1), num(2), num(3)]);
 
@@ -886,7 +932,7 @@ describe("held action cards through eviction", () => {
     );
   });
 
-  it("discards a queued card as soon as its target is kicked during resolution", () => {
+  it("discards a queued card at its execution slot after its target is kicked", () => {
     const state = setup(["a", "b", "c", "d"], [num(5), num(3), num(8), num(4)]);
     const queuedFreeze = freeze();
     const nextChoice = freeze();
@@ -911,9 +957,17 @@ describe("held action cards through eviction", () => {
 
     kick(state, "a", "c", random);
 
-    expect(state.discard).toContainEqual(queuedFreeze);
+    expect(state.discard).not.toContainEqual(queuedFreeze);
     expect(toRoomView("ABCDE", state)).toMatchObject({
       choice: { card: nextChoice, chooserId: "d", options: ["a", "b", "d"] },
+      held: [{ card: queuedFreeze, ownerId: "c" }],
+    });
+
+    choose(state, "d", "a", random);
+
+    expect(state.discard).toContainEqual(queuedFreeze);
+    expect(toRoomView("ABCDE", state)).toMatchObject({
+      choice: null,
       held: [],
     });
   });

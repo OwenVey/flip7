@@ -117,6 +117,8 @@ export interface GameState extends ActionCardState {
   players: Player[];
   deck: Card[];
   discard: Card[];
+  /** Table cards from evicted players, held until round cleanup. */
+  evictedCards?: Card[];
   round: number;
   /** Games started in this room. Missing on rooms saved before games were counted. */
   games?: number;
@@ -229,16 +231,26 @@ const activePlayers = (state: GameState) =>
 const hasSecondChance = (player: Player) =>
   player.hand.some((card) => card.kind === "secondChance");
 
-const clearTable = (state: GameState, player: Player) => {
-  state.discard.push(...player.hand, ...(player.played ?? []));
+const clearTable = (cards: Card[], player: Player) => {
+  cards.push(...player.hand, ...(player.played ?? []));
 
   if (player.bustCard) {
-    state.discard.push(player.bustCard);
+    cards.push(player.bustCard);
   }
 
   player.hand = [];
   player.played = [];
   player.bustCard = null;
+};
+
+const clearRoundTable = (state: GameState, status: RoundStatus) => {
+  state.discard.push(...(state.evictedCards ?? []));
+  state.evictedCards = [];
+
+  for (const player of state.players) {
+    clearTable(state.discard, player);
+    player.status = status;
+  }
 };
 
 const removeCard = (player: Player, card: Card) => {
@@ -591,10 +603,7 @@ const assertMove = (state: GameState, playerId: string, move: Move) => {
 };
 
 const startRound = (state: GameState, random: Random) => {
-  for (const player of state.players) {
-    clearTable(state, player);
-    player.status = "active";
-  }
+  clearRoundTable(state, "active");
 
   state.round += 1;
   state.dealerIndex = (state.dealerIndex + 1) % state.players.length;
@@ -799,6 +808,7 @@ export const startGame = (
 
   state.deck = shuffle(buildDeck(), random);
   state.discard = [];
+  state.evictedCards = [];
   state.games = (state.games ?? 0) + 1;
   state.round = 0;
   state.winnerIds = [];
@@ -905,7 +915,12 @@ export const removePlayer = (
   }
 
   state.players.splice(index, 1);
-  clearTable(state, player);
+
+  const tableCards =
+    state.phase === "lobby" ? state.discard : (state.evictedCards ??= []);
+
+  clearTable(tableCards, player);
+
   const count = state.players.length;
   state.dealerIndex = shiftIndex(state.dealerIndex, index, count);
   state.turnAnchor = shiftIndex(state.turnAnchor, index, count);
@@ -929,14 +944,11 @@ export const removePlayer = (
   if (playing && count < MIN_PLAYERS) {
     state.phase = "lobby";
     state.turnId = null;
-    resetActionCards(state);
+    discardActionCards(state);
     state.dealSlotTurn = false;
     state.dealQueue = [];
 
-    for (const remaining of state.players) {
-      clearTable(state, remaining);
-      remaining.status = "out";
-    }
+    clearRoundTable(state, "out");
 
     say(state, "Not enough players left, so the game ended.");
 
@@ -984,10 +996,7 @@ export const backToLobby = (state: GameState, playerId: string) => {
   state.phase = "lobby";
   state.round = 0;
 
-  for (const player of state.players) {
-    clearTable(state, player);
-    player.status = "out";
-  }
+  clearRoundTable(state, "out");
 };
 
 export const transferHost = (state: GameState) => {
