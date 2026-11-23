@@ -21,6 +21,13 @@ import {
   ROOM_REMOVED_CLOSE_CODE,
 } from "../game/protocol";
 import { makeSteadyHeartbeat } from "./heartbeat";
+import {
+  AVATAR_KEY,
+  forgetRoom,
+  NAME_KEY,
+  rememberRoom,
+  tokenKey,
+} from "./recent-rooms";
 import { createRoomClient } from "./room-client";
 import { roomExists } from "./room-functions";
 
@@ -34,13 +41,9 @@ const HEARTBEAT = {
   wait: 5000,
 };
 
-const NAME_KEY = "flip7:name";
-const AVATAR_KEY = "flip7:avatar";
 const STORAGE_PROBE = "flip7:probe";
 
 const FRESH_PARAM = "fresh";
-
-const tokenKey = (code: string) => `flip7:token:${code}`;
 
 const pickTokenStorage = () =>
   import.meta.env.DEV && new URLSearchParams(location.search).has(FRESH_PARAM)
@@ -85,12 +88,14 @@ export const createRoomConnection = (code: string) => {
     }
   );
 
+  const tokenStorage = usableStorage(pickTokenStorage);
+
   const [token, setToken] = makePersisted(
     createSignal<string | null>(null, { ownedWrite: true }),
     {
       ...plainText,
       name: tokenKey(code),
-      storage: usableStorage(pickTokenStorage),
+      storage: tokenStorage,
     }
   );
 
@@ -127,6 +132,12 @@ export const createRoomConnection = (code: string) => {
       get: () => untrack(token),
       set: (next) => {
         setToken(next);
+
+        if (next === null) {
+          forgetRoom(tokenStorage, code);
+        } else {
+          rememberRoom(tokenStorage, code, Date.now());
+        }
       },
     },
   });

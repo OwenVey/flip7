@@ -12,6 +12,7 @@ import { flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import Home from ".";
+import { rememberRoom, tokenKey } from "../lib/recent-rooms";
 
 const rpcResponse = (value: boolean | string) =>
   Response.json(value, { headers: { "X-Server-Function-Format": "8" } });
@@ -37,6 +38,7 @@ describe(Home, () => {
 
   afterEach(() => {
     cleanup();
+    localStorage.clear();
     vi.unstubAllGlobals();
     configureServerFunctionsClient({ fetch: null });
   });
@@ -151,6 +153,33 @@ describe(Home, () => {
     expect(requests).toBe(1);
 
     reply.resolve(rpcResponse("ABCDE"));
+    await waitFor(() => {
+      expect(history.get()).toBe("/room/ABCDE");
+    });
+  });
+
+  it("offers to rejoin saved rooms that still exist", async () => {
+    for (const code of ["ABCDE", "FGHJK"]) {
+      localStorage.setItem(tokenKey(code), `token-${code}`);
+    }
+
+    rememberRoom(localStorage, "ABCDE", Date.now() - 2 * 3_600_000);
+    configureServerFunctionsClient({
+      fetch: (_, request) => rpcResponse(request.body === "ABCDE"),
+    });
+    const history = renderHome();
+
+    const rejoin = await screen.findByRole("button", {
+      name: "Rejoin room ABCDE",
+    });
+
+    expect(screen.getByText("2 hours ago")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Rejoin room FGHJK" })
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem(tokenKey("FGHJK"))).toBeNull();
+
+    rejoin.click();
     await waitFor(() => {
       expect(history.get()).toBe("/room/ABCDE");
     });

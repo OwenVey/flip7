@@ -12,16 +12,16 @@ import {
 } from "@ui-sdk/solid/otp-input";
 import { createSignal, For, Repeat } from "solid-js";
 
+import HomeGuide from "../components/home-guide";
 import PageMeta, {
   SITE_DESCRIPTION,
   SITE_NAME,
   SITE_ORIGIN,
 } from "../components/page-meta";
 import PlayingCard from "../components/playing-card";
-import RulesDialog from "../components/rules-dialog";
+import RecentRooms from "../components/recent-rooms";
 import { ADDITIVE_MODIFIER_KIND } from "../game/cards";
 import type { Card } from "../game/cards";
-import { TARGET_SCORE } from "../game/engine";
 import { CODE_ALPHABET, CODE_LENGTH, normalizeCode } from "../game/protocol";
 import { createRoom, roomExists } from "../lib/room-functions";
 import { paths } from "../router";
@@ -139,74 +139,70 @@ export default function Home() {
         </ul>
       </section>
 
-      <section class="panel home-actions" aria-labelledby="play-heading">
-        <h2 id="play-heading">Play</h2>
-        <div class="home-create">
-          <Button
-            data-variant="solid"
-            disabled={pending() !== null}
-            onClick={handleCreateRoom}
-          >
-            <Plus size={16} />
-            {pending() === "create" ? "Creating room…" : "Create room"}
-          </Button>
-          <p class="home-hint">You'll get a link to share with friends.</p>
-          <p class="error" role="alert">
-            {createError()}
-          </p>
-        </div>
-        <p class="home-divider" aria-hidden="true">
-          or join with a code
-        </p>
-        <form
-          class="home-join"
-          novalidate
-          onSubmit={(event) => {
-            void handleJoinRoom(event);
-          }}
-        >
-          <Field name="code" invalid={codeError() ? true : undefined}>
-            <FieldLabel class="sr-only">Room code</FieldLabel>
-            <OTPInput
-              autoComplete="off"
-              controller={codeInput}
-              inputMode="text"
-              maxLength={CODE_LENGTH}
-              onValueChange={(value) => {
-                setCode(value);
-                setCodeError("");
-              }}
-              pattern={CODE_CHARACTER_PATTERN}
-              readOnly={pending() === "join"}
-              required
-              value={code()}
+      <div class="home-panels">
+        <section class="panel home-actions" aria-labelledby="play-heading">
+          <h2 id="play-heading">Play</h2>
+          <div class="home-create">
+            <Button
+              data-variant="solid"
+              disabled={pending() !== null}
+              onClick={handleCreateRoom}
             >
-              <OTPInputGroup class="code-input">
-                <Repeat count={CODE_LENGTH}>
-                  {(index) => <OTPInputSlot index={index} />}
-                </Repeat>
-              </OTPInputGroup>
-            </OTPInput>
-            <FieldError role="alert">{codeError()}</FieldError>
-          </Field>
-          <Button
-            type="submit"
-            data-variant={code().length === CODE_LENGTH ? "solid" : undefined}
-            disabled={pending() !== null}
+              <Plus size={16} />
+              {pending() === "create" ? "Creating room…" : "Create room"}
+            </Button>
+            <p class="home-hint">You'll get a link to share with friends.</p>
+            <p class="error" role="alert">
+              {createError()}
+            </p>
+          </div>
+          <p class="home-divider" aria-hidden="true">
+            or join a room
+          </p>
+          <form
+            class="home-join"
+            novalidate
+            onSubmit={(event) => {
+              void handleJoinRoom(event);
+            }}
           >
-            <ArrowRight size={16} />
-            {pending() === "join" ? "Checking room…" : "Join room"}
-          </Button>
-        </form>
-        <p class="home-rules">
-          New here?
-          <RulesDialog
-            targetScore={TARGET_SCORE}
-            label="How to play"
-            variant="quiet"
-          />
-        </p>
-      </section>
+            <Field name="code" invalid={codeError() ? true : undefined}>
+              <FieldLabel>Room code</FieldLabel>
+              <OTPInput
+                autoComplete="off"
+                controller={codeInput}
+                inputMode="text"
+                maxLength={CODE_LENGTH}
+                onValueChange={(value) => {
+                  setCode(value);
+                  setCodeError("");
+                }}
+                pattern={CODE_CHARACTER_PATTERN}
+                readOnly={pending() === "join"}
+                required
+                value={code()}
+              >
+                <OTPInputGroup class="code-input">
+                  <Repeat count={CODE_LENGTH}>
+                    {(index) => <OTPInputSlot index={index} />}
+                  </Repeat>
+                </OTPInputGroup>
+              </OTPInput>
+              <FieldError role="alert">{codeError()}</FieldError>
+            </Field>
+            <Button
+              type="submit"
+              data-variant={code().length === CODE_LENGTH ? "solid" : undefined}
+              disabled={pending() !== null}
+            >
+              <ArrowRight size={16} />
+              {pending() === "join" ? "Checking room…" : "Join room"}
+            </Button>
+          </form>
+          <RecentRooms />
+        </section>
+        <HomeGuide />
+      </div>
     </main>
   );
 }

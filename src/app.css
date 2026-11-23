@@ -1721,9 +1721,21 @@ main {
   }
 }
 
+/* Play and the guide stack on phones, and split the hero's width on desktop. */
+.home-panels {
+  display: grid;
+  gap: clamp(1rem, 3vw, 2rem);
+  justify-items: center;
+  align-items: start;
+
+  @media (min-width: 52rem) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+  }
+}
+
 /* One panel holds both ways in: create a room, or join one with a code. */
-.panel.home-actions {
-  justify-self: center;
+.panel:is(.home-actions, .home-guide) {
   width: min(100%, 32rem);
   border: 0.3125rem solid var(--rail);
   border-radius: var(--radius-xl);
@@ -1731,6 +1743,121 @@ main {
     inset 0 0 0 1.5px var(--rule),
     0 0 0 1px #2c180d,
     var(--shadow-table);
+
+  @media (min-width: 52rem) {
+    width: 100%;
+  }
+}
+
+/* Side by side, the rules read first, left of Play. Phones keep Play on top. */
+.panel.home-guide {
+  grid-template-rows: auto 1fr;
+
+  @media (min-width: 52rem) {
+    order: -1;
+  }
+}
+
+/* When the guide is taller, Play's dividers share the extra height, split evenly above and below each. */
+.panel.home-actions {
+  display: flex;
+  flex-direction: column;
+
+  & > .home-divider {
+    margin-block: auto;
+  }
+}
+
+.home-join [data-slot="field-label"] {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.home-recent-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  & li {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.5rem 0.5rem 0.5rem 0.875rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-lg);
+    background: var(--paper-deep);
+  }
+
+  & [data-slot="button"] {
+    flex: none;
+  }
+}
+
+.home-recent-code {
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  letter-spacing: 0.06em;
+}
+
+.home-recent-time {
+  flex: 1;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+/* The guide's cards are larger than the seat header's minis, and sit centred on their rule. */
+.home-steps {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 0.875rem;
+  font-size: 0.9375rem;
+
+  /* When Play is taller, the steps keep their spacing and the goal line keeps to the bottom. */
+  & .rules-card-list {
+    gap: 1rem;
+    align-content: start;
+  }
+
+  & .rules-card-rule {
+    align-items: center;
+  }
+
+  & .rules-cards {
+    gap: 0.25rem;
+  }
+
+  & .rules-cards .card {
+    width: 1.75rem;
+  }
+
+  & .rules-cards .card[data-kind] .card-label {
+    font-size: 1.125rem;
+  }
+
+  /* The stamp hangs off the card's bottom edge, so the duplicate 8 stays readable above it. */
+  & .rules-cards .card[data-bust]::after {
+    inset: auto -0.3125rem -0.375rem;
+  }
+
+  /* The deck the next card comes from, a step apart from the hand. */
+  & .card-back {
+    width: 1.75rem;
+    margin-inline-start: 0.25rem;
+  }
+}
+
+.home-steps-goal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.9375rem;
 }
 
 .home-create,
@@ -1743,15 +1870,6 @@ main {
   color: var(--ink-soft);
   font-size: 0.875rem;
   text-align: center;
-}
-
-.home-rules {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-soft);
-  font-size: 0.875rem;
 }
 
 .home-divider {
