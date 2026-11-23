@@ -396,6 +396,7 @@ const RoundPlayer = (
       data-winner={isWinner() ? "" : undefined}
       data-offline={props.player.connected ? undefined : ""}
       data-pickable={pickChoice()?.card.kind}
+      data-unpickable={props.moves.choice && !pickChoice() ? "" : undefined}
       aria-label={`${props.player.name}, ${props.player.score} points`}
     >
       <Show when={pickChoice()}>
@@ -579,48 +580,59 @@ const RoundPlayer = (
 
 const ActionCardPrompt = (
   props: Pick<TableProps, "room"> &
-    Pick<MoveControls, "moves"> & { choice: ActionCardChoice }
+    Pick<MoveControls, "moves"> & {
+      choice: ActionCardChoice;
+      dealingLabel?: string;
+    }
 ) => (
   <>
     <ul class="dealt-action-card" data-choice-card="" aria-hidden="true">
       <PlayingCard card={props.choice.card} />
     </ul>
     <Show
-      when={props.moves.choice}
+      when={props.dealingLabel}
       fallback={
-        <p class="headline">
-          {nameOf(props.room, props.choice.chooserId)}{" "}
-          <Show
-            when={props.moves.waitingOn?.offline}
-            fallback={`is choosing who receives ${cardLabel(props.choice.card)}.`}
-          >
-            is offline.{" "}
-            <span class="muted">
-              · The game will play {cardLabel(props.choice.card)} for them soon.
-            </span>
-          </Show>
-        </p>
-      }
-    >
-      {(move) => (
         <Show
-          when={move().forId === undefined}
+          when={props.moves.choice}
           fallback={
             <p class="headline">
-              {nameOf(props.room, props.choice.chooserId)} is offline.{" "}
-              <span class="muted">
-                · Pick who gets their {cardLabel(props.choice.card)}, or the
-                game will play it for them soon.
-              </span>
+              {nameOf(props.room, props.choice.chooserId)}{" "}
+              <Show
+                when={props.moves.waitingOn?.offline}
+                fallback={`is choosing who receives ${cardLabel(props.choice.card)}.`}
+              >
+                is offline.{" "}
+                <span class="muted">
+                  · The game will play {cardLabel(props.choice.card)} for them
+                  soon.
+                </span>
+              </Show>
             </p>
           }
         >
-          <p class="headline">
-            {choiceVerb(props.choice)}…{" "}
-            <span class="muted">· Pick a player</span>
-          </p>
+          {(move) => (
+            <Show
+              when={move().forId === undefined}
+              fallback={
+                <p class="headline">
+                  {nameOf(props.room, props.choice.chooserId)} is offline.{" "}
+                  <span class="muted">
+                    · Pick who gets their {cardLabel(props.choice.card)}, or the
+                    game will play it for them soon.
+                  </span>
+                </p>
+              }
+            >
+              <p class="headline">
+                Who gets your {cardLabel(props.choice.card)}?{" "}
+                <span class="muted">Tap a player</span>
+              </p>
+            </Show>
+          )}
         </Show>
-      )}
+      }
+    >
+      <p class="headline">{props.dealingLabel}</p>
     </Show>
   </>
 );
@@ -1072,7 +1084,11 @@ const ActionBar = (
 
   const dealingLabel = () => {
     const step = props.dealStep ?? null;
-    const target = stepPlayerId(step);
+
+    const target =
+      step?.to.kind === "choice"
+        ? (props.room.choice?.chooserId ?? null)
+        : stepPlayerId(step);
 
     if (step === null || target === null) {
       return "Dealing…";
@@ -1095,6 +1111,14 @@ const ActionBar = (
 
     if (step.from === "held") {
       return `${cardLabel(step.card)} comes into play…`;
+    }
+
+    if (step.from === "choice") {
+      return `${cardLabel(step.card)} goes to ${isMe ? "you" : name}…`;
+    }
+
+    if (step.hit) {
+      return isMe ? "You hit…" : `${name} hits…`;
     }
 
     return isMe ? "Dealing to you…" : `Dealing to ${name}…`;
@@ -1194,6 +1218,9 @@ const ActionBar = (
               {(choice) => (
                 <ActionCardPrompt
                   choice={choice()}
+                  dealingLabel={
+                    props.dealing === true ? dealingLabel() : undefined
+                  }
                   moves={props.moves}
                   room={props.room}
                 />
@@ -1217,7 +1244,9 @@ const ActionBar = (
                   data-size="lg"
                   disabled={props.actionsDisabled}
                   data-variant="solid"
-                  onClick={async () => await props.send({ type: "hit" })}
+                  onClick={() => {
+                    void props.send({ type: "hit" });
+                  }}
                 >
                   <SquarePlus size={16} />
                   Hit
@@ -1226,7 +1255,9 @@ const ActionBar = (
                   <Button
                     data-size="lg"
                     disabled={props.actionsDisabled}
-                    onClick={async () => await props.send({ type: "stay" })}
+                    onClick={() => {
+                      void props.send({ type: "stay" });
+                    }}
                   >
                     <Hand size={16} />
                     Stay

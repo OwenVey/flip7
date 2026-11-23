@@ -29,6 +29,7 @@ export interface DealStep {
   flip: DrawEvent["flip"];
   /** The Second Chance that cancels this card, discarded along with it. */
   partnerId: number | null;
+  hit?: true;
 }
 
 interface Table {
@@ -139,6 +140,7 @@ const drawStep = (
   const step: DealStep = {
     card: draw.card,
     flip: draw.flip,
+    ...(draw.hit && { hit: true }),
     from: "deck",
     partnerId: null,
     to: { kind: "hand", playerId: draw.playerId },

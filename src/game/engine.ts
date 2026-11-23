@@ -83,6 +83,7 @@ export interface DrawEvent {
   /** Set when the card is one of the flips of a Flip Three. */
   flip: FlipDraw["progress"] | null;
   outcome: DrawOutcome;
+  hit?: true;
 }
 
 export type GameCue =
@@ -407,8 +408,10 @@ const resolveDealtCard = (
   state: GameState,
   player: Player,
   card: Card,
-  flip?: FlipDraw
+  source?: FlipDraw | "hit"
 ) => {
+  const flip = source === "hit" ? undefined : source;
+
   const outcome =
     flip?.held === true ? "held" : placeDealtCard(state, player, card);
 
@@ -421,6 +424,7 @@ const resolveDealtCard = (
   draws.push({
     card,
     flip: flip?.progress ?? null,
+    ...(source === "hit" && { hit: true }),
     outcome,
     playerId: player.id,
     seq: state.drawSeq ?? 0,
@@ -774,7 +778,7 @@ export const hit = (state: GameState, playerId: string, random: Random) => {
   const card = draw(state, random);
 
   if (card) {
-    resolveDealtCard(state, player, card);
+    resolveDealtCard(state, player, card, "hit");
   }
 
   advance(state, random);

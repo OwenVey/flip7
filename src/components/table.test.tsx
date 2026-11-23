@@ -81,6 +81,33 @@ const entries = () =>
 describe("<Table />", () => {
   afterEach(cleanup);
 
+  it("distinguishes an opening card from an ordinary hit", () => {
+    const [hit, setHit] = createSignal<true | undefined>(undefined);
+
+    render(() => (
+      <Table
+        room={room({ turnId: "b" })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        dealing
+        dealStep={{
+          card: { id: 2, kind: "number", value: 3 },
+          flip: null,
+          from: "deck",
+          hit: hit(),
+          partnerId: null,
+          to: { kind: "hand", playerId: "b" },
+        }}
+      />
+    ));
+
+    expect(screen.getByText("Dealing to Ben…")).toBeVisible();
+    setHit(true);
+    flush();
+    expect(screen.getByText("Ben hits…")).toBeVisible();
+  });
+
   it("opens the Scores sheet during play and returns focus on close", async () => {
     render(() => (
       <Table
@@ -1218,6 +1245,40 @@ describe("<Table />", () => {
     expect(leave).not.toHaveAccessibleDescription(
       "You can leave after the deal"
     );
+  });
+
+  it("prompts the chooser and dims players who cannot receive the card", () => {
+    const view = room({
+      choice: {
+        card: { id: 9, kind: "freeze" },
+        chooserId: "a",
+        options: ["a"],
+      },
+    });
+
+    const ben = view.players.find((player) => player.id === "b");
+
+    if (ben) {
+      ben.status = "busted";
+    }
+
+    render(() => (
+      <Table
+        room={view}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    expect(screen.getByText(/Who gets your Freeze/u)).toBeVisible();
+    expect(screen.getByText("Tap a player")).toBeVisible();
+    expect(
+      screen.getByRole("article", { name: "Ana, 40 points" })
+    ).toHaveAttribute("data-pickable", "freeze");
+    expect(
+      screen.getByRole("article", { name: "Ben, 12 points" })
+    ).toHaveAttribute("data-unpickable");
   });
 
   it("the chooser picks an action card target by clicking a seat", () => {

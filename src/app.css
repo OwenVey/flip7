@@ -2369,26 +2369,17 @@ main {
   }
 }
 
-.seats:has(.seat-pick:focus-visible:not(:disabled)) {
-  --pick-inactive-opacity: 0.7;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .seats:has(.seat-pick:hover:not(:disabled)) {
-    --pick-inactive-opacity: 0.7;
-  }
+.seat[data-unpickable] {
+  opacity: 0.5;
 }
 
 .seat[data-pickable] {
+  outline: 2px solid var(--pick-color);
+  outline-offset: 2px;
   --pick-color: var(--accent);
   cursor: pointer;
-  opacity: var(--pick-inactive-opacity, 1);
-  transition:
-    opacity 140ms ease,
-    box-shadow 160ms ease;
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: opacity 120ms linear;
+  @media (prefers-reduced-motion: no-preference) {
+    transition: box-shadow 160ms ease;
   }
 
   &[data-pickable="freeze"] {
@@ -2407,13 +2398,10 @@ main {
     z-index: 1;
     outline: 3px solid var(--pick-color);
     outline-offset: 3px;
-    opacity: 1;
   }
 
   @media (hover: hover) and (pointer: fine) {
     &:has(.seat-pick:hover:not(:disabled)) {
-      opacity: 1;
-
       &:not(:has(.seat-pick:focus-visible)) {
         --ring-color: var(--pick-color);
         z-index: 1;
@@ -2430,7 +2418,6 @@ main {
     @media (prefers-reduced-motion: no-preference) {
       transition:
         transform 140ms ease,
-        opacity 140ms ease,
         box-shadow 160ms ease;
     }
   }

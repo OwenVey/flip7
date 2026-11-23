@@ -67,6 +67,7 @@ export const createDealMotion: (
       try {
         await flyCard({
           duration,
+          emphasize: step.from === "choice" || step.from === "held",
           faceDown: step.from === "deck",
           from,
           layer,

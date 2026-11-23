@@ -97,6 +97,18 @@ describe(planDeal, () => {
     ]);
   });
 
+  it("marks a card drawn by Hit even when it opens a target choice", () => {
+    const state = setup(["a", "b"], [num(5), num(3)]);
+    const before = view(state);
+    const card = freeze();
+    rig(state, [card]);
+    hit(state, "a", random);
+
+    expect(planDeal(before, view(state))).toMatchObject([
+      { card, from: "deck", hit: true, to: { kind: "choice" } },
+    ]);
+  });
+
   it("plays out a Flip Three flip by flip, holding the Freeze it turns up", () => {
     const state = setup(["a", "b"], [num(5), num(3)]);
     rig(state, [flipThree(), num(1), freeze(), num(2)]);
