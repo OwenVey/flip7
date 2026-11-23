@@ -1,9 +1,9 @@
 /* oxlint-disable eslint/no-await-in-loop, react-doctor/async-await-in-loop -- Card flights and Room updates must play in order. */
 
-import { isActionCard } from "../game/cards";
+import { calculateRoundScore, isActionCard } from "../game/cards";
 import { waitingOn } from "../game/moves";
 import { roundStarted } from "../game/protocol";
-import type { RoomView } from "../game/protocol";
+import type { PlayerView, RoomView } from "../game/protocol";
 import { dealFrame, planDeal } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
 import { roomCues } from "./room-cues";
@@ -46,9 +46,10 @@ interface Frame {
   step: DealStep | null;
 }
 
-export interface DealPlaybackView extends Frame {
+export interface DealPlaybackView extends Omit<Frame, "incomingCardId"> {
   actionsDisabled: boolean;
   myMove: boolean;
+  roundPoints: ReadonlyMap<string, number>;
 }
 
 const emptyFrame: Frame = {
@@ -58,8 +59,49 @@ const emptyFrame: Frame = {
   step: null,
 };
 
+const visibleRoundPoints = (
+  player: PlayerView,
+  phase: RoomView["phase"],
+  incomingCardId: Frame["incomingCardId"]
+) => {
+  if (phase !== "playing") {
+    return player.lastRound?.total ?? 0;
+  }
+
+  if (player.status === "busted" || player.status === "out") {
+    return 0;
+  }
+
+  const hand =
+    incomingCardId === null
+      ? player.hand
+      : player.hand.filter((card) => card.id !== incomingCardId);
+
+  return calculateRoundScore(hand).total;
+};
+
+/** Each player's round points as the table shows them. A card in flight counts once it lands. */
+export const roundPointsFor = (
+  room: RoomView,
+  incomingCardId: Frame["incomingCardId"] = null
+) =>
+  new Map<string, number>(
+    room.players.map((player) => [
+      player.id,
+      visibleRoundPoints(player, room.phase, incomingCardId),
+    ])
+  );
+
+const displayOf = ({ incomingCardId, room, ...display }: Frame) => ({
+  ...display,
+  room,
+  roundPoints: room
+    ? roundPointsFor(room, incomingCardId)
+    : new Map<string, number>(),
+});
+
 export const initialDealPlayback: DealPlaybackView = {
-  ...emptyFrame,
+  ...displayOf(emptyFrame),
   actionsDisabled: true,
   myMove: false,
 };
@@ -134,7 +176,7 @@ export const createDealPlayback = (
     const myMove =
       !actionsDisabled && latest !== null && ownMove(latest) !== null;
 
-    publish({ ...frame, actionsDisabled, myMove });
+    publish({ ...displayOf(frame), actionsDisabled, myMove });
 
     for (const sound of sounds) {
       cue(sound);

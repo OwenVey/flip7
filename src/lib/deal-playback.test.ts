@@ -6,6 +6,7 @@ import {
   createGame,
   hit,
   nextRound,
+  stay,
   startGame,
 } from "../game/engine";
 import type { GameState } from "../game/engine";
@@ -119,7 +120,7 @@ describe(createDealPlayback, () => {
     expect({ frame: table.shown, cues: table.cues }).toMatchObject({
       frame: {
         actionsDisabled: true,
-        incomingCardId: freeze.id,
+        step: { card: freeze },
         myMove: false,
         room: { choice: { card: freeze } },
       },
@@ -130,7 +131,6 @@ describe(createDealPlayback, () => {
 
     expect(table.shown).toMatchObject({
       actionsDisabled: true,
-      incomingCardId: null,
       myMove: false,
     });
     expect(table.cues).toStrictEqual(["reveal"]);
@@ -146,6 +146,52 @@ describe(createDealPlayback, () => {
       ["reveal", "turn"],
       [true],
     ]);
+  });
+
+  it("counts an incoming card only after its flight finishes", async () => {
+    const game = gameAtFirstTurn();
+    const table = playback();
+    table.show(view(game));
+    game.deck = [number];
+    hit(game, "a", random);
+    table.show(view(game));
+
+    const player = () => table.shown.room?.players.find(({ id }) => id === "a");
+
+    expect(player()?.hand).toContainEqual(number);
+    expect(table.shown.roundPoints.get("a")).toBe(5);
+
+    await vi.advanceTimersToNextTimerAsync();
+
+    expect(table.shown.dealing).toBeTruthy();
+    expect(table.shown.roundPoints.get("a")).toBe(12);
+
+    await vi.runAllTimersAsync();
+
+    expect(table.shown.roundPoints.get("a")).toBe(12);
+  });
+
+  it("keeps a round-ending card out of the score until it lands", async () => {
+    const game = gameAtFirstTurn();
+    const table = playback(true, "b");
+    game.deck = [number];
+    hit(game, "a", random);
+    stay(game, "b", random);
+    table.show(view(game));
+    await vi.runAllTimersAsync();
+
+    game.deck = [{ ...number, id: 1005 }];
+    hit(game, "a", random);
+    expect(game.phase).toBe("roundOver");
+    table.show(view(game));
+
+    expect(table.shown.room?.phase).toBe("playing");
+    expect(table.shown.roundPoints.get("a")).toBe(12);
+
+    await vi.runAllTimersAsync();
+
+    expect(table.shown.room?.phase).toBe("roundOver");
+    expect(table.shown.roundPoints.get("a")).toBe(0);
   });
 
   it("reveals a 16-player opening deal in 2240 ms", async () => {
@@ -242,15 +288,18 @@ describe(createDealPlayback, () => {
     hit(game, "b", random);
     const latest = view(game);
     table.show(latest);
-    expect(table.shown.incomingCardId).toBe(number.id);
+    expect(table.shown.roundPoints.get("a")).toBe(5);
 
     table.setMotion(false);
     expect(table.shown).toStrictEqual({
       actionsDisabled: false,
       dealing: false,
-      incomingCardId: null,
       myMove: true,
       room: latest,
+      roundPoints: new Map([
+        ["a", 12],
+        ["b", 3],
+      ]),
       step: null,
     });
     expect([table.cues, table.readinessAtTurnCue]).toStrictEqual([
@@ -292,7 +341,7 @@ describe(createDealPlayback, () => {
     expect(table.shown).toMatchObject({
       actionsDisabled: true,
       dealing: true,
-      incomingCardId: freeze.id,
+      step: { card: freeze },
     });
 
     await vi.runAllTimersAsync();
@@ -449,7 +498,7 @@ describe(createDealPlayback, () => {
     game.deck = [freeze];
     hit(game, "a", random);
     table.show(view(game));
-    expect(table.shown.incomingCardId).toBe(freeze.id);
+    expect(table.flights).toMatchObject([{ cardId: freeze.id }]);
 
     const newRoom = { ...view(gameAtFirstTurn()), code: "FGHJK" };
     table.show(newRoom);
@@ -457,7 +506,6 @@ describe(createDealPlayback, () => {
 
     expect(table.shown).toMatchObject({
       dealing: false,
-      incomingCardId: null,
       myMove: true,
       room: newRoom,
     });

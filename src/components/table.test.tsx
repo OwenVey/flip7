@@ -8,12 +8,14 @@ import {
 } from "@solidjs/testing-library";
 import { createAgent } from "@ui-sdk/solid/agent";
 import { createSignal, flush } from "solid-js";
+import type { ComponentProps } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { calculateRoundScore } from "../game/cards";
 import type { RoomView } from "../game/protocol";
+import { roundPointsFor } from "../lib/deal-playback";
 import type { RoomConnection } from "../lib/room-connection";
-import Table from "./table";
+import TableView from "./table";
 
 let approve = false;
 
@@ -69,6 +71,16 @@ const room = (overrides: Partial<RoomView> = {}) => {
 
   return view;
 };
+
+const Table = (
+  props: Omit<ComponentProps<typeof TableView>, "roundPoints"> &
+    Partial<Pick<ComponentProps<typeof TableView>, "roundPoints">>
+) => (
+  <TableView
+    {...props}
+    roundPoints={props.roundPoints ?? roundPointsFor(props.room)}
+  />
+);
 
 const meterOf = (name: string) =>
   within(screen.getByRole("article", { name })).getByRole("meter", {
@@ -757,9 +769,8 @@ describe("<Table />", () => {
     );
   });
 
-  it("distinguishes live round points and waits for the incoming card to land", () => {
+  it("distinguishes points in play, banked points, and a bust", () => {
     const [ana, ben] = room().players;
-    const [incomingCardId, setIncomingCardId] = createSignal<number | null>(1);
 
     render(() => (
       <Table
@@ -773,14 +784,13 @@ describe("<Table />", () => {
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
         chat={vi.fn<RoomConnection["chat"]>()}
-        incomingCardId={incomingCardId()}
       />
     ));
 
     const leaderboard = within(screen.getByRole("table", { name: "Scores" }));
     const cell = (name: string) => leaderboard.getByRole("cell", { name });
 
-    expect(cell("0 points, in play")).toHaveAttribute(
+    expect(cell("7 points, in play")).toHaveAttribute(
       "data-round-state",
       "at-risk"
     );
@@ -789,13 +799,9 @@ describe("<Table />", () => {
       "banked"
     );
     expect(cell("0 points, busted")).toHaveTextContent(/^0$/u);
-
-    setIncomingCardId(null);
-    flush();
-    expect(cell("7 points, in play")).toHaveTextContent("+7");
   });
 
-  it("counts up on a reveal and down on a bust in both round-score displays", () => {
+  it("animates both round-score displays toward the points they receive", () => {
     // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
     vi.stubGlobal("matchMedia", () => ({ matches: true }));
     vi.useFakeTimers({
@@ -805,9 +811,7 @@ describe("<Table />", () => {
     try {
       const [state, setState] = createSignal(room());
 
-      const [incomingCardId, setIncomingCardId] = createSignal<number | null>(
-        1
-      );
+      const [points, setPoints] = createSignal(0);
 
       render(() => (
         <Table
@@ -815,7 +819,12 @@ describe("<Table />", () => {
           playerId="a"
           send={vi.fn<RoomConnection["send"]>()}
           chat={vi.fn<RoomConnection["chat"]>()}
-          incomingCardId={incomingCardId()}
+          roundPoints={
+            new Map([
+              ["a", points()],
+              ["b", 3],
+            ])
+          }
         />
       ));
 
@@ -835,7 +844,7 @@ describe("<Table />", () => {
         return [Number(seatPoints), Number(roundCell.textContent)];
       };
 
-      setIncomingCardId(null);
+      setPoints(7);
       flush();
       vi.advanceTimersByTime(64);
       flush();
@@ -856,6 +865,7 @@ describe("<Table />", () => {
           ),
         })
       );
+      setPoints(0);
       flush();
       expect(shown("0 points, busted")).toStrictEqual([seatPoints, seatPoints]);
 

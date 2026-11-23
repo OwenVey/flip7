@@ -37,6 +37,7 @@ import type { AvailableMoves } from "../game/moves";
 import type { PlayerView, RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
+import type { DealPlaybackView } from "../lib/deal-playback";
 import { hostName } from "../lib/host";
 import { motionAllowed } from "../lib/motion";
 import type { RoomConnection } from "../lib/room-connection";
@@ -96,9 +97,14 @@ interface DealProps {
   dealing?: boolean;
   /** The card being dealt, and where it's going. */
   dealStep?: DealStep | null;
-  /** The card in flight, which doesn't count until it lands. */
-  incomingCardId?: number | null;
 }
+
+type RoundPointsByPlayer = Pick<DealPlaybackView, "roundPoints">;
+
+const pointsOf = (
+  roundPoints: RoundPointsByPlayer["roundPoints"],
+  playerId: string
+) => roundPoints.get(playerId) ?? 0;
 
 interface FlipProgress {
   flipped: number;
@@ -243,38 +249,6 @@ const FlipTracker = (props: {
   </div>
 );
 
-const currentRoundPoints = (
-  player: PlayerView,
-  incomingCardId?: DealProps["incomingCardId"]
-) => {
-  if (player.status === "busted") {
-    return 0;
-  }
-
-  const hand =
-    incomingCardId === null || incomingCardId === undefined
-      ? player.hand
-      : player.hand.filter((card) => card.id !== incomingCardId);
-
-  return calculateRoundScore(hand).total;
-};
-
-const visibleRoundPoints = (
-  player: PlayerView,
-  phase: RoomView["phase"],
-  incomingCardId: DealProps["incomingCardId"]
-) => {
-  if (phase !== "playing") {
-    return player.lastRound?.total ?? 0;
-  }
-
-  if (player.status === "out") {
-    return 0;
-  }
-
-  return currentRoundPoints(player, incomingCardId);
-};
-
 const nameOf = (room: RoomView, id: string | null) =>
   room.players.find((player) => player.id === id)?.name ?? "Someone";
 
@@ -322,8 +296,9 @@ const FitLabel = (props: { long: string; short: string }) => (
 const RoundPlayer = (
   props: TableProps &
     MoveControls &
-    Pick<DealProps, "incomingCardId" | "dealStep"> & {
+    Pick<DealProps, "dealStep"> & {
       player: PlayerView;
+      roundPoints: number;
     }
 ) => {
   const numberCards = createMemo(
@@ -386,16 +361,12 @@ const RoundPlayer = (
       : null;
 
   const roundPoints = createMemo(() =>
-    props.room.phase === "playing"
-      ? visibleRoundPoints(props.player, props.room.phase, props.incomingCardId)
-      : 0
+    props.room.phase === "playing" ? props.roundPoints : 0
   );
 
   const baseScore = () => props.player.score;
 
-  const stampedPoints = createMemo(() =>
-    visibleRoundPoints(props.player, props.room.phase, props.incomingCardId)
-  );
+  const stampedPoints = () => props.roundPoints;
 
   const projectedScore = () => baseScore() + roundPoints();
 
@@ -742,7 +713,7 @@ const roundPointsLabels = {
 const LeaderboardRound = (props: {
   player: PlayerView;
   phase: RoomView["phase"];
-  incomingCardId: DealProps["incomingCardId"];
+  points: number;
   index: number;
 }) => {
   const scored = () =>
@@ -752,18 +723,16 @@ const LeaderboardRound = (props: {
     roundPointsState(props.player.status, scored())
   );
 
-  const points = createMemo(() =>
-    visibleRoundPoints(props.player, props.phase, props.incomingCardId)
-  );
-
-  const shownPoints = createCountUp(points, { durationMs: ROUND_COUNT_MS });
+  const shownPoints = createCountUp(() => props.points, {
+    durationMs: ROUND_COUNT_MS,
+  });
 
   return (
     <td
       class="leaderboard-round"
       data-round-state={state()}
       data-scored={scored() ? "" : undefined}
-      aria-label={`${points()} ${points() === 1 ? "point" : "points"}, ${roundPointsLabels[state()]}`}
+      aria-label={`${props.points} ${props.points === 1 ? "point" : "points"}, ${roundPointsLabels[state()]}`}
       style={{ "--row": props.index }}
     >
       <span>
@@ -782,8 +751,7 @@ const LeaderboardRound = (props: {
 };
 
 const Leaderboard = (
-  props: Pick<TableProps, "room" | "playerId"> &
-    Pick<DealProps, "incomingCardId">
+  props: Pick<TableProps, "room" | "playerId"> & RoundPointsByPlayer
 ) => {
   const ranked = createMemo(() => rankPlayers(props.room.players));
 
@@ -844,7 +812,7 @@ const Leaderboard = (
                 <LeaderboardRound
                   player={entry().player}
                   phase={props.room.phase}
-                  incomingCardId={props.incomingCardId}
+                  points={pointsOf(props.roundPoints, entry().player.id)}
                   index={entry().index}
                 />
                 <td
@@ -1006,6 +974,7 @@ const OfflineTurn = (
   props: Pick<TableProps, "room" | "send" | "actionsDisabled"> & {
     playerId: string;
     canStay: boolean;
+    roundPoints: number;
   }
 ) => {
   const player = () =>
@@ -1013,12 +982,8 @@ const OfflineTurn = (
 
   const name = () => player()?.name ?? "Someone";
 
-  const bankedPoints = () => {
-    const current = player();
-    const points = current ? currentRoundPoints(current) : 0;
-
-    return points === 1 ? "1 point" : `${points} points`;
-  };
+  const bankedPoints = () =>
+    props.roundPoints === 1 ? "1 point" : `${props.roundPoints} points`;
 
   return (
     <>
@@ -1094,12 +1059,12 @@ const roundEndHeadline = (room: RoomView) => {
 };
 
 const ActionBar = (
-  props: TableProps & DealProps & Pick<MoveControls, "moves">
+  props: TableProps &
+    DealProps &
+    RoundPointsByPlayer &
+    Pick<MoveControls, "moves">
 ) => {
   const nextRound = async () => await props.send({ type: "nextRound" });
-
-  const me = () =>
-    props.room.players.find((player) => player.id === props.playerId);
 
   const myTurn = () => {
     const { turn } = props.moves;
@@ -1160,11 +1125,7 @@ const ActionBar = (
 
   const iCanStay = () => props.moves.turn?.canStay === true;
 
-  const myRound = () => {
-    const player = me();
-
-    return player ? currentRoundPoints(player) : 0;
-  };
+  const myRound = () => pointsOf(props.roundPoints, props.playerId);
 
   const winners = () =>
     props.room.winnerIds.map((id) => nameOf(props.room, id)).join(" and ");
@@ -1312,6 +1273,7 @@ const ActionBar = (
                 <OfflineTurn
                   playerId={turn().playerId}
                   canStay={turn().canStay}
+                  roundPoints={pointsOf(props.roundPoints, turn().playerId)}
                   room={props.room}
                   send={props.send}
                   actionsDisabled={props.actionsDisabled}
@@ -1346,7 +1308,8 @@ const ActionBar = (
 
 export default function Table(
   props: TableProps &
-    DealProps & {
+    DealProps &
+    RoundPointsByPlayer & {
       chat: RoomConnection["chat"];
       /** Blocks Leave while the room can't hear it. Leave stays open during the deal. */
       offline?: boolean;
@@ -1442,7 +1405,7 @@ export default function Table(
               <Leaderboard
                 room={props.room}
                 playerId={props.playerId}
-                incomingCardId={props.incomingCardId}
+                roundPoints={props.roundPoints}
               />
             </TableSheet>
             <TableSheet
@@ -1504,6 +1467,7 @@ export default function Table(
           actionsDisabled={props.actionsDisabled}
           dealing={props.dealing}
           dealStep={props.dealStep}
+          roundPoints={props.roundPoints}
           moves={moves()}
         />
 
@@ -1517,7 +1481,7 @@ export default function Table(
                   playerId={props.playerId}
                   send={props.send}
                   actionsDisabled={props.actionsDisabled}
-                  incomingCardId={props.incomingCardId}
+                  roundPoints={pointsOf(props.roundPoints, player().id)}
                   dealStep={props.dealStep}
                   moves={moves()}
                   onChoose={chooseTarget}
@@ -1537,7 +1501,7 @@ export default function Table(
                 <Leaderboard
                   room={props.room}
                   playerId={props.playerId}
-                  incomingCardId={props.incomingCardId}
+                  roundPoints={props.roundPoints}
                 />
               </ScrollFade>
             </section>
