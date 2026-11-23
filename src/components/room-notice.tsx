@@ -5,11 +5,6 @@ import { paths } from "../router";
 import CardBackMark from "./card-back-mark";
 import RoomStatus from "./room-status";
 
-/**
- * A dead end in the room route: one line of explanation and a way home.
- * `deck` is the connecting screen's deck at rest; `empty` leaves a dashed slot
- * where no table exists.
- */
 const RoomNotice = (props: {
   title: string;
   code?: string;

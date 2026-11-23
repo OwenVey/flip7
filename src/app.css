@@ -794,6 +794,7 @@ button.room-code {
   &::before,
   &::after {
     content: "\2666";
+    content: "\2666" / "";
     flex: 1 1 0;
     min-width: 1.5rem;
     background: linear-gradient(var(--rule) 0 0) no-repeat;
@@ -4420,6 +4421,7 @@ main {
 @media (prefers-reduced-motion: no-preference) {
   .table,
   .lobby-page,
+  .room-page > .join,
   .room-status:not([data-delayed]) {
     animation: scene-in 320ms ease-out;
   }
