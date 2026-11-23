@@ -10,6 +10,7 @@ interface Flight {
   /** The card in its final place, hidden until the flight lands. */
   to: HTMLElement;
   faceDown: boolean;
+  emphasize?: boolean;
   duration: number;
   signal: AbortSignal;
   /** A fixed, full-viewport layer the flying copy is drawn in. */
@@ -170,6 +171,7 @@ export const flyCard = async ({
   from,
   to,
   faceDown,
+  emphasize,
   duration,
   layer,
   signal,
@@ -194,6 +196,14 @@ export const flyCard = async ({
           {
             transform: `translate(${start.x - end.x}px, ${start.y - end.y}px) scale(${scale}) rotate(${FLIGHT_TILT_DEG}deg)`,
           },
+          ...(emphasize === true
+            ? [
+                {
+                  offset: 0.45,
+                  transform: `translate(${(start.x - end.x) * 0.4}px, ${(start.y - end.y) * 0.4}px) scale(${Math.max(1.15, scale, 72 / target.width)})`,
+                },
+              ]
+            : []),
           { transform: "none" },
         ],
         { duration, easing: FLIGHT_EASING }

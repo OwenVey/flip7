@@ -83,6 +83,7 @@ export interface DrawEvent {
   /** Set when the card is one of the flips of a Flip Three. */
   flip: FlipDraw["progress"] | null;
   outcome: DrawOutcome;
+  hit?: true;
 }
 
 export type GameCue =
@@ -104,6 +105,7 @@ export interface LogEntry {
   id: number;
   /** Missing on entries saved before rounds were recorded. */
   round?: number;
+  summary?: string;
   text: string;
 }
 
@@ -183,8 +185,17 @@ const record = (
 const pointsLabel = (points: number) =>
   points === 1 ? "1 point" : `${points} points`;
 
-export const say = (state: GameState, text: string, cue?: GameCue) => {
-  record(state, { text, ...(cue && { cue }) });
+export const say = (
+  state: GameState,
+  text: string,
+  cue?: GameCue,
+  summary?: string
+) => {
+  record(state, {
+    text,
+    ...(cue && { cue }),
+    ...(summary !== undefined && { summary }),
+  });
 };
 
 export const findPlayer = (state: GameState, id: string) =>
@@ -297,7 +308,8 @@ const placeNumberCard = (
   say(
     state,
     `${player.name} was dealt a duplicate ${card.value} and busted.`,
-    "bust"
+    "bust",
+    `${player.name} busted`
   );
 };
 
@@ -318,7 +330,10 @@ const applyAction = (
       target.id === owner.id
         ? `${owner.name} played Freeze on themselves and banked ${banked}.`
         : `${owner.name} played Freeze on ${target.name}, who banked ${banked}.`,
-      "freeze"
+      "freeze",
+      target.id === owner.id
+        ? `${owner.name} froze themselves`
+        : `${owner.name} froze ${target.name}`
     );
 
     return;
@@ -407,8 +422,10 @@ const resolveDealtCard = (
   state: GameState,
   player: Player,
   card: Card,
-  flip?: FlipDraw
+  source?: FlipDraw | "hit"
 ) => {
+  const flip = source === "hit" ? undefined : source;
+
   const outcome =
     flip?.held === true ? "held" : placeDealtCard(state, player, card);
 
@@ -421,6 +438,7 @@ const resolveDealtCard = (
   draws.push({
     card,
     flip: flip?.progress ?? null,
+    ...(source === "hit" && { hit: true }),
     outcome,
     playerId: player.id,
     seq: state.drawSeq ?? 0,
@@ -774,7 +792,7 @@ export const hit = (state: GameState, playerId: string, random: Random) => {
   const card = draw(state, random);
 
   if (card) {
-    resolveDealtCard(state, player, card);
+    resolveDealtCard(state, player, card, "hit");
   }
 
   advance(state, random);
@@ -787,10 +805,12 @@ const stayAndBankPoints = (
   describe = (banked: string) => `${player.name} stayed and banked ${banked}.`
 ) => {
   player.status = "stayed";
+  const points = calculateRoundScore(player.hand).total;
   say(
     state,
-    describe(pointsLabel(calculateRoundScore(player.hand).total)),
-    "bank"
+    describe(pointsLabel(points)),
+    "bank",
+    `${player.name} stayed +${points}`
   );
   endTurn(state, player);
   advance(state, random);

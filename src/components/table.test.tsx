@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@solidjs/testing-library";
 import { createAgent } from "@ui-sdk/solid/agent";
@@ -14,6 +15,9 @@ import { calculateRoundScore } from "../game/cards";
 import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
 import Table from "./table";
+
+const acceptMove: RoomConnection["send"] = async () =>
+  await Promise.resolve(true);
 
 let approve = false;
 
@@ -80,6 +84,73 @@ const entries = () =>
 
 describe("<Table />", () => {
   afterEach(cleanup);
+
+  it("summarizes round outcomes until you play your move", async () => {
+    const [view, setView] = createSignal(room({ turnId: "b" }));
+
+    render(() => (
+      <Table
+        room={view()}
+        playerId="a"
+        send={acceptMove}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    setView({
+      ...view(),
+      log: [
+        ...view().log,
+        { cue: "bust", id: 2, round: 1, text: "Ben busted." },
+        {
+          cue: "bank",
+          id: 3,
+          round: 1,
+          summary: "Glow stayed +12",
+          text: "Glow stayed.",
+        },
+        { cue: "freeze", id: 4, round: 1, text: "Sparky froze Wick." },
+      ],
+      turnId: "a",
+    });
+    flush();
+
+    const summary = "Since your turn · 1 busted · 1 frozen · Glow stayed +12";
+    expect(screen.getByText(summary)).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hit" }));
+    await waitFor(() => {
+      flush();
+      expect(screen.queryByText(summary)).toBeNull();
+    });
+  });
+
+  it("distinguishes an opening card from an ordinary hit", () => {
+    const [hit, setHit] = createSignal<true | undefined>(undefined);
+
+    render(() => (
+      <Table
+        room={room({ turnId: "b" })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        dealing
+        dealStep={{
+          card: { id: 2, kind: "number", value: 3 },
+          flip: null,
+          from: "deck",
+          hit: hit(),
+          partnerId: null,
+          to: { kind: "hand", playerId: "b" },
+        }}
+      />
+    ));
+
+    expect(screen.getByText("Dealing to Ben…")).toBeVisible();
+    setHit(true);
+    flush();
+    expect(screen.getByText("Ben hits…")).toBeVisible();
+  });
 
   it("opens the Scores sheet during play and returns focus on close", async () => {
     render(() => (
@@ -1137,6 +1208,40 @@ describe("<Table />", () => {
     expect(leave).not.toHaveAccessibleDescription(
       "You can leave after the deal"
     );
+  });
+
+  it("prompts the chooser and dims players who cannot receive the card", () => {
+    const view = room({
+      choice: {
+        card: { id: 9, kind: "freeze" },
+        chooserId: "a",
+        options: ["a"],
+      },
+    });
+
+    const ben = view.players.find((player) => player.id === "b");
+
+    if (ben) {
+      ben.status = "busted";
+    }
+
+    render(() => (
+      <Table
+        room={view}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    expect(screen.getByText(/Who gets your Freeze/u)).toBeVisible();
+    expect(screen.getByText("Tap a player")).toBeVisible();
+    expect(
+      screen.getByRole("article", { name: "Ana, 40 points" })
+    ).toHaveAttribute("data-pickable", "freeze");
+    expect(
+      screen.getByRole("article", { name: "Ben, 12 points" })
+    ).toHaveAttribute("data-unpickable");
   });
 
   it("the chooser picks an action card target by clicking a seat", () => {

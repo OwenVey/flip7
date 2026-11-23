@@ -395,6 +395,7 @@ const RoundPlayer = (
       data-winner={isWinner() ? "" : undefined}
       data-offline={props.player.connected ? undefined : ""}
       data-pickable={pickChoice()?.card.kind}
+      data-unpickable={props.moves.choice && !pickChoice() ? "" : undefined}
       aria-label={`${props.player.name}, ${props.player.score} points`}
     >
       <Show when={pickChoice()}>
@@ -561,48 +562,59 @@ const RoundPlayer = (
 
 const ActionCardPrompt = (
   props: Pick<TableProps, "room"> &
-    Pick<MoveControls, "moves"> & { choice: ActionCardChoice }
+    Pick<MoveControls, "moves"> & {
+      choice: ActionCardChoice;
+      dealingLabel?: string;
+    }
 ) => (
   <>
     <ul class="dealt-action-card" data-choice-card="" aria-hidden="true">
       <PlayingCard card={props.choice.card} />
     </ul>
     <Show
-      when={props.moves.choice}
+      when={props.dealingLabel}
       fallback={
-        <p class="headline">
-          {nameOf(props.room, props.choice.chooserId)}{" "}
-          <Show
-            when={props.moves.waitingOn?.offline}
-            fallback={`is choosing who receives ${cardLabel(props.choice.card)}.`}
-          >
-            is offline.{" "}
-            <span class="muted">
-              · The game will play {cardLabel(props.choice.card)} for them soon.
-            </span>
-          </Show>
-        </p>
-      }
-    >
-      {(move) => (
         <Show
-          when={move().forId === undefined}
+          when={props.moves.choice}
           fallback={
             <p class="headline">
-              {nameOf(props.room, props.choice.chooserId)} is offline.{" "}
-              <span class="muted">
-                · Pick who gets their {cardLabel(props.choice.card)}, or the
-                game will play it for them soon.
-              </span>
+              {nameOf(props.room, props.choice.chooserId)}{" "}
+              <Show
+                when={props.moves.waitingOn?.offline}
+                fallback={`is choosing who receives ${cardLabel(props.choice.card)}.`}
+              >
+                is offline.{" "}
+                <span class="muted">
+                  · The game will play {cardLabel(props.choice.card)} for them
+                  soon.
+                </span>
+              </Show>
             </p>
           }
         >
-          <p class="headline">
-            {choiceVerb(props.choice)}…{" "}
-            <span class="muted">· Pick a player</span>
-          </p>
+          {(move) => (
+            <Show
+              when={move().forId === undefined}
+              fallback={
+                <p class="headline">
+                  {nameOf(props.room, props.choice.chooserId)} is offline.{" "}
+                  <span class="muted">
+                    · Pick who gets their {cardLabel(props.choice.card)}, or the
+                    game will play it for them soon.
+                  </span>
+                </p>
+              }
+            >
+              <p class="headline">
+                Who gets your {cardLabel(props.choice.card)}?{" "}
+                <span class="muted">Tap a player</span>
+              </p>
+            </Show>
+          )}
         </Show>
-      )}
+      }
+    >
+      <p class="headline">{props.dealingLabel}</p>
     </Show>
   </>
 );
@@ -936,6 +948,45 @@ const OfflineTurn = (
   );
 };
 
+const describeTurnOutcomes = (events: (string | undefined)[], verb: string) => {
+  if (events.length === 0) {
+    return "";
+  }
+
+  return (
+    (events.length === 1 ? events[0] : undefined) ?? `${events.length} ${verb}`
+  );
+};
+
+const turnSummary = (room: RoomView, after: number) => {
+  const outcomes: Record<"bust" | "freeze" | "bank", (string | undefined)[]> = {
+    bust: [],
+    freeze: [],
+    bank: [],
+  };
+
+  const game = room.log.at(-1)?.game;
+
+  for (const entry of room.log) {
+    if (
+      entry.id > after &&
+      entry.round === room.round &&
+      entry.game === game &&
+      (entry.cue === "bust" || entry.cue === "freeze" || entry.cue === "bank")
+    ) {
+      outcomes[entry.cue].push(entry.summary);
+    }
+  }
+
+  return [
+    describeTurnOutcomes(outcomes.bust, "busted"),
+    describeTurnOutcomes(outcomes.freeze, "frozen"),
+    describeTurnOutcomes(outcomes.bank, "stayed"),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+};
+
 const ActionBar = (
   props: TableProps & DealProps & Pick<MoveControls, "moves">
 ) => {
@@ -946,6 +997,21 @@ const ActionBar = (
     const { turn } = props.moves;
 
     return turn !== null && turn.forId === undefined && props.dealing !== true;
+  };
+
+  const latestLogId = () => props.room.log.at(-1)?.id ?? 0;
+  const [lastMoveLogId, setLastMoveLogId] = createSignal(untrack(latestLogId));
+
+  const summary = createMemo(() =>
+    myTurn() ? turnSummary(props.room, lastMoveLogId()) : ""
+  );
+
+  const playTurn = async (type: "hit" | "stay") => {
+    const logId = latestLogId();
+
+    if (await props.send({ type })) {
+      setLastMoveLogId(logId);
+    }
   };
 
   const actionBarLabel = () => {
@@ -959,7 +1025,11 @@ const ActionBar = (
 
   const dealingLabel = () => {
     const step = props.dealStep ?? null;
-    const target = stepPlayerId(step);
+
+    const target =
+      step?.to.kind === "choice"
+        ? (props.room.choice?.chooserId ?? null)
+        : stepPlayerId(step);
 
     if (step === null || target === null) {
       return "Dealing…";
@@ -982,6 +1052,14 @@ const ActionBar = (
 
     if (step.from === "held") {
       return `${cardLabel(step.card)} comes into play…`;
+    }
+
+    if (step.from === "choice") {
+      return `${cardLabel(step.card)} goes to ${isMe ? "you" : name}…`;
+    }
+
+    if (step.hit) {
+      return isMe ? "You hit…" : `${name} hits…`;
     }
 
     return isMe ? "Dealing to you…" : `Dealing to ${name}…`;
@@ -1012,6 +1090,7 @@ const ActionBar = (
       data-action-bar=""
       aria-label={actionBarLabel()}
       data-turn={myTurn() ? "" : undefined}
+      data-turn-summary={summary() ? "" : undefined}
     >
       <ScrollFade viewportClass="action-bar-scroll">
         <div class="action-bar-content">
@@ -1074,6 +1153,9 @@ const ActionBar = (
               {(choice) => (
                 <ActionCardPrompt
                   choice={choice()}
+                  dealingLabel={
+                    props.dealing === true ? dealingLabel() : undefined
+                  }
                   moves={props.moves}
                   room={props.room}
                 />
@@ -1083,21 +1165,30 @@ const ActionBar = (
               <p class="headline">{dealingLabel()}</p>
             </Match>
             <Match when={myTurn()}>
-              <p class="headline">
-                Your turn{" "}
-                <span class="muted">
-                  ·{" "}
-                  {iCanStay()
-                    ? `${myRound()} points this round`
-                    : "Hit for a card before you can stay"}
-                </span>
-              </p>
+              <div class="turn-message">
+                <p class="headline">
+                  Your turn{" "}
+                  <span class="muted">
+                    ·{" "}
+                    {iCanStay()
+                      ? `${myRound()} points this round`
+                      : "Hit for a card before you can stay"}
+                  </span>
+                </p>
+                <Show when={summary()}>
+                  <p class="turn-summary" title={summary()}>
+                    Since your turn · {summary()}
+                  </p>
+                </Show>
+              </div>
               <ActionButtons>
                 <Button
                   data-size="lg"
                   disabled={props.actionsDisabled}
                   data-variant="solid"
-                  onClick={async () => await props.send({ type: "hit" })}
+                  onClick={async () => {
+                    await playTurn("hit");
+                  }}
                 >
                   <SquarePlus size={16} />
                   Hit
@@ -1106,7 +1197,9 @@ const ActionBar = (
                   <Button
                     data-size="lg"
                     disabled={props.actionsDisabled}
-                    onClick={async () => await props.send({ type: "stay" })}
+                    onClick={async () => {
+                      await playTurn("stay");
+                    }}
                   >
                     <Hand size={16} />
                     Stay
