@@ -43,6 +43,12 @@ export interface RoomSocket {
   close: () => void;
 }
 
+/** What the browser reports about the page: whether it's online and whether it's showing. */
+export interface BrowserState {
+  online: boolean;
+  visible: boolean;
+}
+
 export interface RoomClientDeps {
   socket: RoomSocket;
   roomExists: () => Promise<boolean>;
@@ -99,7 +105,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   let lastRequestId: string | undefined;
   let pendingMove: PendingMove | null = null;
   let stopped = false;
-  let visible = false;
+  let wasVisible = false;
 
   const update = (patch: Partial<Omit<RoomClientState, "canAct">>) => {
     const next = { ...state, ...patch };
@@ -293,20 +299,14 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   };
 
   return {
-    browserStateChanged: ({
-      online,
-      visible: isVisible,
-    }: {
-      online: boolean;
-      visible: boolean;
-    }) => {
+    browserStateChanged: ({ online, visible }: BrowserState) => {
       if (stopped) {
         return;
       }
 
-      const returned = online && isVisible && !(state.online && visible);
+      const returned = online && visible && !(state.online && wasVisible);
 
-      visible = isVisible;
+      wasVisible = visible;
 
       if (online !== state.online) {
         update({ online });

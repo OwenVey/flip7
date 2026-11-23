@@ -104,6 +104,7 @@ export const createRoomConnection = (code: string) => {
       reconnect: () => {
         socket?.reconnect();
       },
+      // WARNING: a PartySocket that sat through iOS backgrounding can stop retrying, so build a new one.
       replace: () => {
         const stale = socket;
         socket = null;
