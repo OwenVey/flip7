@@ -31,7 +31,10 @@ export interface RoomClientState {
   canAct: boolean;
 }
 
-/** The socket the room client talks through. `send` returns false when the frame couldn't be sent. */
+/**
+ * The socket the room client talks through. `send` returns false when the frame couldn't be sent.
+ * `reconnect` starts over on a fresh connection.
+ */
 export interface RoomSocket {
   isOpen: () => boolean;
   send: (frame: string) => boolean;
@@ -54,6 +57,7 @@ interface PendingMove {
 }
 
 const REPLY_TIMEOUT_MS = 6000;
+const RESYNC_TIMEOUT_MS = 10_000;
 const FAILURES_BEFORE_RECHECK = 3;
 const TRY_AGAIN = "Reconnecting. Try again in a moment.";
 
@@ -89,6 +93,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   let seatedPlayerId: string | null = null;
   let awaitingWelcome = false;
   let joinTimeout: ReturnType<typeof setTimeout> | undefined;
+  let resyncTimeout: ReturnType<typeof setTimeout> | undefined;
   let noticeId = 0;
   let lastRequestId: string | undefined;
   let pendingMove: PendingMove | null = null;
@@ -144,7 +149,13 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     }
   };
 
+  const stopWatchingSync = () => {
+    clearTimeout(resyncTimeout);
+    resyncTimeout = undefined;
+  };
+
   const stop = (status: ConnectionStatus) => {
+    stopWatchingSync();
     settleMove(false);
     startSync();
     update({ status });
@@ -182,6 +193,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
         update({ room: message.room });
 
         if (firstSync) {
+          stopWatchingSync();
           settleAfterReconnect();
           update({ ready: true, status: "open" });
         }
@@ -224,6 +236,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
         if (awaitingWelcome) {
           awaitingWelcome = false;
           forget();
+          stopWatchingSync();
           settleMove(false);
           update({ needsName: true, status: "open" });
 
@@ -254,9 +267,27 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   };
 
   const reconnect = () => {
+    stopWatchingSync();
     startSync();
     update({ status: "reconnecting" });
     socket.reconnect();
+  };
+
+  // WARNING: iOS Safari can wedge a socket in the background, so replace one that stays unsynced.
+  const watchSync = () => {
+    resyncTimeout ??= setTimeout(() => {
+      resyncTimeout = undefined;
+
+      if (!stopped) {
+        reconnect();
+        watchSync();
+      }
+    }, RESYNC_TIMEOUT_MS);
+  };
+
+  const startOver = () => {
+    reconnect();
+    watchSync();
   };
 
   return {
@@ -290,6 +321,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
       startSync();
       update({ status: "reconnecting" });
+      watchSync();
 
       if (shouldRecheck(retryCount)) {
         void recheckRoom();
@@ -309,7 +341,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
       awaitingWelcome = true;
       update({ joinError: "", joining: true });
-      joinTimeout = setTimeout(reconnect, REPLY_TIMEOUT_MS);
+      joinTimeout = setTimeout(startOver, REPLY_TIMEOUT_MS);
 
       if (!raw({ avatar, name, token: null, type: "join" })) {
         awaitingWelcome = false;
@@ -326,11 +358,14 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       const saved = deps.token.get();
 
       if (saved === null) {
+        stopWatchingSync();
         update({ needsName: true, status: "open" });
 
         return;
       }
 
+      stopWatchingSync();
+      watchSync();
       awaitingWelcome = true;
       raw({ name: "", token: saved, type: "join" });
     },
@@ -343,7 +378,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
     resume: () => {
       if (!stopped && state.status === "reconnecting") {
-        socket.reconnect();
+        startOver();
       }
     },
 
@@ -360,7 +395,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
       const requestId = deps.newId();
       const { promise, resolve } = Promise.withResolvers<boolean>();
-      const timeout = setTimeout(reconnect, REPLY_TIMEOUT_MS);
+      const timeout = setTimeout(startOver, REPLY_TIMEOUT_MS);
       pendingMove = { requestId, resolve, timeout };
       update({ sending: true });
 
@@ -382,6 +417,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     stop: () => {
       if (!stopped) {
         clearTimeout(joinTimeout);
+        stopWatchingSync();
         settleMove(false);
         stopped = true;
         socket.close();
