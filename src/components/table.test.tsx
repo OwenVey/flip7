@@ -15,8 +15,10 @@ import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
 import Table from "./table";
 
+let approve = false;
+
 const agent = createAgent({
-  allow: (step) => (step.confirm ?? "") === "",
+  allow: (step) => (step.confirm ?? "") === "" || approve,
 });
 
 const room = (overrides: Partial<RoomView> = {}) => {
@@ -1102,7 +1104,39 @@ describe("<Table />", () => {
     expect(send).toHaveBeenCalledWith({ type: "hit" });
   });
 
-  it("keeps Remove controls out of seats and Scores during play", () => {
+  it("removing a player needs a person to confirm", async () => {
+    const send = vi.fn<RoomConnection["send"]>();
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const ben = within(screen.getByRole("article", { name: "Ben, 12 points" }));
+    expect(ben.getByRole("button", { name: "Remove Ben" })).toBeVisible();
+    const scores = within(screen.getByRole("table", { name: "Scores" }));
+    expect(scores.queryByRole("button", { name: /Remove/u })).toBeNull();
+
+    const remove = {
+      steps: [
+        { action: "press", args: ["Remove from room"], ref: "Remove Ben" },
+      ],
+    };
+
+    approve = false;
+    const refused = await agent.act(remove);
+    expect(refused.ok).toBeFalsy();
+    expect(send).not.toHaveBeenCalled();
+    approve = true;
+    await agent.act(remove);
+    expect(send).toHaveBeenCalledWith({ playerId: "b", type: "kick" });
+    approve = false;
+  });
+
+  it("keeps Remove controls out of seats and Scores while picking a target", () => {
     const choice = {
       card: { id: 9, kind: "freeze" as const },
       chooserId: "a",

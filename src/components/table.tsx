@@ -46,6 +46,7 @@ import LeaveRoom from "./leave-room";
 import OfflineBadge from "./offline-badge";
 import PlayerAvatar from "./player-avatar";
 import PlayingCard from "./playing-card";
+import RemovePlayer from "./remove-player";
 import ScrollFade from "./scroll-fade";
 import TableSheet from "./table-sheet";
 import Tooltip from "./tooltip";
@@ -480,6 +481,21 @@ const RoundPlayer = (
             {(card) => <PlayingCard card={card()} />}
           </For>
         </ul>
+        <Show
+          when={
+            props.moves.choice === null &&
+            props.moves.host.kick.includes(props.player.id)
+          }
+        >
+          <RemovePlayer
+            bot={props.player.bot}
+            disabled={props.actionsDisabled}
+            name={props.player.name}
+            onRemove={() => {
+              void props.send({ playerId: props.player.id, type: "kick" });
+            }}
+          />
+        </Show>
       </header>
       <ul
         class="hand"
