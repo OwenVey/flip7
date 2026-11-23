@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://hotstreak.owenvey.com/sitemap.xml
+Sitemap: https://flip7.owenvey.com/sitemap.xml

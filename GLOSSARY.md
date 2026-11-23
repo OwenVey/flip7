@@ -1,4 +1,4 @@
-# Hot Streak
+# Flip 7
 
 A multiplayer push-your-luck card game played in shared rooms, where players join by room code.
 

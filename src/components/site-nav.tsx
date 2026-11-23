@@ -1,4 +1,3 @@
-import Flame from "@lucide/solid/icons/flame";
 import type { ParentProps } from "solid-js";
 
 import { paths } from "../router";
@@ -7,8 +6,8 @@ export default function SiteNav(props: ParentProps) {
   return (
     <nav class="site-nav">
       <a href={paths()} class="nav-brand">
-        <Flame size={18} />
-        Hot Streak
+        <img src="/favicon.svg" alt="" width={18} height={18} />
+        Flip 7
       </a>
       {props.children}
     </nav>

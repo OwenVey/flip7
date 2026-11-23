@@ -21,9 +21,9 @@ const SOUND_VOLUMES = [
 
 type Sound = (typeof SOUND_VOLUMES)[number][0];
 
-const MUTE_KEY = "hot-streak:sound-muted";
-const EFFECTS_VOLUME_KEY = "hot-streak:effects-volume";
-const MUSIC_VOLUME_KEY = "hot-streak:music-volume";
+const MUTE_KEY = "flip7:sound-muted";
+const EFFECTS_VOLUME_KEY = "flip7:effects-volume";
+const MUSIC_VOLUME_KEY = "flip7:music-volume";
 const MAX_PERCENT = 100;
 const DEFAULT_MUSIC_VOLUME = 25;
 const MUSIC_GAIN = 0.35;

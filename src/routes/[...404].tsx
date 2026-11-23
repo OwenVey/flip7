@@ -21,11 +21,11 @@ export default function NotFound() {
     <>
       <SiteNav />
       <main>
-        <Title>Not Found · Hot Streak</Title>
-        <PageMeta title="Not Found · Hot Streak" path="/" noindex />
+        <Title>Not Found · Flip 7</Title>
+        <PageMeta title="Not Found · Flip 7" path="/" noindex />
         <h1>Page Not Found</h1>
         <p>
-          <a href="/">Back to Hot Streak</a>
+          <a href="/">Back to Flip 7</a>
         </p>
       </main>
     </>

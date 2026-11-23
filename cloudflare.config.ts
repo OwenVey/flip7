@@ -9,7 +9,7 @@ const gameWorker = defineWorker({
   exports: {
     GameRoom: exports.durableObject({ storage: "sqlite" }),
   },
-  name: "hot-streak",
+  name: "flip7",
   observability: { enabled: true },
 });
 

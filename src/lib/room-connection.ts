@@ -34,13 +34,13 @@ const HEARTBEAT = {
   wait: 5000,
 };
 
-const NAME_KEY = "hot-streak:name";
-const AVATAR_KEY = "hot-streak:avatar";
-const STORAGE_PROBE = "hot-streak:probe";
+const NAME_KEY = "flip7:name";
+const AVATAR_KEY = "flip7:avatar";
+const STORAGE_PROBE = "flip7:probe";
 
 const FRESH_PARAM = "fresh";
 
-const tokenKey = (code: string) => `hot-streak:token:${code}`;
+const tokenKey = (code: string) => `flip7:token:${code}`;
 
 const pickTokenStorage = () =>
   import.meta.env.DEV && new URLSearchParams(location.search).has(FRESH_PARAM)

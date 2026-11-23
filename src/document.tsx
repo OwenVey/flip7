@@ -28,7 +28,7 @@ export default function Document(props: ParentProps) {
             crossorigin=""
           />
         ))}
-        <title>Hot Streak</title>
+        <title>Flip 7</title>
         <HydrationScript />
       </head>
       <body>{props.children}</body>

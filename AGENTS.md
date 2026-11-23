@@ -1,4 +1,4 @@
-# Hot Streak agent instructions
+# Flip 7 agent instructions
 
 Use the [README](README.md) for setup, game rules, and deployment. Before exploring the game domain, follow [Domain docs](docs/agents/domain.md) and use the terms in [GLOSSARY.md](GLOSSARY.md).
 

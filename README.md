@@ -1,10 +1,10 @@
-# Hot Streak
+# Flip 7
 
-![Hot Streak banner showing a fan of Number, Freeze, and Score Modifier cards on green felt](docs/readme-banner.jpg)
+![Flip 7 banner showing a fan of Number, Freeze, and Score Modifier cards on green felt](docs/readme-banner.jpg)
 
 A multiplayer push-your-luck card game for **2–16 players**. Share a room link or code and join with a display name. No account is required.
 
-**[Play Hot Streak](https://hotstreak.owenvey.com/)** · [How to play](#how-to-play) · [Local development](#local-development) · [Deploy](#deploy-to-cloudflare)
+**[Play Flip 7](https://flip7.owenvey.com/)** · [How to play](#how-to-play) · [Local development](#local-development) · [Deploy](#deploy-to-cloudflare)
 
 ## How to play
 
@@ -89,8 +89,8 @@ pnpm deploy
 
 ## Contributing
 
-Report bugs and propose changes in [GitHub Issues](https://github.com/OwenVey/hot-streak/issues). For player-facing bugs, include the steps to reproduce and what you expected to happen. Before opening a pull request, run `pnpm check`, `pnpm typecheck`, and `pnpm test --run`. Installing dependencies also sets up the Lefthook pre-commit hook, which formats and fixes supported staged files.
+Report bugs and propose changes in [GitHub Issues](https://github.com/OwenVey/flip7/issues). For player-facing bugs, include the steps to reproduce and what you expected to happen. Before opening a pull request, run `pnpm check`, `pnpm typecheck`, and `pnpm test --run`. Installing dependencies also sets up the Lefthook pre-commit hook, which formats and fixes supported staged files.
 
 ## License
 
-Hot Streak is released under the [MIT License](LICENSE).
+Flip 7 is released under the [MIT License](LICENSE).

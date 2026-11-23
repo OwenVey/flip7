@@ -40,7 +40,7 @@ export const createInvite = () => {
     if (shares()) {
       try {
         await navigator.share({
-          title: "Join my Hot Streak table",
+          title: "Join my Flip 7 table",
           url: location.href,
         });
 

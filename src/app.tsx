@@ -11,7 +11,7 @@ export default function App() {
     <Router>
       {(props) => (
         <>
-          <Title>Hot Streak</Title>
+          <Title>Flip 7</Title>
           <Loading fallback={<main>Loading…</main>}>{props.children}</Loading>
         </>
       )}

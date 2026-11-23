@@ -1,5 +1,5 @@
 "Gaze" by DiceBear (https://www.dicebear.com), licensed CC0 1.0.
-Colors are taken from the Hot Streak palette. Rows of five share a background:
+Colors are taken from the Flip 7 palette. Rows of five share a background:
 Flip Three yellow, Second Chance red, felt green, Freeze blue, plum.
 The backgrounds are softened with the game's cream paper color.
 Each body has a 4px ink (#262451) outline and a 4px ink offset shadow, like the

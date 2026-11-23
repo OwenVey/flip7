@@ -178,11 +178,11 @@ const Room = (props: { code: string }) => {
   return (
     <>
       <Title>
-        {`${table().myMove ? "Your move · " : ""}Room ${props.code} · Hot Streak`}
+        {`${table().myMove ? "Your move · " : ""}Room ${props.code} · Flip 7`}
       </Title>
       <PageMeta
-        title={`Join room ${props.code} · Hot Streak`}
-        description={`You're invited to a game of Hot Streak. Open the link to join room ${props.code}, pick a name and play. No accounts needed.`}
+        title={`Join room ${props.code} · Flip 7`}
+        description={`You're invited to a game of Flip 7. Open the link to join room ${props.code}, pick a name and play. No accounts needed.`}
         path={paths.room(props.code)()}
         noindex
       />
@@ -299,11 +299,7 @@ export default function RoomPage(props: RouteProps<"/room/:code">) {
       keyed
       fallback={
         <>
-          <PageMeta
-            title="Room not found · Hot Streak"
-            path={paths()}
-            noindex
-          />
+          <PageMeta title="Room not found · Flip 7" path={paths()} noindex />
           <SiteNav />
           <main class="room-page">
             <section class="panel">

@@ -125,7 +125,7 @@ export default function Home() {
       <script type="application/ld+json" innerHTML={GAME_STRUCTURED_DATA} />
       <section class="hero">
         <div class="hero-copy">
-          <h1 class="wordmark">Hot Streak</h1>
+          <h1 class="wordmark">Flip 7</h1>
           <p class="lede">
             Hit for another card or Stay to bank your points. Flip 7 for a
             bonus.
