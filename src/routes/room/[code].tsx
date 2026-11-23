@@ -253,6 +253,9 @@ const Room = (props: { code: string }) => {
                     send={connection.send}
                     chat={connection.chat}
                     actionsDisabled={table().actionsDisabled}
+                    offline={
+                      !connection.online() || connection.status() !== "open"
+                    }
                     dealing={table().dealing}
                     dealStep={table().step}
                     incomingCardId={table().incomingCardId}

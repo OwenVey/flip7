@@ -1345,7 +1345,12 @@ const ActionBar = (
 };
 
 export default function Table(
-  props: TableProps & DealProps & { chat: RoomConnection["chat"] }
+  props: TableProps &
+    DealProps & {
+      chat: RoomConnection["chat"];
+      /** Blocks Leave while the room can't hear it. Leave stays open during the deal. */
+      offline?: boolean;
+    }
 ) {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
   const settings = createPopoverController();
@@ -1477,7 +1482,7 @@ export default function Table(
               />
             </Show>
             <LeaveRoom
-              disabled={props.actionsDisabled}
+              disabled={props.offline}
               controller={leave}
               collapsible
               onLeave={() => {
@@ -1486,7 +1491,7 @@ export default function Table(
             />
             <TableMoreMenu
               leave={leave}
-              leaveDisabled={props.actionsDisabled}
+              leaveDisabled={props.offline}
               settings={moves().host.configure ? settings : undefined}
             />
           </div>

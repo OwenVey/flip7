@@ -43,7 +43,7 @@ export default function LeaveRoom(props: {
       <Tooltip
         content={
           props.disabled === true
-            ? "You can leave after the deal"
+            ? "You can leave once you're back online"
             : "Leave room"
         }
         type={props.disabled === true ? "description" : "label"}

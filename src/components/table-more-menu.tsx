@@ -95,9 +95,7 @@ export default function TableMoreMenu(props: {
           <MenuItemIcon>
             <LogOut size={16} />
           </MenuItemIcon>
-          <Show when={props.leaveDisabled === true} fallback="Leave room">
-            Leave after the deal
-          </Show>
+          Leave room
         </MenuItem>
       </MenuContent>
     </Menu>

@@ -234,7 +234,7 @@ describe("<Table />", () => {
     ).resolves.toBeVisible();
   });
 
-  it("leaves room settings out of a guest's phone menu and blocks leaving during the deal", async () => {
+  it("leaves room settings out of a guest's phone menu and lets them leave during the deal", async () => {
     render(() => (
       <Table
         room={room()}
@@ -242,6 +242,7 @@ describe("<Table />", () => {
         send={vi.fn<RoomConnection["send"]>()}
         chat={vi.fn<RoomConnection["chat"]>()}
         actionsDisabled
+        dealing
       />
     ));
 
@@ -251,8 +252,8 @@ describe("<Table />", () => {
       within(menu).queryByRole("menuitem", { name: "Room settings" })
     ).toBeNull();
     expect(
-      within(menu).getByRole("menuitem", { name: "Leave after the deal" })
-    ).toHaveAttribute("aria-disabled", "true");
+      within(menu).getByRole("menuitem", { name: "Leave room" })
+    ).not.toHaveAttribute("aria-disabled");
   });
 
   it("keeps room settings away from guests", () => {
@@ -1484,9 +1485,14 @@ describe("<Table />", () => {
     expect(screen.getByRole("region", { name: "Your move" })).toBeVisible();
   });
 
-  it("keeps Leave room focusable with a reason during the deal", () => {
-    const send = vi.fn<RoomConnection["send"]>();
-    const [dealing, setDealing] = createSignal(true);
+  it("lets a player leave during the deal", async () => {
+    const sent = Promise.withResolvers<Parameters<RoomConnection["send"]>[0]>();
+
+    const send: RoomConnection["send"] = async (command) => {
+      sent.resolve(command);
+
+      return await Promise.resolve(true);
+    };
 
     render(() => (
       <Table
@@ -1494,21 +1500,46 @@ describe("<Table />", () => {
         playerId="a"
         send={send}
         chat={vi.fn<RoomConnection["chat"]>()}
-        actionsDisabled={dealing()}
+        actionsDisabled
+        dealing
+      />
+    ));
+    const leave = screen.getByRole("button", { name: "Leave room" });
+    expect(leave).not.toHaveAttribute("aria-disabled");
+    leave.click();
+    flush();
+
+    const dialog = await screen.findByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Leave" }));
+    await expect(sent.promise).resolves.toStrictEqual({ type: "leave" });
+  });
+
+  it("keeps Leave room focusable with a reason while offline", () => {
+    const [offline, setOffline] = createSignal(true);
+
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        offline={offline()}
       />
     ));
     const leave = screen.getByRole("button", { name: "Leave room" });
     expect(leave).toHaveAttribute("aria-disabled", "true");
-    expect(leave).toHaveAccessibleDescription("You can leave after the deal");
+    expect(leave).toHaveAccessibleDescription(
+      "You can leave once you're back online"
+    );
     leave.click();
     flush();
     expect(screen.queryByRole("alertdialog")).toBeNull();
 
-    setDealing(false);
+    setOffline(false);
     flush();
     expect(leave).not.toHaveAttribute("aria-disabled");
     expect(leave).not.toHaveAccessibleDescription(
-      "You can leave after the deal"
+      "You can leave once you're back online"
     );
   });
 
