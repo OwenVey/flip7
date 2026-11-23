@@ -365,6 +365,16 @@ describe("winning and leaving", () => {
     expect(state.winnerIds).toStrictEqual(["a"]);
   });
 
+  it("ends the game at the winning score the host picked", () => {
+    const state = setup(["a", "b"], [num(10), num(3)]);
+    state.settings = { botSpeed: "normal", locked: false, targetScore: 100 };
+    player(state, "a").score = 95;
+    stay(state, "a", random);
+    stay(state, "b", random);
+    expect(state.phase).toBe("gameOver");
+    expect(state.winnerIds).toStrictEqual(["a"]);
+  });
+
   it("keeps playing when the leaders are tied", () => {
     const state = setup(["a", "b"], [num(10), num(10)]);
     player(state, "a").score = TARGET_SCORE;

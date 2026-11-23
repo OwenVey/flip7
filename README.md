@@ -9,14 +9,15 @@ A multiplayer push-your-luck card game for **2–16 players**. Share a room link
 ## How to play
 
 1. **Create a room** and share the invite link or room code.
-2. **Join with a display name.** The host can start once two players have joined. Playing alone or short-handed? The host can **add bots** in the lobby. Bots count toward the 16-player limit and make their own moves after a short pause.
-3. **Hit or Stay.** Hit to draw another card, or Stay to bank your points and sit out the round. You need a card in front of you to Stay. Drawing a duplicate Number card makes you bust for zero points unless you have a Second Chance.
+2. **Join with a display name.** The host can start once two players have joined. Playing alone or short-handed? The host can **add bots** in the lobby. Bots count toward the 16-player limit and make their own moves after a short pause, or a shorter one if the host sets them to Fast.
+3. **Set up the table.** In the lobby, the host picks the winning score (100, 200, or 300) and can **lock the room** so nobody new can join. Players already in the room can still rejoin. During a game, the host can still lock or unlock the room and change bot speed from **Settings** in the table header. The winning score only changes in the lobby.
+4. **Hit or Stay.** Hit to draw another card, or Stay to bank your points and sit out the round. You need a card in front of you to Stay. Drawing a duplicate Number card makes you bust for zero points unless you have a Second Chance.
 
 ### Rounds and scoring
 
 The dealer rotates each round and deals an opening card to each active player in order, starting on the dealer's left. Action cards interrupt the deal and resolve as soon as they appear. A player who already took cards from a Flip Three before their opening card chooses Hit or Stay instead. The round ends when everyone is out or a player **Flips 7** by collecting seven unique Number cards. A Flip 7 adds 15 bonus points and ends the round for everyone. Everyone who hasn't busted scores what they already have.
 
-Add up your Number cards, apply the ×2 multiplier if you have it, then add any other Score Modifier points and the Flip 7 bonus. At the end of a round, the sole leader wins if they have at least 200 points. Play continues on a tie for first. After a round, the host can start the next round manually or enable a 10-second auto-advance countdown for their current table session. The host can cancel the countdown at any time before it finishes.
+Add up your Number cards, apply the ×2 multiplier if you have it, then add any other Score Modifier points and the Flip 7 bonus. At the end of a round, the sole leader wins if they have at least the winning score: 200 points unless the host chose 100 or 300. Play continues on a tie for first. After a round, the host can start the next round manually or enable a 10-second auto-advance countdown for their current table session. The host can cancel the countdown at any time before it finishes.
 
 ### Cards
 

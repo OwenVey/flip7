@@ -1,7 +1,8 @@
 import { projectActionCards } from "./action-card-resolution";
 import { avatarOf } from "./avatars";
-import { TARGET_SCORE } from "./engine";
 import type { DrawEvent, GameState, HeldCard, Player } from "./engine";
+import { settingsOf } from "./settings";
+import type { BotSpeed } from "./settings";
 
 export const NAME_MAX_LENGTH = 20;
 export const HEARTBEAT_PING = "ping";
@@ -53,6 +54,10 @@ export interface RoomView extends Pick<
   flips: { targetId: string; remaining: number }[];
   held: HeldCard[];
   players: PlayerView[];
+  /** How fast bots move, set by the host. */
+  botSpeed: BotSpeed;
+  /** Whether the host has stopped new players joining. */
+  locked: boolean;
   targetScore: number;
 }
 
@@ -75,8 +80,10 @@ export type ServerMessage =
 
 export const toRoomView = (code: string, state: GameState) => {
   const { choice, flips, held } = projectActionCards(state);
+  const { botSpeed, locked, targetScore } = settingsOf(state);
 
   const view: RoomView = {
+    botSpeed,
     choice,
     code,
     dealerId:
@@ -90,6 +97,7 @@ export const toRoomView = (code: string, state: GameState) => {
     flips,
     held,
     hostId: state.hostId,
+    locked,
     log: state.log,
     phase: state.phase,
     players: state.players.map((player) => ({
@@ -105,7 +113,7 @@ export const toRoomView = (code: string, state: GameState) => {
       status: player.status,
     })),
     round: state.round,
-    targetScore: TARGET_SCORE,
+    targetScore,
     turnId: state.turnId,
     winnerIds: state.winnerIds,
   };

@@ -6,6 +6,7 @@ import { HEARTBEAT_INTERVAL_MS, HEARTBEAT_STALE_MS } from "./protocol";
 import {
   ABSENT_GRACE_MS,
   BOT_DELAY_MS,
+  FAST_BOT_DELAY_MS,
   heartbeatDeadline,
   HOST_GRACE_MS,
   IDLE_EXPIRY_MS,
@@ -158,6 +159,21 @@ describe("room timers", () => {
     const due = START + BOT_DELAY_MS;
     expect(timers.botTurn).toStrictEqual({ at: due, playerId: "bot" });
     expect(nextAlarmAt(timers)).toBe(due);
+  });
+
+  it("waits less before a bot's move once the host speeds bots up", () => {
+    const timers = humanAgainstBotWaitingOnBot();
+    timers.game.settings = {
+      botSpeed: "fast",
+      locked: false,
+      targetScore: 200,
+    };
+
+    syncTimers(timers, START);
+    expect(timers.botTurn).toStrictEqual({
+      at: START + FAST_BOT_DELAY_MS,
+      playerId: "bot",
+    });
   });
 
   it("makes the bot's move once its wait is up", () => {

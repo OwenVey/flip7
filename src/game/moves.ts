@@ -1,5 +1,6 @@
 import type { Card } from "./cards";
 import type { GameState, Player } from "./engine";
+import { DEFAULT_SETTINGS } from "./settings";
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 16;
@@ -24,6 +25,7 @@ export type Move =
   | { type: "nextRound" }
   | { type: "lobby" }
   | { type: "addBot" }
+  | { type: "configure"; targetScore?: number }
   | { type: "kick"; playerId: string };
 
 /** A player may stay only once they have at least one card in front of them. */
@@ -168,6 +170,12 @@ const rejectHostMove = (
     return "Only the host can do that.";
   }
 
+  if (move.type === "configure") {
+    return move.targetScore === undefined || view.phase === "lobby"
+      ? null
+      : "You can only change the winning score in the lobby.";
+  }
+
   if (move.type === "addBot") {
     if (view.phase !== "lobby") {
       return "You can only add bots in the lobby.";
@@ -210,6 +218,7 @@ export const rejectMove = (view: MovesView, viewerId: string, move: Move) => {
     case "nextRound":
     case "lobby":
     case "addBot":
+    case "configure":
     case "kick": {
       return rejectHostMove(view, viewerId, move);
     }
@@ -240,6 +249,12 @@ export const availableMoves = (view: MovesView, viewerId: string) => {
 
   const host = {
     addBot: rejectHostMove(view, viewerId, { type: "addBot" }) === null,
+    configure: rejectHostMove(view, viewerId, { type: "configure" }) === null,
+    setTargetScore:
+      rejectHostMove(view, viewerId, {
+        targetScore: DEFAULT_SETTINGS.targetScore,
+        type: "configure",
+      }) === null,
     kick: isHost
       ? view.players.flatMap((player) =>
           player.id === viewerId ? [] : [player.id]

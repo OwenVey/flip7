@@ -101,6 +101,8 @@
   --control-height-sm: 2rem;
   --control-height: 2.5rem;
   --control-height-lg: 2.75rem;
+  /* The space between neighboring buttons, side by side or stacked. */
+  --button-gap: 0.625rem;
   --dialog-inset: 1rem;
   --dialog-radius: var(--radius-xl);
 }
@@ -371,10 +373,254 @@ p {
   font-weight: 700;
 }
 
-/* Waiting messages under the roster; phones pin them where Start game sits. */
+/* The invite card, then the host's controls or a guest's waiting note. */
+.lobby-side {
+  display: grid;
+  gap: 1.25rem;
+}
+
+/* Waiting messages where Start game will appear. */
 .lobby-status {
   color: var(--ink-soft);
   text-align: center;
+}
+
+/* A guest's note stands on the felt, so it gets its own paper card. */
+.lobby-side > .lobby-status {
+  padding: 0.625rem 1rem;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-xl);
+  background: var(--paper);
+  box-shadow: 3px 3px 0 var(--ink);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.lobby-status {
+  display: grid;
+  gap: 0.25rem;
+
+  & p {
+    margin: 0;
+  }
+}
+
+.lobby-settings {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* A locked room's empty seat says so instead of offering the invite link. */
+.roster .open-seat[data-locked] > span {
+  display: flex;
+  flex: 1;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+/* The host's settings: two segmented rows, then the lock switch beside its copy. */
+/* The host's settings, one row each: the label on the left, its control on the right. */
+.room-settings {
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* In the lobby a dashed rule separates the settings from Add bot and Start game. */
+.host-controls .room-settings {
+  padding-bottom: 0.875rem;
+  border-bottom: 1.5px dashed var(--rule);
+}
+
+/* During a game the host changes the lock and bot speed from the table header. */
+.room-settings-popover {
+  inline-size: min(18rem, calc(100vw - 2rem));
+  min-inline-size: 0;
+  padding: 0;
+  overflow: hidden;
+
+  & [data-slot="popover-title"] {
+    font-size: 0.875rem;
+  }
+}
+
+.room-settings-popover-body {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem;
+}
+
+.room-settings-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+/* A row wraps its control under the label only when the column is too narrow for both. */
+.setting {
+  display: flex;
+  /* web.css stacks every field in a column. */
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+
+  & [data-slot="field-label"] {
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+
+  & [data-slot="field-description"] {
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+  }
+
+  & [data-slot="segmented-control"] {
+    flex: none;
+    width: 9rem;
+  }
+}
+
+.setting-copy {
+  display: grid;
+  flex: 1 1 10rem;
+  gap: 0.125rem;
+}
+
+[data-slot="segmented-control"] {
+  position: relative;
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  padding: 0.1875rem;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius-md);
+  background: var(--paper-deep);
+  isolation: isolate;
+}
+
+[data-slot="segmented-control-item"] {
+  min-height: var(--control-height-sm);
+  padding-inline: 0.5rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+
+  &[data-checked] {
+    color: var(--ink);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  &[data-readonly] {
+    cursor: default;
+  }
+
+  @media (hover: hover) {
+    &:hover:not([data-checked], [data-readonly]) {
+      color: var(--ink);
+    }
+  }
+}
+
+[data-slot="segmented-control-indicator"] {
+  position: absolute;
+  z-index: -1;
+  top: var(--segmented-control-indicator-top);
+  left: var(--segmented-control-indicator-left);
+  width: var(--segmented-control-indicator-width);
+  height: var(--segmented-control-indicator-height);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-sm);
+  background: var(--gold);
+  box-shadow: 1px 1px 0 var(--ink);
+  transition-property: top, left, width, height;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+
+  &[data-activation-direction="none"] {
+    transition: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+[data-slot="switch"] {
+  --switch-width: 2.75rem;
+  --switch-height: 1.625rem;
+  --thumb-size: 1.125rem;
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  width: var(--switch-width);
+  height: var(--switch-height);
+  padding: 0;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper-deep);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 150ms ease;
+
+  &[data-checked] {
+    background: var(--accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  &[data-readonly] {
+    cursor: default;
+  }
+
+  /* Grows the tap area to 44px without moving the switch. */
+  @media (pointer: coarse) {
+    &::before {
+      position: absolute;
+      inset: calc((2.75rem - var(--switch-height)) / -2) -0.25rem;
+      content: "";
+    }
+  }
+}
+
+[data-slot="switch-thumb"] {
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper-light);
+  /* web.css pushes a checked thumb across with an auto margin, which can't animate; the translate below moves it instead. */
+  margin-inline-start: 0;
+  translate: 0.1875rem 0;
+  transition: translate 150ms cubic-bezier(0.2, 0, 0, 1);
+
+  &[data-checked] {
+    margin-inline-start: 0;
+    background: var(--gold);
+    translate: calc(var(--switch-width) - var(--thumb-size) - 0.375rem) 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }
 
 /* Tapping the room code copies it; a stamp says so for a moment. */
@@ -432,6 +678,70 @@ button.room-code {
   }
 }
 
+/*
+ * Wide screens: the invite card stands beside the players as a sticky
+ * sidebar, and narrower seats fit three across.
+ */
+@media (min-width: 64rem) {
+  .lobby {
+    grid-template-columns: 20rem minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .lobby-side {
+    position: sticky;
+    inset-block-start: 1rem;
+  }
+
+  .invite {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+
+    & .room-code-copy {
+      justify-self: center;
+    }
+
+    & .room-code {
+      font-size: 3.5rem;
+    }
+
+    & > .muted {
+      max-width: 24ch;
+    }
+
+    & > :is(h2, [data-slot="button"]) {
+      justify-self: stretch;
+    }
+  }
+
+  .players .roster {
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  }
+}
+
+/* Remove is a square ✕ in the roster; its tooltip and accessible name carry the label. */
+.roster {
+  & .remove-player {
+    flex: none;
+    inline-size: var(--button-height);
+    padding-inline: 0;
+  }
+
+  & .remove-player .button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  & [data-slot="tooltip-content"][data-compact-only] {
+    visibility: visible;
+  }
+}
+
 .link {
   color: var(--accent);
   font-weight: 700;
@@ -441,7 +751,7 @@ button.room-code {
 .alert-dialog-body > [data-slot="row"] {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.625rem;
+  gap: var(--button-gap);
   align-items: center;
 }
 
@@ -957,7 +1267,7 @@ button.room-code {
 .room-nav-actions {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: var(--button-gap);
 }
 
 .audio-settings {
@@ -1575,8 +1885,13 @@ main {
   align-items: center;
   justify-content: space-between;
 
+  /* The lobby heading's size, one step down on phones so it fits beside the touch-size buttons. */
   & h1 {
-    font-size: 1.5rem;
+    font-size: 2rem;
+
+    @media (max-width: 40rem), (max-height: 30rem) {
+      font-size: 1.75rem;
+    }
   }
 
   /* Small controls on desktop; touch keeps full-size targets. */
@@ -1585,7 +1900,8 @@ main {
       :is(
         [data-slot="button"],
         [data-slot="alert-dialog-trigger"],
-        [data-slot="dialog-trigger"]
+        [data-slot="dialog-trigger"],
+        [data-slot="popover-trigger"]
       ) {
       --button-height: var(--control-height-sm);
       padding-inline: 0.75rem;
@@ -1655,7 +1971,7 @@ main {
 
 .action-button-items {
   display: flex;
-  gap: 0.625rem;
+  gap: var(--button-gap);
   min-inline-size: max-content;
 
   & [data-slot="button"] {
@@ -3606,6 +3922,26 @@ main {
   display: grid;
 }
 
+/* Add bot and Start game sit one button gap apart, closer than the panel's sections. */
+.host-actions {
+  display: grid;
+  gap: var(--button-gap);
+}
+
+.start-game {
+  gap: 0.5rem;
+}
+
+/* Says what Start game is waiting for, as a quiet footnote under the button. */
+.start-hint {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-align: center;
+  text-wrap: balance;
+}
+
 /* The deck thins as it runs down. */
 .deck .card-back[data-stack="low"] {
   box-shadow:
@@ -4083,16 +4419,17 @@ main {
     & .row {
       flex: none;
       flex-wrap: nowrap;
-      gap: 0.5rem;
     }
   }
 
   :is(.page-header, .table-header)
     :is(
       [data-table-sheet-trigger],
-      :is([data-slot="button"], [data-slot="alert-dialog-trigger"]):has(
-        > .button-label
-      )
+      :is(
+        [data-slot="button"],
+        [data-slot="alert-dialog-trigger"],
+        [data-slot="popover-trigger"]
+      ):has(> .button-label)
     ) {
     flex: none;
     inline-size: var(--button-height);
@@ -4131,26 +4468,6 @@ main {
 
   .table-sidebar {
     display: none;
-  }
-
-  .lobby-page:has(.start-game, .lobby-status) {
-    padding-bottom: 5rem;
-  }
-
-  :is(.start-game, .lobby-status) {
-    position: fixed;
-    inset: auto 1rem calc(0.75rem + env(safe-area-inset-bottom)) 1rem;
-    z-index: 2;
-  }
-
-  .lobby-status {
-    padding: 0.625rem 1rem;
-    border: 2px solid var(--ink);
-    border-radius: var(--radius-xl);
-    background: var(--paper);
-    box-shadow: 3px 3px 0 var(--ink);
-    color: var(--ink);
-    font-weight: 600;
   }
 
   .home {
@@ -4361,7 +4678,7 @@ main {
 .game-over-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
+  gap: var(--button-gap);
   width: 100%;
   margin-block-start: 0.5rem;
 

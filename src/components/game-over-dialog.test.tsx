@@ -24,6 +24,7 @@ const player = (id: string, name: string, score: number) => {
 
 const room = () => {
   const view: RoomView = {
+    botSpeed: "normal",
     choice: null,
     code: "ABCDE",
     dealerId: "a",
@@ -33,6 +34,7 @@ const room = () => {
     flips: [],
     held: [],
     hostId: "a",
+    locked: false,
     log: [],
     phase: "gameOver",
     players: [

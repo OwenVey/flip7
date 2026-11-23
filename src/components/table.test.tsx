@@ -23,6 +23,7 @@ const agent = createAgent({
 
 const room = (overrides: Partial<RoomView> = {}) => {
   const view: RoomView = {
+    botSpeed: "normal",
     choice: null,
     code: "ABCDE",
     dealerId: "b",
@@ -32,6 +33,7 @@ const room = (overrides: Partial<RoomView> = {}) => {
     flips: [],
     held: [],
     hostId: "a",
+    locked: false,
     log: [{ id: 1, text: "Round 1 begins. Ben deals." }],
     phase: "playing",
     players: [
@@ -106,6 +108,52 @@ describe("<Table />", () => {
     setHit(true);
     flush();
     expect(screen.getByText("Ben hits…")).toBeVisible();
+  });
+
+  it("lets the host lock the room mid-game from the header, without the winning score", async () => {
+    const send = vi.fn<RoomConnection["send"]>();
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    fireEvent.click(screen.getByRole("button", { name: "Room settings" }));
+
+    const popover = await screen.findByRole("dialog", {
+      name: "Room settings",
+    });
+
+    expect(
+      within(popover).queryByRole("radiogroup", { name: "Winning score" })
+    ).toBeNull();
+
+    fireEvent.click(
+      within(popover).getByRole("switch", { name: /Lock room/u })
+    );
+    expect(send).toHaveBeenCalledExactlyOnceWith({
+      locked: true,
+      type: "configure",
+    });
+  });
+
+  it("keeps room settings away from guests", () => {
+    render(() => (
+      <Table
+        room={room()}
+        playerId="b"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    expect(screen.queryByRole("button", { name: "Room settings" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Copy invite link" })
+    ).toHaveTextContent("Invite");
   });
 
   it("opens the Scores sheet during play and returns focus on close", async () => {
