@@ -245,6 +245,29 @@ export const flyCard = async ({
   }
 };
 
+const PX = /px$/u;
+const SCORE_MODIFIER = "[data-score-modifier]";
+
+const pixels = (value: string) => Number(value.replace(PX, "")) || 0;
+
+const startMargin = (element: Element | null) =>
+  element ? pixels(getComputedStyle(element).marginInlineStart) : 0;
+
+const separatorChange = (card: Element) => {
+  const previous = card.previousElementSibling;
+  const next = card.nextElementSibling;
+  const nextMargin = startMargin(next);
+
+  const separatedAfter =
+    next?.matches(SCORE_MODIFIER) === true &&
+    previous !== null &&
+    !previous.matches(SCORE_MODIFIER);
+
+  const marginAfter = separatedAfter ? nextMargin || startMargin(card) : 0;
+
+  return nextMargin - marginAfter;
+};
+
 const closeSlot = (card: Element, duration: number) => {
   const row = card.parentElement;
 
@@ -257,11 +280,14 @@ const closeSlot = (card: Element, duration: number) => {
     return null;
   }
 
-  const gap = Number(getComputedStyle(row).columnGap.replace(/px$/u, "")) || 0;
+  const gap = pixels(getComputedStyle(row).columnGap);
   const before = card.previousElementSibling !== null;
   const after = card.nextElementSibling !== null;
   const side = before || !after ? "marginInlineStart" : "marginInlineEnd";
-  const width = card.offsetWidth + (before || after ? gap : 0);
+
+  const width =
+    card.offsetWidth + (before || after ? gap : 0) + separatorChange(card);
+
   const from = getComputedStyle(card)[side];
 
   return card.animate(
@@ -321,7 +347,7 @@ export const absorbCard = async (
           { offset: 0.4, opacity: 1, scale: "0.8" },
           { opacity: 0, scale: "0.35" },
         ],
-        { duration, easing: "cubic-bezier(0.5, 0, 0.75, 0)", fill: "forwards" }
+        { duration, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "forwards" }
       ),
     ],
     duration,

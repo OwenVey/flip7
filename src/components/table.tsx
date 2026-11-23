@@ -201,10 +201,11 @@ const FlipTracker = (props: {
   leaving: boolean;
   card: Card | null;
 }) => (
-  <span
+  <div
     class="flip-run"
     data-waiting={props.progress.waiting ? "" : undefined}
     data-leaving={props.leaving ? "" : undefined}
+    style={{ "--flip-exit": `${FLIP_EXIT_MS}ms` }}
   >
     <PlayingCardsFan size={12} aria-hidden="true" />
     <span class="flip-run-label">Flip Three</span>
@@ -233,7 +234,7 @@ const FlipTracker = (props: {
         </ul>
       )}
     </Show>
-  </span>
+  </div>
 );
 
 const currentRoundPoints = (
