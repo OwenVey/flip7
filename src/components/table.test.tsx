@@ -240,7 +240,7 @@ describe("<Table />", () => {
     }
   });
 
-  it("advances only after the host opts in and can cancel the countdown", () => {
+  it("waits for the host to start the next round", () => {
     vi.useFakeTimers();
 
     try {
@@ -253,21 +253,10 @@ describe("<Table />", () => {
           chat={vi.fn<RoomConnection["chat"]>()}
         />
       ));
-      vi.advanceTimersByTime(10_000);
+      vi.advanceTimersByTime(60_000);
       expect(send).not.toHaveBeenCalled();
 
-      screen.getByRole("button", { name: "Enable auto-advance" }).click();
-      flush();
-      screen.getByRole("button", { name: "Cancel auto-advance (10s)" }).click();
-      flush();
-      vi.advanceTimersByTime(10_000);
-      expect(send).not.toHaveBeenCalled();
-
-      screen.getByRole("button", { name: "Enable auto-advance" }).click();
-      flush();
-      vi.advanceTimersByTime(9999);
-      expect(send).not.toHaveBeenCalled();
-      vi.advanceTimersByTime(1);
+      screen.getByRole("button", { name: "Start next round" }).click();
       expect(send).toHaveBeenCalledExactlyOnceWith({ type: "nextRound" });
     } finally {
       cleanup();

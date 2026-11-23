@@ -63,7 +63,6 @@ const STATUS_LABELS = {
 
 const SCORES_TITLE = "Scores";
 const ROUND_COUNT_MS = 320;
-const AUTO_ADVANCE_SECONDS = 10;
 const PHONE_TABLE_QUERY = "(max-width: 40rem), (max-height: 30rem)";
 
 const STAMPED_STATUSES: ReadonlySet<RoundStatus> = new Set([
@@ -1024,50 +1023,7 @@ const roundEndHeadline = (room: RoomView) => {
 const ActionBar = (
   props: TableProps & DealProps & Pick<MoveControls, "moves">
 ) => {
-  const [autoAdvance, setAutoAdvance] = createSignal(false);
-  const [seconds, setSeconds] = createSignal(AUTO_ADVANCE_SECONDS);
-
-  const countdownRound = createMemo(() =>
-    autoAdvance() &&
-    props.moves.host.nextRound &&
-    props.actionsDisabled !== true &&
-    props.dealing !== true
-      ? props.room.round
-      : null
-  );
-
   const nextRound = async () => await props.send({ type: "nextRound" });
-
-  createEffect(countdownRound, (round) => {
-    setSeconds(AUTO_ADVANCE_SECONDS);
-
-    let timer: ReturnType<typeof setInterval> | undefined;
-
-    if (round !== null) {
-      const deadline = Date.now() + AUTO_ADVANCE_SECONDS * 1000;
-
-      timer = setInterval(() => {
-        const remaining = Math.max(
-          0,
-          Math.ceil((deadline - Date.now()) / 1000)
-        );
-
-        setSeconds(remaining);
-
-        if (remaining === 0) {
-          clearInterval(timer);
-
-          if (countdownRound() === round) {
-            void nextRound();
-          }
-        }
-      }, 250);
-    }
-
-    return () => {
-      clearInterval(timer);
-    };
-  });
 
   const me = () =>
     props.room.players.find((player) => player.id === props.playerId);
@@ -1206,15 +1162,6 @@ const ActionBar = (
                   >
                     <ArrowRight size={16} />
                     Start next round
-                  </Button>
-                  <Button
-                    data-size="lg"
-                    disabled={props.actionsDisabled}
-                    onClick={() => setAutoAdvance((enabled) => !enabled)}
-                  >
-                    {autoAdvance()
-                      ? `Cancel auto-advance (${seconds()}s)`
-                      : "Enable auto-advance"}
                   </Button>
                 </ActionButtons>
               </Show>
