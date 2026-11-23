@@ -19,6 +19,7 @@ import {
 
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
+import { hostName } from "../lib/host";
 import { rankPlayers } from "../lib/standings";
 import PlayerAvatar from "./player-avatar";
 import ScrollFade from "./scroll-fade";
@@ -200,7 +201,7 @@ export default function GameOverDialog(props: {
             when={props.canReturnToLobby}
             fallback={
               <p class="muted">
-                Waiting for the host to head back to the lobby.
+                Waiting for {hostName(props.room)} to head back to the lobby.
               </p>
             }
           >

@@ -90,7 +90,7 @@ describe("<GameOverDialog />", () => {
         .map((item) => item.querySelector(".game-over-name")?.textContent)
     ).toStrictEqual(["Ben", "Ana You", "Cara"]);
     expect(
-      screen.getByText("Waiting for the host to head back to the lobby.")
+      screen.getByText("Waiting for Ana to head back to the lobby.")
     ).toBeInTheDocument();
   });
 

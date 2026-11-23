@@ -2197,8 +2197,8 @@ main {
   }
 }
 
-/* The dealer button: a flat gold disc beside the dealer's name, styled like the You badge. */
-.dealer-chip {
+/* The dealer button and the host's crown: flat discs beside a seat's name, sized like the You badge. */
+:is(.dealer-chip, .host-chip) {
   display: grid;
   place-items: center;
   box-sizing: border-box;
@@ -2212,6 +2212,11 @@ main {
   border-radius: 50%;
   background: var(--gold);
   color: var(--ink);
+}
+
+/* Light like the lobby's Host badge, so the crown never reads as the gold dealer button or You badge. */
+.host-chip {
+  background: var(--paper);
 }
 
 .table {
@@ -3236,7 +3241,8 @@ main {
 
   & .badge,
   & .avatar,
-  & .dealer-chip {
+  & .dealer-chip,
+  & .host-chip {
     flex: none;
   }
 }

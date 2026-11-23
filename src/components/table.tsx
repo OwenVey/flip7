@@ -1,6 +1,7 @@
 import ArrowLeft from "@lucide/solid/icons/arrow-left";
 import ArrowRight from "@lucide/solid/icons/arrow-right";
 import CircleX from "@lucide/solid/icons/circle-x";
+import Crown from "@lucide/solid/icons/crown";
 import Hand from "@lucide/solid/icons/hand";
 import LockKeyhole from "@lucide/solid/icons/lock-keyhole";
 import MessageCircle from "@lucide/solid/icons/message-circle";
@@ -35,6 +36,7 @@ import type { AvailableMoves } from "../game/moves";
 import type { PlayerView, RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
+import { hostName } from "../lib/host";
 import { motionAllowed } from "../lib/motion";
 import type { RoomConnection } from "../lib/room-connection";
 import { rankPlayers } from "../lib/standings";
@@ -367,6 +369,7 @@ const RoundPlayer = (
 
   const isDealer = () => props.room.dealerId === props.player.id;
   const isMe = () => props.player.id === props.playerId;
+  const isHost = () => props.room.hostId === props.player.id;
 
   const hasDecision = () => props.moves.waitingOn?.playerId === props.player.id;
 
@@ -507,6 +510,15 @@ const RoundPlayer = (
               trigger={(hint) => <span {...hint} class="dealer-chip" />}
             >
               <PlayingCards size={14} strokeWidth={2.25} aria-hidden="true" />
+            </Tooltip>
+          </Show>
+          <Show when={isHost()}>
+            <Tooltip
+              content="Host"
+              type="label"
+              trigger={(hint) => <span {...hint} class="host-chip" />}
+            >
+              <Crown size={12} strokeWidth={2.25} aria-hidden="true" />
             </Tooltip>
           </Show>
           <Show when={isWinner()}>
@@ -1180,7 +1192,12 @@ const ActionBar = (
               </p>
               <Show
                 when={props.moves.host.lobby}
-                fallback={<p class="muted">Waiting for the host.</p>}
+                fallback={
+                  <p class="muted">
+                    Waiting for {hostName(props.room)} to head back to the
+                    lobby.
+                  </p>
+                }
               >
                 <ActionButtons>
                   <Button
@@ -1201,7 +1218,7 @@ const ActionBar = (
                 when={props.moves.host.nextRound}
                 fallback={
                   <p class="muted">
-                    Waiting for the host to start the next round.
+                    Waiting for {hostName(props.room)} to start the next round.
                   </p>
                 }
               >

@@ -376,6 +376,31 @@ describe("<Table />", () => {
     }
   });
 
+  it("crowns the host's seat and names the host while guests wait", () => {
+    render(() => (
+      <Table
+        room={room({ phase: "roundOver" })}
+        playerId="b"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    expect(
+      within(screen.getByRole("article", { name: "Ana, 40 points" })).getByText(
+        "Host"
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole("article", { name: "Ben, 12 points" })
+      ).queryByText("Host")
+    ).toBeNull();
+    expect(
+      screen.getByText("Waiting for Ana to start the next round.")
+    ).toBeInTheDocument();
+  });
+
   it("shows the banked and round scores in the same label row", () => {
     render(() => (
       <Table

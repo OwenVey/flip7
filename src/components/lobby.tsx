@@ -17,6 +17,7 @@ import {
 import { MAX_PLAYERS } from "../game/engine";
 import { availableMoves, MIN_PLAYERS } from "../game/moves";
 import type { RoomView } from "../game/protocol";
+import { hostName } from "../lib/host";
 import { createCopy, createInvite } from "../lib/invite";
 import type { RoomConnection } from "../lib/room-connection";
 import { pop } from "../lib/table-motion";
@@ -122,10 +123,6 @@ export default function Lobby(props: {
 
   const count = () => `${props.room.players.length} / ${MAX_PLAYERS}`;
 
-  const hostName = () =>
-    props.room.players.find((player) => player.id === props.room.hostId)
-      ?.name ?? "the host";
-
   return (
     <div class="lobby-page">
       <header class="page-header">
@@ -154,7 +151,7 @@ export default function Lobby(props: {
             when={isHost()}
             fallback={
               <div class="lobby-status">
-                <p>Waiting for {hostName()} to start the game.</p>
+                <p>Waiting for {hostName(props.room)} to start the game.</p>
                 <p class="lobby-settings">{settingsSummary(props.room)}</p>
               </div>
             }
