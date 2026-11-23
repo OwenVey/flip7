@@ -43,8 +43,12 @@ const ActionIcon = (props: { kind: Card["kind"] }) => (
   </Switch>
 );
 
+/** How a card is drawn: full size in a hand, or shrunk everywhere smaller. */
+export type CardSize = "full" | "mini";
+
 export default function PlayingCard(props: {
   card: Card;
+  size?: CardSize;
   bust?: boolean;
   /** The card a bust card duplicates. */
   dupe?: boolean;
@@ -61,6 +65,7 @@ export default function PlayingCard(props: {
     "data-kind": props.card.kind,
     "data-number": props.card.kind === "number" ? props.card.value : undefined,
     "data-score-modifier": isScoreModifierCard(props.card) ? "" : undefined,
+    "data-size": props.size ?? "full",
   });
 
   const face = () => (

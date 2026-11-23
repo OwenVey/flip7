@@ -110,6 +110,32 @@ describe("<Table />", () => {
     expect(screen.getByText("Ben hits…")).toBeVisible();
   });
 
+  it("sets held action cards beside the deck, not in the seat", () => {
+    render(() => (
+      <Table
+        room={room({
+          flips: [{ remaining: 1, targetId: "b" }],
+          held: [{ card: { id: 9, kind: "freeze" }, ownerId: "b" }],
+        })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const pile = screen.getByRole("list", {
+      name: "Held for Ben until the Flip Three ends",
+    });
+
+    expect(pile.closest("[data-action-bar]")).not.toBeNull();
+    expect(within(pile).getAllByRole("listitem")).toHaveLength(1);
+    expect(
+      within(screen.getByRole("article", { name: /^Ben,/u })).queryByText(
+        /held/iu
+      )
+    ).toBeNull();
+  });
+
   it("lets the host lock the room mid-game from the header, without the winning score", async () => {
     const send = vi.fn<RoomConnection["send"]>();
     render(() => (

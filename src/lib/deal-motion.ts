@@ -1,9 +1,15 @@
 import { leavesTable } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
 import type { DealMotion } from "./deal-playback";
-import { discardCards, flyCard, riffleDeck, sweepCards } from "./fly-card";
+import {
+  absorbCard,
+  discardCards,
+  flyCard,
+  riffleDeck,
+  sweepCards,
+} from "./fly-card";
 import { motionAllowed } from "./motion";
-import { bump } from "./table-motion";
+import { bump, pop } from "./table-motion";
 
 const cardAt = (cardId: number) => ` [data-card-id="${cardId}"]`;
 
@@ -11,7 +17,7 @@ const handCard = (root: Element, playerId: string, cardId: number | null) =>
   cardId === null
     ? null
     : root.querySelector(
-        `[data-seat="${playerId}"] :is(.hand, .seat-extras)${cardAt(cardId)}`
+        `[data-seat="${playerId}"] :is(.hand, .seat-extras, .flip-run-card)${cardAt(cardId)}`
       );
 
 const destination = (root: Element, step: DealStep) => {
@@ -22,9 +28,7 @@ const destination = (root: Element, step: DealStep) => {
   }
 
   if (to.kind === "held") {
-    return root.querySelector(
-      `[data-seat="${to.playerId}"] [data-held]${cardAt(step.card.id)}`
-    );
+    return root.querySelector(`[data-held]${cardAt(step.card.id)}`);
   }
 
   return handCard(root, to.playerId, step.card.id);
@@ -48,11 +52,14 @@ export const createDealMotion: (
   allowed: () => "animate" in Element.prototype && motionAllowed(),
   captureFlight: (step, duration) => {
     const root = table();
-    const from = root && origin(root, step)?.getBoundingClientRect();
+    const start = root ? origin(root, step) : null;
+    const discarded = leavesTable(step.to) && step.to.kind !== "played";
 
-    if (!from || (step.from === "held" && leavesTable(step.to))) {
+    if (!(root && start) || (step.from === "held" && discarded)) {
       return null;
     }
+
+    const from = start.getBoundingClientRect();
 
     return async (signal) => {
       const to = destination(root, step);
@@ -92,6 +99,17 @@ export const createDealMotion: (
 
     if (step.from === "choice" && step.to.kind !== "choice") {
       bump(root.querySelector(`[data-seat="${step.to.playerId}"]`));
+    }
+
+    if (step.to.kind === "played") {
+      const card = handCard(root, step.to.playerId, step.card.id);
+
+      if (card) {
+        await absorbCard(card, discardDuration, signal);
+        pop(card.closest(".flip-run") ?? undefined, 1.12);
+      }
+
+      return;
     }
 
     if (!leavesTable(step.to)) {

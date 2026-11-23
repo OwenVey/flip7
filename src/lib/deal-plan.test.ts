@@ -211,6 +211,22 @@ describe(dealFrame, () => {
     expect(busting.log).toStrictEqual(before.log);
   });
 
+  it("keeps a played Flip Three out of the hand, so the seat's row doesn't shift", () => {
+    const state = setup(["a", "b"], [num(5), num(3)]);
+    rig(state, [flipThree(), num(1), num(2), num(4)]);
+    hit(state, "a", random);
+    const before = view(state);
+    choose(state, "a", "b", random);
+    const after = view(state);
+    const steps = planDeal(before, after);
+
+    expect(steps[0]?.to).toStrictEqual({ kind: "played", playerId: "b" });
+    expect(dealFrame(before, after, steps, 1).players[1]?.hand).toStrictEqual(
+      before.players[1]?.hand
+    );
+    expect(dealFrame(before, after, steps, 1).choice).toBeNull();
+  });
+
   it("clears the last round's hands when a new round is dealt", () => {
     const state = setup(["a", "b"], [num(5), num(3)]);
     state.phase = "roundOver";

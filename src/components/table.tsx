@@ -33,6 +33,7 @@ import type { AvailableMoves } from "../game/moves";
 import type { PlayerView, RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
+import { motionAllowed } from "../lib/motion";
 import type { RoomConnection } from "../lib/room-connection";
 import { rankPlayers } from "../lib/standings";
 import { passDealerChip, pop, slideRows } from "../lib/table-motion";
@@ -157,10 +158,56 @@ const sameHeldCards = (a: HeldCard[], b: HeldCard[]) =>
 const sameCards = <T extends { id: number }>(a: T[], b: T[]) =>
   a.length === b.length && a.every((card, index) => card.id === b[index]?.id);
 
-const FlipTracker = (props: { progress: FlipProgress }) => (
-  <span class="flip-run" data-waiting={props.progress.waiting ? "" : undefined}>
+const FLIP_EXIT_MS = 220;
+
+interface ShownFlip {
+  progress: FlipProgress;
+  leaving: boolean;
+}
+
+const createShownFlip = (flip: () => FlipProgress | null) => {
+  const [shown, setShown] = createSignal<ShownFlip | null>((previous) => {
+    const progress = flip();
+
+    if (progress) {
+      return { leaving: false, progress };
+    }
+
+    return previous && motionAllowed()
+      ? { leaving: true, progress: previous.progress }
+      : null;
+  });
+
+  const clearAfterExit = () => {
+    const timer = setTimeout(() => {
+      setShown(null);
+    }, FLIP_EXIT_MS);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  };
+
+  createEffect(
+    () => shown()?.leaving === true,
+    (leaving) => (leaving ? clearAfterExit() : undefined)
+  );
+
+  return shown;
+};
+
+const FlipTracker = (props: {
+  progress: FlipProgress;
+  leaving: boolean;
+  card: Card | null;
+}) => (
+  <span
+    class="flip-run"
+    data-waiting={props.progress.waiting ? "" : undefined}
+    data-leaving={props.leaving ? "" : undefined}
+  >
     <PlayingCardsFan size={12} aria-hidden="true" />
-    Flip Three
+    <span class="flip-run-label">Flip Three</span>
     <span class="flip-pips" aria-hidden="true">
       <Repeat count={props.progress.total}>
         {(index) => (
@@ -179,6 +226,13 @@ const FlipTracker = (props: { progress: FlipProgress }) => (
     <span class="sr-only">
       {`, ${props.progress.flipped} of ${props.progress.total} flipped`}
     </span>
+    <Show when={props.card}>
+      {(card) => (
+        <ul class="flip-run-card" aria-hidden="true">
+          <PlayingCard card={card()} size="mini" />
+        </ul>
+      )}
+    </Show>
   </span>
 );
 
@@ -265,11 +319,6 @@ const RoundPlayer = (
       player: PlayerView;
     }
 ) => {
-  const held = createMemo(
-    () => props.room.held.filter((entry) => entry.ownerId === props.player.id),
-    { equals: sameHeldCards }
-  );
-
   const numberCards = createMemo(
     () => props.player.hand.filter((card) => card.kind === "number"),
     { equals: sameCards }
@@ -297,6 +346,19 @@ const RoundPlayer = (
   const flip = createMemo(
     () => flipProgress(props.room, props.dealStep, props.player.id),
     { equals: sameProgress }
+  );
+
+  const shownFlip = createShownFlip(flip);
+
+  const playedCard = createMemo(
+    () => {
+      const step = props.dealStep;
+
+      return step?.to.kind === "played" && step.to.playerId === props.player.id
+        ? step.card
+        : null;
+    },
+    { equals: (a, b) => a?.id === b?.id }
   );
 
   const isDealer = () => props.room.dealerId === props.player.id;
@@ -449,6 +511,15 @@ const RoundPlayer = (
           </Show>
         </div>
         <div class="seat-meta">
+          <Show when={shownFlip()}>
+            {(shown) => (
+              <FlipTracker
+                progress={shown().progress}
+                leaving={shown().leaving}
+                card={playedCard()}
+              />
+            )}
+          </Show>
           <Show when={hasDecision()}>
             <span class="badge" data-tone="turn">
               {decisionLabel()}
@@ -474,16 +545,13 @@ const RoundPlayer = (
                 : "Plays next round"}
             </span>
           </Show>
-          <Show when={flip()}>
-            {(progress) => <FlipTracker progress={progress()} />}
-          </Show>
         </div>
         <ul
           class="seat-extras"
           aria-label={`${props.player.name}'s modifier and Second Chance cards`}
         >
           <For each={extraCards()} keyed={(card) => card.id}>
-            {(card) => <PlayingCard card={card()} />}
+            {(card) => <PlayingCard card={card()} size="mini" />}
           </For>
         </ul>
         <Show
@@ -520,19 +588,6 @@ const RoundPlayer = (
           </span>
         </Show>
       </div>
-      <Show when={held().length > 0}>
-        <div class="held" data-held="">
-          <p class="held-label">Waiting to play</p>
-          <ul
-            class="held-cards"
-            aria-label={`${props.player.name}'s held action cards`}
-          >
-            <For each={held()} keyed={(entry) => entry.card.id}>
-              {(entry) => <PlayingCard card={entry().card} />}
-            </For>
-          </ul>
-        </div>
-      </Show>
       <Show when={isFrozen()}>
         <Snowflake class="frost-burst" aria-hidden="true" />
       </Show>
@@ -591,7 +646,7 @@ const ActionCardPrompt = (
 ) => (
   <>
     <ul class="dealt-action-card" data-choice-card="" aria-hidden="true">
-      <PlayingCard card={props.choice.card} />
+      <PlayingCard card={props.choice.card} size="mini" />
     </ul>
     <Show
       when={props.dealingLabel}
@@ -823,6 +878,33 @@ const deckStack = (count: number) => {
 
 const automaticTurnLabel = (canStay: boolean) =>
   `The game will ${canStay ? "Stay" : "Hit"} for them soon.`;
+
+const HeldPile = (props: { room: RoomView }) => {
+  const held = createMemo(() => props.room.held, { equals: sameHeldCards });
+
+  const owners = () =>
+    [...new Set(held().map((entry) => entry.ownerId))]
+      .map((id) => nameOf(props.room, id))
+      .join(" and ");
+
+  return (
+    <Show when={held().length > 0}>
+      <div class="held-pile" data-held="">
+        <span class="held-pile-label" aria-hidden="true">
+          Held
+        </span>
+        <ul
+          class="held-pile-cards"
+          aria-label={`Held for ${owners()} until the Flip Three ends`}
+        >
+          <For each={held()} keyed={(entry) => entry.card.id}>
+            {(entry) => <PlayingCard card={entry().card} size="mini" />}
+          </For>
+        </ul>
+      </div>
+    </Show>
+  );
+};
 
 const Deck = (props: { count: number }) => {
   let counter: HTMLSpanElement | undefined;
@@ -1081,6 +1163,7 @@ const ActionBar = (
               <Trophy />
             </span>
           </Show>
+          <HeldPile room={props.room} />
           <Switch>
             <Match when={props.room.phase === "gameOver"}>
               <p class="headline" data-winner-headline="">
