@@ -25,7 +25,7 @@ const CardRule = (props: ParentProps<{ cards?: Card[] }>) => (
   <li class="rules-card-rule">
     <ul class="rules-cards" aria-hidden="true">
       <For each={props.cards ?? []}>
-        {(card) => <PlayingCard card={card} />}
+        {(card) => <PlayingCard card={card} size="mini" />}
       </For>
     </ul>
     <p>{props.children}</p>

@@ -284,11 +284,11 @@ const arrive = (
     frame.choice = null;
   }
 
-  if (step.from === "held" && !leavesTable(step.to)) {
+  const { to } = step;
+
+  if (step.from === "held" && (!leavesTable(to) || to.kind === "played")) {
     frame.held = frame.held.filter((entry) => entry.card.id !== step.card.id);
   }
-
-  const { to } = step;
 
   if (to.kind === "choice") {
     frame.choice = current.choice;
@@ -302,7 +302,11 @@ const arrive = (
     frame.held = [...frame.held, { card: step.card, ownerId: to.playerId }];
   } else if (seat && to.kind === "bust") {
     seat.bustCard = step.card;
-  } else if (seat && (to.kind === "hand" || step.from !== "held")) {
+  } else if (
+    seat &&
+    to.kind !== "played" &&
+    (to.kind === "hand" || step.from !== "held")
+  ) {
     seat.hand = [...seat.hand, step.card];
   }
 };

@@ -1610,8 +1610,10 @@ main {
 }
 
 .hero-cards {
+  --card-w: min(21cqi, clamp(2.75rem, 11vw, 6.375rem));
   position: relative;
   isolation: isolate;
+  container-type: inline-size;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1640,7 +1642,6 @@ main {
   & .card[data-kind] {
     --fan: 0deg;
     --drop: 0rem;
-    width: min(21%, clamp(2.75rem, 11vw, 6.375rem));
     transform: translateY(var(--drop)) rotate(var(--fan));
     transform-origin: 50% 110%;
     animation: none;
@@ -1668,14 +1669,6 @@ main {
   & .card:nth-child(5) {
     --fan: 24deg;
     --drop: 1.5vw;
-  }
-
-  & .card-label {
-    font-size: clamp(1.625rem, 4.75vw, 3.5rem);
-  }
-
-  & [data-kind="freeze"] .card-label {
-    font-size: clamp(0.43rem, 1.1vw, 0.85rem);
   }
 }
 
@@ -1829,17 +1822,8 @@ main {
     gap: 0.25rem;
   }
 
-  & .rules-cards .card {
-    width: 1.75rem;
-  }
-
-  & .rules-cards .card[data-kind] .card-label {
-    font-size: 1.125rem;
-  }
-
-  /* The stamp hangs off the card's bottom edge, so the duplicate 8 stays readable above it. */
-  & .rules-cards .card[data-bust]::after {
-    inset: auto -0.3125rem -0.375rem;
+  & .rules-cards {
+    --card-w: 1.75rem;
   }
 
   /* The deck the next card comes from, a step apart from the hand. */
@@ -2729,6 +2713,17 @@ main {
     gap: 0.5rem 0.75rem;
     padding: 0.625rem 0.75rem;
 
+    /* On the narrowest phones the held pile drops its label and stacks its cards, leaving the prompt room. */
+    @media (max-width: 25rem) {
+      & .held-pile-label {
+        display: none;
+      }
+
+      & .held-pile-cards > .card + .card {
+        margin-inline-start: calc(var(--card-w) * -0.55);
+      }
+    }
+
     /* The message shares the deck's row; only the buttons take a row of their own. */
     & .headline {
       flex: 1 1 0;
@@ -2772,6 +2767,8 @@ main {
 .seat {
   position: relative;
   display: grid;
+  /* A crowded header gives way inside the seat instead of widening it. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.5rem;
   align-content: start;
   padding: 0.625rem 0.75rem 0.75rem;
@@ -3064,12 +3061,15 @@ main {
 }
 
 .seat-header {
+  container: seat-header / inline-size;
   display: flex;
-  gap: 0.5rem;
+  /* A header too full for one row moves its mini cards to a second, so nothing overlaps. */
+  flex-wrap: wrap;
+  gap: 0.375rem 0.5rem;
   align-items: center;
   justify-content: space-between;
   /* Same height with or without the host's Remove button. */
-  height: 2rem;
+  min-height: 2rem;
 }
 
 /* Name, then status, then the dealer chip and Remove, all on one row. */
@@ -3124,10 +3124,10 @@ main {
 }
 
 .flip-run {
+  position: relative;
   display: inline-flex;
   gap: 0.375rem;
   align-items: center;
-  margin-inline-start: auto;
   padding: 0 0.5rem;
   border: 1.5px solid var(--flip);
   border-radius: 999px;
@@ -3142,6 +3142,41 @@ main {
   &[data-waiting] {
     border-style: dashed;
   }
+}
+
+/*
+ * A narrow header makes room for a Flip Three first by dropping the turn badge,
+ * which the seat's ring and the action bar already show, then by dropping the
+ * badge's words. The words stay for screen readers.
+ */
+@container seat-header (width < 25rem) {
+  .seat-meta:has(> .flip-run) > [data-tone="turn"] {
+    display: none;
+  }
+}
+
+@container seat-header (width < 19rem) {
+  .flip-run-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/*
+ * A played Flip Three lands on the badge's icon and sinks into it, so the
+ * seat's row never makes room for it and nothing beside it shifts.
+ */
+.flip-run-card {
+  position: absolute;
+  top: 50%;
+  left: calc(0.5rem + 7.5px);
+  z-index: 1;
+  translate: -50% -50%;
+  pointer-events: none;
 }
 
 .flip-pips {
@@ -3168,51 +3203,34 @@ main {
   }
 }
 
-/* Action cards set aside during a Flip Three, played once it ends. */
-.held {
+/* Action cards set aside during a Flip Three, beside the deck until its run ends. */
+.held-pile {
   display: flex;
-  gap: 0.75rem;
+  flex: none;
+  gap: 0.375rem;
   align-items: center;
-  padding: 0.375rem 0.625rem;
+  /* 1.5rem cards are 2.1rem tall; with this padding and border it fits the bar's 2.75rem row. */
+  padding: 0.1875rem 0.3125rem 0.1875rem 0.5rem;
   border: 1.5px dashed var(--flip);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--flip-soft);
 }
 
-.held-label {
-  margin: 0;
+.held-pile-label {
   color: var(--flip-ink);
-  font-size: 0.75rem;
+  font-size: 0.625rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-.held-cards {
+.held-pile-cards {
+  --card-w: 1.5rem;
   display: flex;
-  gap: 0.375rem;
-  margin: 0 0 0 auto;
+  gap: 0.25rem;
+  margin: 0;
   padding: 0;
   list-style: none;
-
-  & .card {
-    width: 2.25rem;
-    padding: 0.25rem;
-    border-radius: var(--radius-sm);
-
-    &::before {
-      inset: 0.18rem;
-    }
-  }
-
-  & .card-label {
-    display: none;
-  }
-
-  & .card-icon {
-    width: 1.125rem;
-    height: 1.125rem;
-  }
 }
 
 .status-pill {
@@ -3275,13 +3293,7 @@ main {
   box-shadow: inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.45);
   list-style: none;
 
-  & .card {
-    width: var(--hand-card);
-  }
-
-  & [data-kind="number"] .card-label {
-    font-size: 1.75rem;
-  }
+  --card-w: var(--hand-card);
 }
 
 /*
@@ -3289,7 +3301,8 @@ main {
  * header, so the mat holds only Number cards and shows the run toward Flip 7.
  * The rules reuse them beside the matching rule.
  */
-:is(.seat-extras, .rules-cards) {
+:is(.seat-extras, .rules-cards, .flip-run-card) {
+  --card-w: 1.375rem;
   display: flex;
   flex: none;
   gap: 0.1875rem;
@@ -3302,105 +3315,9 @@ main {
     display: none;
   }
 
-  /*
-   * Mini cards echo the Number cards without their cream face or shadow: a
-   * printed inner rule and faint sunburst on one color, so the label keeps
-   * the whole card. 1.375rem wide is 1.925rem tall, inside the 2rem header.
-   */
-  & .card {
-    --mini-color: var(--paper);
-    --mini-ink: var(--ink);
-    --mini-line: rgb(255 255 255 / 0.5);
-    --mini-ray: rgb(255 255 255 / 0.16);
-    grid-template-rows: 1fr;
-    grid-template-columns: minmax(0, 1fr);
-    width: 1.375rem;
-    padding: 0;
-    border: 1px solid rgb(38 36 81 / 0.6);
-    border-radius: 0.3125rem;
-    background: var(--mini-color);
-    box-shadow: none;
-  }
-
-  /* Doubled up to outrank the full-size face rules that come later. */
-  & .card[data-kind]::before {
-    inset: 2px;
-    border-radius: 0.1875rem;
-    background: repeating-conic-gradient(
-      from -6deg at 50% 50%,
-      var(--mini-ray) 0deg 12deg,
-      transparent 12deg 24deg
-    );
-    box-shadow: inset 0 0 0 1px var(--mini-line);
-  }
-
-  & .card-corner {
-    display: none;
-  }
-
   /* A small gap splits held action cards from the Score Modifiers after them. */
   & :not([data-score-modifier]) + [data-score-modifier] {
     margin-inline-start: 0.25rem;
-  }
-
-  /* Doubled up to outrank the full-size label rules that come later. */
-  & .card[data-kind] .card-label {
-    color: var(--mini-ink);
-    font-size: 0.875rem;
-    letter-spacing: -0.03em;
-    /* A one-step print offset, like the Number cards' stacked numerals. */
-    text-shadow: 1px 1px 0 var(--mini-print, rgb(255 255 255 / 0.55));
-  }
-
-  & [data-kind="bonus"] {
-    --mini-color: var(--modifier);
-  }
-
-  /* ×2 multiplies rather than adds, so it inverts: ink chip, orange numeral. */
-  & [data-kind="double"] {
-    --mini-color: var(--ink);
-    --mini-ink: var(--modifier);
-    --mini-line: color-mix(in srgb, var(--modifier) 55%, transparent);
-    --mini-ray: color-mix(in srgb, var(--modifier) 14%, transparent);
-    --mini-print: rgb(0 0 0 / 0.6);
-    border-color: var(--ink);
-  }
-
-  & [data-kind="secondChance"] {
-    --mini-color: var(--second-chance);
-    --mini-ink: #fff;
-    border-color: var(--second-chance-ink);
-  }
-
-  & [data-kind="flipThree"] {
-    --mini-color: var(--flip);
-    --mini-ink: var(--flip-ink);
-  }
-
-  & [data-kind="freeze"] {
-    --mini-color: var(--freeze);
-    --mini-ink: #fff;
-  }
-
-  /* Mini action cards show only their icon, so they stay the row's height. */
-  &
-    :is(
-      [data-kind="freeze"],
-      [data-kind="flipThree"],
-      [data-kind="secondChance"]
-    )
-    .card-label {
-    display: none;
-  }
-
-  & .card[data-kind] .card-icon {
-    width: 0.875rem;
-    height: 0.875rem;
-    color: var(--mini-ink);
-  }
-
-  & [data-kind="secondChance"] .card-icon {
-    fill: currentcolor;
   }
 }
 
@@ -3408,18 +3325,24 @@ main {
   --card-color: var(--paper);
   --card-panel: #fffaf0;
   --card-ink: var(--ink);
+  /*
+   * Every size inside a card scales with its width, which the row it sits in
+   * sets as --card-w. Its look comes from data-size, never from the row, so a
+   * copy of it looks the same anywhere.
+   */
+  --w: var(--card-w, 3.75rem);
   position: relative;
   isolation: isolate;
   display: grid;
   grid-template-rows: auto 1fr auto;
   /* Cards with a tooltip are tooltip triggers; drop the fixed height and gap ui-sdk gives triggers so they keep the 5:7 shape. */
   gap: 0;
-  width: 3.75rem;
+  width: var(--w);
   height: auto;
   aspect-ratio: 5 / 7;
-  padding: 0.45rem 0.475rem;
+  padding: calc(var(--w) * 0.1385) calc(var(--w) * 0.1462);
   border: 1px solid rgb(38 36 81 / 0.85);
-  border-radius: var(--radius-md);
+  border-radius: calc(var(--w) * 0.1538);
   background: var(--card-color);
   box-shadow:
     inset 0 0 0 1px rgb(255 255 255 / 0.55),
@@ -3431,8 +3354,8 @@ main {
   &::before {
     position: absolute;
     z-index: -1;
-    inset: 0.3rem;
-    border-radius: 0.25rem;
+    inset: calc(var(--w) * 0.0923);
+    border-radius: calc(var(--w) * 0.0769);
     background:
       radial-gradient(
         circle at 50% 50%,
@@ -3515,16 +3438,27 @@ main {
   &[data-score-modifier] {
     --card-color: var(--ink);
     --card-panel: var(--modifier);
+    --modifier-stripe: rgb(255 255 255 / 0.22);
+    --modifier-print: var(--paper);
 
     &::before {
       background:
         repeating-linear-gradient(
           45deg,
           transparent 0 5px,
-          rgb(255 255 255 / 0.22) 5px 7px
+          var(--modifier-stripe) 5px 7px
         ),
         var(--card-panel);
     }
+  }
+
+  /* ×2 multiplies rather than adds, so it inverts: orange frame, ink face, orange numeral. */
+  &[data-kind="double"] {
+    --card-color: var(--modifier);
+    --card-panel: var(--ink);
+    --card-ink: var(--modifier);
+    --modifier-stripe: color-mix(in srgb, var(--modifier) 16%, transparent);
+    --modifier-print: rgb(0 0 0 / 0.6);
   }
 
   &[data-kind="freeze"],
@@ -3575,13 +3509,13 @@ main {
     &::after {
       content: "Bust";
       position: absolute;
-      inset: auto -0.375rem 1.5rem;
+      inset: auto calc(var(--w) * -0.1154) calc(var(--w) * 0.4615);
       padding: 0.0625rem 0;
       border: 1.5px solid var(--ink);
       background: var(--danger);
       color: var(--paper);
       font-family: var(--font-display);
-      font-size: 0.625rem;
+      font-size: calc(var(--w) * 0.1923);
       text-align: center;
       transform: rotate(-8deg);
     }
@@ -3591,7 +3525,7 @@ main {
 .card-corner {
   color: var(--card-ink);
   font-family: var(--font-numeral);
-  font-size: 0.6875rem;
+  font-size: calc(var(--w) * 0.2115);
   font-weight: 900;
   line-height: 1;
 
@@ -3603,7 +3537,7 @@ main {
 
 .card-face {
   display: grid;
-  gap: 0.25rem;
+  gap: calc(var(--w) * 0.0769);
   align-content: center;
   place-items: center;
 }
@@ -3611,7 +3545,7 @@ main {
 .card-label {
   color: var(--card-ink);
   font-family: var(--font-numeral);
-  font-size: 2.125rem;
+  font-size: calc(var(--w) * 0.5385);
   font-weight: 900;
   line-height: 1;
   text-shadow:
@@ -3628,8 +3562,8 @@ main {
   }
 
   [data-score-modifier] & {
-    font-size: 1.75rem;
-    text-shadow: 2px 2px 0 var(--paper);
+    font-size: calc(var(--w) * 0.45);
+    text-shadow: 2px 2px 0 var(--modifier-print);
   }
 
   [data-kind="freeze"] &,
@@ -3640,7 +3574,7 @@ main {
     background: var(--card-color);
     color: #fff;
     font-family: var(--font-display);
-    font-size: 0.5rem;
+    font-size: calc(var(--w) * 0.1333);
     line-height: 1.15;
     text-align: center;
     text-shadow: 0 1px 0 rgb(0 0 0 / 0.35);
@@ -3648,9 +3582,67 @@ main {
 }
 
 .card-icon {
-  width: 1.625rem;
-  height: 1.625rem;
+  width: calc(var(--w) * 0.3);
+  height: calc(var(--w) * 0.3);
   color: color-mix(in srgb, var(--card-color) 70%, var(--ink));
+}
+
+/*
+ * Mini cards are the full card shrunk for a seat's header, a card waiting to
+ * be played, and the rules: the same colors and face, without the corner
+ * numbers or action captions. 1.375rem wide is 1.925rem tall, inside the 2rem
+ * header.
+ */
+.card[data-size="mini"] {
+  grid-template-rows: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  padding: calc(var(--w) * 0.11);
+  border-radius: calc(var(--w) * 0.2273);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.55),
+    0 1px 0 rgb(0 0 0 / 0.25);
+
+  &::before {
+    inset: calc(var(--w) * 0.09);
+    border-radius: calc(var(--w) * 0.1364);
+  }
+
+  & .card-corner {
+    display: none;
+  }
+
+  &:is(
+      [data-kind="freeze"],
+      [data-kind="flipThree"],
+      [data-kind="secondChance"]
+    )
+    .card-label {
+    display: none;
+  }
+
+  & .card-label {
+    font-size: calc(var(--w) * 0.6);
+    letter-spacing: -0.03em;
+    /* A one-step print offset; the full card's deeper stack would smear this small. */
+    text-shadow: 1px 1px 0 var(--modifier-print, var(--card-panel));
+  }
+
+  & .card-icon {
+    width: calc(var(--w) * 0.6);
+    height: calc(var(--w) * 0.6);
+  }
+
+  &[data-bust] {
+    box-shadow:
+      0 0 0 2px var(--danger),
+      0 0.25rem 0.5rem rgb(4 20 14 / 0.4);
+  }
+
+  /* The stamp hangs off the card's bottom edge, so the duplicate stays readable above it. */
+  &[data-bust]::after {
+    inset: auto calc(var(--w) * -0.1786) calc(var(--w) * -0.2143);
+    font-size: calc(var(--w) * 0.3571);
+  }
 }
 
 /* The face-down deck the dealer deals from, at the head of the action bar. */
@@ -3735,6 +3727,16 @@ main {
   visibility: hidden;
 }
 
+/* Mini cards keep to the right, even when they wrap below a crowded header. */
+.seat-header > .seat-extras {
+  margin-inline-start: auto;
+}
+
+/* A mini card already on the table when the page loads just sits in its row. */
+.seat-extras > .card:not([data-incoming], [data-flown]) {
+  animation: none;
+}
+
 /* Its flight already brought the card in, so it skips the drop-in animation. */
 .card:is([data-incoming], [data-flown]) {
   animation: none;
@@ -3767,8 +3769,8 @@ main {
   backface-visibility: hidden;
 }
 
+/* Drawn at its own --card-w, copied from the card it stands in for. */
 .flying-card-face {
-  width: 100%;
   margin: 0;
   list-style: none;
   animation: none;
@@ -4131,25 +4133,7 @@ main {
   margin-block: -0.5rem;
   padding: 0;
   list-style: none;
-
-  & .card {
-    width: 2.25rem;
-    padding: 0.25rem;
-    border-radius: var(--radius-sm);
-
-    &::before {
-      inset: 0.18rem;
-    }
-  }
-
-  & .card-label {
-    display: none;
-  }
-
-  & .card-icon {
-    width: 1.125rem;
-    height: 1.125rem;
-  }
+  --card-w: 2.25rem;
 }
 
 .connection-banner:not(:empty) {
@@ -4260,8 +4244,41 @@ main {
   }
 
   /* Status changes pop in, and Stayed stamps like a banked chip. */
-  .seat-meta > :is(.status-pill, .badge, .flip-run) {
+  .seat-meta > :is(.status-pill, .badge) {
     animation: pop-in 240ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  }
+
+  /* The badge fades as its run ends, rather than vanishing with the result. */
+  /*
+   * Fades in without growing, so a played card lands on its icon. One
+   * animation for its whole life: swapping it would replay the entrance.
+   */
+  .seat-meta > .flip-run {
+    animation: fade-in 200ms ease-out both;
+  }
+
+  /*
+   * A card joining a seat's mini row opens its slot from nothing, so the cards
+   * beside it slide aside. The row hugs the right, so the newest card already
+   * sits where it ends up and its flight lands there. Only flown-in cards do
+   * this; cards already on the table when the page loads stay put.
+   */
+  .seat-extras > .card:is([data-incoming], [data-flown]) {
+    --slot-gap: 0.1875rem;
+    animation: slot-open 260ms cubic-bezier(0.25, 0.8, 0.3, 1) backwards;
+  }
+
+  .seat-extras > .card:first-child:is([data-incoming], [data-flown]) {
+    --slot-gap: 0rem;
+  }
+
+  /* Fades rather than grows, so a card flying in lands where it will rest. */
+  .held-pile {
+    animation: fade-in 200ms ease-out both;
+  }
+
+  .seat-meta > .flip-run[data-leaving] {
+    animation: pop-out var(--flip-exit) cubic-bezier(0.23, 1, 0.32, 1) both;
   }
 
   .seat[data-status="stayed"] .status-pill,
@@ -4494,6 +4511,25 @@ main {
   from {
     opacity: 0;
     scale: 0.6;
+  }
+}
+
+@keyframes slot-open {
+  from {
+    margin-inline-start: calc(-1 * (var(--w) + var(--slot-gap)));
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    scale: 0.85;
   }
 }
 

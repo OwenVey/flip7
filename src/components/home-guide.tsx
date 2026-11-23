@@ -20,6 +20,7 @@ const Step = (
         {(card, index) => (
           <PlayingCard
             card={card}
+            size="mini"
             bust={props.bust === true && index() === props.cards.length - 1}
           />
         )}

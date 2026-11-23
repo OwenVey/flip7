@@ -30,38 +30,6 @@ const centre = (rect: DOMRect) => ({
   y: rect.top + rect.height / 2,
 });
 
-const CONTEXT_STYLES = [
-  "display",
-  "font-size",
-  "width",
-  "height",
-  "padding",
-  "border-radius",
-  "filter",
-] as const;
-
-const copyContextStyles = (source: Element, copy: Element) => {
-  if (!(copy instanceof HTMLElement || copy instanceof SVGElement)) {
-    return;
-  }
-
-  const computed = getComputedStyle(source);
-
-  for (const property of CONTEXT_STYLES) {
-    copy.style.setProperty(property, computed.getPropertyValue(property));
-  }
-};
-
-const matchPlacement = (source: Element, copy: Element) => {
-  copyContextStyles(source, copy);
-  const sources = source.querySelectorAll("*");
-  const copies = copy.querySelectorAll("*");
-
-  for (const [index, element] of sources.entries()) {
-    copyContextStyles(element, copies.item(index));
-  }
-};
-
 const cardFace = (card: HTMLElement) => {
   const face = card.cloneNode(true);
 
@@ -71,9 +39,7 @@ const cardFace = (card: HTMLElement) => {
 
   delete face.dataset.incoming;
   delete face.dataset.flown;
-  matchPlacement(card, face);
-  face.style.removeProperty("width");
-  face.style.removeProperty("height");
+  face.style.setProperty("--card-w", `${card.offsetWidth}px`);
   face.classList.add("flying-card-face");
 
   return face;
@@ -279,6 +245,61 @@ export const flyCard = async ({
   }
 };
 
+const PX = /px$/u;
+const SCORE_MODIFIER = "[data-score-modifier]";
+
+const pixels = (value: string) => Number(value.replace(PX, "")) || 0;
+
+const startMargin = (element: Element | null) =>
+  element ? pixels(getComputedStyle(element).marginInlineStart) : 0;
+
+const separatorChange = (card: Element) => {
+  const previous = card.previousElementSibling;
+  const next = card.nextElementSibling;
+  const nextMargin = startMargin(next);
+
+  const separatedAfter =
+    next?.matches(SCORE_MODIFIER) === true &&
+    previous !== null &&
+    !previous.matches(SCORE_MODIFIER);
+
+  const marginAfter = separatedAfter ? nextMargin || startMargin(card) : 0;
+
+  return nextMargin - marginAfter;
+};
+
+const closeSlot = (card: Element, duration: number) => {
+  const row = card.parentElement;
+
+  if (
+    !(
+      card instanceof HTMLElement &&
+      row?.classList.contains("seat-extras") === true
+    )
+  ) {
+    return null;
+  }
+
+  const gap = pixels(getComputedStyle(row).columnGap);
+  const before = card.previousElementSibling !== null;
+  const after = card.nextElementSibling !== null;
+  const side = before || !after ? "marginInlineStart" : "marginInlineEnd";
+
+  const width =
+    card.offsetWidth + (before || after ? gap : 0) + separatorChange(card);
+
+  const from = getComputedStyle(card)[side];
+
+  return card.animate(
+    [
+      { [side]: from },
+      { offset: 0.3, [side]: from },
+      { [side]: `${-width}px` },
+    ],
+    { duration, easing: "cubic-bezier(0.45, 0, 0.25, 1)", fill: "forwards" }
+  );
+};
+
 /** Lifts cards off the table and fades them out, as when Second Chance is used. */
 export const discardCards = async (
   cards: Element[],
@@ -289,24 +310,46 @@ export const discardCards = async (
     return;
   }
 
+  const lifts = cards.map((card) =>
+    card.animate(
+      [
+        { opacity: 1, transform: "none" },
+        {
+          offset: 0.35,
+          opacity: 1,
+          transform: "translateY(-0.5rem) rotate(6deg)",
+        },
+        {
+          opacity: 0,
+          transform: "translateY(-1.25rem) rotate(-10deg) scale(0.85)",
+        },
+      ],
+      { duration, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "forwards" }
+    )
+  );
+
+  const closes = cards.flatMap((card) => closeSlot(card, duration) ?? []);
+
+  await settle([...lifts, ...closes], duration, signal);
+};
+
+/** Shrinks a card into the badge it sits on, as when a Flip Three is played. */
+export const absorbCard = async (
+  card: Element,
+  duration: number,
+  signal: AbortSignal
+) => {
   await settle(
-    cards.map((card) =>
+    [
       card.animate(
         [
-          { opacity: 1, transform: "none" },
-          {
-            offset: 0.35,
-            opacity: 1,
-            transform: "translateY(-0.5rem) rotate(6deg)",
-          },
-          {
-            opacity: 0,
-            transform: "translateY(-1.25rem) rotate(-10deg) scale(0.85)",
-          },
+          { opacity: 1, scale: "1" },
+          { offset: 0.4, opacity: 1, scale: "0.8" },
+          { opacity: 0, scale: "0.35" },
         ],
         { duration, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "forwards" }
-      )
-    ),
+      ),
+    ],
     duration,
     signal
   );
