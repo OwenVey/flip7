@@ -4,6 +4,7 @@ import { makeObjectStorage, makePersisted } from "@solid-primitives/storage";
 import { PartySocket } from "partysocket";
 import {
   createEffect,
+  createMemo,
   createSignal,
   getOwner,
   onSettled,
@@ -180,10 +181,12 @@ export const createRoomConnection = (code: string) => {
       client.setOnline(isOnline);
     });
     const visible = usePageVisibility();
+    // WARNING: effects re-run on every state change, and resume() changes state, so only an actual return may resume.
+    const back = createMemo(() => state().online && visible());
     createEffect(
-      () => state().online && visible(),
-      (back) => {
-        if (back) {
+      () => back(),
+      (isBack) => {
+        if (isBack) {
           client.resume();
         }
       }
@@ -217,6 +220,7 @@ export const createRoomConnection = (code: string) => {
     online: () => state().online,
     playerId: () => state().playerId,
     room: () => state().room,
+    retry: client.retry,
     savedAvatar,
     savedName,
     send: client.send,

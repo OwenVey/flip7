@@ -376,6 +376,12 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       }
     },
 
+    retry: () => {
+      if (!stopped) {
+        startOver();
+      }
+    },
+
     resume: () => {
       if (!stopped && state.status === "reconnecting") {
         startOver();
