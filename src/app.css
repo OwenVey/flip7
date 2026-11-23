@@ -3200,7 +3200,8 @@ main {
   flex: none;
   gap: 0.375rem;
   align-items: center;
-  padding: 0.25rem 0.375rem 0.25rem 0.5rem;
+  /* 1.5rem cards are 2.1rem tall; with this padding and border it fits the bar's 2.75rem row. */
+  padding: 0.1875rem 0.3125rem 0.1875rem 0.5rem;
   border: 1.5px dashed var(--flip);
   border-radius: var(--radius-md);
   background: var(--flip-soft);
@@ -3215,7 +3216,7 @@ main {
 }
 
 .held-pile-cards {
-  --card-w: 1.75rem;
+  --card-w: 1.5rem;
   display: flex;
   gap: 0.25rem;
   margin: 0;
