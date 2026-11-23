@@ -22,6 +22,7 @@ import JoinForm from "../../components/join-form";
 import Lobby from "../../components/lobby";
 import PageMeta from "../../components/page-meta";
 import RoomConnecting from "../../components/room-connecting";
+import RoomNotice from "../../components/room-notice";
 import RulesDialog from "../../components/rules-dialog";
 import SiteNav from "../../components/site-nav";
 import SoundControls from "../../components/sound-controls";
@@ -218,24 +219,14 @@ const Room = (props: { code: string }) => {
           }
         >
           <Match when={connection.status() === "missing"}>
-            <section class="panel">
-              <h1>Room {props.code} doesn't exist</h1>
-              <p class="muted">
-                Check the code, or start a new room from the home page.
-              </p>
-              <a class="link" href={paths()}>
-                Back to home
-              </a>
-            </section>
+            <RoomNotice title="No table here" code={props.code} card="empty">
+              Check the code and try again.
+            </RoomNotice>
           </Match>
           <Match when={connection.status() === "removed"}>
-            <section class="panel">
-              <h1>You're out of room {props.code}</h1>
-              <p class="muted">You left, or the host removed you.</p>
-              <a class="link" href={paths()}>
-                Back to home
-              </a>
-            </section>
+            <RoomNotice title="Out of the room" code={props.code} card="deck">
+              You left, or the host removed you.
+            </RoomNotice>
           </Match>
           <Match when={connection.needsName() && connection.room() !== null}>
             <JoinForm
@@ -302,12 +293,9 @@ export default function RoomPage(props: RouteProps<"/room/:code">) {
           <PageMeta title="Room not found · Flip 7" path={paths()} noindex />
           <SiteNav />
           <main class="room-page">
-            <section class="panel">
-              <h1>That isn't a room code</h1>
-              <a class="link" href={paths()}>
-                Back to home
-              </a>
-            </section>
+            <RoomNotice title="Not a room code" card="empty">
+              Room codes are five letters.
+            </RoomNotice>
           </main>
         </>
       }

@@ -1449,16 +1449,20 @@ main {
  * Waits half a beat before showing, so a fast connection goes straight from the
  * felt to the table without a flash of loading text.
  */
-.connecting {
+/* Every full-page room status: connecting, removed, no such room. */
+.room-status {
   display: grid;
   justify-items: center;
   padding-block: clamp(3rem, 14vh, 8rem) 3rem;
   text-align: center;
+}
+
+.room-status[data-delayed] {
   animation: scene-in 240ms ease-out 400ms both;
 }
 
 /* The deck sits on the panel's top edge, as if set down on the card. */
-.connecting-deck {
+.room-status-art {
   position: relative;
   z-index: 1;
   display: grid;
@@ -1484,7 +1488,7 @@ main {
 }
 
 /* The lobby's invite card in miniature: gold-ruled title, the code, then a line of help. */
-.connecting-panel {
+.room-status-panel {
   justify-items: center;
   width: min(22rem, 100%);
   padding-block-start: calc(2.75rem + 0.75rem);
@@ -1499,6 +1503,28 @@ main {
   & > .room-code {
     font-size: clamp(2rem, 9vw, 3rem);
   }
+}
+
+.room-status-art {
+  /* No table: a dashed slot where the deck would be, solid enough to cover the panel's edge. */
+  & .card-back[data-empty] {
+    border-width: 2px;
+    border-color: color-mix(in oklab, var(--ink-soft) 60%, var(--paper));
+    background: var(--paper-deep);
+  }
+}
+
+.room-status-panel {
+  & > [data-slot="button"] {
+    margin-block-start: 0.25rem;
+    text-decoration: none;
+  }
+}
+
+.room-notice-message {
+  max-width: 30ch;
+  margin: 0;
+  text-wrap: pretty;
 }
 
 /* The dots hang off the end of the words, so the words stay centred and still as the dots fill in. */
@@ -1525,14 +1551,14 @@ main {
     animation: dots-fill 1.6s steps(4, jump-none) infinite;
   }
 
-  .connecting-deck .card-back[data-dealt] {
+  .room-status-art .card-back[data-dealt] {
     animation: deal-loop 1.6s cubic-bezier(0.3, 0.7, 0.3, 1) 400ms infinite;
   }
 }
 
 /* Without motion, the deck breathes instead of dealing. */
 @media (prefers-reduced-motion: reduce) {
-  .connecting-deck {
+  .room-status[data-delayed] .room-status-art {
     animation: deck-breathe 2s ease-in-out infinite alternate;
   }
 
@@ -4394,7 +4420,7 @@ main {
 @media (prefers-reduced-motion: no-preference) {
   .table,
   .lobby-page,
-  .room-page > .panel {
+  .room-status:not([data-delayed]) {
     animation: scene-in 320ms ease-out;
   }
 
