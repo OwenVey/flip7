@@ -848,6 +848,14 @@ button.room-code {
     white-space: nowrap;
   }
 
+  /* Host is a role, not you: a light pill with a crown, so it never reads as the gold You badge. */
+  &[data-tone="host"] {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    background: var(--paper);
+  }
+
   &[data-tone="winner"] {
     display: inline-flex;
     gap: 0.25rem;

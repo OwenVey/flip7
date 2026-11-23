@@ -1,4 +1,5 @@
 import BotPlus from "@lucide/solid/icons/bot-plus";
+import Crown from "@lucide/solid/icons/crown";
 import Lock from "@lucide/solid/icons/lock";
 import Play from "@lucide/solid/icons/play";
 import UserPlus from "@lucide/solid/icons/user-plus";
@@ -232,12 +233,15 @@ export default function Lobby(props: {
                   data-offline={player().connected ? undefined : ""}
                 >
                   <PlayerAvatar player={player()} />
-                  <span class="roster-name">
-                    {player().name}
-                    {player().id === props.playerId ? " (you)" : ""}
-                  </span>
+                  <span class="roster-name">{player().name}</span>
+                  <Show when={player().id === props.playerId}>
+                    <span class="badge">You</span>
+                  </Show>
                   <Show when={player().id === props.room.hostId}>
-                    <span class="badge">Host</span>
+                    <span class="badge" data-tone="host">
+                      <Crown size={12} aria-hidden="true" />
+                      Host
+                    </span>
                   </Show>
                   <Show when={!player().connected}>
                     <OfflineBadge />
