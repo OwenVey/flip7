@@ -1014,6 +1014,20 @@ button.room-code {
   padding: var(--dialog-inset);
 }
 
+/* Dialog actions sit on the right; on phones they split the full width equally. */
+.alert-dialog-body > [data-slot="row"] {
+  justify-content: flex-end;
+
+  @media (max-width: 40rem) {
+    flex-wrap: nowrap;
+
+    & > * {
+      flex: 1 1 0;
+      min-inline-size: 0;
+    }
+  }
+}
+
 .alert-dialog-copy {
   display: grid;
   gap: 0.5rem;
