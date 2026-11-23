@@ -299,7 +299,6 @@ const RoundPlayer = (
 
   const isDealer = () => props.room.dealerId === props.player.id;
   const isMe = () => props.player.id === props.playerId;
-  const canKick = () => props.moves.host.kick.includes(props.player.id);
 
   const hasDecision = () => props.moves.waitingOn?.playerId === props.player.id;
 
@@ -481,16 +480,6 @@ const RoundPlayer = (
             {(card) => <PlayingCard card={card()} />}
           </For>
         </ul>
-        <Show when={canKick()}>
-          <RemovePlayer
-            bot={props.player.bot}
-            disabled={props.actionsDisabled}
-            name={props.player.name}
-            onRemove={() => {
-              void props.send({ playerId: props.player.id, type: "kick" });
-            }}
-          />
-        </Show>
       </header>
       <ul
         class="hand"
@@ -682,10 +671,11 @@ const LeaderboardRound = (props: {
 };
 
 const Leaderboard = (
-  props: Pick<TableProps, "room" | "playerId"> &
-    Pick<DealProps, "incomingCardId">
+  props: Pick<TableProps, "room" | "playerId" | "send" | "actionsDisabled"> &
+    Pick<DealProps, "incomingCardId"> & { kick: readonly string[] }
 ) => {
   const ranked = createMemo(() => rankPlayers(props.room.players));
+  const canKick = () => props.kick.length > 0;
 
   let body: HTMLTableSectionElement | undefined;
   let rowTops = new Map<string, number>();
@@ -708,6 +698,11 @@ const Leaderboard = (
           <th scope="col">Player</th>
           <th scope="col">Round</th>
           <th scope="col">Total</th>
+          <Show when={canKick()}>
+            <th scope="col">
+              <span class="sr-only">Remove</span>
+            </th>
+          </Show>
         </tr>
       </thead>
       <tbody
@@ -745,6 +740,23 @@ const Leaderboard = (
               >
                 <CountUp value={entry().player.score} />
               </td>
+              <Show when={canKick()}>
+                <td class="leaderboard-remove">
+                  <Show when={props.kick.includes(entry().player.id)}>
+                    <RemovePlayer
+                      bot={entry().player.bot}
+                      disabled={props.actionsDisabled}
+                      name={entry().player.name}
+                      onRemove={() => {
+                        void props.send({
+                          playerId: entry().player.id,
+                          type: "kick",
+                        });
+                      }}
+                    />
+                  </Show>
+                </td>
+              </Show>
             </tr>
           )}
         </For>
@@ -936,6 +948,15 @@ const ActionBar = (
     return turn !== null && turn.forId === undefined && props.dealing !== true;
   };
 
+  const actionBarLabel = () => {
+    const { choice } = props.moves;
+
+    const myChoice =
+      choice !== null && choice.forId === undefined && props.dealing !== true;
+
+    return myTurn() || myChoice ? "Your move" : "Game status";
+  };
+
   const dealingLabel = () => {
     const step = props.dealStep ?? null;
     const target = stepPlayerId(step);
@@ -989,7 +1010,7 @@ const ActionBar = (
     <section
       class="action-bar"
       data-action-bar=""
-      aria-label="Your move"
+      aria-label={actionBarLabel()}
       data-turn={myTurn() ? "" : undefined}
     >
       <ScrollFade viewportClass="action-bar-scroll">
@@ -1201,6 +1222,9 @@ export default function Table(
                   room={props.room}
                   playerId={props.playerId}
                   incomingCardId={props.incomingCardId}
+                  kick={moves().host.kick}
+                  send={props.send}
+                  actionsDisabled={props.actionsDisabled}
                 />
               </TableSheet>
             </Show>
@@ -1279,6 +1303,9 @@ export default function Table(
                   room={props.room}
                   playerId={props.playerId}
                   incomingCardId={props.incomingCardId}
+                  kick={moves().host.kick}
+                  send={props.send}
+                  actionsDisabled={props.actionsDisabled}
                 />
               </ScrollFade>
             </section>

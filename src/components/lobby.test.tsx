@@ -33,25 +33,47 @@ const addBotButton = () =>
 describe("<Lobby />", () => {
   afterEach(cleanup);
 
-  it("keeps the host's Add bot button mounted and disabled once the room fills", () => {
+  it("keeps the host's Add bot button mounted and focusable once the room fills", () => {
+    const send = vi.fn<RoomConnection["send"]>();
     const [room, setRoom] = createSignal<RoomView>(roomOf(MAX_PLAYERS - 1));
 
-    render(() => (
-      <Lobby
-        room={room()}
-        playerId="p0"
-        send={vi.fn<RoomConnection["send"]>()}
-      />
-    ));
+    render(() => <Lobby room={room()} playerId="p0" send={send} />);
     const button = addBotButton();
-    expect(button).toHaveTextContent(`${MAX_PLAYERS - 1} / ${MAX_PLAYERS}`);
-    expect(button).not.toBeDisabled();
+    expect(button).not.toHaveAttribute("aria-disabled");
 
     setRoom(roomOf(MAX_PLAYERS));
     flush();
     expect(addBotButton()).toBe(button);
     expect(button).toHaveTextContent("Table full");
-    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(button);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("keeps a bot's Remove focusable but ignores presses while actions are paused", () => {
+    const send = vi.fn<RoomConnection["send"]>();
+    const [paused, setPaused] = createSignal(true);
+    render(() => (
+      <Lobby
+        room={roomWithBot()}
+        playerId="p0"
+        send={send}
+        actionsDisabled={paused()}
+      />
+    ));
+    const [, bot] = screen.getAllByRole("button", { name: /^Remove/u });
+    expect(bot).toBeEnabled();
+    expect(bot).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(bot);
+    expect(send).not.toHaveBeenCalled();
+
+    setPaused(false);
+    flush();
+    fireEvent.click(bot);
+    expect(send).toHaveBeenCalledExactlyOnceWith({
+      playerId: "bot",
+      type: "kick",
+    });
   });
 
   it("shows one open seat until the room is full, then none", () => {

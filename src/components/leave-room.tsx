@@ -35,9 +35,13 @@ export default function LeaveRoom(props: {
       }}
     >
       <Tooltip
-        content="Leave room"
-        type="label"
-        compactOnly
+        content={
+          props.disabled === true
+            ? "You can leave after the deal"
+            : "Leave room"
+        }
+        type={props.disabled === true ? "description" : "label"}
+        compactOnly={props.disabled !== true}
         trigger={(hint) => (
           <AlertDialogTrigger
             {...hint}

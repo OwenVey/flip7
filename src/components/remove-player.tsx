@@ -46,9 +46,11 @@ export default function RemovePlayer(props: {
               class="remove-player"
               data-variant="quiet"
               data-size="sm"
-              disabled={props.disabled}
+              aria-disabled={props.disabled === true ? "true" : undefined}
               onClick={() => {
-                props.onRemove();
+                if (props.disabled !== true) {
+                  props.onRemove();
+                }
               }}
             />
           )}

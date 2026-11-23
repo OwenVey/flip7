@@ -2531,8 +2531,11 @@ main {
 }
 
 /* The tooltip labels the icon-only Remove button. */
-.seat-header {
+.leaderboard-remove {
+  width: 1%;
+
   & :is([data-slot="alert-dialog-trigger"]) {
+    --button-height: var(--control-height-sm);
     inline-size: var(--button-height);
     padding-inline: 0;
   }
@@ -4081,7 +4084,7 @@ main {
  * only once a round is scored.
  */
 @media (max-width: 40rem), (max-height: 30rem) {
-  :is(.page-header, .table-header, .seat-header)
+  :is(.page-header, .table-header)
     [data-slot="tooltip-content"][data-compact-only] {
     visibility: visible;
   }
@@ -4110,7 +4113,7 @@ main {
     }
   }
 
-  :is(.page-header, .table-header, .seat-header)
+  :is(.page-header, .table-header)
     :is(
       [data-table-sheet-trigger],
       :is([data-slot="button"], [data-slot="alert-dialog-trigger"]):has(
@@ -4122,7 +4125,7 @@ main {
     padding-inline: 0;
   }
 
-  :is(.page-header, .table-header, .seat-header) .button-label {
+  :is(.page-header, .table-header) .button-label {
     position: absolute;
     width: 1px;
     height: 1px;

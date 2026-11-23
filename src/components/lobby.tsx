@@ -71,6 +71,9 @@ export default function Lobby(props: {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
   const isHost = () => props.room.hostId === props.playerId;
 
+  const addBotBlocked = () =>
+    props.actionsDisabled === true || !moves().host.addBot;
+
   const missing = () => Math.max(0, MIN_PLAYERS - props.room.players.length);
 
   const openSeats = () => (props.room.players.length < MAX_PLAYERS ? 1 : 0);
@@ -116,10 +119,12 @@ export default function Lobby(props: {
           <Show when={isHost()}>
             <div class="add-bot">
               <Button
-                disabled={
-                  props.actionsDisabled === true || !moves().host.addBot
-                }
-                onClick={async () => await props.send({ type: "addBot" })}
+                aria-disabled={addBotBlocked() ? "true" : undefined}
+                onClick={async () => {
+                  if (!addBotBlocked()) {
+                    await props.send({ type: "addBot" });
+                  }
+                }}
               >
                 <BotPlus size={16} aria-hidden="true" />
                 {moves().host.addBot ? "Add bot" : "Table full"}
