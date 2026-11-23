@@ -3734,12 +3734,17 @@ main {
       var(--shadow-print),
       var(--shadow-table);
 
-    /* Your own seat keeps its turn ring, which breathes toward the card's color. */
+    /*
+     * Your own seat keeps the turn ring's ink edge, but its band fades into
+     * the felt in step with the other seats. Blending toward gold instead
+     * would barely move for Flip Three, whose color is a deeper gold.
+     * Transparent would show the solid ink shadow beneath the band.
+     */
     &[data-turn] {
       --ring-color: color-mix(
         in srgb,
         var(--pick-color) var(--pick-pulse),
-        var(--gold)
+        var(--felt)
       );
       box-shadow: var(--shadow-ring);
     }
