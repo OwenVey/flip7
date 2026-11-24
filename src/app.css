@@ -2835,10 +2835,6 @@ main {
       );
     }
 
-    & .leaderboard-scroll {
-      scrollbar-gutter: stable;
-    }
-
     & .leaderboard {
       border-collapse: separate;
       border-spacing: 0;
@@ -2851,7 +2847,12 @@ main {
       }
     }
 
-    & .leaderboard-scroll[data-scroll-before] thead th::after {
+    /* The track starts under the sticky header row, beside the rows it scrolls. */
+    & .leaderboard-body > [data-slot="scroll-area-scrollbar"] {
+      margin-block-start: 2rem;
+    }
+
+    & .leaderboard-body:not([data-at-y-start]) thead th::after {
       position: absolute;
       inset: 100% 0 auto;
       height: 1.125rem;
@@ -4184,28 +4185,34 @@ main {
   grid-template-rows: minmax(0, 1fr);
   min-block-size: 0;
   min-width: 0;
+  /* Visible, so a card's scrollbar can sit out in the card's padding. */
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  font-size: inherit;
 
-  &:has(> [data-scroll-after])::after,
-  &:not(.leaderboard-body):has(> [data-scroll-before])::before {
+  &::before,
+  &::after {
     position: absolute;
     z-index: 2;
     pointer-events: none;
-    content: "";
   }
 
-  &:not([data-horizontal], .leaderboard-body):has(
-      > [data-scroll-before]
-    )::before {
-    inset: 0 0 auto;
-    height: min(1.5rem, 28%);
-    background: linear-gradient(var(--scroll-fade-stops));
-  }
+  &:not([data-horizontal]) {
+    &:not(.leaderboard-body, [data-at-y-start])::before {
+      inset: 0 0 auto;
+      height: min(1.5rem, 28%);
+      background: linear-gradient(var(--scroll-fade-stops));
+      content: "";
+    }
 
-  &:not([data-horizontal]):has(> [data-scroll-after])::after {
-    inset-inline: 0;
-    inset-block-end: 0;
-    height: min(1.5rem, 28%);
-    background: linear-gradient(to top, var(--scroll-fade-stops));
+    &:not([data-at-y-end])::after {
+      inset-inline: 0;
+      inset-block-end: 0;
+      height: min(1.5rem, 28%);
+      background: linear-gradient(to top, var(--scroll-fade-stops));
+      content: "";
+    }
   }
 
   &[data-horizontal] {
@@ -4217,53 +4224,93 @@ main {
       --scroll-end-direction: to right;
     }
 
-    &:has(> [data-scroll-before])::before,
-    &:has(> [data-scroll-after])::after {
+    &::before,
+    &::after {
       inset-block: 0;
       width: min(1.5rem, 28%);
     }
 
-    &:has(> [data-scroll-before])::before {
+    &:not([data-at-x-start])::before {
       inset-inline-start: 0;
       background: linear-gradient(
         var(--scroll-start-direction),
         var(--scroll-fade-stops)
       );
+      content: "";
     }
 
-    &:has(> [data-scroll-after])::after {
+    &:not([data-at-x-end])::after {
       inset-inline-end: 0;
       background: linear-gradient(
         var(--scroll-end-direction),
         var(--scroll-fade-stops)
       );
+      content: "";
     }
   }
 
-  &.log-body:has(> [data-scroll-after])::after {
+  &.log-body::after {
     inset-block-end: 1px;
+  }
+
+  & > [data-slot="scroll-area-scrollbar"] {
+    z-index: 3;
+
+    &[data-orientation="vertical"] {
+      width: 0.5rem;
+    }
+
+    &[data-orientation="horizontal"] {
+      height: 0.5rem;
+    }
+  }
+
+  & [data-slot="scroll-area-thumb"] {
+    background: color-mix(in srgb, var(--ink) 35%, transparent);
+
+    &:hover,
+    &[data-dragging] {
+      background: color-mix(in srgb, var(--ink) 60%, transparent);
+    }
   }
 }
 
-.scroll-fade-viewport {
-  min-block-size: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+/* In a card the vertical scrollbar sits in the card's padding, beside the content instead of over it. */
+.panel
+  .scroll-fades
+  > [data-slot="scroll-area-scrollbar"][data-orientation="vertical"] {
+  margin-inline-end: -0.75rem;
+}
 
-  [data-horizontal] > & {
-    overflow: auto hidden;
-  }
+.scroll-fade-viewport {
+  width: auto;
+  height: auto;
+  min-block-size: 0;
+  overscroll-behavior: contain;
+}
+
+/* Vertical lists never scroll sideways, even when pop-in overshoot pokes past the edge. */
+.scroll-fades:not([data-horizontal])
+  > .scroll-fade-viewport
+  > [data-slot="scroll-area-content"],
+.log-entries {
+  overflow-x: clip;
+}
+
+[data-slot="scroll-area-content"] {
+  padding: 0;
 }
 
 .log-scroll {
   max-height: min(22rem, 55svh);
-  /* Overlay scrollbars ignore the gutter, so keep timestamps clear of the thumb. */
+  /* Outside a card the thumb floats over the log, so keep timestamps clear of it. */
   padding-inline-end: 0.625rem;
-  /* The log only scrolls vertically; pop-in overshoot or a stray wide entry must never add a sideways scrollbar. */
-  overflow: hidden auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
   border-block-end: 1px solid var(--rule);
+
+  .panel & {
+    padding-inline-end: 0;
+  }
 }
 
 .log-entries {

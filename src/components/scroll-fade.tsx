@@ -1,7 +1,11 @@
-import { onSettled } from "solid-js";
+import {
+  ScrollArea,
+  ScrollAreaContent,
+  ScrollAreaScrollbar,
+  ScrollAreaThumb,
+  ScrollAreaViewport,
+} from "@ui-sdk/solid/scroll-area";
 import type { ParentProps } from "solid-js";
-
-import { observeScrollEdges } from "../lib/scroll-edges";
 
 export default function ScrollFade(
   props: ParentProps<{
@@ -12,34 +16,24 @@ export default function ScrollFade(
     hiddenFromAgent?: boolean;
   }>
 ) {
-  let viewport: HTMLDivElement | undefined;
-
-  onSettled(() => {
-    const content = viewport?.firstElementChild;
-
-    return viewport && content
-      ? observeScrollEdges(viewport, content, undefined, props.horizontal)
-      : undefined;
-  });
-
   return (
-    <div
+    <ScrollArea
       class={["scroll-fades", props.class]}
       data-horizontal={props.horizontal === true ? "" : undefined}
       data-agent-hidden={props.hiddenFromAgent === true ? "" : undefined}
     >
-      <div
+      <ScrollAreaViewport
         class={["scroll-fade-viewport", props.viewportClass]}
         aria-label={props.label}
         role={props.label === undefined ? undefined : "region"}
-        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Keyboard users need to focus named scroll areas.
-        tabindex={props.label === undefined ? undefined : 0}
-        ref={(element) => {
-          viewport = element;
-        }}
       >
-        {props.children}
-      </div>
-    </div>
+        <ScrollAreaContent>{props.children}</ScrollAreaContent>
+      </ScrollAreaViewport>
+      <ScrollAreaScrollbar
+        orientation={props.horizontal === true ? "horizontal" : "vertical"}
+      >
+        <ScrollAreaThumb />
+      </ScrollAreaScrollbar>
+    </ScrollArea>
   );
 }

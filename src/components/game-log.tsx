@@ -16,18 +16,24 @@ import { dynamic } from "@solidjs/web";
 import { Button } from "@ui-sdk/solid/button";
 import { Input } from "@ui-sdk/solid/input";
 import {
+  createScrollAreaController,
+  ScrollArea,
+  ScrollAreaContent,
+  ScrollAreaScrollbar,
+  ScrollAreaThumb,
+  ScrollAreaViewport,
+} from "@ui-sdk/solid/scroll-area";
+import {
   createEffect,
   createMemo,
   createSignal,
   For,
-  onSettled,
   Show,
   untrack,
 } from "solid-js";
 
 import { CHAT_MAX_LENGTH } from "../game/engine";
 import type { LogEntry } from "../game/engine";
-import { observeScrollEdges } from "../lib/scroll-edges";
 import PlayerAvatar from "./player-avatar";
 import Tooltip from "./tooltip";
 
@@ -48,7 +54,6 @@ export const countChatsAfter = (
 const SECOND_MS = 1000;
 const MINUTE_MS = 60 * SECOND_MS;
 const HOUR_MS = 60 * MINUTE_MS;
-const PINNED_SLACK_PX = 24;
 const FILTERS = ["All", "Chat", "Game"] as const;
 
 type LogFilter = (typeof FILTERS)[number];
@@ -394,10 +399,6 @@ const GameEvent = (props: {
   );
 };
 
-const isScrolledToBottom = (element: HTMLElement) =>
-  element.scrollHeight - element.scrollTop - element.clientHeight <=
-  PINNED_SLACK_PX;
-
 const ChatForm = (props: { onSend: (text: string) => boolean }) => {
   const [text, setText] = createSignal("");
 
@@ -489,9 +490,8 @@ export default function GameLog(props: {
 
   const hiddenChats = () => (filter() === "Game" ? unreadChats() : 0);
 
+  const scroll = createScrollAreaController();
   let scroller: HTMLDivElement | undefined;
-  let entries: HTMLDivElement | undefined;
-  let pinned = true;
 
   const markSeen = (id: number, currentFilter: LogFilter) => {
     setSeenId(id);
@@ -501,40 +501,20 @@ export default function GameLog(props: {
     }
   };
 
-  const scrollToLatest = () => {
-    if (scroller) {
-      scroller.scrollTop = scroller.scrollHeight;
-    }
-  };
-
   const pinToLatest = () => {
-    pinned = true;
     setAtBottom(true);
-    scrollToLatest();
+    scroll.scrollToEnd({ behavior: "instant" });
     markSeen(latestId(), filter());
   };
 
   createEffect(
     () => ({ filter: filter(), id: latestId() }),
     ({ filter: currentFilter, id }) => {
-      if (pinned) {
-        scrollToLatest();
+      if (scroll.isSticking()) {
         markSeen(id, currentFilter);
       }
     }
   );
-
-  onSettled(() => {
-    scrollToLatest();
-
-    return scroller && entries
-      ? observeScrollEdges(scroller, entries, () => {
-          if (pinned) {
-            scrollToLatest();
-          }
-        })
-      : undefined;
-  });
 
   return (
     <section class={props.inSheet === true ? "stack" : "panel log"}>
@@ -569,8 +549,8 @@ export default function GameLog(props: {
               data-variant={filter() === option ? "solid" : undefined}
               onClick={() => {
                 if (filter() !== option) {
-                  pinned = true;
                   setAtBottom(true);
+                  scroll.scrollToEnd({ behavior: "instant" });
                   setFilter(option);
                 }
               }}
@@ -591,19 +571,16 @@ export default function GameLog(props: {
           )}
         </For>
       </fieldset>
-      <div class="log-body scroll-fades">
-        <div
+      <ScrollArea class="log-body scroll-fades" stickToEnd controller={scroll}>
+        <ScrollAreaViewport
           class="log-scroll"
           role="log"
           aria-label={CHAT_AND_GAME_LOG_TITLE}
-          // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Keyboard users need to focus the scrolling history.
-          tabindex={0}
           ref={(element) => {
             scroller = element;
           }}
-          onScroll={(event) => {
-            const bottom = isScrolledToBottom(event.currentTarget);
-            pinned = bottom;
+          onScroll={() => {
+            const bottom = scroll.isAtEnd();
             setAtBottom(bottom);
 
             if (bottom) {
@@ -611,12 +588,7 @@ export default function GameLog(props: {
             }
           }}
         >
-          <div
-            class="log-entries"
-            ref={(element) => {
-              entries = element;
-            }}
-          >
+          <ScrollAreaContent class="log-entries">
             <Show
               when={groups().length > 0}
               fallback={<p class="log-empty">{EMPTY_MESSAGE[filter()]}</p>}
@@ -683,8 +655,11 @@ export default function GameLog(props: {
                 )}
               </For>
             </Show>
-          </div>
-        </div>
+          </ScrollAreaContent>
+        </ScrollAreaViewport>
+        <ScrollAreaScrollbar>
+          <ScrollAreaThumb />
+        </ScrollAreaScrollbar>
         <Show when={!atBottom()}>
           <div class="log-jump">
             <Button
@@ -701,7 +676,7 @@ export default function GameLog(props: {
             </Button>
           </div>
         </Show>
-      </div>
+      </ScrollArea>
       <Show
         when={props.onChat}
         fallback={<p class="muted chat-hint">Join as a player to chat.</p>}

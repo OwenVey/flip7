@@ -42,7 +42,10 @@ const spectator = () => ({
 });
 
 describe("<Table />", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
 
   it("sets held action cards beside the deck, not in the seat", () => {
     render(() => (
@@ -295,8 +298,14 @@ describe("<Table />", () => {
     const scores = screen.getByRole("button", { name: "Scores" });
     scores.focus();
 
+    const scoresButton = agent
+      .snapshot()
+      .find(
+        (entry) => entry.label === "Scores" && entry.actions.includes("press")
+      );
+
     const result = await agent.act({
-      steps: [{ action: "press", ref: "Scores" }],
+      steps: [{ action: "press", ref: scoresButton?.ref ?? "" }],
     });
 
     expect(result.error).toBeUndefined();
@@ -872,6 +881,9 @@ describe("<Table />", () => {
   });
 
   it("keeps the scroll position and counts new entries until jumping to latest", () => {
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame"],
+    });
     const [view, setView] = createSignal(room());
     render(() => (
       <Table
@@ -888,8 +900,12 @@ describe("<Table />", () => {
       clientHeight: { value: 200 },
       scrollHeight: { configurable: true, value: 500 },
     });
+    log.scrollTop = 300;
+    fireEvent.scroll(log);
+    vi.advanceTimersToNextFrame();
     log.scrollTop = 100;
     fireEvent.scroll(log);
+    vi.advanceTimersToNextFrame();
     flush();
 
     setView(
@@ -919,9 +935,10 @@ describe("<Table />", () => {
     );
     flush();
 
+    vi.advanceTimersToNextFrame();
     expect({
-      after: Object.hasOwn(log.dataset, "scrollAfter"),
-      before: Object.hasOwn(log.dataset, "scrollBefore"),
+      after: !Object.hasOwn(log.dataset, "atYEnd"),
+      before: !Object.hasOwn(log.dataset, "atYStart"),
       top: log.scrollTop,
       unread: unread.textContent,
     }).toStrictEqual({
@@ -931,15 +948,15 @@ describe("<Table />", () => {
       unread: "1 unread message",
     });
     screen.getByRole("button", { name: "Jump to latest · 4 new" }).click();
+    vi.advanceTimersToNextFrame();
     flush();
 
-    expect(log.scrollTop).toBe(log.scrollHeight);
+    expect(log.scrollTop).toBe(log.scrollHeight - log.clientHeight);
     expect(log).toHaveFocus();
     expect(
       screen.queryByRole("button", { name: /Jump to latest/u })
     ).toBeNull();
 
-    Object.defineProperty(log, "scrollHeight", { value: 600 });
     setView(
       room({
         log: [
@@ -956,13 +973,19 @@ describe("<Table />", () => {
       })
     );
     flush();
-    expect({ top: log.scrollTop, unread: unread.textContent }).toStrictEqual({
-      top: log.scrollHeight,
+    expect({
+      following: Object.hasOwn(log.dataset, "sticking"),
+      unread: unread.textContent,
+    }).toStrictEqual({
+      following: true,
       unread: "",
     });
   });
 
   it("marks the score edges that have more rows to scroll to", () => {
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame"],
+    });
     render(() => (
       <Table
         room={room()}
@@ -973,20 +996,22 @@ describe("<Table />", () => {
     ));
 
     const scores = screen.getByRole("region", { name: "Scores" });
-    expect(scores).not.toHaveAttribute("data-scroll-after");
+    expect(scores).toHaveAttribute("data-at-y-end");
 
     Object.defineProperties(scores, {
       clientHeight: { value: 120 },
       scrollHeight: { value: 300 },
     });
     fireEvent.scroll(scores);
-    expect(scores).not.toHaveAttribute("data-scroll-before");
-    expect(scores).toHaveAttribute("data-scroll-after");
+    vi.advanceTimersToNextFrame();
+    expect(scores).toHaveAttribute("data-at-y-start");
+    expect(scores).not.toHaveAttribute("data-at-y-end");
 
     scores.scrollTop = 180;
     fireEvent.scroll(scores);
-    expect(scores).toHaveAttribute("data-scroll-before");
-    expect(scores).not.toHaveAttribute("data-scroll-after");
+    vi.advanceTimersToNextFrame();
+    expect(scores).not.toHaveAttribute("data-at-y-start");
+    expect(scores).toHaveAttribute("data-at-y-end");
   });
 
   it("lets a player leave during the deal", async () => {
