@@ -184,10 +184,11 @@ export default function Table(
           playerId={props.playerId}
           send={props.send}
           actionsDisabled={props.actionsDisabled}
-          dealing={props.dealing}
-          dealStep={props.dealStep}
-          roundPoints={props.roundPoints}
-          moves={moves()}
+          playback={{
+            dealing: props.dealing === true,
+            roundPoints: props.roundPoints,
+            step: props.dealStep ?? null,
+          }}
         />
 
         <div class="table-body">

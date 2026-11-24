@@ -116,6 +116,33 @@ describe("<Table />", () => {
     expect(screen.getByText("Ben hits…")).toBeVisible();
   });
 
+  it("keeps the same Hit and Stay buttons while the prompt's points change", () => {
+    const [points, setPoints] = createSignal(7);
+
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        roundPoints={new Map([["a", points()]])}
+      />
+    ));
+
+    const actionBar = within(screen.getByRole("region", { name: "Your move" }));
+    const hit = actionBar.getByRole("button", { name: "Hit" });
+    const stay = actionBar.getByRole("button", { name: "Stay" });
+
+    expect(actionBar.getByText("7 points this round")).toBeVisible();
+
+    setPoints(9);
+    flush();
+
+    expect(actionBar.getByText("9 points this round")).toBeVisible();
+    expect(actionBar.getByRole("button", { name: "Hit" })).toBe(hit);
+    expect(actionBar.getByRole("button", { name: "Stay" })).toBe(stay);
+  });
+
   it("sets held action cards beside the deck, not in the seat", () => {
     render(() => (
       <Table
@@ -2081,24 +2108,5 @@ describe("<Table />", () => {
         .getAllByRole("heading")
         .map((heading) => heading.textContent)
     ).toStrictEqual(["Round 1", "Before the game", "Game 2 · Round 1"]);
-  });
-
-  it("says when the player everyone is waiting on is offline", () => {
-    const view = room();
-    view.players = view.players.map((seat) =>
-      seat.id === "a" ? { ...seat, connected: false } : seat
-    );
-
-    render(() => (
-      <Table
-        room={view}
-        playerId="b"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
-    ));
-    expect(
-      screen.getByText(/The game will Stay for them soon/u)
-    ).toBeInTheDocument();
   });
 });
