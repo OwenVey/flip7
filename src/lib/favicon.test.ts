@@ -1,32 +1,36 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import dotSvg from "../../public/favicon-dot.svg?raw";
 import plainSvg from "../../public/favicon.svg?raw";
-import { showFaviconDot } from "./favicon";
+import { restoreFavicon, showFaviconDot } from "./favicon";
 
 const svgIcon = () => document.head.querySelector('link[type="image/svg+xml"]');
 
-const embeddedIcon = () =>
-  decodeURIComponent(svgIcon()?.getAttribute("href") ?? "");
+const iconHref = () => svgIcon()?.getAttribute("href") ?? "";
+
+const embeddedIcon = () => decodeURIComponent(iconHref());
+
+const resetHead = () => {
+  document.head.innerHTML = `
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  `;
+};
 
 describe(showFaviconDot, () => {
-  beforeEach(() => {
-    document.head.innerHTML = `
-      <link rel="icon" href="/favicon.ico" sizes="32x32" />
-      <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    `;
-  });
+  beforeEach(resetHead);
 
-  it("swaps the SVG icon for the dotted one during a move alert", () => {
+  it("adds the dot to the site icon during a move alert", () => {
     showFaviconDot(true);
 
-    expect(embeddedIcon()).toBe(`data:image/svg+xml,${dotSvg}`);
+    expect(embeddedIcon()).toContain(
+      plainSvg.trimEnd().replace("</svg>", "<circle")
+    );
     expect(
       document.head.querySelector('link[sizes="32x32"]')?.getAttribute("href")
     ).toBe("/favicon.ico");
   });
 
-  it("puts the plain icon back when the move alert ends", () => {
+  it("shows the plain icon between blinks", () => {
     showFaviconDot(true);
     showFaviconDot(false);
 
@@ -39,5 +43,16 @@ describe(showFaviconDot, () => {
     expect(() => {
       showFaviconDot(true);
     }).not.toThrow();
+  });
+});
+
+describe(restoreFavicon, () => {
+  beforeEach(resetHead);
+
+  it("puts back the site's own icon link", () => {
+    showFaviconDot(true);
+    restoreFavicon();
+
+    expect(iconHref()).toBe("/favicon.svg");
   });
 });

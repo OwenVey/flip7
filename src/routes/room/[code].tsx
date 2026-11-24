@@ -34,7 +34,7 @@ import {
   createDealPlayback,
   initialDealPlayback,
 } from "../../lib/deal-playback";
-import { showFaviconDot } from "../../lib/favicon";
+import { restoreFavicon, showFaviconDot } from "../../lib/favicon";
 import { MOTION_PREFERENCE_QUERY } from "../../lib/motion";
 import { createMoveAlertBlink, MOVE_ALERT_TITLE } from "../../lib/move-alert";
 import { createRoomConnection } from "../../lib/room-connection";
@@ -194,7 +194,7 @@ const Room = (props: { code: string }) => {
       document.removeEventListener("visibilitychange", playback.syncMotion);
       playback.dispose();
       toast.dismiss();
-      showFaviconDot(false);
+      restoreFavicon();
     };
   });
 

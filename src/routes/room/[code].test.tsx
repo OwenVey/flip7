@@ -146,6 +146,7 @@ describe(RoomPage, () => {
     setVisibility("hidden");
     history.set({ replace: false, scroll: false, value: "/" });
     await advanceTime(1000);
-    expectAlert("Home", false);
+    expect(document.title).toBe("Home");
+    expect(icon?.getAttribute("href")).toBe("/favicon.svg");
   });
 });
