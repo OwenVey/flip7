@@ -671,6 +671,43 @@ describe("draws through the room client", () => {
   });
 });
 
+describe("a room that goes back to an older save", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("replaces draws and log it has that the room no longer does", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    await moveTableOn(net);
+    const older = structuredClone(net.stored);
+    await moveTableOn(net);
+    await moveTableOn(net);
+    ben.client.chat("lost");
+    net.flush();
+
+    Object.assign(net.stored.game, older.game);
+    net.stored.broadcastSeqs = older.broadcastSeqs;
+    ben.client.chat("after the restore");
+    net.flush();
+
+    expect({
+      ...drawsOf(ana),
+      log: ana.client.state.room?.log,
+      syncs: net.syncs,
+    }).toStrictEqual({
+      ...serverDraws(net),
+      log: net.stored.game.log,
+      syncs: [ana.link?.id, ben.link?.id],
+    });
+  });
+});
+
 describe("recovering a stuck connection", () => {
   beforeEach(() => {
     vi.useFakeTimers();
