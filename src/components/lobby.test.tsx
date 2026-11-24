@@ -1,4 +1,4 @@
-import { captureArtifact, expectNoDiagnostics } from "@solidjs/diagnostics";
+import { expectNoDiagnostics } from "@solidjs/diagnostics";
 import {
   cleanup,
   fireEvent,
@@ -13,6 +13,7 @@ import { addBot, addPlayer, createGame, MAX_PLAYERS } from "../game/engine";
 import { toRoomView } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
+import { captureScenario } from "../test/diagnostics";
 import Lobby from "./lobby";
 
 const roomOf = (size: number) => {
@@ -134,15 +135,12 @@ describe("<Lobby />", () => {
     ));
     const seat = screen.getByText("Open seat");
 
-    const { artifact } = await captureArtifact(
-      () => {
-        for (let size = 3; size <= 8; size += 1) {
-          setRoom(roomOf(size));
-          flush();
-        }
-      },
-      { scenario: "lobby-bots-join" }
-    );
+    const { artifact } = await captureScenario(() => {
+      for (let size = 3; size <= 8; size += 1) {
+        setRoom(roomOf(size));
+        flush();
+      }
+    }, "lobby-bots-join");
 
     expectNoDiagnostics(artifact);
     expect(screen.getByText("Open seat")).toBe(seat);

@@ -571,7 +571,12 @@ export default function GameLog(props: {
           )}
         </For>
       </fieldset>
-      <ScrollArea class="log-body scroll-fades" stickToEnd controller={scroll}>
+      <ScrollArea
+        class="log-body scroll-fades"
+        type="auto"
+        stickToEnd
+        controller={scroll}
+      >
         <ScrollAreaViewport
           class="log-scroll"
           role="log"

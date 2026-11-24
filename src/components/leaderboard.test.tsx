@@ -1,4 +1,4 @@
-import { captureArtifact, expectNoDiagnostics } from "@solidjs/diagnostics";
+import { expectNoDiagnostics } from "@solidjs/diagnostics";
 import { cleanup, render, screen, within } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { calculateRoundScore } from "../game/cards";
 import type { RoomView } from "../game/protocol";
 import { roundPointsFor } from "../lib/deal-playback";
+import { captureScenario } from "../test/diagnostics";
 import { room } from "../test/room-view";
 import Leaderboard from "./leaderboard";
 
@@ -58,28 +59,25 @@ describe("<Leaderboard />", () => {
       ["2", "Cara", "+0", "12"],
     ]);
 
-    const { artifact } = await captureArtifact(
-      () => {
-        setView(
-          room({
-            phase: "gameOver",
-            players: [
-              {
-                ...ben,
-                lastRound: calculateRoundScore(ben.hand),
-                score: 202,
-                status: "stayed",
-              },
-              ana,
-              cara,
-            ],
-            winnerIds: ["b"],
-          })
-        );
-        flush();
-      },
-      { scenario: "leaderboard-game-over" }
-    );
+    const { artifact } = await captureScenario(() => {
+      setView(
+        room({
+          phase: "gameOver",
+          players: [
+            {
+              ...ben,
+              lastRound: calculateRoundScore(ben.hand),
+              score: 202,
+              status: "stayed",
+            },
+            ana,
+            cara,
+          ],
+          winnerIds: ["b"],
+        })
+      );
+      flush();
+    }, "leaderboard-game-over");
 
     expectNoDiagnostics(artifact);
     expect(rows()).toStrictEqual([

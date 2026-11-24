@@ -1,0 +1,408 @@
+.log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.log-unread {
+  min-width: 1rem;
+  padding-inline: 0.25rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--paper);
+  font-family: var(--font-body);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  text-align: center;
+}
+
+.scroll-fades {
+  --scroll-fade-stops:
+    var(--paper) 0 8%, color-mix(in srgb, var(--paper) 90%, transparent) 27%,
+    color-mix(in srgb, var(--paper) 52%, transparent) 55%,
+    color-mix(in srgb, var(--paper) 14%, transparent) 80%, transparent;
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-block-size: 0;
+  min-width: 0;
+  /* Visible, so a card's scrollbar can sit out in the card's padding. */
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  font-size: inherit;
+
+  &::before,
+  &::after {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  &:not([data-horizontal]) {
+    &:not(.leaderboard-body, [data-at-y-start])::before {
+      inset: 0 0 auto;
+      height: min(1.5rem, 28%);
+      background: linear-gradient(var(--scroll-fade-stops));
+      content: "";
+    }
+
+    &:not([data-at-y-end])::after {
+      inset-inline: 0;
+      inset-block-end: 0;
+      height: min(1.5rem, 28%);
+      background: linear-gradient(to top, var(--scroll-fade-stops));
+      content: "";
+    }
+
+    /* Stops above the log's bottom rule. */
+    &.log-body::after {
+      inset-block-end: 1px;
+    }
+  }
+
+  &[data-horizontal] {
+    --scroll-start-direction: to right;
+    --scroll-end-direction: to left;
+
+    &:dir(rtl) {
+      --scroll-start-direction: to left;
+      --scroll-end-direction: to right;
+    }
+
+    &::before,
+    &::after {
+      inset-block: 0;
+      width: min(1.5rem, 28%);
+    }
+
+    &:not([data-at-x-start])::before {
+      inset-inline-start: 0;
+      background: linear-gradient(
+        var(--scroll-start-direction),
+        var(--scroll-fade-stops)
+      );
+      content: "";
+    }
+
+    &:not([data-at-x-end])::after {
+      inset-inline-end: 0;
+      background: linear-gradient(
+        var(--scroll-end-direction),
+        var(--scroll-fade-stops)
+      );
+      content: "";
+    }
+  }
+
+  & > [data-slot="scroll-area-scrollbar"] {
+    z-index: 3;
+
+    &[data-orientation="horizontal"] {
+      height: 0.5rem;
+
+      & > [data-slot="scroll-area-thumb"] {
+        background: color-mix(in srgb, var(--ink) 35%, transparent);
+      }
+    }
+
+    /* A vertical track is a gold rule capped with diamond pips, like the card titles. */
+    &[data-orientation="vertical"] {
+      --pip-size: 0.3125rem;
+      width: 0.625rem;
+      padding: calc(var(--pip-size) + 0.25rem) 0.125rem;
+      background: linear-gradient(var(--rule), var(--rule)) center / 1px
+        calc(100% - var(--pip-size)) no-repeat;
+
+      &::before,
+      &::after {
+        position: absolute;
+        inset-inline-start: 50%;
+        width: var(--pip-size);
+        height: var(--pip-size);
+        background: var(--rule);
+        content: "";
+        translate: -50% 0;
+        rotate: 45deg;
+      }
+
+      &::before {
+        inset-block-start: 0;
+      }
+
+      &::after {
+        inset-block-end: 0;
+      }
+
+      & > [data-slot="scroll-area-thumb"] {
+        z-index: 1;
+        background: var(--ink);
+
+        &:hover,
+        &[data-dragging] {
+          background: var(--accent);
+        }
+      }
+    }
+  }
+}
+
+/* In a card the vertical scrollbar sits in the card's padding, beside the content instead of over it. */
+.panel
+  .scroll-fades
+  > [data-slot="scroll-area-scrollbar"][data-orientation="vertical"] {
+  margin-inline-end: -0.75rem;
+}
+
+.scroll-fade-viewport {
+  width: auto;
+  height: auto;
+  min-block-size: 0;
+  overscroll-behavior: contain;
+}
+
+/* Vertical lists never scroll sideways, even when pop-in overshoot pokes past the edge. */
+.scroll-fades:not([data-horizontal])
+  > .scroll-fade-viewport
+  > [data-slot="scroll-area-content"],
+.log-entries {
+  overflow-x: clip;
+}
+
+[data-slot="scroll-area-content"] {
+  padding: 0;
+}
+
+.log-scroll {
+  max-height: min(22rem, 55svh);
+  /* Outside a card the thumb floats over the log, so keep timestamps clear of it. */
+  padding-inline-end: 0.625rem;
+  overscroll-behavior: contain;
+  border-block-end: 1px solid var(--rule);
+
+  .panel & {
+    padding-inline-end: 0;
+  }
+}
+
+.log-entries {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.875rem;
+  align-content: start;
+  padding-block-end: 0.5rem;
+}
+
+.log-jump {
+  position: absolute;
+  z-index: 3;
+  inset-inline: 0;
+  bottom: 0.625rem;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+
+  & > * {
+    pointer-events: auto;
+  }
+}
+
+.chat-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+
+  & [data-slot="input"] {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.log-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.375rem;
+
+  & .log-round-heading {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.125rem 0.625rem;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-block: 0.375rem 0.125rem;
+    border-block-start: 1px solid var(--rule);
+  }
+
+  & h3 {
+    margin: 0;
+    color: var(--accent);
+    font-size: 0.6875rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  &:first-child .log-round-heading {
+    padding-block-start: 0;
+    border-block-start: 0;
+  }
+
+  & time {
+    color: var(--ink-soft);
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  & ol {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  & li {
+    padding-block: 0.125rem;
+    overflow-wrap: anywhere;
+    color: var(--ink-soft);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+
+  & li[data-kind="game"]:has(> time:not(.log-time-heading)) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.625rem;
+    align-items: baseline;
+  }
+
+  & .log-time-heading {
+    display: block;
+    margin-block: 0.375rem 0.25rem;
+  }
+
+  & .log-event {
+    display: grid;
+    grid-template-columns: 0.875rem minmax(0, 1fr);
+    column-gap: 0.375rem;
+  }
+
+  & .log-event-icon {
+    grid-area: 1 / 1;
+    margin-block-start: 0.125rem;
+  }
+
+  & .log-event-text {
+    grid-column: 2;
+  }
+
+  & .log-event[data-announcement] .log-event-text {
+    font-style: italic;
+  }
+
+  & :is(.log-event-icon, .log-outcome) {
+    color: var(--ink);
+  }
+
+  &
+    li:is([data-cue="bank"], [data-cue="join"])
+    :is(.log-event-icon, .log-outcome) {
+    color: var(--good);
+  }
+
+  & li[data-cue="bust"] :is(.log-event-icon, .log-outcome) {
+    color: var(--danger);
+  }
+
+  & li[data-cue="freeze"] :is(.log-event-icon, .log-outcome) {
+    color: var(--freeze-ink);
+  }
+
+  &
+    li:is([data-cue="flipSeven"], [data-cue="special"])
+    :is(.log-event-icon, .log-outcome) {
+    color: var(--accent);
+  }
+
+  &
+    li:is(
+      [data-cue="bank"],
+      [data-cue="bust"],
+      [data-cue="freeze"],
+      [data-cue="flipSeven"]
+    )
+    .log-outcome {
+    font-weight: 700;
+  }
+
+  /* Bubbles take at least most of the column, so short messages line up with the log lines around them. */
+  & li[data-kind="chat"] {
+    justify-self: start;
+    min-inline-size: 70%;
+    max-inline-size: 90%;
+    margin-block: 0.125rem 0.25rem;
+    margin-inline: 0.1875rem;
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--ink);
+    border-radius: var(--radius-sm);
+    background: var(--paper-deep);
+    box-shadow: 2px 2px 0 var(--ink);
+    color: var(--ink);
+    font-size: 0.875rem;
+  }
+
+  & li[data-kind="chat"][data-own] {
+    justify-self: end;
+    background: color-mix(in srgb, var(--gold) 30%, var(--paper));
+  }
+
+  & .log-message-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.125rem 0.625rem;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-block-end: 0.125rem;
+  }
+
+  & .log-author-line {
+    display: inline-flex;
+    gap: 0.375rem;
+    align-items: center;
+    align-self: center;
+  }
+
+  & .log-author {
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+}
+
+.log-empty {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
+
+.unread-count {
+  position: absolute;
+  inset-block-start: -0.5rem;
+  inset-inline-end: -0.5rem;
+  min-width: 1.25rem;
+  padding-inline: 0.3125rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--paper);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  line-height: 1.125rem;
+  text-align: center;
+}

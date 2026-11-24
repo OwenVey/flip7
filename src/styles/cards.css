@@ -1,0 +1,522 @@
+/*
+ * Score Modifiers and Second Chance sit as mini cards at the end of the seat
+ * header, so the mat holds only Number cards and shows the run toward Flip 7.
+ * The rules reuse them beside the matching rule.
+ */
+:is(.seat-extras, .rules-cards, .flip-run-card) {
+  --card-w: 1.375rem;
+  display: flex;
+  flex: none;
+  gap: 0.1875rem;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  &:empty {
+    display: none;
+  }
+
+  /*
+   * A small gap splits held action cards from the Score Modifiers after them.
+   * A card on its way out already counts as gone, so the gap doesn't jump
+   * when it's removed.
+   */
+  &
+    :is(
+      :not([data-score-modifier], [data-leaving]) + [data-score-modifier],
+      :not([data-score-modifier], [data-leaving])
+        + [data-leaving]
+        + [data-score-modifier]
+    ) {
+    margin-inline-start: 0.25rem;
+  }
+}
+
+.card {
+  --card-color: var(--paper);
+  --card-panel: #fffaf0;
+  --card-ink: var(--ink);
+  /*
+   * Every size inside a card scales with its width, which the row it sits in
+   * sets as --card-w. Its look comes from data-size, never from the row, so a
+   * copy of it looks the same anywhere.
+   */
+  --w: var(--card-w, 3.75rem);
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  /* Cards with a tooltip are tooltip triggers; drop the fixed height and gap ui-sdk gives triggers so they keep the 5:7 shape. */
+  gap: 0;
+  width: var(--w);
+  height: auto;
+  aspect-ratio: 5 / 7;
+  padding: calc(var(--w) * 0.1385) calc(var(--w) * 0.1462);
+  border: 1px solid rgb(38 36 81 / 0.85);
+  border-radius: calc(var(--w) * 0.1538);
+  background: var(--card-color);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.55),
+    0 1px 0 rgb(0 0 0 / 0.25),
+    0 0.25rem 0.5rem rgb(4 20 14 / 0.4);
+  animation: deal 320ms cubic-bezier(0.2, 0.8, 0.2, 1.2) both;
+
+  /* The cream face printed inside the colored border. */
+  &::before {
+    position: absolute;
+    z-index: -1;
+    inset: calc(var(--w) * 0.0923);
+    border-radius: calc(var(--w) * 0.0769);
+    background:
+      radial-gradient(
+        circle at 50% 50%,
+        var(--card-panel) 0 30%,
+        transparent 31%
+      ),
+      repeating-conic-gradient(
+        from -6deg at 50% 50%,
+        color-mix(in srgb, var(--card-color) 55%, transparent) 0deg 12deg,
+        transparent 12deg 24deg
+      ),
+      var(--card-panel);
+    box-shadow: inset 0 0 0 1px
+      color-mix(in srgb, var(--card-color) 60%, var(--ink));
+    content: "";
+  }
+
+  &[data-number="0"] {
+    --card-color: var(--heat-0);
+    background: linear-gradient(
+      160deg,
+      var(--heat-1),
+      var(--heat-3),
+      var(--heat-5),
+      var(--heat-7),
+      var(--heat-9),
+      var(--heat-11)
+    );
+  }
+
+  &[data-number="1"] {
+    --card-color: var(--heat-1);
+  }
+
+  &[data-number="2"] {
+    --card-color: var(--heat-2);
+  }
+
+  &[data-number="3"] {
+    --card-color: var(--heat-3);
+  }
+
+  &[data-number="4"] {
+    --card-color: var(--heat-4);
+  }
+
+  &[data-number="5"] {
+    --card-color: var(--heat-5);
+  }
+
+  &[data-number="6"] {
+    --card-color: var(--heat-6);
+  }
+
+  &[data-number="7"] {
+    --card-color: var(--heat-7);
+  }
+
+  &[data-number="8"] {
+    --card-color: var(--heat-8);
+  }
+
+  &[data-number="9"] {
+    --card-color: var(--heat-9);
+  }
+
+  &[data-number="10"] {
+    --card-color: var(--heat-10);
+  }
+
+  &[data-number="11"] {
+    --card-color: var(--heat-11);
+  }
+
+  &[data-number="12"] {
+    --card-color: var(--heat-12);
+  }
+
+  /* Score Modifiers read as orange chips: dark border, orange face. */
+  &[data-score-modifier] {
+    --card-color: var(--ink);
+    --card-panel: var(--modifier);
+    --modifier-stripe: rgb(255 255 255 / 0.22);
+    --modifier-print: var(--paper);
+
+    &::before {
+      background:
+        repeating-linear-gradient(
+          45deg,
+          transparent 0 5px,
+          var(--modifier-stripe) 5px 7px
+        ),
+        var(--card-panel);
+    }
+  }
+
+  /* ×2 multiplies rather than adds, so it inverts: orange frame, ink face, orange numeral. */
+  &[data-kind="double"] {
+    --card-color: var(--modifier);
+    --card-panel: var(--ink);
+    --card-ink: var(--modifier);
+    --modifier-stripe: color-mix(in srgb, var(--modifier) 16%, transparent);
+    --modifier-print: rgb(0 0 0 / 0.6);
+  }
+
+  &[data-kind="freeze"],
+  &[data-kind="flipThree"],
+  &[data-kind="secondChance"] {
+    grid-template-rows: 1fr;
+  }
+
+  &[data-kind="freeze"] {
+    --card-color: var(--freeze);
+    --card-panel: var(--freeze-soft);
+
+    &::before {
+      background:
+        linear-gradient(
+          145deg,
+          rgb(255 255 255 / 0.55) 0 30%,
+          transparent 30% 70%,
+          rgb(255 255 255 / 0.3) 70%
+        ),
+        linear-gradient(
+          var(--card-panel),
+          color-mix(in srgb, var(--card-color) 22%, var(--card-panel))
+        );
+    }
+
+    & .card-icon {
+      color: var(--freeze-ink);
+    }
+  }
+
+  &[data-kind="flipThree"] {
+    --card-color: var(--flip);
+    --card-panel: var(--flip-soft);
+  }
+
+  &[data-kind="secondChance"] {
+    --card-color: var(--second-chance);
+    --card-panel: var(--second-chance-soft);
+  }
+
+  &[data-bust] {
+    transform: rotate(-7deg);
+    box-shadow:
+      0 0 0 2px var(--danger),
+      0 0.25rem 0.5rem rgb(4 20 14 / 0.4);
+
+    &::after {
+      content: "Bust";
+      position: absolute;
+      inset: auto calc(var(--w) * -0.1154) calc(var(--w) * 0.4615);
+      padding: 0.0625rem 0;
+      border: 1.5px solid var(--ink);
+      background: var(--danger);
+      color: var(--paper);
+      font-family: var(--font-display);
+      font-size: calc(var(--w) * 0.1923);
+      text-align: center;
+      transform: rotate(-8deg);
+    }
+  }
+}
+
+.card-corner {
+  color: var(--card-ink);
+  font-family: var(--font-numeral);
+  font-size: calc(var(--w) * 0.2115);
+  font-weight: 900;
+  line-height: 1;
+
+  &[data-end] {
+    justify-self: end;
+    transform: rotate(180deg);
+  }
+}
+
+.card-face {
+  display: grid;
+  gap: calc(var(--w) * 0.0769);
+  align-content: center;
+  place-items: center;
+}
+
+.card-label {
+  color: var(--card-ink);
+  font-family: var(--font-numeral);
+  font-size: calc(var(--w) * 0.5385);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow:
+    -1px -1px 0 var(--card-panel),
+    1px -1px 0 var(--card-panel),
+    -1px 1px 0 var(--card-panel),
+    2px 2px 0 var(--card-color),
+    3px 3px 0 var(--card-ink);
+
+  [data-number="0"] & {
+    text-shadow:
+      2px 2px 0 var(--heat-1),
+      3px 3px 0 var(--card-ink);
+  }
+
+  [data-score-modifier] & {
+    font-size: calc(var(--w) * 0.45);
+    text-shadow: 2px 2px 0 var(--modifier-print);
+  }
+
+  [data-kind="freeze"] &,
+  [data-kind="flipThree"] &,
+  [data-kind="secondChance"] & {
+    padding: 0.125rem 0.1875rem;
+    border-radius: 0.1875rem;
+    background: var(--card-color);
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: calc(var(--w) * 0.1333);
+    line-height: 1.15;
+    text-align: center;
+    text-shadow: 0 1px 0 rgb(0 0 0 / 0.35);
+  }
+}
+
+.card-icon {
+  width: calc(var(--w) * 0.3);
+  height: calc(var(--w) * 0.3);
+  color: color-mix(in srgb, var(--card-color) 70%, var(--ink));
+}
+
+/*
+ * Mini cards are the full card shrunk for a seat's header, a card waiting to
+ * be played, and the rules: the same colors and face, without the corner
+ * numbers or action captions. 1.375rem wide is 1.925rem tall, inside the 2rem
+ * header.
+ */
+.card[data-size="mini"] {
+  grid-template-rows: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  padding: calc(var(--w) * 0.11);
+  border-radius: calc(var(--w) * 0.2273);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.55),
+    0 1px 0 rgb(0 0 0 / 0.25);
+
+  &::before {
+    inset: calc(var(--w) * 0.09);
+    border-radius: calc(var(--w) * 0.1364);
+  }
+
+  & .card-corner {
+    display: none;
+  }
+
+  &:is(
+      [data-kind="freeze"],
+      [data-kind="flipThree"],
+      [data-kind="secondChance"]
+    )
+    .card-label {
+    display: none;
+  }
+
+  & .card-label {
+    font-size: calc(var(--w) * 0.6);
+    letter-spacing: -0.03em;
+    /* A one-step print offset; the full card's deeper stack would smear this small. */
+    text-shadow: 1px 1px 0 var(--modifier-print, var(--card-panel));
+  }
+
+  & .card-icon {
+    width: calc(var(--w) * 0.6);
+    height: calc(var(--w) * 0.6);
+  }
+
+  &[data-bust] {
+    box-shadow:
+      0 0 0 2px var(--danger),
+      0 0.25rem 0.5rem rgb(4 20 14 / 0.4);
+  }
+
+  /* The stamp hangs off the card's bottom edge, so the duplicate stays readable above it. */
+  &[data-bust]::after {
+    inset: auto calc(var(--w) * -0.1786) calc(var(--w) * -0.2143);
+    font-size: calc(var(--w) * 0.3571);
+  }
+}
+
+/* The face-down deck the dealer deals from, at the head of the action bar. */
+.deck {
+  position: relative;
+  flex: none;
+  padding-inline-end: 0.75rem;
+  border-inline-end: 1px solid var(--rule);
+
+  /* Sized with its stacked edge and count badge to fit inside the 4rem action bar. */
+  & .card-back {
+    width: 1.875rem;
+
+    & svg {
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+  }
+}
+
+.deck-count {
+  position: absolute;
+  inset-block-end: -0.125rem;
+  inset-inline-end: 0.25rem;
+  min-width: 1.375rem;
+  padding: 0 0.25rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  font-family: var(--font-numeral);
+  font-size: 0.75rem;
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.card-back {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  aspect-ratio: 5 / 7;
+  border: 1px solid var(--ink);
+  border-radius: 0.25rem;
+  background:
+    radial-gradient(circle, var(--accent) 0 0.45rem, transparent 0.5rem),
+    repeating-linear-gradient(
+      45deg,
+      transparent 0 3px,
+      rgb(255 212 95 / 0.35) 3px 4px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0 3px,
+      rgb(255 212 95 / 0.35) 3px 4px
+    ),
+    var(--accent);
+  box-shadow:
+    inset 0 0 0 2px var(--accent),
+    inset 0 0 0 3px var(--gold),
+    2px 2px 0 -1px var(--accent),
+    2px 2px 0 0 var(--ink),
+    4px 4px 0 -1px var(--accent),
+    4px 4px 0 0 var(--ink);
+  color: var(--gold);
+
+  & svg {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  &[data-empty] {
+    border-style: dashed;
+    background: transparent;
+    box-shadow: none;
+    color: var(--ink-soft);
+  }
+}
+
+/* A dealt card waits, hidden, in its place while its copy flies in from the deck. */
+.card[data-incoming] {
+  visibility: hidden;
+}
+
+/* Mini cards keep to the right, even when they wrap below a crowded header. */
+.seat-header > .seat-extras {
+  margin-inline-start: auto;
+}
+
+/* A mini card already on the table when the page loads just sits in its row. */
+.seat-extras > .card:not([data-incoming], [data-flown]) {
+  animation: none;
+}
+
+/* Its flight already brought the card in, so it skips the drop-in animation. */
+.card:is([data-incoming], [data-flown]) {
+  animation: none;
+}
+
+.flight-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.flying-card {
+  position: absolute;
+  perspective: 40rem;
+  will-change: transform;
+}
+
+.flying-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.flying-card-face,
+.flying-card-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+/* Drawn at its own --card-w, copied from the card it stands in for. */
+.flying-card-face {
+  margin: 0;
+  list-style: none;
+  animation: none;
+}
+
+/* Fills the flying card and drops the deck's stacked edge, keeping the deck's look. */
+.flying-card-back {
+  width: auto;
+  aspect-ratio: auto;
+  border-radius: var(--radius-md);
+  box-shadow:
+    inset 0 0 0 2px var(--accent),
+    inset 0 0 0 3px var(--gold),
+    0 0.75rem 1.5rem rgb(4 20 14 / 0.45);
+  transform: rotateY(180deg);
+
+  & svg {
+    width: 46%;
+    height: auto;
+  }
+}
+
+@keyframes deal {
+  from {
+    opacity: 0;
+    transform: translateY(-0.75rem) rotate(-4deg) scale(0.9);
+  }
+}
+
+/* The deck thins as it runs down. */
+.deck .card-back[data-stack="low"] {
+  box-shadow:
+    inset 0 0 0 2px var(--accent),
+    inset 0 0 0 3px var(--gold),
+    2px 2px 0 -1px var(--accent),
+    2px 2px 0 0 var(--ink);
+}

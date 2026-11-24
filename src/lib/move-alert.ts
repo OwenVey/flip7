@@ -1,10 +1,11 @@
 import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
 
-import plainSvg from "../../public/favicon.svg?raw";
+import plainSvg from "../assets/favicon.svg?raw";
+import siteIcon from "../assets/favicon.svg?url";
 
 const MOVE_ALERT_TITLE = "⚡ Your move!";
 const MOVE_ALERT_BLINK_MS = 1000;
-const SITE_ICON = "/favicon.svg";
+const SITE_ICON = siteIcon;
 
 const DOT =
   '<circle cx="49" cy="15" r="13" fill="#e5322d" stroke="#fcf5e8" stroke-width="4"/>';

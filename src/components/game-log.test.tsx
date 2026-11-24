@@ -1,9 +1,10 @@
-import { captureArtifact, expectNoDiagnostics } from "@solidjs/diagnostics";
+import { expectNoDiagnostics } from "@solidjs/diagnostics";
 import { cleanup, render, screen } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { LogEntry } from "../game/engine";
+import { captureScenario } from "../test/diagnostics";
 import GameLog from "./game-log";
 
 const entries = (count: number) =>
@@ -32,15 +33,12 @@ describe("<GameLog />", () => {
     render(() => <GameLog log={log()} playerId="p0" onChat={() => true} />);
     const first = screen.getByText("Player 0 stayed");
 
-    const { artifact } = await captureArtifact(
-      () => {
-        for (let count = 3; count <= 8; count += 1) {
-          setLog(entries(count));
-          flush();
-        }
-      },
-      { scenario: "game-log-snapshots" }
-    );
+    const { artifact } = await captureScenario(() => {
+      for (let count = 3; count <= 8; count += 1) {
+        setLog(entries(count));
+        flush();
+      }
+    }, "game-log-snapshots");
 
     expectNoDiagnostics(artifact);
     expect(screen.getByText("Player 0 stayed")).toBe(first);

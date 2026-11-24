@@ -5,6 +5,7 @@ import { cleanup, render } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import faviconUrl from "../../assets/favicon.svg?url";
 import { addPlayer, createGame, startGame } from "../../game/engine";
 import { waitingOn } from "../../game/moves";
 import type { ServerMessage } from "../../game/protocol";
@@ -78,7 +79,7 @@ describe(RoomPage, () => {
     setVisibility("visible");
     document.head.insertAdjacentHTML(
       "beforeend",
-      '<link rel="icon" type="image/svg+xml" href="/favicon.svg" />'
+      `<link rel="icon" type="image/svg+xml" href="${faviconUrl}" />`
     );
     const icon = document.head.querySelector(iconSelector);
 
@@ -147,6 +148,6 @@ describe(RoomPage, () => {
     history.set({ replace: false, scroll: false, value: "/" });
     await advanceTime(1000);
     expect(document.title).toBe("Home");
-    expect(icon?.getAttribute("href")).toBe("/favicon.svg");
+    expect(icon?.getAttribute("href")).toBe(faviconUrl);
   });
 });
