@@ -91,4 +91,10 @@ describe(applyListUpdate, () => {
       applyListUpdate(null, { after: 0, entries: entries(1), seq: 1 }, spec)
     ).toBeNull();
   });
+
+  it("can't build on an update from a list behind its copy", () => {
+    expect(
+      applyListUpdate(have, { after: 1, entries: [], seq: 1 }, spec)
+    ).toBeNull();
+  });
 });

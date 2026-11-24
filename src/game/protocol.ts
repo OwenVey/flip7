@@ -1,6 +1,6 @@
 import { projectActionCards } from "./action-card-resolution";
 import { avatarOf } from "./avatars";
-import { LOG_LIMIT } from "./engine";
+import { DRAW_LIMIT, LOG_LIMIT } from "./engine";
 import type {
   DrawEvent,
   GameState,
@@ -79,6 +79,7 @@ export const roundStarted = (previous: RoomView, current: RoomView) =>
 
 /** The parts of the room view that are sent as new entries rather than in full. */
 export interface RoomLists {
+  draws: DrawEvent[];
   log: LogEntry[];
 }
 
@@ -87,6 +88,7 @@ export type RoomListName = keyof RoomLists;
 type ListEntry<K extends RoomListName> = RoomLists[K][number];
 
 const ROOM_LISTS = {
+  draws: { limit: DRAW_LIMIT, seqOf: (draw) => draw.seq },
   log: { limit: LOG_LIMIT, seqOf: (entry) => entry.id },
 } satisfies { [K in RoomListName]: ListSpec<ListEntry<K>> };
 
@@ -104,7 +106,7 @@ export type ReceivedLists = {
   [K in RoomListName]: ReceivedList<ListEntry<K>> | null;
 };
 
-export const NO_LISTS: ReceivedLists = { log: null };
+export const NO_LISTS: ReceivedLists = { draws: null, log: null };
 
 export type ServerMessage =
   | {
@@ -163,7 +165,10 @@ export const toRoomView = (code: string, state: GameState) => {
 
 /** The lists' sequence numbers now, to remember what a broadcast sent. */
 export const listSeqsOf = (state: GameState) => {
-  const seqs: Required<ListSeqs> = { log: state.logSeq };
+  const seqs: Required<ListSeqs> = {
+    draws: state.drawSeq ?? 0,
+    log: state.logSeq,
+  };
 
   return seqs;
 };
@@ -174,10 +179,15 @@ export const toStateMessage = (
   state: GameState,
   since: ListSeqs = {}
 ) => {
-  const { log, ...room } = toRoomView(code, state);
+  const { draws, log, ...room } = toRoomView(code, state);
 
   const message: ServerMessage = {
     lists: {
+      draws: listUpdateSince(
+        { clearedAt: 0, entries: draws, seq: state.drawSeq ?? 0 },
+        since.draws,
+        ROOM_LISTS.draws
+      ),
       log: listUpdateSince(
         { clearedAt: state.logClearedAt ?? 0, entries: log, seq: state.logSeq },
         since.log,
@@ -201,14 +211,33 @@ export const receiveState = (
   message: Extract<ServerMessage, { type: "state" }>
 ) => {
   const gaps: RoomListName[] = [];
+
+  const draws = applyListUpdate(
+    received.draws,
+    message.lists.draws,
+    ROOM_LISTS.draws
+  );
+
   const log = applyListUpdate(received.log, message.lists.log, ROOM_LISTS.log);
+
+  if (!draws) {
+    gaps.push("draws");
+  }
 
   if (!log) {
     gaps.push("log");
   }
 
-  const lists: ReceivedLists = { log: log ?? received.log };
-  const room: RoomView = { ...message.room, log: lists.log?.entries ?? [] };
+  const lists: ReceivedLists = {
+    draws: draws ?? received.draws,
+    log: log ?? received.log,
+  };
+
+  const room: RoomView = {
+    ...message.room,
+    draws: lists.draws?.entries ?? [],
+    log: lists.log?.entries ?? [],
+  };
 
   return { gaps, lists, room };
 };

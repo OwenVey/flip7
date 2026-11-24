@@ -76,7 +76,8 @@ export const listUpdateSince = <T>(
 
 /**
  * Applies an update to the receiver's copy. Returns null when the update
- * doesn't follow on from the copy, so the receiver needs the whole list.
+ * doesn't follow on from the copy, or comes from a list behind it, so the
+ * receiver needs the whole list.
  * Entries the copy already has are skipped, and only the newest `limit` are
  * kept. The copy is returned unchanged when nothing is new.
  */
@@ -94,7 +95,7 @@ export const applyListUpdate = <T>(
     return replaced;
   }
 
-  if (!current || update.after > current.seq) {
+  if (!current || update.after > current.seq || update.seq < current.seq) {
     return null;
   }
 
@@ -111,7 +112,7 @@ export const applyListUpdate = <T>(
       fresh.length === 0
         ? current.entries
         : [...current.entries, ...fresh].slice(-spec.limit),
-    seq: Math.max(current.seq, update.seq),
+    seq: update.seq,
   };
 
   return appended;

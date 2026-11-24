@@ -236,6 +236,11 @@ export const createRoomClient = (deps: RoomClientDeps) => {
           askedForLists = raw({ type: "sync" });
         }
 
+        // WARNING: deal playback reads the cards dealt since the shown room from draws, so keep showing that room until they arrive.
+        if (received.gaps.includes("draws")) {
+          return;
+        }
+
         const firstSync = seatedPlayerId !== null && !synced;
         synced = seatedPlayerId !== null;
         update({ room: received.room });
