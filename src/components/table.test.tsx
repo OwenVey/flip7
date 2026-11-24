@@ -178,8 +178,8 @@ describe("<Table />", () => {
   it("keeps the same Hit and Stay buttons for an offline player while their points change", () => {
     const [points, setPoints] = createSignal(7);
     const view = room({ turnId: "b" });
-    view.players = view.players.map((seat) =>
-      seat.id === "b" ? { ...seat, connected: false } : seat
+    view.players = view.players.map((player) =>
+      player.id === "b" ? { ...player, connected: false } : player
     );
 
     render(() => (

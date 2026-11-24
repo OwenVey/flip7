@@ -135,12 +135,13 @@ const ActionBar = (
     return controls.kind === "turn" ? controls : null;
   };
 
-  const forName = () => turn()?.for?.name ?? "";
+  const offlinePlayer = () => turn()?.for;
+  const turnPointsLabel = () => pointsLabel(turn()?.roundPoints ?? 0);
 
-  const myTurn = () => kind() === "turn" && forName() === "";
+  const myTurn = () => kind() === "turn" && offlinePlayer() === undefined;
 
   const turnMove = (type: "hit" | "stay") => {
-    const target = turn()?.for;
+    const target = offlinePlayer();
 
     return target === undefined ? { type } : { forId: target.id, type };
   };
@@ -256,7 +257,11 @@ const ActionBar = (
                   data-size="lg"
                   disabled={props.actionsDisabled}
                   data-variant="solid"
-                  aria-label={forName() ? `Hit for ${forName()}` : undefined}
+                  aria-label={
+                    offlinePlayer()
+                      ? `Hit for ${offlinePlayer()?.name}`
+                      : undefined
+                  }
                   data-game-tap=""
                   onClick={async () => await props.send(turnMove("hit"))}
                 >
@@ -268,17 +273,17 @@ const ActionBar = (
                     data-size="lg"
                     disabled={props.actionsDisabled}
                     aria-label={
-                      forName()
-                        ? `Stay for ${forName()} with ${pointsLabel(turn()?.roundPoints ?? 0)}`
+                      offlinePlayer()
+                        ? `Stay for ${offlinePlayer()?.name} with ${turnPointsLabel()}`
                         : undefined
                     }
                     data-game-tap=""
                     onClick={async () => await props.send(turnMove("stay"))}
                   >
                     <Hand size={16} />
-                    <Show when={forName()} fallback="Stay">
+                    <Show when={offlinePlayer()} fallback="Stay">
                       <FitLabel
-                        long={`Stay · ${pointsLabel(turn()?.roundPoints ?? 0)}`}
+                        long={`Stay · ${turnPointsLabel()}`}
                         short="Stay"
                       />
                     </Show>

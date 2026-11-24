@@ -107,7 +107,6 @@ export const roundPointsFor = (
     ])
   );
 
-/** A player's round points as the table shows them, or 0 for a Spectator. */
 export const pointsOf = (
   roundPoints: DealPlaybackView["roundPoints"],
   playerId: string | null
