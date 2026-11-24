@@ -1,11 +1,8 @@
-.log-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  min-inline-size: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
+.log-filters [data-slot="segmented-control-item"] {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+  justify-content: center;
 }
 
 .log-unread {

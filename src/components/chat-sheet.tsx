@@ -1,12 +1,30 @@
 import MessageCircle from "@lucide/solid/icons/message-circle";
+import X from "@lucide/solid/icons/x";
+import {
+  Drawer,
+  DrawerBackdrop,
+  DrawerClose,
+  DrawerContent,
+  DrawerHandle,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@ui-sdk/solid/drawer";
+import type { SnapPoint } from "@ui-sdk/solid/drawer";
 import { createSignal, Show, untrack } from "solid-js";
 
 import type { LogEntry } from "../game/engine";
 import { countChatsAfter } from "../lib/game-log-entries";
 import GameLog, { CHAT_AND_GAME_LOG_TITLE } from "./game-log";
-import TableSheet from "./table-sheet";
+import Tooltip from "./tooltip";
 
-/** Chat & Log as a sheet from the header, with an unread count, for screens without room for the log beside the page. */
+const HALF = 0.5;
+const SNAP_POINTS: SnapPoint[] = [HALF, "content"];
+
+/**
+ * Chat & Log as a drawer from the header, with an unread count, for screens
+ * without room for the log beside the page. At half height the table above
+ * stays usable, so players can chat while they watch.
+ */
 export default function ChatSheet(props: {
   log: LogEntry[];
   playerId: string | null;
@@ -32,34 +50,75 @@ export default function ChatSheet(props: {
   };
 
   return (
-    <TableSheet
-      title={CHAT_AND_GAME_LOG_TITLE}
-      triggerLabel={triggerLabel()}
-      shortLabel="Chat"
-      keepMounted
+    <Drawer
       open={open()}
       onOpenChange={(next) => {
         setSeenLogId(latestLogId());
         setOwnOpen(next);
         props.onOpenChange?.(next);
       }}
-      trigger={
-        <>
-          <MessageCircle size={16} aria-hidden="true" />
-          <Show when={unreadChats() > 0}>
-            <span class="unread-count" aria-hidden="true">
-              {unreadChats()}
-            </span>
-          </Show>
-        </>
-      }
+      snapPoints={SNAP_POINTS}
+      modalAbove={HALF}
     >
-      <GameLog
-        inSheet
-        log={props.log}
-        playerId={props.playerId}
-        onChat={props.onChat}
-      />
-    </TableSheet>
+      <Tooltip
+        content={triggerLabel()}
+        type="label"
+        side="bottom"
+        compactOnly
+        trigger={(hint) => (
+          <DrawerTrigger
+            {...hint}
+            data-table-sheet-trigger=""
+            aria-label={triggerLabel()}
+          />
+        )}
+      >
+        <MessageCircle size={16} aria-hidden="true" />
+        <Show when={unreadChats() > 0}>
+          <span class="unread-count" aria-hidden="true">
+            {unreadChats()}
+          </span>
+        </Show>
+        <span class="button-label" aria-hidden="true">
+          Chat
+        </span>
+      </Tooltip>
+      <DrawerBackdrop />
+      <DrawerContent
+        class="chat-sheet"
+        keepMounted
+        style={{ "--chat-sheet-lower-snap": String(HALF) }}
+      >
+        <DrawerHandle aria-label="Resize" />
+        <header class="table-sheet-header">
+          <DrawerTitle>{CHAT_AND_GAME_LOG_TITLE}</DrawerTitle>
+          <Tooltip
+            content="Close"
+            type="label"
+            trigger={(hint) => (
+              <DrawerClose
+                {...hint}
+                aria-label="Close"
+                data-size="sm"
+                data-icon=""
+              />
+            )}
+          >
+            <X size={16} aria-hidden="true" />
+          </Tooltip>
+        </header>
+        <div
+          class="chat-sheet-body"
+          data-agent-hidden={open() ? undefined : ""}
+        >
+          <GameLog
+            inSheet
+            log={props.log}
+            playerId={props.playerId}
+            onChat={props.onChat}
+          />
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }

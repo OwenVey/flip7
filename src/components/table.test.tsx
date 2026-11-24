@@ -818,14 +818,14 @@ describe("<Table />", () => {
     ));
 
     const filters = within(
-      screen.getByRole("group", { name: "Filter activity" })
+      screen.getByRole("radiogroup", { name: "Filter activity" })
     );
 
     expect(
-      filters.getByRole("button", { name: "All", pressed: true })
+      filters.getByRole("radio", { name: "All", checked: true })
     ).toBeVisible();
 
-    filters.getByRole("button", { name: "Game" }).click();
+    filters.getByRole("radio", { name: "Game" }).click();
     flush();
 
     setView(
@@ -856,19 +856,22 @@ describe("<Table />", () => {
     const log = within(screen.getByRole("log", { name: "Chat & Log" }));
     const unread = screen.getByRole("status", { name: "Unread chat messages" });
     expect({
+      chatFilter: filters.queryByRole("radio", { name: "Chat, 1 unread" })
+        ?.textContent,
       hiddenMessage: log.queryByText("gl"),
       unread: unread.textContent,
     }).toStrictEqual({
+      chatFilter: "Chat",
       hiddenMessage: null,
       unread: "1 unread message",
     });
 
     await agent.act({
-      steps: [{ action: "press", ref: "Chat, 1 unread" }],
+      steps: [{ action: "setValue", args: ["Chat"], ref: "Filter activity" }],
     });
 
     expect(
-      filters.getByRole("button", { name: "Chat", pressed: true })
+      filters.getByRole("radio", { name: "Chat", checked: true })
     ).toBeVisible();
     expect({
       gameEvent: log.queryByText("Ben deals."),
@@ -878,7 +881,7 @@ describe("<Table />", () => {
       unread: "",
     });
 
-    filters.getByRole("button", { name: "All" }).click();
+    filters.getByRole("radio", { name: "All" }).click();
     flush();
     expect(log.getByText("Ben deals.")).toBeVisible();
   });

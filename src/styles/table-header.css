@@ -44,6 +44,7 @@
         [data-slot="button"],
         [data-slot="alert-dialog-trigger"],
         [data-slot="dialog-trigger"],
+        [data-slot="drawer-trigger"],
         [data-slot="popover-trigger"],
         [data-slot="menu-trigger"]
       ) {
@@ -51,11 +52,6 @@
       padding-inline: 0.75rem;
     }
   }
-}
-
-/* The closed chat sheet keeps its viewport mounted to preserve drafts, so take it out of the header's row of buttons. */
-:is(.table-header, .page-header) .row > [data-slot="dialog-viewport"] {
-  position: fixed;
 }
 
 /* Phones swap Invite, Settings, and Leave for this one menu. */

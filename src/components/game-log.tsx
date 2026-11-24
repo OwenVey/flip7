@@ -25,6 +25,11 @@ import {
   ScrollAreaViewport,
 } from "@ui-sdk/solid/scroll-area";
 import {
+  SegmentedControl,
+  SegmentedControlIndicator,
+  SegmentedControlItem,
+} from "@ui-sdk/solid/segmented-control";
+import {
   createEffect,
   createMemo,
   createSignal,
@@ -308,25 +313,29 @@ export default function GameLog(props: {
           </Show>
         </output>
       </Show>
-      <fieldset class="log-filters">
-        <legend class="sr-only">Filter activity</legend>
+      <SegmentedControl
+        class="log-filters"
+        aria-label="Filter activity"
+        value={filter()}
+        onValueChange={(next) => {
+          const option = FILTERS.find((candidate) => candidate === next);
+
+          if (option !== undefined) {
+            scroll.scrollToEnd({ behavior: "instant" });
+            setFilter(option);
+          }
+        }}
+      >
+        <SegmentedControlIndicator />
         <For each={FILTERS}>
           {(option) => (
-            <Button
+            <SegmentedControlItem
+              value={option}
               aria-label={
                 option === "Chat" && hiddenChats() > 0
                   ? `Chat, ${hiddenChats()} unread`
-                  : option
+                  : undefined
               }
-              aria-pressed={filter() === option ? "true" : "false"}
-              data-size="sm"
-              data-variant={filter() === option ? "solid" : undefined}
-              onClick={() => {
-                if (filter() !== option) {
-                  scroll.scrollToEnd({ behavior: "instant" });
-                  setFilter(option);
-                }
-              }}
             >
               {option}
               <Show
@@ -340,10 +349,10 @@ export default function GameLog(props: {
                   {hiddenChats()}
                 </span>
               </Show>
-            </Button>
+            </SegmentedControlItem>
           )}
         </For>
-      </fieldset>
+      </SegmentedControl>
       <ScrollArea
         class="log-body scroll-fades"
         type="auto"
