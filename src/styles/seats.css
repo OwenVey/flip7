@@ -1,0 +1,766 @@
+.seat-meter {
+  --round-fill: color-mix(in srgb, var(--accent) 58%, var(--paper-deep));
+  --round-stripe: color-mix(in srgb, var(--accent) 34%, var(--paper-deep));
+  --meter-ease: 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  min-width: 0;
+
+  & [data-slot="meter-track"] {
+    flex: 1 1 auto;
+    position: relative;
+    height: 0.875rem;
+    overflow: hidden;
+    border: 1.5px solid var(--ink);
+    background: var(--paper-deep);
+  }
+
+  /*
+   * The banked fill and this round's band are each as wide as the track and
+   * slide in from the left with translate, so they grow off the main thread.
+   * A translate percentage is of the element's own width, the track's here.
+   * The banked fill sits on top and hides the band up to the banked score.
+   */
+  & :is([data-slot="meter-indicator"], .meter-round) {
+    position: absolute;
+    inset: 0;
+    width: auto !important;
+  }
+
+  & [data-slot="meter-indicator"] {
+    z-index: 1;
+    background: var(--accent);
+    translate: calc(var(--round-start) - 100%) 0;
+  }
+
+  /* Splits the banked fill from this round's points. */
+  &:has(.meter-round[data-divider]) [data-slot="meter-indicator"]::after {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    width: 1px;
+    background: var(--ink);
+    content: "";
+  }
+
+  /* This round's points: striped while the player could still bust, solid once they're safe. */
+  & .meter-round {
+    overflow: hidden;
+    background: var(--round-fill);
+    translate: calc(var(--projected-score) - 100%) 0;
+  }
+
+  /* One stripe tile wider than the band, so sliding it a tile loops seamlessly. */
+  &[data-round="at-risk"] .meter-round::before {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: -0.7071rem 0;
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--round-fill) 0 0.25rem,
+      var(--round-stripe) 0.25rem 0.5rem
+    );
+    background-size: 0.7071rem 0.7071rem;
+    content: "";
+  }
+
+  & .meter-lost {
+    position: absolute;
+    inset-block: 0;
+    inset-inline: var(--round-start) calc(100% - var(--lost-end));
+    transform-origin: left;
+    background: var(--danger);
+    opacity: 0;
+    animation: meter-bust 900ms ease-in both;
+  }
+
+  /* One row: banked total, the bar, then this round's points. */
+  & .seat-score {
+    flex: none;
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    line-height: 1;
+
+    &[data-projected] {
+      color: var(--ink-soft);
+    }
+  }
+
+  &[data-round="locked"] .seat-score[data-projected] {
+    color: var(--good);
+  }
+
+  .seat[data-status="busted"] & .seat-score[data-projected] {
+    color: var(--danger);
+  }
+
+  &[data-winning] .seat-score[data-projected] {
+    text-shadow: 2px 2px 0 var(--gold);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .seat-meter {
+    & [data-slot="meter-indicator"] {
+      transition: translate var(--meter-ease);
+    }
+
+    & .meter-round {
+      transition:
+        translate var(--meter-ease),
+        background-color 300ms;
+    }
+
+    &[data-round="at-risk"] .meter-round::before {
+      animation: meter-risk 900ms linear infinite;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat-meter .meter-lost {
+    animation: none;
+  }
+}
+
+@keyframes meter-risk {
+  to {
+    translate: 0.7071rem 0;
+  }
+}
+
+@keyframes meter-bust {
+  0%,
+  45% {
+    scale: 1 1;
+    opacity: 1;
+  }
+
+  100% {
+    scale: 0 1;
+    opacity: 0;
+  }
+}
+
+@media (max-width: 40rem), (max-height: 30rem) {
+  .table {
+    padding-bottom: 9rem;
+  }
+
+  .seat-meter [data-slot="meter-track"] {
+    height: 1rem;
+  }
+
+  .action-bar {
+    position: fixed;
+    inset: auto 0.5rem calc(0.5rem + env(safe-area-inset-bottom)) 0.5rem;
+    z-index: 2;
+    height: auto;
+    max-height: 55dvh;
+
+    & .action-bar-scroll {
+      overflow-y: auto;
+    }
+  }
+
+  .action-bar-content {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    padding: 0.625rem 0.75rem;
+
+    /* On the narrowest phones the held pile drops its label and stacks its cards, leaving the prompt room. */
+    @media (max-width: 25rem) {
+      & .held-pile-label {
+        display: none;
+      }
+
+      & .held-pile-cards > .card + .card {
+        margin-inline-start: calc(var(--card-w) * -0.55);
+      }
+    }
+
+    /* The message shares the deck's row; only the buttons take a row of their own. */
+    & .headline {
+      flex: 1 1 0;
+    }
+
+    & > p.muted {
+      flex: 1 1 100%;
+    }
+
+    & .action-buttons {
+      flex: 1 1 100%;
+      max-width: none;
+    }
+
+    & .action-button-items {
+      flex-wrap: wrap;
+      min-inline-size: 0;
+
+      & [data-slot="button"] {
+        flex: 1 1 0;
+        white-space: normal;
+      }
+    }
+  }
+
+  .deck {
+    padding-inline-end: 0.5rem;
+  }
+
+  .headline {
+    font-size: 1.0625rem;
+  }
+}
+
+.seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
+}
+
+.seat {
+  position: relative;
+  display: grid;
+  /* A crowded header gives way inside the seat instead of widening it. */
+  grid-template-columns: minmax(0, 1fr);
+  /* Seats in a row share the tallest one's height; the mat takes the extra so no blank paper gathers at the bottom. */
+  grid-template-rows: auto 1fr auto;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem 0.75rem;
+  border: 2px solid var(--ink);
+  border-radius: var(--dialog-radius);
+  background: var(--paper);
+  box-shadow: var(--shadow-print), var(--shadow-table);
+  scroll-margin-block-start: 5.5rem;
+  transition: box-shadow 160ms ease;
+
+  &[data-me] {
+    background: #fff0c6;
+  }
+
+  &[data-turn] {
+    box-shadow: var(--shadow-ring);
+  }
+
+  /* A Flip Three under way: the ring takes the Flip Three card's deeper gold. */
+  &[data-flipping] {
+    --ring-color: var(--flip);
+    box-shadow: var(--shadow-ring);
+  }
+
+  &[data-status="flipSeven"] .hand {
+    box-shadow:
+      inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.45),
+      0 0 0 2px var(--gold);
+  }
+
+  .table:not([data-phase="gameOver"]) &[data-status="flipSeven"] .hand {
+    box-shadow:
+      inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.45),
+      0 0 0 2px var(--gold),
+      0 0 1rem rgb(255 212 95 / 0.6);
+  }
+
+  &[data-offline] :is(.seat-meta, .seat-meter) {
+    opacity: 0.45;
+    filter: grayscale(0.6);
+  }
+
+  & .hand-stamp {
+    --stamp-color: var(--good);
+    --stamp-face: var(--paper);
+    position: absolute;
+    z-index: 2;
+    inset-block-start: 100%;
+    inset-inline-start: 50%;
+    display: flex;
+    translate: -50% -60%;
+    border: 2px solid var(--stamp-color);
+    border-radius: var(--radius-sm);
+    background: var(--stamp-color);
+    box-shadow: 2px 2px 0 color-mix(in oklab, var(--stamp-color), black 25%);
+    color: var(--stamp-color);
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    pointer-events: none;
+
+    & > span {
+      padding: 0.125rem 0.75rem;
+      background: var(--stamp-face);
+    }
+
+    & > .hand-stamp-points {
+      padding-inline: 0.5rem;
+      background: none;
+      color: var(--paper);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &[data-status="busted"] {
+    & .hand {
+      background:
+        radial-gradient(rgb(255 255 255 / 0.04) 0.6px, transparent 1px) 0 0 /
+          4px 4px,
+        radial-gradient(ellipse at 50% 0%, #6e2533, #3a0f19);
+    }
+
+    & .hand-stamp {
+      --stamp-color: var(--danger);
+    }
+  }
+
+  &[data-status="frozen"] .hand-stamp {
+    --stamp-color: var(--freeze-ink);
+  }
+
+  &[data-status="flipSeven"] .hand-stamp {
+    --stamp-color: var(--ink);
+    --stamp-face: var(--gold);
+    box-shadow:
+      2px 2px 0 color-mix(in oklab, var(--ink), black 25%),
+      0 0 1rem rgb(255 212 95 / 0.7);
+
+    & > .hand-stamp-points {
+      color: var(--gold);
+    }
+  }
+
+  &:is(
+    [data-status="stayed"],
+    [data-status="busted"],
+    [data-status="frozen"],
+    [data-status="flipSeven"]
+  ) {
+    border-color: var(--seat-ink);
+    box-shadow:
+      3px 3px 0 var(--seat-ink),
+      var(--shadow-table);
+  }
+
+  &[data-status="stayed"] {
+    --seat-ink: var(--good);
+  }
+
+  &[data-status="busted"] {
+    --seat-ink: var(--danger);
+  }
+
+  &[data-status="flipSeven"] {
+    --seat-ink: var(--rule);
+  }
+
+  &[data-status="frozen"] {
+    --seat-ink: var(--freeze-ink);
+    animation: freeze-shiver 520ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+
+  &[data-winner] {
+    border-color: var(--ink);
+    background: linear-gradient(170deg, #ffe6a0, #fff1cc 55%, var(--paper));
+    box-shadow:
+      inset 0 0 0 var(--ring-width) var(--gold),
+      4px 4px 0 var(--ink),
+      0 0 2rem 0.25rem rgb(255 212 95 / 0.55),
+      var(--shadow-table);
+  }
+
+  &[data-status="frozen"] .hand {
+    background:
+      linear-gradient(
+        125deg,
+        transparent 30%,
+        rgb(255 255 255 / 0.25) 42%,
+        transparent 50%
+      ),
+      radial-gradient(rgb(255 255 255 / 0.14) 0.6px, transparent 1px) 0 0 / 4px
+        4px,
+      radial-gradient(ellipse at 50% 0%, #5f9fbb, #24546b);
+    box-shadow:
+      inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.35),
+      inset 0 0 0 2px color-mix(in srgb, var(--freeze-glow) 75%, transparent),
+      inset 0 0 1.5rem color-mix(in srgb, var(--freeze-soft) 50%, transparent);
+  }
+}
+
+.seat[data-unpickable] {
+  opacity: 0.5;
+}
+
+.seat[data-pickable] {
+  outline: 2px solid var(--pick-color);
+  outline-offset: 2px;
+  --pick-color: var(--accent);
+  cursor: pointer;
+  @media (prefers-reduced-motion: no-preference) {
+    transition: box-shadow 160ms ease;
+  }
+
+  &[data-pickable="freeze"] {
+    --pick-color: var(--freeze);
+  }
+
+  &[data-pickable="flipThree"] {
+    --pick-color: var(--flip);
+  }
+
+  &[data-pickable="secondChance"] {
+    --pick-color: var(--second-chance);
+  }
+
+  &:has(.seat-pick:focus-visible:not(:disabled)) {
+    z-index: 1;
+    outline: 3px solid var(--pick-color);
+    outline-offset: 3px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:has(.seat-pick:hover:not(:disabled)) {
+      &:not(:has(.seat-pick:focus-visible)) {
+        --ring-color: var(--pick-color);
+        z-index: 1;
+        box-shadow:
+          var(--shadow-ring),
+          0 1.25rem 2rem rgb(4 20 14 / 0.5);
+
+        @media (prefers-reduced-motion: no-preference) {
+          transform: translateY(-6px);
+        }
+      }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      transition:
+        transform 140ms ease,
+        box-shadow 160ms ease;
+    }
+  }
+
+  &:has(.seat-pick:disabled) {
+    cursor: default;
+  }
+
+  /* The host's Remove button stays clickable above the pick target. */
+  & [data-slot="alert-dialog-trigger"] {
+    position: relative;
+    z-index: 2;
+  }
+}
+
+.seat-pick {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: inherit;
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+.frost-burst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6rem;
+  height: 6rem;
+  margin: -3rem 0 0 -3rem;
+  color: #fff;
+  pointer-events: none;
+  filter: drop-shadow(0 0 0.5rem var(--freeze-glow))
+    drop-shadow(0 0 1px var(--freeze-ink));
+  animation: frost-burst 1100ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes freeze-shiver {
+  0%,
+  100% {
+    transform: none;
+  }
+
+  15%,
+  55% {
+    transform: translateX(-3px) rotate(-0.4deg);
+  }
+
+  35%,
+  75% {
+    transform: translateX(3px) rotate(0.4deg);
+  }
+}
+
+@keyframes frost-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(-90deg);
+  }
+
+  35% {
+    opacity: 1;
+    transform: scale(1.15) rotate(0deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.6) rotate(30deg);
+  }
+}
+
+.seat-header {
+  container: seat-header / inline-size;
+  display: flex;
+  /* A header too full for one row moves its mini cards to a second, so nothing overlaps. */
+  flex-wrap: wrap;
+  gap: 0.375rem 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  /* Same height with or without the host's Remove button. */
+  min-height: 2rem;
+}
+
+/* Name, then status, then the dealer chip and Remove, all on one row. */
+.seat-name {
+  display: flex;
+  flex: 0 1 auto;
+  gap: 0.375rem;
+  align-items: center;
+  min-width: 3rem;
+  overflow: hidden;
+
+  & strong {
+    overflow: hidden;
+    font-size: 1.0625rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  & .badge,
+  & .avatar,
+  & .dealer-chip,
+  & .host-chip {
+    flex: none;
+  }
+}
+
+/* The action bar and the seat's ring already say it's your move. */
+.seat[data-me] .seat-meta > [data-tone="turn"] {
+  display: none;
+}
+
+.seat-meta {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 0.5rem;
+  align-items: center;
+  min-width: 0;
+  font-size: 0.875rem;
+  white-space: nowrap;
+
+  /* Badges keep their size; the points text gives way when the row is full. */
+  & > * {
+    flex: none;
+  }
+
+  & > .muted {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.flip-run {
+  position: relative;
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: center;
+  padding: 0 0.5rem;
+  border: 1.5px solid var(--flip);
+  border-radius: 999px;
+  background: var(--flip-soft);
+  color: var(--flip-ink);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.25rem;
+  text-transform: uppercase;
+
+  &[data-waiting] {
+    border-style: dashed;
+  }
+}
+
+/*
+ * A narrow header makes room for a Flip Three first by dropping the turn badge,
+ * which the seat's ring and the action bar already show, then by dropping the
+ * badge's words. The words stay for screen readers.
+ */
+@container seat-header (width < 25rem) {
+  .seat-meta:has(> .flip-run) > [data-tone="turn"] {
+    display: none;
+  }
+}
+
+/* The host's Remove button beside mini cards would push them to a second row, so the turn badge makes way first. */
+@container seat-header (width < 20rem) {
+  .seat-header:has(> .seat-extras > *):has(.remove-player)
+    .seat-meta
+    > [data-tone="turn"] {
+    display: none;
+  }
+}
+
+@container seat-header (width < 19rem) {
+  .flip-run-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/*
+ * A played Flip Three lands on the badge's icon and sinks into it, so the
+ * seat's row never makes room for it and nothing beside it shifts.
+ */
+.flip-run-card {
+  position: absolute;
+  top: 50%;
+  left: calc(0.5rem + 7.5px);
+  z-index: 1;
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+.flip-pips {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.flip-pip {
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1.5px solid var(--flip);
+  border-radius: 50%;
+  transition:
+    background-color 200ms ease,
+    transform 200ms ease;
+
+  &[data-filled] {
+    background: var(--flip);
+  }
+
+  &[data-current] {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--flip) 30%, transparent);
+    transform: scale(1.3);
+  }
+}
+
+/* Action cards set aside during a Flip Three, beside the deck until its run ends. */
+.held-pile {
+  display: flex;
+  flex: none;
+  gap: 0.375rem;
+  align-items: center;
+  /* 1.5rem cards are 2.1rem tall; with this padding and border it fits the bar's 2.75rem row. */
+  padding: 0.1875rem 0.3125rem 0.1875rem 0.5rem;
+  border: 1.5px dashed var(--flip);
+  border-radius: var(--radius-md);
+  background: var(--flip-soft);
+}
+
+.held-pile-label {
+  color: var(--flip-ink);
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.held-pile-cards {
+  --card-w: 1.5rem;
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.status-pill {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+  padding: 0 0.5rem;
+  border: 1.5px solid currentcolor;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+
+  [data-status="busted"] & {
+    color: var(--danger);
+  }
+
+  [data-status="frozen"] & {
+    color: var(--freeze-ink);
+  }
+
+  [data-status="flipSeven"] &,
+  [data-status="stayed"] & {
+    color: var(--good);
+  }
+}
+
+.seat-tools {
+  display: flex;
+  justify-content: end;
+}
+
+.hand-area {
+  position: relative;
+  display: grid;
+  isolation: isolate;
+  /* Room below for the end-of-round stamp that straddles the bottom edge, kept always so seats don't jump. */
+  margin-block-end: 0.375rem;
+}
+
+.hand {
+  --hand-card: 3.25rem;
+  --hand-pad: 0.5rem;
+  display: grid;
+  grid-auto-columns: minmax(0, calc(var(--hand-card) + 0.375rem));
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: start;
+  min-height: calc(var(--hand-card) * 1.4 + 2 * var(--hand-pad) + 0.5rem);
+  margin: 0;
+  /* Room at the end for the last card when the columns squeeze and cards overlap. */
+  padding: var(--hand-pad) calc(var(--hand-pad) + var(--hand-card))
+    var(--hand-pad) var(--hand-pad);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(rgb(255 255 255 / 0.04) 0.6px, transparent 1px) 0 0 / 4px
+      4px,
+    radial-gradient(ellipse at 50% 0%, var(--felt-light), var(--felt-deep));
+  box-shadow: inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.45);
+  list-style: none;
+
+  --card-w: var(--hand-card);
+}

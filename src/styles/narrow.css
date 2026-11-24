@@ -1,0 +1,201 @@
+/* Short button labels and sheet triggers only show on narrow screens. */
+.label-short,
+[data-table-sheet-trigger] {
+  display: none;
+}
+
+:is(.table-header, .page-header) [data-table-sheet-trigger] {
+  position: relative;
+}
+
+/* Without room for the sidebar, scores and the log open as sheets from the header so they stay discoverable. */
+@media (width < 64rem), (max-height: 30rem) {
+  [data-table-sheet-trigger] {
+    display: inline-flex;
+  }
+
+  .table-sidebar,
+  .lobby > .log {
+    display: none;
+  }
+}
+
+@container table-header (width < 50rem) {
+  .table-header [data-collapsible] {
+    display: none;
+  }
+
+  .table-header .table-more-trigger {
+    display: inline-flex;
+    flex: none;
+    inline-size: var(--button-height);
+    padding-inline: 0;
+  }
+
+  /* A spectator has no ⋯ menu, so their actions and the watcher count shrink to icons instead. */
+  .table-header .spectator-action {
+    flex: none;
+    inline-size: var(--button-height);
+    padding-inline: 0;
+  }
+
+  .table-header :is(.spectator-action, .watcher-count) .button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .table-header .watcher-count-short {
+    display: inline;
+  }
+}
+
+@container table-header (width < 30rem) {
+  .table-header {
+    & [data-slot="tooltip-content"][data-compact-only] {
+      visibility: visible;
+    }
+
+    & [data-table-sheet-trigger] {
+      flex: none;
+      inline-size: var(--button-height);
+      padding-inline: 0;
+    }
+
+    & .button-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    & .watcher-count-short {
+      display: inline;
+    }
+  }
+}
+
+.unread-count {
+  position: absolute;
+  inset-block-start: -0.5rem;
+  inset-inline-end: -0.5rem;
+  min-width: 1.25rem;
+  padding-inline: 0.3125rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--paper);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  line-height: 1.125rem;
+  text-align: center;
+}
+
+/*
+ * Phones, upright or sideways. One column of compact seats with yours first,
+ * header controls as icons, and scores, log, and chat in sheets.
+ */
+@media (max-width: 40rem), (max-height: 30rem) {
+  .page-header [data-slot="tooltip-content"][data-compact-only] {
+    visibility: visible;
+  }
+
+  .label-long {
+    display: none;
+  }
+
+  .label-short {
+    display: inline;
+  }
+
+  .page-header {
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+
+    & h1 {
+      min-width: 0;
+    }
+
+    & .row {
+      flex: none;
+      flex-wrap: nowrap;
+    }
+  }
+
+  .page-header
+    :is(
+      [data-slot="button"],
+      [data-slot="alert-dialog-trigger"],
+      [data-slot="dialog-trigger"],
+      [data-slot="popover-trigger"]
+    ):has(> .button-label) {
+    flex: none;
+    inline-size: var(--button-height);
+    padding-inline: 0;
+  }
+
+  .page-header .button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .page-header .watcher-count-short {
+    display: inline;
+  }
+
+  .seats {
+    gap: 0.75rem;
+  }
+
+  .seat {
+    scroll-margin-block: 1rem 11rem;
+
+    &[data-me] {
+      order: -1;
+    }
+  }
+
+  .seat-header {
+    height: auto;
+    min-height: 2rem;
+  }
+
+  .home {
+    gap: 1rem;
+    padding-top: 0.5rem;
+  }
+
+  .hero {
+    gap: 0.25rem;
+    padding: 1.25rem 1rem 0.5rem;
+    border-width: 0.5rem;
+    border-radius: 1.25rem;
+  }
+
+  .hero-copy {
+    gap: 0.75rem;
+  }
+
+  .hero-cards {
+    min-height: 0;
+    padding: 0.25rem 0;
+
+    /* The fan row is short here, so stretch the rays past it to keep them round. */
+    &::before {
+      inset: -2.5rem 15% 0;
+    }
+  }
+
+  .lede {
+    font-size: 0.9375rem;
+  }
+}

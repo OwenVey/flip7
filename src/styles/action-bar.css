@@ -1,0 +1,103 @@
+.action-bar {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 1;
+  display: grid;
+  /* One fixed height for every phase: two headline lines or one row of 2.75rem buttons. */
+  height: 4rem;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-xl);
+  background: var(--paper);
+  box-shadow:
+    3px 3px 0 var(--ink),
+    var(--shadow-table);
+  font-weight: 600;
+}
+
+.action-bar .action-bar-scroll {
+  overflow: visible;
+}
+
+.action-bar-content {
+  display: flex;
+  gap: 0.75rem 1.25rem;
+  align-items: center;
+  min-block-size: 100%;
+  padding: 0.5rem 1rem 0.5rem 0.875rem;
+}
+
+.headline {
+  display: -webkit-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 1.25rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+
+  /* The clamp's overflow clips descenders at the display font's line-height: 1. */
+  & .muted {
+    font-family: var(--font-body);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+}
+
+.action-buttons {
+  flex: none;
+  max-width: 70%;
+  /* Many players: the choices scroll sideways instead of adding a row. */
+  margin: -0.25rem;
+}
+
+.action-buttons-scroll {
+  padding: 0.25rem;
+}
+
+.action-button-items {
+  display: flex;
+  gap: var(--button-gap);
+  min-inline-size: max-content;
+
+  & [data-slot="button"] {
+    min-width: 7rem;
+  }
+}
+
+.action-bar-trophy {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 2px 2px 0 var(--ink);
+  color: var(--ink);
+
+  & svg {
+    width: 1.375rem;
+    height: 1.375rem;
+  }
+}
+
+.headline[data-winner-headline] {
+  font-size: 1.625rem;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+  text-shadow: 2px 2px 0 var(--gold);
+}
+
+/* Declared per element so a local --ring-color recolors it. */
+:is(.action-bar, .seat) {
+  --shadow-ring:
+    0 0 0 var(--ring-width) var(--ring-color),
+    0 0 0 calc(var(--ring-width) + 2px) var(--ink),
+    calc(var(--ring-width) + 3px) calc(var(--ring-width) + 3px) 0 2px var(--ink);
+}
+
+.action-bar[data-turn] {
+  box-shadow: var(--shadow-ring);
+}

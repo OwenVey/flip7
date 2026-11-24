@@ -1,0 +1,300 @@
+.leaderboard {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+
+  & th,
+  & td {
+    padding: 0.375rem 0.25rem;
+    border-bottom: 1px solid var(--rule);
+    text-align: end;
+  }
+
+  & th:nth-child(2),
+  & th[scope="row"] {
+    overflow-wrap: anywhere;
+    text-align: start;
+  }
+
+  & thead {
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+  }
+
+  /* Your own row, tinted like your seat; a medal at game over takes precedence. */
+  & tr[data-me] {
+    background: #fff0c6;
+  }
+
+  /* At game over, the same gold, silver and bronze as the final standings. */
+  & tr[data-winner] {
+    background: var(--gold);
+  }
+
+  & tr[data-medal="2"] {
+    background: #dcdfe6;
+  }
+
+  & tr[data-medal="3"] {
+    background: #ebb985;
+  }
+}
+
+.leaderboard-total,
+.leaderboard-round {
+  font-family: var(--font-numeral);
+  font-size: 1.0625rem;
+  font-weight: 900;
+}
+
+.leaderboard-round {
+  color: var(--ink-soft);
+  font-weight: 600;
+  white-space: nowrap;
+
+  & > span {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+  }
+
+  &[data-round-state="banked"] {
+    color: var(--good);
+    font-weight: 900;
+  }
+
+  &[data-round-state="busted"] {
+    color: var(--danger);
+    font-weight: 900;
+  }
+}
+
+[data-slot="dialog-content"]:is(.table-sheet, .rules-dialog) {
+  gap: 0;
+  max-height: min(85dvh, calc(var(--visual-viewport-height, 100dvh) - 1rem));
+  padding: 0;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+[data-slot="dialog-content"].rules-dialog[data-presentation="dialog"] {
+  width: min(38rem, calc(100% - 2rem));
+}
+
+.rules-sections {
+  display: grid;
+  gap: 1.25rem;
+  color: var(--ink-soft);
+
+  & section {
+    display: grid;
+    gap: 0.625rem;
+  }
+
+  & h3 {
+    margin: 0;
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  & p {
+    margin: 0;
+  }
+
+  & strong {
+    color: var(--ink);
+  }
+}
+
+.rules-list {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0;
+  padding-inline-start: 1.125rem;
+
+  & li::marker {
+    color: var(--rule);
+  }
+}
+
+/* Each rule's cards stand in for its bullet, and the list's rules share one card column. */
+.rules-card-list {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rules-card-rule {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: start;
+
+  & > p {
+    grid-column: 2;
+  }
+
+  & .card {
+    animation: none;
+  }
+}
+
+[data-slot="dialog-content"]:is(
+  .table-sheet,
+  .rules-dialog[data-presentation="sheet"]
+) {
+  --sheet-backdrop: var(--ui-overlay);
+  width: 100%;
+  padding-bottom: env(safe-area-inset-bottom);
+  border: 0;
+  border-radius: 1.5rem 1.5rem 0 0;
+  box-shadow: 0 -0.375rem 2rem rgb(10 16 28 / 0.24);
+}
+
+.table-sheet-header {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem var(--dialog-inset) 0.625rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+
+  .rules-dialog[data-presentation="dialog"] & {
+    padding-top: var(--dialog-inset);
+  }
+
+  [data-presentation="sheet"] &::before {
+    position: absolute;
+    inset: 0.375rem auto auto 50%;
+    width: 2rem;
+    height: 0.25rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink) 25%, transparent);
+    content: "";
+    translate: -50% 0;
+  }
+}
+
+.table-sheet-body {
+  padding: 0.75rem var(--dialog-inset) var(--dialog-inset);
+
+  & .log-scroll {
+    max-height: min(22rem, 48dvh);
+  }
+
+  & .leaderboard th:first-child {
+    width: 3rem;
+  }
+}
+
+.table-body {
+  display: grid;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.table-sidebar {
+  min-width: 0;
+
+  & > .panel {
+    padding-inline: 1rem;
+  }
+}
+
+/*
+ * Wide screens: the header runs across the top, the action bar and seats
+ * share the left column, and the scores and log run down the right, level
+ * with the action bar.
+ */
+@media (min-width: 64rem) {
+  .table {
+    grid-template-columns: minmax(0, 1fr) 18rem;
+    grid-template-rows: auto auto 1fr;
+    column-gap: 1rem;
+    align-items: start;
+  }
+
+  .table-body {
+    display: contents;
+  }
+
+  .table-header {
+    grid-column: 1 / -1;
+  }
+
+  .action-bar,
+  .seats {
+    grid-column: 1;
+  }
+
+  .table-sidebar {
+    grid-row: 2 / span 2;
+    grid-column: 2;
+  }
+}
+
+@media (min-width: 64rem) and (height > 30rem) {
+  .table-sidebar {
+    --sidebar-height: calc(100dvh - 9rem);
+    position: sticky;
+    inset-block-start: 0.5rem;
+    grid-template-rows: auto minmax(0, 1fr);
+    max-block-size: var(--sidebar-height);
+    align-self: start;
+
+    & > .panel {
+      gap: 0.625rem;
+      padding-block: clamp(0.75rem, 2dvh, 1.25rem);
+    }
+
+    & .leaderboard-panel {
+      grid-template-rows: auto minmax(0, 1fr);
+      max-block-size: min(
+        calc((var(--sidebar-height) - 1rem) * 0.47),
+        calc(var(--sidebar-height) - 15rem)
+      );
+    }
+
+    & .leaderboard-scroll {
+      scrollbar-gutter: stable;
+    }
+
+    & .leaderboard {
+      border-collapse: separate;
+      border-spacing: 0;
+
+      & thead th {
+        position: sticky;
+        z-index: 1;
+        inset-block-start: 0;
+        background: var(--paper);
+      }
+    }
+
+    & .leaderboard-scroll[data-scroll-before] thead th::after {
+      position: absolute;
+      inset: 100% 0 auto;
+      height: 1.125rem;
+      background: linear-gradient(var(--scroll-fade-stops));
+      pointer-events: none;
+      content: "";
+    }
+
+    & .log {
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      min-block-size: 0;
+    }
+
+    & .log-scroll {
+      max-block-size: none;
+    }
+  }
+}
