@@ -5,11 +5,13 @@ import Trophy from "@lucide/solid/icons/trophy";
 import { Meter, MeterIndicator, MeterTrack } from "@ui-sdk/solid/meter";
 import { createEffect, createMemo, For, Show } from "solid-js";
 
-import { calculateRoundScore } from "../game/cards";
 import type { Card } from "../game/cards";
 import type { ActionCardChoice, Player, RoundStatus } from "../game/engine";
+import type { AvailableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
+import type { DealStep } from "../lib/deal-plan";
+import { scoreMeter } from "../lib/score-meter";
 import { pop } from "../lib/table-motion";
 import FlipTracker, {
   createShownFlip,
@@ -21,7 +23,6 @@ import PlayerAvatar from "./player-avatar";
 import PlayingCard from "./playing-card";
 import RemovePlayer from "./remove-player";
 import { nameOf, ROUND_COUNT_MS } from "./table-common";
-import type { DealProps, MoveControls, TableProps } from "./table-common";
 import Tooltip from "./tooltip";
 
 const STATUS_LABELS = {
@@ -75,14 +76,20 @@ const pickLabel = (
   return forId === undefined ? label : `${label} for ${nameOf(room, forId)}`;
 };
 
-const RoundPlayer = (
-  props: TableProps &
-    MoveControls &
-    Pick<DealProps, "dealStep"> & {
-      player: Player;
-      roundPoints: number;
-    }
-) => {
+interface RoundPlayerProps {
+  room: RoomView;
+  player: Player;
+  playerId: string | null;
+  moves: AvailableMoves;
+  dealStep?: DealStep | null;
+  roundPoints: number;
+  actionsDisabled?: boolean;
+  removeDisabled?: boolean;
+  onPick: (targetId: string) => void;
+  onRemove: (playerId: string) => void;
+}
+
+const RoundPlayer = (props: RoundPlayerProps) => {
   const numberCards = createMemo(
     () => props.player.hand.filter((card) => card.kind === "number"),
     { equals: sameCards }
@@ -150,60 +157,34 @@ const RoundPlayer = (
   );
 
   const playing = createMemo(() => props.room.phase === "playing");
-  const stampedPoints = createMemo(() => props.roundPoints);
-  const roundPoints = createMemo(() => (playing() ? stampedPoints() : 0));
 
-  const baseScore = () => props.player.score;
+  const meter = createMemo(() =>
+    scoreMeter(
+      props.player,
+      props.room.phase,
+      props.roundPoints,
+      props.room.settings.targetScore
+    )
+  );
 
-  const projectedScore = () => baseScore() + roundPoints();
+  const banked = createMemo(() => meter().banked);
+  const round = createMemo(() => meter().round);
+  const shownBaseScore = createCountUp(banked);
 
-  const shownBaseScore = createCountUp(baseScore);
-
-  const shownRoundPoints = createCountUp(roundPoints, {
+  const shownRoundPoints = createCountUp(round, {
     durationMs: ROUND_COUNT_MS,
   });
 
   let bankedLabel: HTMLSpanElement | undefined;
 
-  createEffect(baseScore, (score, previous) => {
+  createEffect(banked, (score, previous) => {
     if (previous !== undefined && score > previous) {
       pop(bankedLabel, 1.35);
     }
   });
 
-  const lostPoints = () =>
-    props.room.phase === "playing" && props.player.status === "busted"
-      ? calculateRoundScore(props.player.hand).total
-      : 0;
-
-  const roundRisk = () => {
-    if (roundPoints() <= 0) {
-      return "none";
-    }
-
-    return props.room.phase === "playing" && props.player.status === "active"
-      ? "at-risk"
-      : "locked";
-  };
-
-  const atTarget = () => projectedScore() >= props.room.settings.targetScore;
-
   const scorePercent = (score: number) =>
     `${Math.min(100, (score / props.room.settings.targetScore) * 100)}%`;
-
-  const scoreDetails = () => {
-    const details: string[] = [];
-
-    if (roundPoints() > 0) {
-      details.push(`${roundPoints()} this round`);
-    }
-
-    if (atTarget()) {
-      details.push("at the target");
-    }
-
-    return details;
-  };
 
   const decisionLabel = () => {
     if (props.room.choice) {
@@ -242,7 +223,7 @@ const RoundPlayer = (
               props.moves.choice?.forId
             )}
             onClick={() => {
-              props.onChoose(props.player.id);
+              props.onPick(props.player.id);
             }}
           />
         )}
@@ -334,10 +315,10 @@ const RoundPlayer = (
         <Show when={canKick()}>
           <RemovePlayer
             bot={props.player.bot}
-            disabled={props.offline}
+            disabled={props.removeDisabled}
             name={props.player.name}
             onRemove={() => {
-              void props.send({ playerId: props.player.id, type: "kick" });
+              props.onRemove(props.player.id);
             }}
           />
         </Show>
@@ -355,7 +336,7 @@ const RoundPlayer = (
           <span class="hand-stamp" aria-hidden="true">
             <span>{STATUS_LABELS[props.player.status]}</span>
             <Show when={props.player.status !== "busted"}>
-              <span class="hand-stamp-points">+{stampedPoints()}</span>
+              <span class="hand-stamp-points">+{props.roundPoints}</span>
             </Show>
           </span>
         </Show>
@@ -368,15 +349,15 @@ const RoundPlayer = (
         class="seat-meter"
         value={props.player.score}
         max={props.room.settings.targetScore}
-        data-round={roundRisk()}
-        data-winning={atTarget() ? "" : undefined}
+        data-round={meter().risk}
+        data-winning={meter().atTarget ? "" : undefined}
         style={{
-          "--lost-end": scorePercent(baseScore() + lostPoints()),
-          "--projected-score": scorePercent(projectedScore()),
-          "--round-start": scorePercent(baseScore()),
+          "--lost-end": scorePercent(meter().banked + meter().lost),
+          "--projected-score": scorePercent(meter().projected),
+          "--round-start": scorePercent(banked()),
         }}
         getValueLabel={(value, details) =>
-          [`${value} of ${details.max} points`, ...scoreDetails()].join(", ")
+          [`${value} of ${details.max} points`, ...meter().details].join(", ")
         }
       >
         <span
@@ -393,9 +374,9 @@ const RoundPlayer = (
           <MeterIndicator />
           <span
             class="meter-round"
-            data-divider={baseScore() > 0 && roundPoints() > 0 ? "" : undefined}
+            data-divider={banked() > 0 && round() > 0 ? "" : undefined}
           />
-          <Show when={lostPoints() > 0}>
+          <Show when={meter().lost > 0}>
             <span class="meter-lost" />
           </Show>
         </MeterTrack>

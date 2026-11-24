@@ -56,6 +56,10 @@ export default function Table(
   const settings = createPopoverController();
   const leave = createAlertDialogController();
 
+  const removePlayer = (playerId: string) => {
+    void props.send({ playerId, type: "kick" });
+  };
+
   const chooseTarget = (targetId: string) => {
     const { choice } = moves();
 
@@ -199,13 +203,13 @@ export default function Table(
                   player={props.room.players[index()]}
                   room={props.room}
                   playerId={props.playerId}
-                  send={props.send}
                   actionsDisabled={props.actionsDisabled}
-                  offline={props.offline}
+                  removeDisabled={props.offline}
                   roundPoints={pointsOf(props.roundPoints, id)}
                   dealStep={props.dealStep}
                   moves={moves()}
-                  onChoose={chooseTarget}
+                  onPick={chooseTarget}
+                  onRemove={removePlayer}
                 />
               )}
             </For>

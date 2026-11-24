@@ -1,4 +1,3 @@
-import type { AvailableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { stepPlayerId as dealStepPlayerId } from "../lib/deal-plan";
 import type { DealStep } from "../lib/deal-plan";
@@ -18,11 +17,6 @@ export interface TableProps {
    * open during the deal and while a move waits for the room.
    */
   offline?: boolean;
-}
-
-export interface MoveControls {
-  moves: AvailableMoves;
-  onChoose: (targetId: string) => void;
 }
 
 export interface DealProps {
