@@ -14,6 +14,7 @@ Use the [README](README.md) for setup, game rules, and deployment. Before explor
 | Room creation and existence checks | `src/lib/room-functions.ts` |
 | Browser identity, reconnects, and pending moves | `src/lib/room-connection.ts`, `src/lib/room-client.ts` |
 | Lobby, table, and deal playback | `src/routes/room/[code].tsx`, `src/components/table.tsx`, `src/lib/deal-playback.ts`, `src/lib/deal-plan.ts` |
+| What the action bar says and offers (Table prompt) | `src/lib/table-prompt.ts`, `src/components/action-bar.tsx` |
 
 ## Room and game changes
 

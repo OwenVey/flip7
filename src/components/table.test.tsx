@@ -15,6 +15,7 @@ import { calculateRoundScore } from "../game/cards";
 import type { RoomView } from "../game/protocol";
 import { roundPointsFor } from "../lib/deal-playback";
 import type { RoomConnection } from "../lib/room-connection";
+import { LOGGED_AT, room } from "../test/room-view";
 import TableView from "./table";
 
 let approve = false;
@@ -22,67 +23,6 @@ let approve = false;
 const agent = createAgent({
   allow: (step) => (step.confirm ?? "") === "" || approve,
 });
-
-const LOGGED_AT = Date.now();
-
-const room = (overrides: Partial<RoomView> = {}) => {
-  const view: RoomView = {
-    choice: null,
-    code: "ABCDE",
-    dealerId: "b",
-    deckCount: 80,
-    discardCount: 0,
-    drawSeq: 0,
-    draws: [],
-    flips: [],
-    held: [],
-    hostId: "a",
-    log: [
-      {
-        at: LOGGED_AT,
-        game: 1,
-        id: 1,
-        round: 1,
-        text: "Round 1 begins. Ben deals.",
-      },
-    ],
-    phase: "playing",
-    players: [
-      {
-        avatar: 1,
-        bot: false,
-        bustCard: null,
-        connected: true,
-        hand: [{ id: 1, kind: "number", value: 7 }],
-        id: "a",
-        lastRound: null,
-        name: "Ana",
-        score: 40,
-        status: "active",
-      },
-      {
-        avatar: 1,
-        bot: false,
-        bustCard: null,
-        connected: true,
-        hand: [{ id: 2, kind: "number", value: 3 }],
-        id: "b",
-        lastRound: null,
-        name: "Ben",
-        score: 12,
-        status: "active",
-      },
-    ],
-    round: 1,
-    settings: { botSpeed: "normal", locked: false, targetScore: 200 },
-    spectatorCount: 0,
-    turnId: "a",
-    winnerIds: [],
-    ...overrides,
-  };
-
-  return view;
-};
 
 const withBot = (overrides: Partial<RoomView> = {}) => {
   const view = room(overrides);
@@ -174,6 +114,33 @@ describe("<Table />", () => {
     setHit(true);
     flush();
     expect(screen.getByText("Ben hits…")).toBeVisible();
+  });
+
+  it("keeps the same Hit and Stay buttons while the prompt's points change", () => {
+    const [points, setPoints] = createSignal(7);
+
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        roundPoints={new Map([["a", points()]])}
+      />
+    ));
+
+    const actionBar = within(screen.getByRole("region", { name: "Your move" }));
+    const hit = actionBar.getByRole("button", { name: "Hit" });
+    const stay = actionBar.getByRole("button", { name: "Stay" });
+
+    expect(actionBar.getByText("7 points this round")).toBeVisible();
+
+    setPoints(9);
+    flush();
+
+    expect(actionBar.getByText("9 points this round")).toBeVisible();
+    expect(actionBar.getByRole("button", { name: "Hit" })).toBe(hit);
+    expect(actionBar.getByRole("button", { name: "Stay" })).toBe(stay);
   });
 
   it("sets held action cards beside the deck, not in the seat", () => {
@@ -2141,24 +2108,5 @@ describe("<Table />", () => {
         .getAllByRole("heading")
         .map((heading) => heading.textContent)
     ).toStrictEqual(["Round 1", "Before the game", "Game 2 · Round 1"]);
-  });
-
-  it("says when the player everyone is waiting on is offline", () => {
-    const view = room();
-    view.players = view.players.map((seat) =>
-      seat.id === "a" ? { ...seat, connected: false } : seat
-    );
-
-    render(() => (
-      <Table
-        room={view}
-        playerId="b"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
-    ));
-    expect(
-      screen.getByText(/The game will Stay for them soon/u)
-    ).toBeInTheDocument();
   });
 });

@@ -32,6 +32,8 @@ A multiplayer push-your-luck card game played in shared rooms, where players joi
 
 **Held action card**: A Freeze or Flip Three set aside during a Flip Three. It stays held until it takes effect or is discarded, even if it has already been assigned to a player.
 
+**Table prompt**: What the action bar tells a player right now: a headline, an optional note, and which controls to offer (Hit and Stay, a target to pick, start the next round, play again). Exactly one applies at a time, chosen from the game's phase, the Move being waited on and Deal playback. _Avoid_: action prompt (an action is a kind of card), status
+
 **Deal playback**: The sequence in which the table reveals dealt cards and shows their results to a player.
 
 ## Clocks

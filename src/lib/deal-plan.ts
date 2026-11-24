@@ -326,7 +326,7 @@ const complete = (
   frame.held = frame.held.filter((entry) => entry.card.id !== step.card.id);
 };
 
-const stepPlayerId = (step: DealStep) =>
+export const stepPlayerId = (step: DealStep) =>
   step.to.kind === "choice" ? null : step.to.playerId;
 
 /**
