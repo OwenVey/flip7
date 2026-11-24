@@ -146,4 +146,42 @@ describe(createRoomHaptics, () => {
     expect(localStorage.getItem("flip7:haptics-enabled")).toBe("false");
     haptics.dispose();
   });
+
+  it("stops a running vibration when another tab disables it", () => {
+    device(true);
+    const haptics = setup();
+    haptics.play("celebrate");
+    expect(vibrate).toHaveBeenCalledOnce();
+
+    const key = "flip7:haptics-enabled";
+    localStorage.setItem(key, "false");
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key,
+        newValue: "false",
+        storageArea: localStorage,
+      })
+    );
+    flush();
+
+    expect(vibrate).toHaveBeenCalledTimes(2);
+    expect(vibrate).toHaveBeenLastCalledWith(0);
+    haptics.dispose();
+  });
+
+  it("restores a saved choice and follows a change from another view", () => {
+    device(true);
+    localStorage.setItem("flip7:haptics-enabled", "false");
+    const first = setup();
+    const second = setup();
+
+    expect([first.enabled(), second.enabled()]).toStrictEqual([false, false]);
+
+    second.setEnabled(true);
+    flush();
+
+    expect([first.enabled(), second.enabled()]).toStrictEqual([true, true]);
+    first.dispose();
+    second.dispose();
+  });
 });

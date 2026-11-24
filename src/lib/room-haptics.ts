@@ -1,7 +1,7 @@
-import { makePersisted } from "@solid-primitives/storage";
-import { createSignal, onSettled } from "solid-js";
+import { createLocalStorage, createPreference } from "@ui-sdk/core";
+import { usePreference } from "@ui-sdk/solid/preferences";
+import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
 
-import { preferenceStorage } from "./preference-storage";
 import type { HapticOutcome } from "./room-haptic-cues";
 
 /** Outcomes at the local seat, plus alerts and feedback the room emits itself. */
@@ -24,14 +24,15 @@ const TOUCH_QUERY = "(any-pointer: coarse)";
 export const createRoomHaptics = (canPlay: () => boolean) => {
   const [supported, setSupported] = createSignal(false);
 
-  const [enabled, setEnabled] = makePersisted(
-    createSignal(true, { ownedWrite: true }),
-    {
-      deserialize: (value) => value !== "false",
-      name: "flip7:haptics-enabled",
-      storage: preferenceStorage,
-    }
-  );
+  const preference = createPreference({
+    attribute: "data-haptics-enabled",
+    defaultValue: "true",
+    storage: createLocalStorage("flip7:haptics-enabled"),
+    values: ["true", "false"],
+  });
+
+  const state = usePreference(preference);
+  const enabled = createMemo(() => state().value === "true");
 
   const play = (cue: RoomHapticCue) => {
     if (
@@ -73,15 +74,17 @@ export const createRoomHaptics = (canPlay: () => boolean) => {
     };
   });
 
+  createEffect(enabled, (allowsVibration) => {
+    if (!allowsVibration && supported()) {
+      navigator.vibrate(0);
+    }
+  });
+
   return {
     enabled,
     play,
     setEnabled: (value: boolean) => {
-      setEnabled(value);
-
-      if (!value && supported()) {
-        navigator.vibrate(0);
-      }
+      preference.set(value ? "true" : "false");
     },
     supported,
   };

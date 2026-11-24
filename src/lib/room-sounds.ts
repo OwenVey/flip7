@@ -1,9 +1,8 @@
 import { createAudio } from "@nkzw/audio";
 import type { Audio, Sound as AudioSound } from "@nkzw/audio";
-import { makePersisted } from "@solid-primitives/storage";
-import { createSignal, onSettled } from "solid-js";
-
-import { preferenceStorage } from "./preference-storage";
+import { createLocalStorage, createPreference } from "@ui-sdk/core";
+import { usePreference } from "@ui-sdk/solid/preferences";
+import { createEffect, createMemo, onSettled } from "solid-js";
 
 const SOUND_VOLUMES = [
   ["bank", 0.72],
@@ -24,42 +23,50 @@ const SOUND_VOLUMES = [
 type Sound = (typeof SOUND_VOLUMES)[number][0];
 
 const MUTE_KEY = "flip7:sound-muted";
-const EFFECTS_VOLUME_KEY = "flip7:effects-volume";
-const MUSIC_VOLUME_KEY = "flip7:music-volume";
 const MAX_PERCENT = 100;
 const DEFAULT_MUSIC_VOLUME = 25;
 const MUSIC_GAIN = 0.35;
 
-const persistedVolume = (name: string, fallback: number) =>
-  makePersisted(createSignal(fallback, { ownedWrite: true }), {
-    name,
-    storage: preferenceStorage,
-    deserialize: (stored) => {
-      const volume = Number(stored);
+const PERCENTS = Array.from({ length: MAX_PERCENT + 1 }, (_, percent) =>
+  String(percent)
+);
 
-      return Number.isInteger(volume) && volume >= 0 && volume <= MAX_PERCENT
-        ? volume
-        : fallback;
-    },
+const savedVolume = (name: string, fallback: number) => {
+  const preference = createPreference({
+    attribute: `data-${name}`,
+    defaultValue: String(fallback),
+    storage: createLocalStorage(`flip7:${name}`),
+    values: PERCENTS,
   });
 
-export const createRoomSounds = () => {
-  const [muted, setMuted] = makePersisted(
-    createSignal(false, { ownedWrite: true }),
-    {
-      name: MUTE_KEY,
-      storage: preferenceStorage,
-      deserialize: (stored) => stored === "true",
-    }
-  );
+  const state = usePreference(preference);
 
-  const [effectsVolume, setEffectsVolume] = persistedVolume(
-    EFFECTS_VOLUME_KEY,
+  return [
+    createMemo(() => Number(state().value)),
+    (volume: number) => {
+      preference.set(String(volume));
+    },
+  ] as const;
+};
+
+export const createRoomSounds = () => {
+  const mutedPreference = createPreference({
+    attribute: "data-sound-muted",
+    defaultValue: "false",
+    storage: createLocalStorage(MUTE_KEY),
+    values: ["false", "true"],
+  });
+
+  const mutedState = usePreference(mutedPreference);
+  const muted = createMemo(() => mutedState().value === "true");
+
+  const [effectsVolume, setEffectsVolume] = savedVolume(
+    "effects-volume",
     MAX_PERCENT
   );
 
-  const [musicVolume, setMusicVolume] = persistedVolume(
-    MUSIC_VOLUME_KEY,
+  const [musicVolume, setMusicVolume] = savedVolume(
+    "music-volume",
     DEFAULT_MUSIC_VOLUME
   );
 
@@ -118,6 +125,22 @@ export const createRoomSounds = () => {
     });
   };
 
+  createEffect(muted, (silent) => {
+    mixer?.mute(silent);
+
+    if (silent) {
+      for (const sound of sounds.values()) {
+        sound.stop();
+      }
+    }
+  });
+
+  createEffect(effectsVolume, (volume) => {
+    for (const [name, gain] of SOUND_VOLUMES) {
+      sounds.get(name)?.volume((volume / MAX_PERCENT) * gain);
+    }
+  });
+
   onSettled(() => {
     const preloadTimer = setTimeout(preloadSounds, 0);
 
@@ -133,16 +156,8 @@ export const createRoomSounds = () => {
   const effectsEnabled = () => !muted() && effectsVolume() > 0;
 
   return {
-    changeEffectsVolume: (volume: number) => {
-      setEffectsVolume(volume);
-
-      for (const [name, gain] of SOUND_VOLUMES) {
-        sounds.get(name)?.volume((volume / MAX_PERCENT) * gain);
-      }
-    },
-    changeMusicVolume: (volume: number) => {
-      setMusicVolume(volume);
-    },
+    changeEffectsVolume: setEffectsVolume,
+    changeMusicVolume: setMusicVolume,
     effectsEnabled,
     effectsVolume,
     musicVolume,
@@ -158,14 +173,10 @@ export const createRoomSounds = () => {
     },
     toggle: () => {
       const next = !muted();
-      setMuted(next);
-      mixer?.mute(next);
+      mutedPreference.set(next ? "true" : "false");
 
-      if (next) {
-        for (const sound of sounds.values()) {
-          sound.stop();
-        }
-      } else if (effectsVolume() > 0) {
+      if (!next && effectsVolume() > 0) {
+        mixer?.mute(false);
         sounds.get("turn")?.play();
       }
     },

@@ -20,7 +20,6 @@ export default function TableSheet(
     trigger: JSX.Element;
     /** A short visible label beside the icon, shown when the header has room. */
     shortLabel?: string;
-    keepMounted?: boolean;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
   }>
@@ -51,7 +50,7 @@ export default function TableSheet(
           </span>
         </Show>
       </Tooltip>
-      <DialogContent class="table-sheet" keepMounted={props.keepMounted}>
+      <DialogContent class="table-sheet">
         <header class="table-sheet-header">
           <DialogTitle>{props.title}</DialogTitle>
           <Tooltip
