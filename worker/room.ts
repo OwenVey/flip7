@@ -16,6 +16,7 @@ import type {
   StoredRoom,
 } from "../src/game/room";
 import { withServerConnectionId } from "./connection-id";
+import { createRoomStore } from "./room-store";
 
 const UINT32_RANGE = 2 ** 32;
 
@@ -66,6 +67,8 @@ export class GameRoom extends Server<Env> {
 
   private stored: StoredRoom | null = null;
 
+  private readonly store = createRoomStore(this.ctx.storage);
+
   private readonly seats: Seats = {
     assign: (connectionId, admission) => {
       this.getConnection<Admission>(connectionId)?.setState(admission);
@@ -84,7 +87,7 @@ export class GameRoom extends Server<Env> {
       new WebSocketRequestResponsePair(HEARTBEAT_PING, HEARTBEAT_PONG)
     );
     void ctx.blockConcurrencyWhile(async () => {
-      this.stored = (await ctx.storage.get<StoredRoom>("room")) ?? null;
+      this.stored = await this.store.load();
     });
   }
 
@@ -177,6 +180,7 @@ export class GameRoom extends Server<Env> {
   }
 
   override async onAlarm() {
+    await this.store.refreshAlarm();
     await this.carryOut(this.room()?.alarm());
   }
 
@@ -195,12 +199,9 @@ export class GameRoom extends Server<Env> {
 
     if (outcome.expired) {
       this.stored = null;
-      await this.ctx.storage.deleteAll();
+      await this.store.clear();
     } else {
-      await Promise.all([
-        this.ctx.storage.put("room", stored),
-        this.ctx.storage.setAlarm(outcome.alarmAt),
-      ]);
+      await this.store.save(stored, outcome.alarmAt);
     }
 
     deliver(outcome, {
