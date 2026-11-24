@@ -46,10 +46,11 @@ export interface StoredRoom extends RoomTimers {
   code: string;
   game: GameState;
   /** Each player's last accepted move. */
-  lastRequests: Map<string, string>;
+  lastRequests: Partial<Record<string, string>>;
   /** Each list's sequence number at the last broadcast, so the next one sends only newer entries. */
   broadcastSeqs: ListSeqs;
-  tokens: Map<string, string>;
+  /** Each player's rejoin token, by player ID. */
+  tokens: Partial<Record<string, string>>;
 }
 
 /** A connection bound to a player. */
@@ -60,6 +61,11 @@ export interface Seat {
 
 /** Admission follows the connection across Worker hibernation. */
 export type Admission = Seat | { watchedAt: number };
+
+const withoutPlayer = (byPlayer: Partial<Record<string, string>>, id: string) =>
+  Object.fromEntries(
+    Object.entries(byPlayer).filter(([playerId]) => playerId !== id)
+  );
 
 const playerSeat = (admission: Admission | null) =>
   admission && "playerId" in admission ? admission : null;
@@ -156,9 +162,9 @@ export const newStoredRoom = (code: string, now: number) => {
     game,
     hostLeftAt: null,
     lastActiveAt: now,
-    lastRequests: new Map(),
+    lastRequests: {},
     stall: null,
-    tokens: new Map(),
+    tokens: {},
   };
 
   return room;
@@ -234,7 +240,7 @@ export const createRoom = (
 
   const welcome = (playerId: string, token: string) =>
     reply({
-      lastRequestId: stored.lastRequests.get(playerId),
+      lastRequestId: stored.lastRequests[playerId],
       playerId,
       token,
       type: "welcome",
@@ -308,13 +314,16 @@ export const createRoom = (
     avatar: number | undefined
   ) => {
     const joined = seatOf(connectionId);
-    const joinedToken = joined ? stored.tokens.get(joined.playerId) : undefined;
+    const joinedToken = joined ? stored.tokens[joined.playerId] : undefined;
 
     if (joined && joinedToken !== undefined) {
       return welcome(joined.playerId, joinedToken);
     }
 
-    const known = [...stored.tokens].find(([, saved]) => saved === token);
+    const known = Object.entries(stored.tokens).find(
+      ([, saved]) => saved === token
+    );
+
     const knownPlayer = known ? findPlayer(game, known[0]) : undefined;
 
     if (knownPlayer && token !== null) {
@@ -340,15 +349,15 @@ export const createRoom = (
         ? avatar
         : pickAvatar(deps.random(), takenAvatars(game.players))
     );
-    stored.tokens.set(playerId, newToken);
+    stored.tokens[playerId] = newToken;
     seat(connectionId, playerId);
 
     return welcome(playerId, newToken);
   };
 
   const evict = (playerId: string, reason: "kicked" | "left") => {
-    stored.tokens.delete(playerId);
-    stored.lastRequests.delete(playerId);
+    stored.tokens = withoutPlayer(stored.tokens, playerId);
+    stored.lastRequests = withoutPlayer(stored.lastRequests, playerId);
 
     return seatedConnections(playerId).map((connection) => {
       seats.assign(connection.id, null);
@@ -546,7 +555,7 @@ export const createRoom = (
           }
 
           if (!isRoomCommand(command)) {
-            stored.lastRequests.set(playerId, requestId);
+            stored.lastRequests[playerId] = requestId;
           }
 
           return [BROADCAST, reply({ requestId, type: "accepted" }), ...closes];

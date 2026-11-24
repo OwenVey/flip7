@@ -275,11 +275,11 @@ describe("commands", () => {
 
     h.drop("ana-tab");
     h.connect("ana-tab-2");
-    const ana = h.stored.tokens.get(h.stored.game.hostId ?? "");
+    const ana = h.stored.tokens[h.stored.game.hostId ?? ""];
     expect(welcomeOf(h.room.join("ana-tab-2", "", ana ?? null))).toMatchObject({
       lastRequestId: "move-1",
     });
-    expect(h.stored.lastRequests?.has(ben.playerId)).toBeFalsy();
+    expect(Object.hasOwn(h.stored.lastRequests, ben.playerId)).toBeFalsy();
   });
 
   it("rejects a move from a tab that hasn't joined, quoting the request", () => {
@@ -340,7 +340,7 @@ describe("evicting a player", () => {
       },
     ]);
     expect(h.seatOf("ben-tab")).toBeNull();
-    expect(h.stored.tokens.has(ben.playerId)).toBeFalsy();
+    expect(Object.hasOwn(h.stored.tokens, ben.playerId)).toBeFalsy();
   });
 
   it("only lets the host kick", () => {
@@ -382,8 +382,8 @@ describe("evicting a player", () => {
         type: "close",
       },
     ]);
-    expect(h.stored.lastRequests?.has(ben.playerId) ?? false).toBeFalsy();
-    expect(h.stored.tokens.has(ben.playerId)).toBeFalsy();
+    expect(Object.hasOwn(h.stored.lastRequests, ben.playerId)).toBeFalsy();
+    expect(Object.hasOwn(h.stored.tokens, ben.playerId)).toBeFalsy();
   });
 });
 
@@ -521,7 +521,7 @@ describe("bots", () => {
     expect(broadcasts(outcome)).toBeTruthy();
     expect(bot).toMatchObject({ bot: true, connected: true });
     expect(h.room.reconcile().effects).toStrictEqual([]);
-    expect(h.stored.tokens.size).toBe(1);
+    expect(Object.keys(h.stored.tokens)).toHaveLength(1);
   });
 
   it("plays the bot's moves from the alarm", () => {
@@ -1109,7 +1109,7 @@ describe("spectating a room", () => {
     expect({
       names: h.stored.game.players.map(({ name }) => name),
       seat: h.seatOf("ben-tab"),
-      token: h.stored.tokens.has(ben.playerId),
+      token: Object.hasOwn(h.stored.tokens, ben.playerId),
     }).toStrictEqual({
       names: ["Ana"],
       seat: { watchedAt: START },
