@@ -100,10 +100,10 @@ describe("<Lobby />", () => {
     });
   });
 
-  it("shows one open seat until the room is full, then none", () => {
+  it("keeps a placeholder for every vacancy and labels only the next", () => {
     const [room, setRoom] = createSignal<RoomView>(roomOf(1));
 
-    render(() => (
+    const { container } = render(() => (
       <Lobby
         chat={() => true}
         room={room()}
@@ -111,15 +111,36 @@ describe("<Lobby />", () => {
         send={vi.fn<RoomConnection["send"]>()}
       />
     ));
-    expect(screen.getAllByText("Open seat")).toHaveLength(1);
+
+    const vacancies = () => container.querySelectorAll(".roster .open-seat");
+
+    expect(vacancies()).toHaveLength(MAX_PLAYERS - 1);
+    expect(screen.getAllByText("Waiting for players…")).toHaveLength(1);
 
     setRoom(roomOf(MAX_PLAYERS - 1));
     flush();
-    expect(screen.getAllByText("Open seat")).toHaveLength(1);
+    expect(vacancies()).toHaveLength(1);
 
     setRoom(roomOf(MAX_PLAYERS));
     flush();
-    expect(screen.queryByText("Open seat")).toBeNull();
+    expect(vacancies()).toHaveLength(0);
+  });
+
+  it("lists only seated players to assistive tech", () => {
+    render(() => (
+      <Lobby
+        chat={() => true}
+        room={roomOf(1)}
+        playerId="p0"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+
+    expect(
+      within(screen.getByRole("list", { name: "Players" })).getAllByRole(
+        "listitem"
+      )
+    ).toHaveLength(1);
   });
 
   it("keeps the open seat list quiet while bots join", async () => {
@@ -133,7 +154,7 @@ describe("<Lobby />", () => {
         send={vi.fn<RoomConnection["send"]>()}
       />
     ));
-    const seat = screen.getByText("Open seat");
+    const seat = screen.getByText("Waiting for players…");
 
     const { artifact } = await captureScenario(() => {
       for (let size = 3; size <= 8; size += 1) {
@@ -143,7 +164,7 @@ describe("<Lobby />", () => {
     }, "lobby-bots-join");
 
     expectNoDiagnostics(artifact);
-    expect(screen.getByText("Open seat")).toBe(seat);
+    expect(screen.getByText("Waiting for players…")).toBe(seat);
   });
 
   it("shows spectators the chat log and their actions, without Leave", () => {
@@ -270,7 +291,7 @@ describe("<Lobby />", () => {
     });
   });
 
-  it("offers the invite from the open seat", () => {
+  it("offers the invite only in the Invite friends card", () => {
     render(() => (
       <Lobby
         chat={() => true}
@@ -280,9 +301,13 @@ describe("<Lobby />", () => {
       />
     ));
 
+    const [invite] = screen.getAllByRole("button", { name: /invite link/iu });
     expect(
-      screen.getByRole("button", { name: /Open seat.*invite/iu })
-    ).toBeInTheDocument();
+      screen.getAllByRole("button", { name: /invite link/iu })
+    ).toHaveLength(1);
+    expect(invite?.closest("section")).toContainElement(
+      screen.getByRole("heading", { name: "Invite friends" })
+    );
   });
 
   it("sends the host's settings changes and shows the room's saved values", () => {
@@ -304,7 +329,7 @@ describe("<Lobby />", () => {
     expect(screen.getByRole("radio", { name: "200" })).toBeChecked();
   });
 
-  it("shows guests the settings and a locked seat instead of the invite", () => {
+  it("shows guests the settings and marks vacant seats as locked", () => {
     render(() => (
       <Lobby
         chat={() => true}
@@ -321,8 +346,11 @@ describe("<Lobby />", () => {
     expect(
       screen.getByText("First to 100 · Fast bots · Room locked")
     ).toBeInTheDocument();
-    expect(screen.getByText("Room locked")).toBeInTheDocument();
-    expect(screen.queryByText("Open seat")).toBeNull();
+    expect(screen.queryByText("Locked")).toBeNull();
+    expect(
+      document.querySelectorAll(".roster .open-seat[data-locked] svg")
+    ).toHaveLength(MAX_PLAYERS - 3);
+    expect(screen.queryByText("Waiting for players…")).toBeNull();
   });
 
   it("offers bot speed only once a bot is seated", () => {

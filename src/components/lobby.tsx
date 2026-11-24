@@ -2,7 +2,6 @@ import BotPlus from "@lucide/solid/icons/bot-plus";
 import Crown from "@lucide/solid/icons/crown";
 import Lock from "@lucide/solid/icons/lock";
 import Play from "@lucide/solid/icons/play";
-import UserPlus from "@lucide/solid/icons/user-plus";
 import { Button } from "@ui-sdk/solid/button";
 import {
   createEffect,
@@ -18,7 +17,7 @@ import { MAX_PLAYERS } from "../game/engine";
 import { availableMoves, MIN_PLAYERS } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { hostName } from "../lib/host";
-import { createCopy, createInvite } from "../lib/invite";
+import { createCopy } from "../lib/invite";
 import type { RoomConnection } from "../lib/room-connection";
 import { pop } from "../lib/table-motion";
 import ChatSheet from "./chat-sheet";
@@ -56,39 +55,18 @@ const RoomCode = (props: { code: string }) => {
   );
 };
 
-const OpenSeat = () => {
-  const { copied, invite, shares } = createInvite();
-
-  const action = () => {
-    if (copied()) {
-      return "Link copied";
-    }
-
-    return shares() ? "Invite a friend" : "Copy invite link";
-  };
-
-  return (
-    <li class="open-seat">
-      <button
-        type="button"
-        onClick={() => {
-          void invite();
-        }}
-      >
-        <UserPlus size={16} aria-hidden="true" />
-        <span>Open seat</span>
-        <span class="open-seat-action">{action()}</span>
-      </button>
-    </li>
-  );
-};
-
-const LockedSeat = () => (
-  <li class="open-seat" data-locked="">
-    <span>
-      <Lock size={16} aria-hidden="true" />
-      <span>Room locked</span>
-    </span>
+const OpenSeat = (props: { next: boolean; locked: boolean }) => (
+  <li
+    class="open-seat"
+    aria-hidden="true"
+    data-locked={props.locked ? "" : undefined}
+  >
+    <Show
+      when={props.locked}
+      fallback={<Show when={props.next}>Waiting for players…</Show>}
+    >
+      <Lock size={16} />
+    </Show>
   </li>
 );
 
@@ -112,9 +90,7 @@ export default function Lobby(props: {
 
   const missing = () => Math.max(0, MIN_PLAYERS - props.room.players.length);
 
-  const openSeats = createMemo(() =>
-    props.room.players.length < MAX_PLAYERS ? 1 : 0
-  );
+  const openSeats = createMemo(() => MAX_PLAYERS - props.room.players.length);
 
   const startHintId = createUniqueId();
 
@@ -271,7 +247,7 @@ export default function Lobby(props: {
               {count()}
             </span>
           </div>
-          <ul class="roster">
+          <ul class="roster" aria-label="Players">
             <For each={props.room.players} keyed={(player) => player.id}>
               {(player) => (
                 <li
@@ -315,10 +291,11 @@ export default function Lobby(props: {
               )}
             </For>
             <Repeat count={openSeats()}>
-              {() => (
-                <Show when={props.room.settings.locked} fallback={<OpenSeat />}>
-                  <LockedSeat />
-                </Show>
+              {(index) => (
+                <OpenSeat
+                  next={index === 0}
+                  locked={props.room.settings.locked}
+                />
               )}
             </Repeat>
           </ul>

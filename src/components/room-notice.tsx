@@ -27,21 +27,21 @@ const RoomNotice = (props: {
     }
   >
     <p class="muted room-notice-message">{props.children}</p>
-    <Show when={props.onReturn}>
-      <Button data-variant="solid" onClick={() => props.onReturn?.()}>
-        Return to room
+    <div class="room-status-actions">
+      <Show when={props.onReturn}>
+        <Button onClick={() => props.onReturn?.()}>Return to room</Button>
+      </Show>
+      <Button
+        data-variant="solid"
+        render={(buttonProps) => (
+          <a {...buttonProps} href={paths()}>
+            {buttonProps.children}
+          </a>
+        )}
+      >
+        Back to home
       </Button>
-    </Show>
-    <Button
-      data-variant={props.onReturn ? undefined : "solid"}
-      render={(buttonProps) => (
-        <a {...buttonProps} href={paths()}>
-          {buttonProps.children}
-        </a>
-      )}
-    >
-      Back to home
-    </Button>
+    </div>
   </RoomStatus>
 );
 
