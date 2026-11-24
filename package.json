@@ -23,6 +23,7 @@
     "@nkzw/audio": "^1.1.0",
     "@solid-primitives/clipboard": "^2.0.0",
     "@solid-primitives/connectivity": "^1.0.0",
+    "@solid-primitives/mutation-observer": "^3.0.0",
     "@solid-primitives/page-utilities": "^3.0.0",
     "@solid-primitives/storage": "^5.0.0",
     "@solid-primitives/timer": "^1.4.5",

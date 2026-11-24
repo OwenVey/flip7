@@ -11,6 +11,7 @@ import Shuffle from "@lucide/solid/icons/shuffle";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import Trophy from "@lucide/solid/icons/trophy";
 import UserPlus from "@lucide/solid/icons/user-plus";
+import { createMutationObserver } from "@solid-primitives/mutation-observer";
 import { createPolled } from "@solid-primitives/timer";
 import { dynamic } from "@solidjs/web";
 import { Button } from "@ui-sdk/solid/button";
@@ -28,7 +29,6 @@ import {
   createMemo,
   createSignal,
   For,
-  onSettled,
   Show,
   untrack,
 } from "solid-js";
@@ -502,28 +502,18 @@ export default function GameLog(props: {
     }
   };
 
-  onSettled(() => {
-    const viewport = scroller;
-
-    const observer = new MutationObserver(() => {
-      const bottom = viewport?.dataset.atYEnd !== undefined;
+  const [observeScrollEnd] = createMutationObserver(
+    [],
+    { attributeFilter: ["data-at-y-end"] },
+    () => {
+      const bottom = scroller?.dataset.atYEnd !== undefined;
       setAtBottom(bottom);
 
       if (bottom) {
         markSeen(latestId(), filter());
       }
-    });
-
-    if (viewport) {
-      observer.observe(viewport, {
-        attributeFilter: ["data-at-y-end"],
-      });
     }
-
-    return () => {
-      observer.disconnect();
-    };
-  });
+  );
 
   const pinToLatest = () => {
     setAtBottom(true);
@@ -607,6 +597,7 @@ export default function GameLog(props: {
           aria-label={CHAT_AND_GAME_LOG_TITLE}
           ref={(element) => {
             scroller = element;
+            observeScrollEnd(element);
           }}
         >
           <ScrollAreaContent class="log-entries">
