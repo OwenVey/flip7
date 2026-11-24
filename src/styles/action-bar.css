@@ -101,3 +101,12 @@
 .action-bar[data-turn] {
   box-shadow: var(--shadow-ring);
 }
+
+.dealt-action-card {
+  display: flex;
+  flex: none;
+  margin-block: -0.5rem;
+  padding: 0;
+  list-style: none;
+  --card-w: 2.25rem;
+}

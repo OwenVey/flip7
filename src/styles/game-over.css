@@ -1,3 +1,23 @@
+.confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -1rem;
+  left: var(--x);
+  width: 0.5rem;
+  height: 0.875rem;
+  border: 1px solid var(--ink);
+  border-radius: 1px;
+  background: var(--color);
+  opacity: 0;
+}
+
 /* Game over: the card springs in, the trophy stamps down and throws confetti, then the standings rise in. */
 [data-slot="dialog-content"].game-over-dialog {
   /* A flex column lets the standings shrink and scroll inside the max height; grid auto rows would not. */

@@ -398,3 +398,18 @@ main {
     opacity: 0.55;
   }
 }
+
+.connection-banner:not(:empty) {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 3;
+  display: block;
+  margin-bottom: 1rem;
+  padding: 0.625rem 1rem;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-xl);
+  background: var(--gold);
+  box-shadow: 3px 3px 0 var(--ink);
+  font-weight: 700;
+  text-align: center;
+}

@@ -90,3 +90,63 @@
     }
   }
 }
+
+@container table-header (width < 50rem) {
+  .table-header [data-collapsible] {
+    display: none;
+  }
+
+  .table-header .table-more-trigger {
+    display: inline-flex;
+    flex: none;
+    inline-size: var(--button-height);
+    padding-inline: 0;
+  }
+
+  /* A spectator has no ⋯ menu, so their actions and the watcher count shrink to icons instead. */
+  .table-header .spectator-action {
+    flex: none;
+    inline-size: var(--button-height);
+    padding-inline: 0;
+  }
+
+  .table-header :is(.spectator-action, .watcher-count) .button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .table-header .watcher-count-short {
+    display: inline;
+  }
+}
+
+@container table-header (width < 30rem) {
+  .table-header {
+    & [data-slot="tooltip-content"][data-compact-only] {
+      visibility: visible;
+    }
+
+    & [data-table-sheet-trigger] {
+      flex: none;
+      inline-size: var(--button-height);
+      padding-inline: 0;
+    }
+
+    & .button-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    & .watcher-count-short {
+      display: inline;
+    }
+  }
+}

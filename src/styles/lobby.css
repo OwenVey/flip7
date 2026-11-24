@@ -475,3 +475,28 @@ button.room-code {
 :is(.roster, .seat) [data-slot="tooltip-content"][data-compact-only] {
   visibility: visible;
 }
+
+.start-game,
+.add-bot {
+  display: grid;
+}
+
+/* Add bot and Start game sit one button gap apart, closer than the panel's sections. */
+.host-actions {
+  display: grid;
+  gap: var(--button-gap);
+}
+
+.start-game {
+  gap: 0.5rem;
+}
+
+/* Says what Start game is waiting for, as a quiet footnote under the button. */
+.start-hint {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-align: center;
+  text-wrap: balance;
+}
