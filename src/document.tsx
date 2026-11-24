@@ -4,6 +4,8 @@ import bungeeUrl from "@fontsource/bungee/files/bungee-latin-400-normal.woff2?ur
 import { HydrationScript } from "@solidjs/web";
 import type { ParentProps } from "solid-js";
 
+import faviconUrl from "./assets/favicon.svg?url";
+
 // WARNING: these must be the same files the @font-face rules in app.css load, or they download twice.
 const preloadedFonts = [interUrl, bungeeUrl, bigShouldersUrl];
 
@@ -16,7 +18,7 @@ export default function Document(props: ParentProps) {
         <meta name="color-scheme" content="light" />
         <meta name="theme-color" content="#0e3a2c" />
         <link rel="icon" href="/favicon.ico" sizes="32x32" />
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="icon" type="image/svg+xml" href={faviconUrl} />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/site.webmanifest" />
         {preloadedFonts.map((href) => (
