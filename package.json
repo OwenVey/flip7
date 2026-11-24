@@ -12,7 +12,6 @@
     "typecheck": "cf workers types && tsc --noEmit && tsc --noEmit -p worker/tsconfig.json",
     "deploy": "vite build && cf deploy --prebuilt",
     "check": "ultracite check",
-    "css:compare": "node scripts/compare-built-css.ts",
     "fix": "ultracite fix",
     "prepare": "lefthook install"
   },

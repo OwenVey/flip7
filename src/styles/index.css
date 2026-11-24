@@ -1,7 +1,6 @@
 /*
  * These files apply in this order, so a later file wins a tie in specificity.
  * Add a rule to the area and position it belongs, not just the end of a file.
- * After moving rules, run `pnpm css:compare` to diff the built CSS with main.
  */
 @import "./base.css";
 @import "./lobby.css";
