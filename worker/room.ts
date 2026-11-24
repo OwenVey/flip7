@@ -136,7 +136,7 @@ export class GameRoom extends Server<Env> {
     } else if (message.type === "chat") {
       await this.carryOut(room.chat(ws.id, message.text), ws);
     } else if (message.type === "sync") {
-      await this.carryOut(room.sync(), ws);
+      send(ws, room.snapshot());
     } else {
       await this.carryOut(room.command(ws.id, message), ws);
     }

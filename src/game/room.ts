@@ -564,7 +564,5 @@ export const createRoom = (
     },
 
     snapshot,
-
-    sync: () => finish([reply(snapshot())]),
   };
 };

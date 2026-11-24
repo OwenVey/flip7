@@ -99,7 +99,7 @@ const network = () => {
       carryOut(room.chat(link.id, message.text), link);
     } else if (message.type === "sync") {
       syncs.push(link.id);
-      carryOut(room.sync(), link);
+      link.toClient.push(room.snapshot());
     } else {
       carryOut(room.command(link.id, message), link);
     }

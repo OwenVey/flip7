@@ -118,18 +118,6 @@ const broadcastOf = (outcome: RoomOutcome) => {
   return found.message;
 };
 
-const stateReplyOf = (outcome: RoomOutcome) => {
-  const found = replies(outcome).find(
-    (message): message is StateMessage => message.type === "state"
-  );
-
-  if (!found) {
-    throw new Error("Expected the table in a reply");
-  }
-
-  return found;
-};
-
 const logTexts = (message: StateMessage) =>
   message.lists.log.entries.map((entry) => entry.text);
 
@@ -783,19 +771,18 @@ describe("sending the log", () => {
     expect(logTexts(again)).not.toContain("gg");
   });
 
-  it("sends the whole log to a tab that asks after missing entries", () => {
+  it("builds a full recovery snapshot without changing the stored room", () => {
     const h = harness();
     joinAs(h, "ana-tab", "Ana");
     h.room.chat("ana-tab", "one");
+    const stored = structuredClone(h.stored);
+    h.advance(1000);
 
-    const outcome = h.room.sync();
+    const snapshot = h.room.snapshot();
 
-    expect(broadcasts(outcome)).toBeFalsy();
-    expect(stateReplyOf(outcome).lists.log).toMatchObject({ after: null });
-    expect(logTexts(stateReplyOf(outcome))).toStrictEqual([
-      "Ana joined.",
-      "one",
-    ]);
+    expect(snapshot.lists.log.after).toBeNull();
+    expect(logTexts(snapshot)).toStrictEqual(["Ana joined.", "one"]);
+    expect(h.stored).toStrictEqual(stored);
   });
 
   it("remembers what it broadcast across hibernation", () => {
