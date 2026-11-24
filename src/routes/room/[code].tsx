@@ -36,6 +36,7 @@ import {
 } from "../../lib/deal-playback";
 import { showFaviconDot } from "../../lib/favicon";
 import { MOTION_PREFERENCE_QUERY } from "../../lib/motion";
+import { createMoveAlertBlink, MOVE_ALERT_TITLE } from "../../lib/move-alert";
 import { createRoomConnection } from "../../lib/room-connection";
 import { createRoomSounds } from "../../lib/room-sounds";
 import {
@@ -114,8 +115,21 @@ const Room = (props: { code: string }) => {
     return connection.watching() ? "Watching · " : "";
   };
 
+  const [tabHidden, setTabHidden] = createSignal(false);
+
+  const syncTabHidden = () => {
+    setTabHidden(document.visibilityState === "hidden");
+  };
+
+  const moveAlertBlink = createMoveAlertBlink(() => table().myMove, tabHidden);
+
+  const pageTitle = () =>
+    moveAlertBlink() === "lit"
+      ? MOVE_ALERT_TITLE
+      : `${titlePrefix()}Room ${props.code} · Flip 7`;
+
   createEffect(
-    () => table().myMove,
+    () => table().myMove && moveAlertBlink() !== "dark",
     (dot) => {
       showFaviconDot(dot);
     }
@@ -170,8 +184,11 @@ const Room = (props: { code: string }) => {
     const motionPreference = globalThis.matchMedia?.(MOTION_PREFERENCE_QUERY);
     motionPreference?.addEventListener("change", playback.syncMotion);
     document.addEventListener("visibilitychange", playback.syncMotion);
+    syncTabHidden();
+    document.addEventListener("visibilitychange", syncTabHidden);
 
     return () => {
+      document.removeEventListener("visibilitychange", syncTabHidden);
       disposed = true;
       motionPreference?.removeEventListener("change", playback.syncMotion);
       document.removeEventListener("visibilitychange", playback.syncMotion);
@@ -213,7 +230,7 @@ const Room = (props: { code: string }) => {
 
   return (
     <>
-      <Title>{`${titlePrefix()}Room ${props.code} · Flip 7`}</Title>
+      <Title>{pageTitle()}</Title>
       <PageMeta
         title={`Join room ${props.code} · Flip 7`}
         description={`You're invited to a game of Flip 7. Open the link to join room ${props.code}, pick a name and play. No accounts needed.`}
