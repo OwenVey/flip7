@@ -1,4 +1,4 @@
-import { captureArtifact, expectNoDiagnostics } from "@solidjs/diagnostics";
+import { expectNoDiagnostics } from "@solidjs/diagnostics";
 import {
   cleanup,
   fireEvent,
@@ -14,6 +14,7 @@ import { availableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { pointsOf, roundPointsFor } from "../lib/deal-playback";
 import type { RoomConnection } from "../lib/room-connection";
+import { captureScenario } from "../test/diagnostics";
 import { room } from "../test/room-view";
 import { agent, agentApproval, Table } from "../test/table";
 import RoundPlayer from "./round-player";
@@ -502,14 +503,11 @@ describe("<RoundPlayer />", () => {
 
     expect(screen.getByRole("button", { name: "Freeze Ben" })).toBeDisabled();
 
-    const { artifact } = await captureArtifact(
-      () => {
-        setView(room({ choice: { ...choice, options: ["a"] } }));
-        setSyncing(false);
-        flush();
-      },
-      { scenario: "table-choice-targets-after-sync" }
-    );
+    const { artifact } = await captureScenario(() => {
+      setView(room({ choice: { ...choice, options: ["a"] } }));
+      setSyncing(false);
+      flush();
+    }, "table-choice-targets-after-sync");
 
     expectNoDiagnostics(artifact);
     expect(screen.queryByRole("button", { name: "Freeze Ben" })).toBeNull();

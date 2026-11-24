@@ -35,6 +35,7 @@ Read the Solid 2.0 skill before writing or reviewing Solid code. Check unfamilia
 - Use `createEffect(compute, apply)`, `onSettled` for setup and cleanup, and draft setters for stores. Write from event handlers, effect apply callbacks, `onSettled`, or actions.
 - Use `solid-js` for reactive primitives and `@solidjs/web` for DOM APIs. In tests, use `flush()` before asserting on batched updates when needed.
 - For a Solid diagnostic code, use the reactivity-diagnostics skill or the installed diagnostic reference named in the console footer. Use the agent-loops skill when you need to verify reactive behavior with a diagnostics capture.
+- When a test asserts `expectNoDiagnostics`, capture with `captureScenario` from `src/test/diagnostics.ts`. It turns off HOT_SCOPE_TIME and WASTED_RECOMPUTE, which measure wall-clock time and fail on a busy machine.
 
 ## ui-sdk
 
