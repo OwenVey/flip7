@@ -662,7 +662,7 @@ describe("the game log", () => {
       startGame(state, "a", random);
     }).toThrow(GameError);
     expect(state.log.at(-1)?.text).toBe("anyone?");
-    expect(state.logClearedAt).toBeUndefined();
+    expect(state.logClearedAt).toBe(0);
   });
 
   it("keeps only the newest entries once it reaches the cap", () => {
@@ -1026,32 +1026,6 @@ describe("held action cards through eviction", () => {
       choice: null,
       held: [],
     });
-  });
-});
-
-describe("held action cards in saved Rooms", () => {
-  it("opens a choice for the owner of an old queued card without a target", () => {
-    const state = setup(["a", "b", "c"], [num(5), num(3), num(8)]);
-    const card = freeze();
-    delete state.assignment;
-    state.actionQueue = [{ card, ownerId: "b" }];
-
-    expect(toRoomView("ABCDE", state).held).toStrictEqual([
-      { card, ownerId: "b" },
-    ]);
-
-    stay(state, "a", random);
-
-    expect(toRoomView("ABCDE", state)).toMatchObject({
-      choice: { card, chooserId: "b", options: ["b", "c"] },
-      held: [],
-    });
-
-    choose(state, "b", "c", random);
-
-    const target = player(state, "c");
-    expect(target.hand).toContainEqual(card);
-    expect(target.status).toBe("frozen");
   });
 });
 

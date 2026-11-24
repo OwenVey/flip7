@@ -1,5 +1,4 @@
 import { projectActionCards } from "./action-card-resolution";
-import { avatarOf } from "./avatars";
 import { DRAW_LIMIT, LOG_LIMIT } from "./engine";
 import type {
   DrawEvent,
@@ -10,7 +9,6 @@ import type {
 } from "./engine";
 import { applyListUpdate, listUpdateSince } from "./sequenced-list";
 import type { ListSpec, ListUpdate, ReceivedList } from "./sequenced-list";
-import { settingsOf } from "./settings";
 import type { BotSpeed } from "./settings";
 
 export const NAME_MAX_LENGTH = 20;
@@ -38,10 +36,7 @@ export const normalizeCode = (raw: string) => {
 export const cleanName = (raw: string) =>
   raw.replaceAll(/\s+/gu, " ").trim().slice(0, NAME_MAX_LENGTH);
 
-export type PlayerView = Omit<Player, "avatar"> & {
-  /** The person's avatar, or null for a bot. */
-  avatar: number | null;
-};
+export type PlayerView = Player;
 
 export interface RoomView extends Pick<
   GameState,
@@ -122,7 +117,7 @@ export type ServerMessage =
 
 export const toRoomView = (code: string, state: GameState) => {
   const { choice, flips, held } = projectActionCards(state);
-  const { botSpeed, locked, targetScore } = settingsOf(state);
+  const { botSpeed, locked, targetScore } = state.settings;
 
   const view: RoomView = {
     botSpeed,
@@ -134,8 +129,8 @@ export const toRoomView = (code: string, state: GameState) => {
         : (state.players[state.dealerIndex]?.id ?? null),
     deckCount: state.deck.length,
     discardCount: state.discard.length,
-    draws: state.draws ?? [],
-    drawSeq: state.drawSeq ?? 0,
+    draws: state.draws,
+    drawSeq: state.drawSeq,
     flips,
     held,
     hostId: state.hostId,
@@ -143,8 +138,8 @@ export const toRoomView = (code: string, state: GameState) => {
     log: state.log,
     phase: state.phase,
     players: state.players.map((player) => ({
-      avatar: avatarOf(player),
-      bot: player.bot === true,
+      avatar: player.avatar,
+      bot: player.bot,
       bustCard: player.bustCard,
       connected: player.connected,
       hand: player.hand,
@@ -166,7 +161,7 @@ export const toRoomView = (code: string, state: GameState) => {
 /** The lists' sequence numbers now, to remember what a broadcast sent. */
 export const listSeqsOf = (state: GameState) => {
   const seqs: Required<ListSeqs> = {
-    draws: state.drawSeq ?? 0,
+    draws: state.drawSeq,
     log: state.logSeq,
   };
 
@@ -184,12 +179,12 @@ export const toStateMessage = (
   const message: ServerMessage = {
     lists: {
       draws: listUpdateSince(
-        { clearedAt: 0, entries: draws, seq: state.drawSeq ?? 0 },
+        { clearedAt: 0, entries: draws, seq: state.drawSeq },
         since.draws,
         ROOM_LISTS.draws
       ),
       log: listUpdateSince(
-        { clearedAt: state.logClearedAt ?? 0, entries: log, seq: state.logSeq },
+        { clearedAt: state.logClearedAt, entries: log, seq: state.logSeq },
         since.log,
         ROOM_LISTS.log
       ),

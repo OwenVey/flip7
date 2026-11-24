@@ -3,7 +3,6 @@ import { findPlayer, playForAbsent, playForBot, transferHost } from "./engine";
 import type { GameState } from "./engine";
 import { waitingOn } from "./moves";
 import { HEARTBEAT_STALE_MS } from "./protocol";
-import { settingsOf } from "./settings";
 
 export const HOST_GRACE_MS = 20_000;
 export const ABSENT_GRACE_MS = 30_000;
@@ -27,12 +26,12 @@ export interface BotTurn {
 
 export interface RoomTimers {
   game: GameState;
-  /** When the bot the game is waiting on makes its move. Missing on rooms saved before bots. */
-  botTurn?: BotTurn | null;
+  /** When the bot the game is waiting on makes its move. */
+  botTurn: BotTurn | null;
   lastActiveAt: number;
   hostLeftAt: number | null;
-  /** Missing on rooms saved before offline players were auto-played. */
-  stall?: Stall | null;
+  /** The offline player the game is waiting on, and since when. */
+  stall: Stall | null;
 }
 
 const offlineWhileOthersOnline = (game: GameState, id: string | null) => {
@@ -43,12 +42,12 @@ const offlineWhileOthersOnline = (game: GameState, id: string | null) => {
   }
 
   return game.players.some(
-    (other) => other.connected && other.bot !== true && other.id !== id
+    (other) => other.connected && !other.bot && other.id !== id
   );
 };
 
 const humanOnline = (game: GameState) =>
-  game.players.some((player) => player.connected && player.bot !== true);
+  game.players.some((player) => player.connected && !player.bot);
 
 const syncBotTurn = (
   room: RoomTimers,
@@ -62,7 +61,7 @@ const syncBotTurn = (
     room.botTurn = null;
   } else if (room.botTurn?.playerId !== bot.id) {
     const delay =
-      settingsOf(game).botSpeed === "fast" ? FAST_BOT_DELAY_MS : BOT_DELAY_MS;
+      game.settings.botSpeed === "fast" ? FAST_BOT_DELAY_MS : BOT_DELAY_MS;
 
     room.botTurn = { at: now + delay, playerId: bot.id };
   }

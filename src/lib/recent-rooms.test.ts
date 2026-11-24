@@ -28,26 +28,20 @@ describe(readRecentRooms, () => {
     ]);
   });
 
-  it("keeps seats saved before join times, after the timed ones", () => {
-    seat("ABCDE");
-    seat("FGHJK");
-    rememberRoom(localStorage, "FGHJK", 2000);
-
-    expect(readRecentRooms(localStorage)).toStrictEqual([
-      { code: "FGHJK", joinedAt: 2000 },
-      { code: "ABCDE", joinedAt: null },
-    ]);
-  });
-
-  it("skips join times whose token is gone and ignores corrupt data", () => {
+  it("skips join times whose token is gone, and tokens without a join time", () => {
     rememberRoom(localStorage, "ABCDE", 1000);
     expect(readRecentRooms(localStorage)).toStrictEqual([]);
 
+    seat("FGHJK");
+    expect(readRecentRooms(localStorage)).toStrictEqual([]);
+  });
+
+  it("ignores corrupt join times", () => {
     seat("ABCDE");
+    rememberRoom(localStorage, "ABCDE", 1000);
     localStorage.setItem("flip7:recent", "not json");
-    expect(readRecentRooms(localStorage)).toStrictEqual([
-      { code: "ABCDE", joinedAt: null },
-    ]);
+
+    expect(readRecentRooms(localStorage)).toStrictEqual([]);
   });
 
   it("forgets a room's join time and token together", () => {

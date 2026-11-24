@@ -251,7 +251,7 @@ export default function Lobby(props: {
                   <Show when={moves().host.kick.includes(player().id)}>
                     <RemovePlayer
                       bot={player().bot}
-                      confirm={player().bot !== true}
+                      confirm={!player().bot}
                       disabled={props.actionsDisabled}
                       name={player().name}
                       onRemove={() => {

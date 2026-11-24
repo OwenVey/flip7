@@ -8,6 +8,7 @@ import GameLog from "./game-log";
 
 const entries = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
+    at: 0,
     cue: "bank",
     game: 1,
     id: index + 1,

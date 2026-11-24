@@ -3,8 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   AVATAR_COUNT,
   AVATARS,
-  avatarOf,
-  fallbackAvatar,
   parseSavedAvatar,
   pickAvatar,
   takenAvatars,
@@ -31,13 +29,6 @@ describe(pickAvatar, () => {
   });
 });
 
-describe(fallbackAvatar, () => {
-  it("gives the same avatar for the same player id", () => {
-    expect(fallbackAvatar("player-1")).toBe(fallbackAvatar("player-1"));
-    expect(AVATARS).toContain(fallbackAvatar("player-1"));
-  });
-});
-
 describe(parseSavedAvatar, () => {
   it("reads a saved avatar", () => {
     expect(parseSavedAvatar("7")).toBe(7);
@@ -52,14 +43,9 @@ describe(parseSavedAvatar, () => {
 });
 
 describe(takenAvatars, () => {
-  it("lists people's avatars, using the fallback for older players and skipping bots", () => {
-    expect(avatarOf({ bot: true, id: "bot" })).toBeNull();
+  it("lists people's avatars, skipping bots", () => {
     expect(
-      takenAvatars([
-        { avatar: 4, id: "ana" },
-        { id: "old" },
-        { bot: true, id: "bot" },
-      ])
-    ).toStrictEqual([4, fallbackAvatar("old")]);
+      takenAvatars([{ avatar: 4 }, { avatar: 9 }, { avatar: null }])
+    ).toStrictEqual([4, 9]);
   });
 });

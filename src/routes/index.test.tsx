@@ -164,6 +164,7 @@ describe(Home, () => {
     }
 
     rememberRoom(localStorage, "ABCDE", Date.now() - 2 * 3_600_000);
+    rememberRoom(localStorage, "FGHJK", Date.now() - 60_000);
     configureServerFunctionsClient({
       fetch: (_, request) => rpcResponse(request.body === "ABCDE"),
     });

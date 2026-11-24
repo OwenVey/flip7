@@ -22,10 +22,3 @@ export const DEFAULT_SETTINGS: Readonly<RoomSettings> = {
   locked: false,
   targetScore: 200,
 };
-
-/** A room's settings, with defaults for rooms saved before settings existed. */
-export const settingsOf = (state: { settings?: Partial<RoomSettings> }) => {
-  const settings: RoomSettings = { ...DEFAULT_SETTINGS, ...state.settings };
-
-  return settings;
-};

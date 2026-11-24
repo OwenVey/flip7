@@ -18,6 +18,7 @@ const roomWith = (names: string[], avatar = 1) => {
     phase: "lobby",
     players: names.map((name, index) => ({
       avatar,
+      bot: false,
       bustCard: null,
       connected: true,
       hand: [],

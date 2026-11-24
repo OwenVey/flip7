@@ -998,15 +998,11 @@ const cardsAtTable = (state: GameState) => {
   const all: Card[] = [...state.deck, ...state.discard];
 
   for (const player of state.players) {
-    all.push(
-      ...player.hand,
-      ...(player.played ?? []),
-      ...(player.bustCard ? [player.bustCard] : [])
-    );
+    all.push(...player.hand, ...(player.bustCard ? [player.bustCard] : []));
   }
 
   for (const run of state.flipRuns) {
-    all.push(...run.deferred, ...(run.card ? [run.card] : []));
+    all.push(...run.deferred, run.card);
   }
 
   all.push(...state.actionQueue.map((queued) => queued.card));

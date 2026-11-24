@@ -42,14 +42,10 @@ const HEARTBEAT_CLOSE_CODE = 1001;
 export interface StoredRoom extends RoomTimers {
   code: string;
   game: GameState;
-  /** Each player's last accepted move. Missing on rooms saved before moves were recorded. */
-  lastRequests?: Map<string, string>;
-  /**
-   * Each list's sequence number at the last broadcast, so the next one sends
-   * only newer entries. Missing on rooms saved before lists were sent as
-   * updates, which send them in full once.
-   */
-  broadcastSeqs?: ListSeqs;
+  /** Each player's last accepted move. */
+  lastRequests: Map<string, string>;
+  /** Each list's sequence number at the last broadcast, so the next one sends only newer entries. */
+  broadcastSeqs: Required<ListSeqs>;
   tokens: Map<string, string>;
 }
 
@@ -136,11 +132,16 @@ export const deliver = (outcome: RoomOutcome, transport: RoomTransport) => {
 };
 
 export const newStoredRoom = (code: string, now: number) => {
+  const game = createGame();
+
   const room: StoredRoom = {
+    botTurn: null,
+    broadcastSeqs: listSeqsOf(game),
     code,
-    game: createGame(),
+    game,
     hostLeftAt: null,
     lastActiveAt: now,
+    lastRequests: new Map(),
     stall: null,
     tokens: new Map(),
   };
@@ -211,7 +212,7 @@ export const createRoom = (
 
   const welcome = (playerId: string, token: string) =>
     reply({
-      lastRequestId: stored.lastRequests?.get(playerId),
+      lastRequestId: stored.lastRequests.get(playerId),
       playerId,
       token,
       type: "welcome",
@@ -312,7 +313,7 @@ export const createRoom = (
 
   const evict = (playerId: string, reason: "kicked" | "left") => {
     stored.tokens.delete(playerId);
-    stored.lastRequests?.delete(playerId);
+    stored.lastRequests.delete(playerId);
 
     return seatedConnections(playerId).map((connection) => {
       seats.assign(connection.id, null);
@@ -501,7 +502,6 @@ export const createRoom = (
           }
 
           if (!isRoomCommand(command)) {
-            stored.lastRequests ??= new Map();
             stored.lastRequests.set(playerId, requestId);
           }
 
@@ -552,7 +552,7 @@ export const createRoom = (
       let changed = false;
 
       for (const player of game.players) {
-        const connected = player.bot === true || seated.has(player.id);
+        const connected = player.bot || seated.has(player.id);
 
         if (connected !== player.connected) {
           player.connected = connected;

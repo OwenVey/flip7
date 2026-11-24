@@ -120,7 +120,7 @@ const rejectMoveFor = (
     return "That player isn't in this room.";
   }
 
-  if (player.bot === true) {
+  if (player.bot) {
     return "Bots make their own moves.";
   }
 

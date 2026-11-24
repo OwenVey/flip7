@@ -5,6 +5,8 @@ import { toRoomView } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 import { roomCues } from "./room-cues";
 
+const LOGGED_AT = Date.now();
+
 const game = createGame();
 
 addPlayer(game, "me", "Me", 1);
@@ -14,7 +16,9 @@ addPlayer(game, "opponent", "Opp", 1);
 const before: RoomView = {
   ...toRoomView("ABCDE", game),
   drawSeq: 10,
-  log: [{ cue: "bank", id: 7, text: "Banked." }],
+  log: [
+    { at: LOGGED_AT, cue: "bank", game: 1, id: 7, round: 1, text: "Banked." },
+  ],
   phase: "playing",
   round: 1,
   turnId: "opponent",
@@ -38,7 +42,17 @@ describe(roomCues, () => {
     const bust: RoomView = {
       ...before,
       drawSeq: 11,
-      log: [...before.log, { cue: "bust", id: 8, text: "Busted." }],
+      log: [
+        ...before.log,
+        {
+          at: LOGGED_AT,
+          cue: "bust",
+          game: 1,
+          id: 8,
+          round: 1,
+          text: "Busted.",
+        },
+      ],
     };
 
     expect(roomCues(before, bust, "me")).toStrictEqual(["bust"]);
@@ -52,7 +66,14 @@ describe(roomCues, () => {
       ...before,
       log: [
         ...before.log,
-        { from: { id: "opponent", name: "Opp" }, id: 8, text: "gl" },
+        {
+          at: LOGGED_AT,
+          from: { avatar: 1, id: "opponent", name: "Opp" },
+          game: 1,
+          id: 8,
+          round: 1,
+          text: "gl",
+        },
       ],
     };
 
