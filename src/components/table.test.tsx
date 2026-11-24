@@ -143,6 +143,42 @@ describe("<Table />", () => {
     expect(actionBar.getByRole("button", { name: "Stay" })).toBe(stay);
   });
 
+  it("keeps the same Hit and Stay buttons for an offline player while their points change", () => {
+    const [points, setPoints] = createSignal(7);
+    const view = room({ turnId: "b" });
+    view.players = view.players.map((seat) =>
+      seat.id === "b" ? { ...seat, connected: false } : seat
+    );
+
+    render(() => (
+      <Table
+        room={view}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        roundPoints={new Map([["b", points()]])}
+      />
+    ));
+
+    const actionBar = within(
+      screen.getByRole("region", { name: "Game status" })
+    );
+
+    const hit = actionBar.getByRole("button", { name: "Hit for Ben" });
+
+    const stay = actionBar.getByRole("button", {
+      name: "Stay for Ben with 7 points",
+    });
+
+    setPoints(9);
+    flush();
+
+    expect(actionBar.getByRole("button", { name: "Hit for Ben" })).toBe(hit);
+    expect(
+      actionBar.getByRole("button", { name: "Stay for Ben with 9 points" })
+    ).toBe(stay);
+  });
+
   it("sets held action cards beside the deck, not in the seat", () => {
     render(() => (
       <Table
