@@ -30,11 +30,16 @@ import type { ParentProps } from "solid-js";
 
 import { cardLabel, calculateRoundScore } from "../game/cards";
 import type { Card } from "../game/cards";
-import { FLIP_SEVEN_STATUS, FLIP_THREE_COUNT } from "../game/engine";
-import type { ActionCardChoice, HeldCard, RoundStatus } from "../game/engine";
+import { FLIP_THREE_COUNT } from "../game/engine";
+import type {
+  ActionCardChoice,
+  HeldCard,
+  Player,
+  RoundStatus,
+} from "../game/engine";
 import { availableMoves } from "../game/moves";
 import type { AvailableMoves } from "../game/moves";
-import type { PlayerView, RoomView } from "../game/protocol";
+import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
 import type { DealPlaybackView } from "../lib/deal-playback";
@@ -66,7 +71,7 @@ const STATUS_LABELS = {
   frozen: "Frozen",
   out: "Sitting out",
   stayed: "Stayed",
-  [FLIP_SEVEN_STATUS]: "Flip 7!",
+  flipSeven: "Flip 7!",
 } as const satisfies Record<RoundStatus, string>;
 
 const SCORES_TITLE = "Scores";
@@ -75,7 +80,7 @@ const SHEET_TABLE_QUERY = "(width < 64rem), (max-height: 30rem)";
 
 const STAMPED_STATUSES: ReadonlySet<RoundStatus> = new Set([
   "busted",
-  FLIP_SEVEN_STATUS,
+  "flipSeven",
   "frozen",
   "stayed",
 ]);
@@ -309,7 +314,7 @@ const RoundPlayer = (
   props: TableProps &
     MoveControls &
     Pick<DealProps, "dealStep"> & {
-      player: PlayerView;
+      player: Player;
       roundPoints: number;
     }
 ) => {
@@ -416,10 +421,10 @@ const RoundPlayer = (
       : "locked";
   };
 
-  const atTarget = () => projectedScore() >= props.room.targetScore;
+  const atTarget = () => projectedScore() >= props.room.settings.targetScore;
 
   const scorePercent = (score: number) =>
-    `${Math.min(100, (score / props.room.targetScore) * 100)}%`;
+    `${Math.min(100, (score / props.room.settings.targetScore) * 100)}%`;
 
   const scoreDetails = () => {
     const details: string[] = [];
@@ -446,11 +451,7 @@ const RoundPlayer = (
   return (
     <article
       class="seat"
-      data-status={
-        props.player.status === FLIP_SEVEN_STATUS
-          ? "flipSeven"
-          : props.player.status
-      }
+      data-status={props.player.status}
       data-seat={props.player.id}
       data-flipping={flip()?.waiting === false ? "" : undefined}
       data-turn={hasDecision() ? "" : undefined}
@@ -600,7 +601,7 @@ const RoundPlayer = (
         aria-label="Total score"
         class="seat-meter"
         value={props.player.score}
-        max={props.room.targetScore}
+        max={props.room.settings.targetScore}
         data-round={roundRisk()}
         data-winning={atTarget() ? "" : undefined}
         style={{
@@ -620,7 +621,7 @@ const RoundPlayer = (
             bankedLabel = element;
           }}
         >
-          {shownBaseScore()} / {props.room.targetScore}
+          {shownBaseScore()} / {props.room.settings.targetScore}
         </span>
         <MeterTrack>
           <MeterIndicator />
@@ -723,7 +724,7 @@ const roundPointsLabels = {
 };
 
 const LeaderboardRound = (props: {
-  player: PlayerView;
+  player: Player;
   phase: RoomView["phase"];
   points: number;
   index: number;
@@ -1036,12 +1037,12 @@ const OfflineTurn = (
   );
 };
 
-const previousScore = (player: PlayerView) =>
+const previousScore = (player: Player) =>
   player.score - (player.lastRound?.total ?? 0);
 
 const roundEndHeadline = (room: RoomView) => {
   const flippedSeven = room.players.find(
-    (player) => player.status === FLIP_SEVEN_STATUS
+    (player) => player.status === "flipSeven"
   );
 
   if (flippedSeven) {

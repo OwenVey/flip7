@@ -45,7 +45,7 @@ export interface StoredRoom extends RoomTimers {
   /** Each player's last accepted move. */
   lastRequests: Map<string, string>;
   /** Each list's sequence number at the last broadcast, so the next one sends only newer entries. */
-  broadcastSeqs: Required<ListSeqs>;
+  broadcastSeqs: ListSeqs;
   tokens: Map<string, string>;
 }
 

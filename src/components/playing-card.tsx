@@ -4,17 +4,12 @@ import Snowflake from "@lucide/solid/icons/snowflake";
 import { TooltipTrigger } from "@ui-sdk/solid/tooltip";
 import { Match, Show, Switch } from "solid-js";
 
-import {
-  ADDITIVE_MODIFIER_KIND,
-  cardLabel,
-  isActionCard,
-  isScoreModifierCard,
-} from "../game/cards";
+import { cardLabel, isActionCard, isScoreModifierCard } from "../game/cards";
 import type { Card } from "../game/cards";
 import { useCardTooltips } from "./card-tooltips";
 
 const CARD_HINTS = {
-  [ADDITIVE_MODIFIER_KIND]: "Score Modifier card that adds the points shown",
+  modifier: "Score Modifier card that adds the points shown",
   double: "Score Modifier card that doubles the value of your Number cards",
   flipThree: "The receiving player takes the next three cards, one at a time",
   freeze: "The receiving player banks their points and exits the round",

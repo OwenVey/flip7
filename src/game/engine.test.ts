@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  ADDITIVE_MODIFIER_KIND,
-  buildDeck,
-  calculateRoundScore,
-} from "./cards";
+import { buildDeck, calculateRoundScore } from "./cards";
 import type { Card } from "./cards";
 import {
   addPlayer,
@@ -24,11 +20,11 @@ import {
   removePlayer,
   startGame,
   stay,
-  TARGET_SCORE,
 } from "./engine";
 import type { GameState } from "./engine";
 import { waitingOn } from "./moves";
 import { parseServerMessage, toRoomView } from "./protocol";
+import { DEFAULT_SETTINGS } from "./settings";
 
 const random = () => 0.5;
 
@@ -44,7 +40,7 @@ const num = (value: number) =>
   ({ id: id(), kind: "number", value }) satisfies Card;
 
 const additiveModifier = (value: number) =>
-  ({ id: id(), kind: ADDITIVE_MODIFIER_KIND, value }) satisfies Card;
+  ({ id: id(), kind: "modifier", value }) satisfies Card;
 
 const multiplierCard = () => ({ id: id(), kind: "double" }) satisfies Card;
 const freeze = () => ({ id: id(), kind: "freeze" }) satisfies Card;
@@ -223,12 +219,12 @@ describe("a round", () => {
 
     const message = { room: toRoomView("ABCDE", state), type: "state" };
     const raw = JSON.stringify(message);
-    expect(raw).toContain('"kind":"bonus"');
+    expect(raw).toContain('"kind":"modifier"');
     expect(parseServerMessage(raw)).toMatchObject({
       room: {
         players: [
-          { lastRound: { streak: true }, status: "streak" },
-          { lastRound: { bonus: 4 } },
+          { lastRound: { flipSeven: true }, status: "flipSeven" },
+          { lastRound: { modifiers: 4 } },
         ],
       },
       type: "state",
@@ -359,7 +355,7 @@ describe("rules from the FAQ", () => {
 describe("winning and leaving", () => {
   it("ends the game when one player reaches the target alone", () => {
     const state = setup(["a", "b"], [num(10), num(3)]);
-    player(state, "a").score = TARGET_SCORE - 5;
+    player(state, "a").score = DEFAULT_SETTINGS.targetScore - 5;
     stay(state, "a", random);
     stay(state, "b", random);
     expect(state.phase).toBe("gameOver");
@@ -378,8 +374,8 @@ describe("winning and leaving", () => {
 
   it("keeps playing when the leaders are tied", () => {
     const state = setup(["a", "b"], [num(10), num(10)]);
-    player(state, "a").score = TARGET_SCORE;
-    player(state, "b").score = TARGET_SCORE;
+    player(state, "a").score = DEFAULT_SETTINGS.targetScore;
+    player(state, "b").score = DEFAULT_SETTINGS.targetScore;
     stay(state, "a", random);
     stay(state, "b", random);
     expect(state.phase).toBe("roundOver");
@@ -839,12 +835,12 @@ describe("Flip Three", () => {
     hit(state, "a", random);
     choose(state, "a", "b", random);
 
-    expect(player(state, "b").lastRound?.streak).toBeTruthy();
+    expect(player(state, "b").lastRound?.flipSeven).toBeTruthy();
     expect(table(state, mark)).toMatchObject({
       deck: [unflipped.id],
       discarded: [trigger.id, nested.id],
       phase: "roundOver",
-      players: { a: { score: 5 }, b: { score: 28 + 15, status: "streak" } },
+      players: { a: { score: 5 }, b: { score: 28 + 15, status: "flipSeven" } },
       turnId: null,
     });
   });

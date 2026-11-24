@@ -1,6 +1,3 @@
-/** This kind is stored in rooms and sent in WebSocket state messages. */
-export const ADDITIVE_MODIFIER_KIND = "bonus";
-
 export interface NumberCard {
   id: number;
   kind: "number";
@@ -8,7 +5,7 @@ export interface NumberCard {
 }
 
 export type ScoreModifierCard =
-  | { id: number; kind: typeof ADDITIVE_MODIFIER_KIND; value: number }
+  | { id: number; kind: "modifier"; value: number }
   | { id: number; kind: "double" };
 
 export type ActionCard =
@@ -46,7 +43,7 @@ export const buildDeck = () => {
   }
 
   for (const value of ADDITIVE_MODIFIER_VALUES) {
-    add({ kind: ADDITIVE_MODIFIER_KIND, value });
+    add({ kind: "modifier", value });
   }
 
   add({ kind: "double" });
@@ -79,18 +76,21 @@ export const isActionCard = (card: Card): card is ActionCard =>
   card.kind === "secondChance";
 
 export const isScoreModifierCard = (card: Card): card is ScoreModifierCard =>
-  card.kind === ADDITIVE_MODIFIER_KIND || card.kind === "double";
+  card.kind === "modifier" || card.kind === "double";
 
 export const countUniqueNumberCards = (cards: readonly Card[]) =>
   new Set(cards.flatMap((card) => (card.kind === "number" ? [card.value] : [])))
     .size;
 
-/** Field names also describe the persisted round score and its WebSocket payload. */
+/** How a player's round score adds up. */
 export interface RoundScore {
+  /** The sum of their Number cards, before ×2. */
   numbers: number;
   doubled: boolean;
-  bonus: number;
-  streak: boolean;
+  /** The sum of their additive Score Modifier cards. */
+  modifiers: number;
+  /** Whether they earned the Flip 7 bonus. */
+  flipSeven: boolean;
   total: number;
 }
 
@@ -102,7 +102,7 @@ export const calculateRoundScore = (cards: readonly Card[]) => {
   for (const card of cards) {
     if (card.kind === "number") {
       numberCardPoints += card.value;
-    } else if (card.kind === ADDITIVE_MODIFIER_KIND) {
+    } else if (card.kind === "modifier") {
       modifierPoints += card.value;
     } else if (card.kind === "double") {
       hasMultiplier = true;
@@ -118,16 +118,16 @@ export const calculateRoundScore = (cards: readonly Card[]) => {
     (earnedFlipSevenBonus ? FLIP_SEVEN_BONUS : 0);
 
   return {
-    bonus: modifierPoints,
     doubled: hasMultiplier,
+    flipSeven: earnedFlipSevenBonus,
+    modifiers: modifierPoints,
     numbers: numberCardPoints,
-    streak: earnedFlipSevenBonus,
     total,
   } satisfies RoundScore;
 };
 
 const KIND_LABELS = {
-  [ADDITIVE_MODIFIER_KIND]: "Score Modifier card",
+  modifier: "Score Modifier card",
   double: "×2",
   flipThree: "Flip Three",
   freeze: "Freeze",
@@ -140,7 +140,7 @@ export const cardLabel = (card: Card) => {
     return String(card.value);
   }
 
-  if (card.kind === ADDITIVE_MODIFIER_KIND) {
+  if (card.kind === "modifier") {
     return `+${card.value}`;
   }
 

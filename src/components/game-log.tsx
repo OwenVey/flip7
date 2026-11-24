@@ -128,7 +128,7 @@ const cueIcons = {
   freeze: Snowflake,
   join: UserPlus,
   special: PlayingCards,
-  streak: Flame,
+  flipSeven: Flame,
 };
 
 const eventCopy = {
@@ -191,7 +191,7 @@ const eventCopy = {
       Heart,
     ],
   ],
-  streak: [
+  flipSeven: [
     [/^(?<player>.+) earned the Flip 7 bonus!$/u, "$<player> flipped 7!"],
   ],
 } satisfies Partial<

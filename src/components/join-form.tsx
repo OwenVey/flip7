@@ -8,7 +8,7 @@ import {
 import { Input } from "@ui-sdk/solid/input";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 
-import { pickAvatar } from "../game/avatars";
+import { pickAvatar, takenAvatars } from "../game/avatars";
 import { MAX_PLAYERS } from "../game/engine";
 import { NAME_MAX_LENGTH } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
@@ -32,10 +32,7 @@ export default function JoinForm(props: {
   const avatar = () =>
     picked() ??
     props.savedAvatar ??
-    pickAvatar(
-      seed,
-      (props.room?.players ?? []).flatMap((player) => player.avatar ?? [])
-    );
+    pickAvatar(seed, takenAvatars(props.room?.players ?? []));
 
   const [emptyName, setEmptyName] = createSignal(false);
   const full = () => (props.room?.players.length ?? 0) >= MAX_PLAYERS;

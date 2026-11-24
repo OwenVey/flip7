@@ -24,17 +24,11 @@ import type { Move } from "./moves";
 import { DEFAULT_SETTINGS } from "./settings";
 import type { RoomSettings } from "./settings";
 
-/** The winning score a room starts with. */
-export const TARGET_SCORE = DEFAULT_SETTINGS.targetScore;
-
 export { MAX_PLAYERS } from "./moves";
 
 export { FLIP_THREE_COUNT } from "./action-card-resolution";
 
 export type { ActionCardChoice, HeldCard } from "./action-card-resolution";
-
-/** This status is stored in rooms and sent in WebSocket state messages. */
-export const FLIP_SEVEN_STATUS = "streak";
 
 /** The most log entries a room keeps. The log starts over each game, so this only guards against runaway chat. */
 export const LOG_LIMIT = 1000;
@@ -52,7 +46,7 @@ export type RoundStatus =
   | "stayed"
   | "frozen"
   | "busted"
-  | typeof FLIP_SEVEN_STATUS;
+  | "flipSeven";
 
 export interface Player {
   id: string;
@@ -93,7 +87,7 @@ export type GameCue =
   | "freeze"
   | "join"
   | "special"
-  | "streak";
+  | "flipSeven";
 
 export interface LogEntry {
   /** Epoch milliseconds. */
@@ -122,7 +116,8 @@ export interface GameState extends ActionCardState {
   dealerIndex: number;
   turnId: string | null;
   turnAnchor: number;
-  dealQueue: string[];
+  /** Players still to be dealt an opening card this round, in deal order. */
+  openingSlots: string[];
   winnerIds: string[];
   /** This game's log, oldest first. Cleared when a game starts. */
   log: LogEntry[];
@@ -134,10 +129,10 @@ export interface GameState extends ActionCardState {
   drawSeq: number;
   /** The most recent draws, oldest first. */
   draws: DrawEvent[];
-  /** Players dealt Flip Three cards this round, who get Hit or Stay at their opening deal slot. */
-  flippedIds: string[];
-  /** The current turn is an opening deal slot, so it doesn't move where play resumes. */
-  dealSlotTurn: boolean;
+  /** Players who have taken Flip Three draws this round. They get Hit or Stay at their opening slot instead of a dealt card. */
+  flipThreeTargetIds: string[];
+  /** The current turn is an opening slot, so it doesn't move where play resumes. */
+  atOpeningSlot: boolean;
   /**
    * A draw found both the deck and the discard pile empty, so the round ends
    * and every player who hasn't busted scores what they hold.
@@ -154,15 +149,15 @@ export class GameError extends Error {
 export const createGame = () => {
   const state: GameState = {
     ...initialActionCards(),
-    dealQueue: [],
-    dealSlotTurn: false,
+    openingSlots: [],
+    atOpeningSlot: false,
     dealerIndex: -1,
     deck: [],
     discard: [],
     drawSeq: 0,
     draws: [],
     evictedCards: [],
-    flippedIds: [],
+    flipThreeTargetIds: [],
     games: 0,
     hostId: null,
     log: [],
@@ -299,8 +294,8 @@ const placeNumberCard = (
     player.hand.push(card);
 
     if (countUniqueNumberCards(player.hand) >= FLIP_SEVEN_COUNT) {
-      player.status = FLIP_SEVEN_STATUS;
-      say(state, `${player.name} earned the Flip 7 bonus!`, "streak");
+      player.status = "flipSeven";
+      say(state, `${player.name} earned the Flip 7 bonus!`, "flipSeven");
     }
 
     return;
@@ -442,8 +437,8 @@ const resolveDealtCard = (
   const outcome =
     flip?.held === true ? "held" : placeDealtCard(state, player, card);
 
-  if (flip && !state.flippedIds.includes(player.id)) {
-    state.flippedIds = [...state.flippedIds, player.id];
+  if (flip && !state.flipThreeTargetIds.includes(player.id)) {
+    state.flipThreeTargetIds = [...state.flipThreeTargetIds, player.id];
   }
 
   state.draws.push({
@@ -473,15 +468,15 @@ const nextActiveAfter = (state: GameState, index: number) => {
 
 const roundIsOver = (state: GameState) =>
   state.outOfCards ||
-  state.players.some((player) => player.status === FLIP_SEVEN_STATUS) ||
+  state.players.some((player) => player.status === "flipSeven") ||
   activePlayers(state).length === 0;
 
 const finishRound = (state: GameState) => {
   discardActionCards(state);
   state.outOfCards = false;
   state.turnId = null;
-  state.dealQueue = [];
-  state.dealSlotTurn = false;
+  state.openingSlots = [];
+  state.atOpeningSlot = false;
 
   for (const player of state.players) {
     if (player.status === "out") {
@@ -491,7 +486,13 @@ const finishRound = (state: GameState) => {
 
     const score: RoundScore =
       player.status === "busted"
-        ? { bonus: 0, doubled: false, numbers: 0, streak: false, total: 0 }
+        ? {
+            doubled: false,
+            flipSeven: false,
+            modifiers: 0,
+            numbers: 0,
+            total: 0,
+          }
         : calculateRoundScore(player.hand);
 
     player.lastRound = score;
@@ -521,7 +522,7 @@ const finishRound = (state: GameState) => {
 };
 
 const stepDeal = (state: GameState, random: Random) => {
-  const id = state.dealQueue.shift();
+  const id = state.openingSlots.shift();
 
   if (id === undefined) {
     return false;
@@ -533,9 +534,9 @@ const stepDeal = (state: GameState, random: Random) => {
     return true;
   }
 
-  if (state.flippedIds.includes(player.id)) {
+  if (state.flipThreeTargetIds.includes(player.id)) {
     state.turnId = player.id;
-    state.dealSlotTurn = true;
+    state.atOpeningSlot = true;
 
     return true;
   }
@@ -578,12 +579,12 @@ const advance = (state: GameState, random: Random) => {
       continue;
     }
 
-    if (state.dealSlotTurn) {
+    if (state.atOpeningSlot) {
       if (state.turnId !== null && isActive(state, state.turnId)) {
         return;
       }
 
-      state.dealSlotTurn = false;
+      state.atOpeningSlot = false;
       state.turnId = null;
     }
 
@@ -618,11 +619,11 @@ const startRound = (state: GameState, random: Random) => {
   state.turnAnchor = state.dealerIndex;
   state.turnId = null;
   resetActionCards(state);
-  state.flippedIds = [];
-  state.dealSlotTurn = false;
+  state.flipThreeTargetIds = [];
+  state.atOpeningSlot = false;
   state.outOfCards = false;
   state.phase = "playing";
-  state.dealQueue = state.players.map(
+  state.openingSlots = state.players.map(
     (_, offset) =>
       state.players[(state.dealerIndex + 1 + offset) % state.players.length]
         ?.id ?? ""
@@ -838,8 +839,8 @@ export const nextRound = (
 };
 
 const endTurn = (state: GameState, player: Player) => {
-  if (state.dealSlotTurn) {
-    state.dealSlotTurn = false;
+  if (state.atOpeningSlot) {
+    state.atOpeningSlot = false;
   } else {
     state.turnAnchor = state.players.indexOf(player);
   }
@@ -935,12 +936,12 @@ export const removePlayer = (
   const count = state.players.length;
   state.dealerIndex = shiftIndex(state.dealerIndex, index, count);
   state.turnAnchor = shiftIndex(state.turnAnchor, index, count);
-  state.dealQueue = state.dealQueue.filter((id) => id !== playerId);
+  state.openingSlots = state.openingSlots.filter((id) => id !== playerId);
   evictFromActionCards(state, playerId);
 
   if (state.turnId === playerId) {
     state.turnId = null;
-    state.dealSlotTurn = false;
+    state.atOpeningSlot = false;
   }
 
   if (state.hostId === playerId) {
@@ -956,8 +957,8 @@ export const removePlayer = (
     state.phase = "lobby";
     state.turnId = null;
     discardActionCards(state);
-    state.dealSlotTurn = false;
-    state.dealQueue = [];
+    state.atOpeningSlot = false;
+    state.openingSlots = [];
 
     clearRoundTable(state, "out");
 

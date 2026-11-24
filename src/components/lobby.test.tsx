@@ -211,9 +211,7 @@ describe("<Lobby />", () => {
       <Lobby
         room={{
           ...roomWithBot(),
-          botSpeed: "fast",
-          locked: true,
-          targetScore: 100,
+          settings: { botSpeed: "fast", locked: true, targetScore: 100 },
         }}
         playerId="p1"
         send={vi.fn<RoomConnection["send"]>()}

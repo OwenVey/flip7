@@ -30,13 +30,11 @@ const hasBots = (room: Pick<RoomView, "players">) =>
   room.players.some((player) => player.bot);
 
 /** A one-line summary of the room's settings, for guests who can't change them. */
-export const settingsSummary = (
-  room: Pick<RoomView, "botSpeed" | "locked" | "players" | "targetScore">
-) =>
+export const settingsSummary = (room: Pick<RoomView, "players" | "settings">) =>
   [
-    `First to ${room.targetScore}`,
-    room.botSpeed === "fast" && hasBots(room) ? "Fast bots" : null,
-    room.locked ? "Room locked" : null,
+    `First to ${room.settings.targetScore}`,
+    room.settings.botSpeed === "fast" && hasBots(room) ? "Fast bots" : null,
+    room.settings.locked ? "Room locked" : null,
   ]
     .filter((part) => part !== null)
     .join(" · ");
@@ -58,7 +56,7 @@ export default function RoomSettingsForm(props: {
         <Field class="setting">
           <FieldLabel>Winning score</FieldLabel>
           <SegmentedControl
-            value={String(props.room.targetScore)}
+            value={String(props.room.settings.targetScore)}
             readOnly={props.readOnly}
             onValueChange={(next, details) => {
               details.cancel();
@@ -88,7 +86,7 @@ export default function RoomSettingsForm(props: {
         <Field class="setting">
           <FieldLabel>Bot speed</FieldLabel>
           <SegmentedControl
-            value={props.room.botSpeed}
+            value={props.room.settings.botSpeed}
             readOnly={props.readOnly}
             onValueChange={(next, details) => {
               details.cancel();
@@ -117,7 +115,7 @@ export default function RoomSettingsForm(props: {
           <FieldDescription>New players can't join.</FieldDescription>
         </div>
         <Switch
-          checked={props.room.locked}
+          checked={props.room.settings.locked}
           readOnly={props.readOnly}
           onCheckedChange={(next, details) => {
             details.cancel();

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ADDITIVE_MODIFIER_KIND,
   buildDeck,
   calculateRoundScore,
   countUniqueNumberCards,
@@ -35,7 +34,7 @@ const num = (value: number) =>
   ({ id: newId(), kind: "number", value }) satisfies Card;
 
 const plus = (value: number) =>
-  ({ id: newId(), kind: ADDITIVE_MODIFIER_KIND, value }) satisfies Card;
+  ({ id: newId(), kind: "modifier", value }) satisfies Card;
 
 const double = () => ({ id: newId(), kind: "double" }) satisfies Card;
 const freeze = () => ({ id: newId(), kind: "freeze" }) satisfies Card;
@@ -128,7 +127,7 @@ describe("1. deck and card identity", () => {
 
     for (const each of deck) {
       const key =
-        each.kind === "number" || each.kind === ADDITIVE_MODIFIER_KIND
+        each.kind === "number" || each.kind === "modifier"
           ? `${each.kind}:${each.value}`
           : each.kind;
 
@@ -146,11 +145,11 @@ describe("1. deck and card identity", () => {
     expect(new Set(ids(deck)).size).toBe(94);
     expect(counts).toStrictEqual({
       ...numbers,
-      [`${ADDITIVE_MODIFIER_KIND}:10`]: 1,
-      [`${ADDITIVE_MODIFIER_KIND}:2`]: 1,
-      [`${ADDITIVE_MODIFIER_KIND}:4`]: 1,
-      [`${ADDITIVE_MODIFIER_KIND}:6`]: 1,
-      [`${ADDITIVE_MODIFIER_KIND}:8`]: 1,
+      "modifier:10": 1,
+      "modifier:2": 1,
+      "modifier:4": 1,
+      "modifier:6": 1,
+      "modifier:8": 1,
       double: 1,
       flipThree: 3,
       freeze: 3,
@@ -554,7 +553,7 @@ describe("4. Flip Three", () => {
     hit(state, "a", random);
     choose(state, "a", "a", random);
 
-    expect(seat(state, "a").lastRound).toMatchObject({ streak: true });
+    expect(seat(state, "a").lastRound).toMatchObject({ flipSeven: true });
     expect(snapshot(state)).toMatchObject({
       choice: null,
       deck: [unflipped.id],
@@ -577,7 +576,7 @@ describe("4. Flip Three", () => {
 
     expect(countUniqueNumberCards(a.hand)).toBe(6);
     expect(calculateRoundScore(a.hand)).toMatchObject({
-      streak: false,
+      flipSeven: false,
       total: 21 + 4,
     });
     expect(snapshot(state)).toMatchObject({
@@ -786,7 +785,7 @@ describe("5. scoring", () => {
     hit(state, "d", random);
     hit(state, "a", random);
 
-    expect(seat(state, "d").lastRound?.streak).toBeFalsy();
+    expect(seat(state, "d").lastRound?.flipSeven).toBeFalsy();
     expect(snapshot(state)).toMatchObject({
       phase: "roundOver",
       turnId: null,
@@ -1001,8 +1000,8 @@ const cardsAtTable = (state: GameState) => {
     all.push(...player.hand, ...(player.bustCard ? [player.bustCard] : []));
   }
 
-  for (const run of state.flipRuns) {
-    all.push(...run.deferred, run.card);
+  for (const sequence of state.flipSequences) {
+    all.push(...sequence.deferred, sequence.card);
   }
 
   all.push(...state.actionQueue.map((queued) => queued.card));

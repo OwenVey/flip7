@@ -1,13 +1,13 @@
-import type { PlayerView } from "../game/protocol";
+import type { Player } from "../game/engine";
 
 export interface Standing {
   index: number;
-  player: PlayerView;
+  player: Player;
   rank: number;
 }
 
 /** Highest total first. Tied totals share a rank, and the next rank skips past them. */
-export const rankPlayers = (players: readonly PlayerView[]) => {
+export const rankPlayers = (players: readonly Player[]) => {
   const sorted = players.toSorted((a, b) => b.score - a.score);
   let rank = 1;
 
