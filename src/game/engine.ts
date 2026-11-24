@@ -21,6 +21,7 @@ import {
 import type { ActionCard, Card, NumberCard, Random, RoundScore } from "./cards";
 import { MAX_PLAYERS, MIN_PLAYERS, rejectMove, waitingOn } from "./moves";
 import type { Move } from "./moves";
+import { nameKey, sameName } from "./names";
 import { DEFAULT_SETTINGS } from "./settings";
 import type { RoomSettings } from "./settings";
 
@@ -650,9 +651,7 @@ export const addPlayer = (
     throw new GameError("This room is locked. Ask the host to unlock it.");
   }
 
-  const taken = state.players.some(
-    (player) => player.name.toLowerCase() === name.toLowerCase()
-  );
+  const taken = state.players.some((player) => sameName(player.name, name));
 
   if (taken) {
     throw new GameError(`Someone here is already called ${name}.`);
@@ -702,11 +701,9 @@ const BOT_NAMES = [
 ] as const;
 
 const botName = (state: GameState, random: Random) => {
-  const taken = new Set(
-    state.players.map((player) => player.name.toLowerCase())
-  );
+  const taken = new Set(state.players.map((player) => nameKey(player.name)));
 
-  const free = BOT_NAMES.filter((name) => !taken.has(name.toLowerCase()));
+  const free = BOT_NAMES.filter((name) => !taken.has(nameKey(name)));
   const picked = free[Math.floor(random() * free.length)];
 
   if (picked !== undefined) {

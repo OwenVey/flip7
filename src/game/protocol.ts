@@ -31,8 +31,14 @@ export const normalizeCode = (raw: string) => {
   return CODE_PATTERN.test(code) ? code : null;
 };
 
+const INVISIBLE_CHARACTERS = /\p{Cf}|(?!\s)\p{Cc}/gu;
+
 export const cleanName = (raw: string) =>
-  raw.replaceAll(/\s+/gu, " ").trim().slice(0, NAME_MAX_LENGTH);
+  raw
+    .replaceAll(INVISIBLE_CHARACTERS, "")
+    .replaceAll(/\s+/gu, " ")
+    .trim()
+    .slice(0, NAME_MAX_LENGTH);
 
 export interface RoomView extends Pick<
   GameState,

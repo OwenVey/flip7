@@ -195,6 +195,26 @@ describe("joining a room", () => {
     expect(broadcasts(outcome)).toBeFalsy();
   });
 
+  it("rejects a name made only of invisible characters", () => {
+    const h = harness();
+    h.connect("tab");
+
+    const outcome = h.room.join("tab", "\u200B\u2060\uFEFF", null);
+
+    expect(replies(outcome)).toStrictEqual([
+      { message: "Enter a name to join.", type: "error" },
+    ]);
+  });
+
+  it("seats a name without the invisible characters hidden in it", () => {
+    const h = harness();
+    h.connect("tab");
+
+    h.room.join("tab", "A\u200Bna", null);
+
+    expect(h.stored.game.players.map((p) => p.name)).toStrictEqual(["Ana"]);
+  });
+
   it("seats a player with the avatar they picked", () => {
     const h = harness();
     h.connect("tab");

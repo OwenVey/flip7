@@ -396,6 +396,17 @@ describe("winning and leaving", () => {
     }).toThrow(GameError);
   });
 
+  it("rejects a name that only looks different through compatibility forms", () => {
+    const state = createGame();
+    addPlayer(state, "a", "Ana", 1);
+    expect(() => {
+      addPlayer(state, "b", "\uFF21\uFF4E\uFF41", 1);
+    }).toThrow(GameError);
+    expect(() => {
+      addPlayer(state, "c", "\u{1D400}\u{1D427}\u{1D41A}", 1);
+    }).toThrow(GameError);
+  });
+
   it("returns to the lobby when too few players remain", () => {
     const state = setup(["a", "b"], [num(1), num(2)]);
     removePlayer(state, "b", random);

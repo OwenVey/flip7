@@ -13,6 +13,7 @@ import type { ParentProps } from "solid-js";
 import { pickAvatar, takenAvatars } from "../game/avatars";
 import { MAX_PLAYERS } from "../game/engine";
 import { MAX_SPECTATORS } from "../game/moves";
+import { sameName } from "../game/names";
 import { NAME_MAX_LENGTH } from "../game/protocol";
 import type { RoomPreview } from "../game/protocol";
 import { paths } from "../router";
@@ -77,8 +78,8 @@ export default function JoinForm(props: {
   const suggestion = createMemo(() => {
     const saved = props.savedName;
 
-    const taken = props.room?.players.some(
-      (player) => player.name.toLowerCase() === saved.toLowerCase()
+    const taken = props.room?.players.some((player) =>
+      sameName(player.name, saved)
     );
 
     return taken === true ? "" : saved;

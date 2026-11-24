@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { addBot, addPlayer, createGame } from "./engine";
 import {
+  cleanName,
   parseServerMessage,
   roundStarted,
   toRoomView,
@@ -19,6 +20,26 @@ const lobby = toRoomView("ABCDE", game);
 
 const view = (changes: Partial<RoomView>) =>
   ({ ...lobby, ...changes }) satisfies RoomView;
+
+describe(cleanName, () => {
+  it("collapses whitespace and trims", () => {
+    expect(cleanName("  Ana \t\n Lee  ")).toBe("Ana Lee");
+  });
+
+  it("strips zero-width, bidi and other invisible characters", () => {
+    expect(cleanName("A\u200Bn\u200Da\u2060\uFEFF")).toBe("Ana");
+    expect(cleanName("\u202EAna\u202C")).toBe("Ana");
+    expect(cleanName("An\u0000a\u007F")).toBe("Ana");
+  });
+
+  it("leaves nothing of a name made only of invisible characters", () => {
+    expect(cleanName("\u200B\u200C\u2060 \u00AD")).toBe("");
+  });
+
+  it("keeps a space between words that an invisible character sat next to", () => {
+    expect(cleanName("Ana \u200B Lee")).toBe("Ana Lee");
+  });
+});
 
 describe(roundStarted, () => {
   it("is true when the game starts or the next round is dealt", () => {
