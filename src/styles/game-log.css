@@ -59,7 +59,6 @@
       content: "";
     }
 
-    /* Stops above the log's bottom rule. */
     &.log-body::after {
       inset-block-end: 1px;
     }
@@ -104,24 +103,12 @@
 
     &[data-orientation="horizontal"] {
       height: 0.5rem;
-      visibility: hidden;
-
-      &[data-dragging] {
-        visibility: visible;
-      }
-
-      @media (any-hover: hover) {
-        .scroll-fades:hover > & {
-          visibility: visible;
-        }
-      }
 
       & > [data-slot="scroll-area-thumb"] {
         background: color-mix(in srgb, var(--ink) 35%, transparent);
       }
     }
 
-    /* A vertical track is a gold rule capped with diamond pips, like the card titles. */
     &[data-orientation="vertical"] {
       --pip-size: 0.3125rem;
       width: 0.625rem;
@@ -169,6 +156,7 @@
   margin-inline-end: -0.75rem;
 }
 
+/* Grid stretch sizes the viewport; ui-sdk's full width and height would break the cards' max heights. */
 .scroll-fade-viewport {
   width: auto;
   height: auto;
@@ -219,6 +207,10 @@
 
   & > * {
     pointer-events: auto;
+  }
+
+  & > :not([data-visible]) {
+    visibility: hidden;
   }
 }
 

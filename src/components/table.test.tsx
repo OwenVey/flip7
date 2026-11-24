@@ -7,7 +7,7 @@ import {
   within,
 } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { calculateRoundScore } from "../game/cards";
 import type { RoomView } from "../game/protocol";
@@ -305,8 +305,10 @@ describe("<Table />", () => {
         (entry) => entry.label === "Scores" && entry.actions.includes("press")
       );
 
+    assert.exists(scoresButton);
+
     const result = await agent.act({
-      steps: [{ action: "press", ref: scoresButton?.ref ?? "" }],
+      steps: [{ action: "press", ref: scoresButton.ref }],
     });
 
     expect(result.error).toBeUndefined();
@@ -883,7 +885,7 @@ describe("<Table />", () => {
 
   it("keeps the scroll position and counts new entries until jumping to latest", async () => {
     vi.useFakeTimers({
-      toFake: ["requestAnimationFrame", "cancelAnimationFrame"],
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
     });
     const resizeCallbacks = new Map<Element, () => void>();
     // oxlint-disable-next-line landmines-testing/no-test-doubles -- Deliver layout changes that jsdom cannot measure.
@@ -966,20 +968,16 @@ describe("<Table />", () => {
       top: 100,
       unread: "1 unread message",
     });
-    screen.getByRole("button", { name: "Jump to latest · 4 new" }).click();
-    vi.advanceTimersToNextFrame();
+    const jump = screen.getByRole("button", { name: "Jump to latest · 4 new" });
+    jump.click();
+    vi.advanceTimersByTime(1000);
     await Promise.resolve();
     flush();
 
     expect({
-      focused: document.activeElement === log,
-      jump: screen.queryByRole("button", { name: /Jump to latest/u }),
-      top: log.scrollTop,
-    }).toStrictEqual({
-      focused: true,
-      jump: null,
-      top: log.scrollHeight - log.clientHeight,
-    });
+      following: Object.hasOwn(log.dataset, "sticking"),
+      jumpShown: Object.hasOwn(jump.dataset, "visible"),
+    }).toStrictEqual({ following: true, jumpShown: false });
 
     setView(
       room({
@@ -1015,9 +1013,7 @@ describe("<Table />", () => {
     vi.advanceTimersToNextFrame();
     await Promise.resolve();
     flush();
-    expect(
-      screen.getByRole("button", { name: /Jump to latest/u })
-    ).toBeVisible();
+    expect(jump).toHaveAttribute("data-visible");
 
     Object.defineProperty(log, "clientHeight", { value: 600 });
     resizeCallbacks.get(log)?.();
@@ -1025,9 +1021,9 @@ describe("<Table />", () => {
     await Promise.resolve();
     flush();
     expect({
-      jump: screen.queryByRole("button", { name: /Jump to latest/u }),
+      jumpShown: Object.hasOwn(jump.dataset, "visible"),
       top: log.scrollTop,
-    }).toStrictEqual({ jump: null, top: 0 });
+    }).toStrictEqual({ jumpShown: false, top: 0 });
   });
 
   it("marks the score edges that have more rows to scroll to", () => {

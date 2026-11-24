@@ -206,9 +206,6 @@ importers:
       '@solid-primitives/connectivity':
         specifier: ^1.0.0
         version: 1.0.0(@solidjs/web@2.0.3(solid-js@2.0.3))(solid-js@2.0.3)
-      '@solid-primitives/mutation-observer':
-        specifier: ^3.0.0
-        version: 3.0.0(@solidjs/web@2.0.3(solid-js@2.0.3))(solid-js@2.0.3)
       '@solid-primitives/page-utilities':
         specifier: ^3.0.0
         version: 3.0.0(@solidjs/web@2.0.3(solid-js@2.0.3))(solid-js@2.0.3)
@@ -1498,12 +1495,6 @@ packages:
 
   '@solid-primitives/event-listener@3.0.0':
     resolution: {integrity: sha512-dRluvmXarq/aVYl01UPgljuyU8ROYO0aYKQNJRmmAO1KzS2nmwMVCRUqmx3uayKu88vFEKSTqqr5dxIxI7A+bA==}
-    peerDependencies:
-      '@solidjs/web': ^2.0.0
-      solid-js: ^2.0.0
-
-  '@solid-primitives/mutation-observer@3.0.0':
-    resolution: {integrity: sha512-4qVUsTgd0taV1JYqC8zeVGO0k/c+pgZZoTlQ8Mk6RS1UgoWrli+upSk9U7E7DjbzMox89R4vUmyd38SWMYnqQA==}
     peerDependencies:
       '@solidjs/web': ^2.0.0
       solid-js: ^2.0.0
@@ -3805,12 +3796,6 @@ snapshots:
       solid-js: 2.0.3
 
   '@solid-primitives/event-listener@3.0.0(@solidjs/web@2.0.3(solid-js@2.0.3))(solid-js@2.0.3)':
-    dependencies:
-      '@solid-primitives/utils': 7.0.1(@solidjs/web@2.0.3(solid-js@2.0.3))(solid-js@2.0.3)
-      '@solidjs/web': 2.0.3(solid-js@2.0.3)
-      solid-js: 2.0.3
-
-  '@solid-primitives/mutation-observer@3.0.0(@solidjs/web@2.0.3(solid-js@2.0.3))(solid-js@2.0.3)':
     dependencies:
       '@solid-primitives/utils': 7.0.1(@solidjs/web@2.0.3(solid-js@2.0.3))(solid-js@2.0.3)
       '@solidjs/web': 2.0.3(solid-js@2.0.3)

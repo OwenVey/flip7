@@ -19,7 +19,7 @@ export default function ScrollFade(
   return (
     <ScrollArea
       class={["scroll-fades", props.class]}
-      type="auto"
+      type={props.horizontal === true ? "hover" : "auto"}
       data-horizontal={props.horizontal === true ? "" : undefined}
       data-agent-hidden={props.hiddenFromAgent === true ? "" : undefined}
     >

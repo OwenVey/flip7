@@ -11,7 +11,6 @@ import Shuffle from "@lucide/solid/icons/shuffle";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import Trophy from "@lucide/solid/icons/trophy";
 import UserPlus from "@lucide/solid/icons/user-plus";
-import { createMutationObserver } from "@solid-primitives/mutation-observer";
 import { createPolled } from "@solid-primitives/timer";
 import { dynamic } from "@solidjs/web";
 import { Button } from "@ui-sdk/solid/button";
@@ -21,6 +20,7 @@ import {
   ScrollArea,
   ScrollAreaContent,
   ScrollAreaScrollbar,
+  ScrollAreaScrollToEnd,
   ScrollAreaThumb,
   ScrollAreaViewport,
 } from "@ui-sdk/solid/scroll-area";
@@ -477,14 +477,14 @@ export default function GameLog(props: {
 
   const [seenId, setSeenId] = createSignal(0);
   const [seenChatId, setSeenChatId] = createSignal(untrack(latestId));
-  const [atBottom, setAtBottom] = createSignal(true);
+  const [following, setFollowing] = createSignal(true);
 
   const newEntries = createMemo(() =>
-    atBottom() ? 0 : visible().filter((entry) => entry.id > seenId()).length
+    following() ? 0 : visible().filter((entry) => entry.id > seenId()).length
   );
 
   const unreadChats = createMemo(() =>
-    filter() === "Game" || !atBottom()
+    filter() === "Game" || !following()
       ? countChatsAfter(props.log, props.playerId, seenChatId())
       : 0
   );
@@ -492,7 +492,6 @@ export default function GameLog(props: {
   const hiddenChats = () => (filter() === "Game" ? unreadChats() : 0);
 
   const scroll = createScrollAreaController();
-  let scroller: HTMLDivElement | undefined;
 
   const markSeen = (id: number, currentFilter: LogFilter) => {
     setSeenId(id);
@@ -502,29 +501,10 @@ export default function GameLog(props: {
     }
   };
 
-  const [observeScrollEnd] = createMutationObserver(
-    [],
-    { attributeFilter: ["data-at-y-end"] },
-    () => {
-      const bottom = scroller?.dataset.atYEnd !== undefined;
-      setAtBottom(bottom);
-
-      if (bottom) {
-        markSeen(latestId(), filter());
-      }
-    }
-  );
-
-  const pinToLatest = () => {
-    setAtBottom(true);
-    scroll.scrollToEnd({ behavior: "instant" });
-    markSeen(latestId(), filter());
-  };
-
   createEffect(
-    () => ({ filter: filter(), id: latestId() }),
-    ({ filter: currentFilter, id }) => {
-      if (scroll.isSticking()) {
+    () => ({ filter: filter(), id: latestId(), isFollowing: following() }),
+    ({ filter: currentFilter, id, isFollowing }) => {
+      if (isFollowing) {
         markSeen(id, currentFilter);
       }
     }
@@ -563,7 +543,6 @@ export default function GameLog(props: {
               data-variant={filter() === option ? "solid" : undefined}
               onClick={() => {
                 if (filter() !== option) {
-                  setAtBottom(true);
                   scroll.scrollToEnd({ behavior: "instant" });
                   setFilter(option);
                 }
@@ -591,103 +570,112 @@ export default function GameLog(props: {
         stickToEnd
         controller={scroll}
       >
-        <ScrollAreaViewport
-          class="log-scroll"
-          role="log"
-          aria-label={CHAT_AND_GAME_LOG_TITLE}
-          ref={(element) => {
-            scroller = element;
-            observeScrollEnd(element);
-          }}
-        >
-          <ScrollAreaContent class="log-entries">
-            <Show
-              when={groups().length > 0}
-              fallback={<p class="log-empty">{EMPTY_MESSAGE[filter()]}</p>}
-            >
-              <For each={groups()} keyed={(group) => group.id}>
-                {(group) => (
-                  <div class="log-group">
-                    <Show when={group().heading}>
-                      {(heading) => (
-                        <div class="log-round-heading">
-                          <h3>{heading()}</h3>
-                          <ClockMinute
-                            at={oldGameMinute(group().entries[0], now)}
-                          />
+        {(state) => {
+          createEffect(
+            () => state.sticking,
+            (sticking) => {
+              setFollowing(sticking);
+            }
+          );
+
+          return (
+            <>
+              <ScrollAreaViewport
+                class="log-scroll"
+                role="log"
+                aria-label={CHAT_AND_GAME_LOG_TITLE}
+              >
+                <ScrollAreaContent class="log-entries">
+                  <Show
+                    when={groups().length > 0}
+                    fallback={
+                      <p class="log-empty">{EMPTY_MESSAGE[filter()]}</p>
+                    }
+                  >
+                    <For each={groups()} keyed={(group) => group.id}>
+                      {(group) => (
+                        <div class="log-group">
+                          <Show when={group().heading}>
+                            {(heading) => (
+                              <div class="log-round-heading">
+                                <h3>{heading()}</h3>
+                                <ClockMinute
+                                  at={oldGameMinute(group().entries[0], now)}
+                                />
+                              </div>
+                            )}
+                          </Show>
+                          <ol>
+                            <For
+                              each={group().entries}
+                              keyed={(entry) => entry.id}
+                            >
+                              {(entry, index) => (
+                                <li
+                                  data-cue={entry().cue}
+                                  data-kind={entry().from ? "chat" : "game"}
+                                  data-own={
+                                    entry().from?.id === props.playerId
+                                      ? ""
+                                      : undefined
+                                  }
+                                >
+                                  <Show
+                                    when={entry().from}
+                                    fallback={
+                                      <GameEvent
+                                        entry={entry()}
+                                        hasRoundHeading={group().heading !== ""}
+                                        previous={group().entries[index() - 1]}
+                                        now={now}
+                                      />
+                                    }
+                                  >
+                                    {(author) => (
+                                      <>
+                                        <div class="log-message-header">
+                                          <span class="log-author-line">
+                                            <PlayerAvatar
+                                              player={author()}
+                                              size="sm"
+                                            />
+                                            <strong class="log-author">
+                                              {author().name}
+                                            </strong>
+                                          </span>
+                                          <LogTime at={entry().at} now={now} />
+                                        </div>
+                                        {entry().text}
+                                      </>
+                                    )}
+                                  </Show>
+                                </li>
+                              )}
+                            </For>
+                          </ol>
                         </div>
                       )}
-                    </Show>
-                    <ol>
-                      <For each={group().entries} keyed={(entry) => entry.id}>
-                        {(entry, index) => (
-                          <li
-                            data-cue={entry().cue}
-                            data-kind={entry().from ? "chat" : "game"}
-                            data-own={
-                              entry().from?.id === props.playerId
-                                ? ""
-                                : undefined
-                            }
-                          >
-                            <Show
-                              when={entry().from}
-                              fallback={
-                                <GameEvent
-                                  entry={entry()}
-                                  hasRoundHeading={group().heading !== ""}
-                                  previous={group().entries[index() - 1]}
-                                  now={now}
-                                />
-                              }
-                            >
-                              {(author) => (
-                                <>
-                                  <div class="log-message-header">
-                                    <span class="log-author-line">
-                                      <PlayerAvatar
-                                        player={author()}
-                                        size="sm"
-                                      />
-                                      <strong class="log-author">
-                                        {author().name}
-                                      </strong>
-                                    </span>
-                                    <LogTime at={entry().at} now={now} />
-                                  </div>
-                                  {entry().text}
-                                </>
-                              )}
-                            </Show>
-                          </li>
-                        )}
-                      </For>
-                    </ol>
-                  </div>
-                )}
-              </For>
-            </Show>
-          </ScrollAreaContent>
-        </ScrollAreaViewport>
-        <ScrollAreaScrollbar>
-          <ScrollAreaThumb />
-        </ScrollAreaScrollbar>
-        <Show when={!atBottom()}>
-          <div class="log-jump">
-            <Button
-              data-size="sm"
-              data-variant="solid"
-              onClick={() => {
-                scroller?.focus({ preventScroll: true });
-                pinToLatest();
-              }}
-            >
-              <ArrowDown aria-hidden="true" />
-              Jump to latest
-              <Show when={newEntries() > 0}> · {newEntries()} new</Show>
-            </Button>
-          </div>
-        </Show>
+                    </For>
+                  </Show>
+                </ScrollAreaContent>
+              </ScrollAreaViewport>
+              <ScrollAreaScrollbar>
+                <ScrollAreaThumb />
+              </ScrollAreaScrollbar>
+              <div class="log-jump">
+                <ScrollAreaScrollToEnd
+                  render={(jump) => (
+                    <Button {...jump} data-size="sm" data-variant="solid" />
+                  )}
+                >
+                  <ArrowDown aria-hidden="true" />
+                  Jump to latest
+                  <Show when={newEntries() > 0}> · {newEntries()} new</Show>
+                </ScrollAreaScrollToEnd>
+              </div>
+            </>
+          );
+        }}
       </ScrollArea>
       <Show
         when={props.onChat}
