@@ -42,6 +42,7 @@ export default function InviteButton(props: {
           {...hint}
           data-variant={props.solid === true ? "solid" : undefined}
           data-collapsible={props.collapsible === true ? "" : undefined}
+          aria-label={label()}
           onClick={invite}
         />
       )}
