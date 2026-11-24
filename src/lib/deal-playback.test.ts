@@ -1,17 +1,27 @@
+/* oxlint-disable eslint/no-await-in-loop -- Room updates reach playback one at a time, in order. */
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   addPlayer,
   choose,
   createGame,
+  DRAW_LIMIT,
   hit,
   nextRound,
   stay,
   startGame,
 } from "../game/engine";
 import type { GameState } from "../game/engine";
-import { toRoomView } from "../game/protocol";
-import type { RoomView } from "../game/protocol";
+import {
+  listSeqsOf,
+  NO_LISTS,
+  receiveState,
+  toRoomView,
+  toStateMessage,
+} from "../game/protocol";
+import type { ListSeqs, RoomView, ServerMessage } from "../game/protocol";
+import type { DealStep } from "./deal-plan";
 import { createDealPlayback, initialDealPlayback } from "./deal-playback";
 import type { DealMotion } from "./deal-playback";
 import type { RoomCue } from "./room-cues";
@@ -45,11 +55,13 @@ const playback = (animate = true, playerId = "a") => {
   const cues: RoomCue[] = [];
   const readinessAtTurnCue: boolean[] = [];
   const flights: { cardId: number; duration: number }[] = [];
+  const steps: DealStep[] = [];
 
   const motion: DealMotion = {
     allowed: () => motionEnabled,
     captureFlight: (step, duration) => async (signal) => {
       flights.push({ cardId: step.card.id, duration });
+      steps.push(step);
       const { promise, resolve } = Promise.withResolvers<undefined>();
 
       const done = () => {
@@ -93,6 +105,7 @@ const playback = (animate = true, playerId = "a") => {
     show: (room: RoomView, canAct = true) => {
       instance.update({ canAct, playerId, room });
     },
+    steps,
     get shown() {
       return shown;
     },
@@ -556,5 +569,137 @@ describe(createDealPlayback, () => {
       room: newRoom,
     });
     expect(table.cues).toStrictEqual(["turn"]);
+  });
+});
+
+type StateMessage = Extract<ServerMessage, { type: "state" }>;
+
+const moveOn = (game: GameState) => {
+  const hostId = game.hostId ?? "";
+
+  if (game.phase === "roundOver") {
+    nextRound(game, hostId, random);
+  } else if (game.phase === "gameOver") {
+    startGame(game, hostId, random);
+  } else if (game.choice) {
+    choose(game, game.choice.chooserId, game.choice.options[0] ?? "", random);
+  } else if (game.turnId !== null) {
+    hit(game, game.turnId, random);
+  }
+};
+
+const browserCopy = () => {
+  let lists = NO_LISTS;
+
+  return {
+    receive: (message: StateMessage) => {
+      const overTheWire = structuredClone(message);
+      const received = receiveState(lists, overTheWire);
+      ({ lists } = received);
+
+      expect(received.gaps).toStrictEqual([]);
+
+      return received.room;
+    },
+    reconnect: () => {
+      lists = NO_LISTS;
+    },
+  };
+};
+
+describe("deal playback from draws sent as new entries", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("plays the same deals as full draws across a reconnect, new rounds and a new game", async () => {
+    const game = createGame();
+    addPlayer(game, "a", "Ada", 1);
+    addPlayer(game, "b", "Ben", 1);
+    addPlayer(game, "c", "Cat", 1);
+
+    const full = playback(true, "b");
+    const sent = playback(true, "b");
+    const browser = browserCopy();
+    let broadcastSeqs: ListSeqs | undefined;
+    let online = true;
+
+    const broadcast = async () => {
+      const message = toStateMessage("ABCDE", game, broadcastSeqs);
+      broadcastSeqs = listSeqsOf(game);
+
+      if (!online) {
+        return;
+      }
+
+      full.show(view(game));
+      sent.show(browser.receive(message));
+      await vi.runAllTimersAsync();
+    };
+
+    const reconnect = async () => {
+      online = true;
+      browser.reconnect();
+      full.show(view(game));
+      sent.show(browser.receive(toStateMessage("ABCDE", game)));
+      await vi.runAllTimersAsync();
+    };
+
+    full.show(view(game));
+    sent.show(browser.receive(toStateMessage("ABCDE", game)));
+    startGame(game, "a", random);
+    await broadcast();
+
+    const seen = new Set<string>();
+
+    for (let move = 0; move < 400 && (game.games ?? 0) < 2; move += 1) {
+      if (move === 6) {
+        online = false;
+      }
+
+      if (move === 9) {
+        await reconnect();
+      }
+
+      if (game.phase === "roundOver" && game.round >= 3) {
+        game.phase = "gameOver";
+      }
+
+      moveOn(game);
+      seen.add(`${game.games}:${game.round}`);
+      await broadcast();
+    }
+
+    for (let move = 0; move < 6; move += 1) {
+      moveOn(game);
+      await broadcast();
+    }
+
+    expect({
+      games: game.games,
+      manyDeals: full.flights.length > DRAW_LIMIT,
+      pastDrawLimit: (game.drawSeq ?? 0) > DRAW_LIMIT,
+      rounds: seen.size >= 4,
+    }).toStrictEqual({
+      games: 2,
+      manyDeals: true,
+      pastDrawLimit: true,
+      rounds: true,
+    });
+    expect({
+      cues: sent.cues,
+      flights: sent.flights,
+      shown: sent.shown,
+      steps: sent.steps,
+    }).toStrictEqual({
+      cues: full.cues,
+      flights: full.flights,
+      shown: full.shown,
+      steps: full.steps,
+    });
   });
 });

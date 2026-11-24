@@ -38,7 +38,9 @@ export const FLIP_SEVEN_STATUS = "streak";
 
 /** The most log entries a room keeps. The log starts over each game, so this only guards against runaway chat. */
 export const LOG_LIMIT = 1000;
-const DRAW_LIMIT = 40;
+
+/** The most recent draws a room keeps, enough for deal playback to replay one update card by card. */
+export const DRAW_LIMIT = 40;
 export const CHAT_MAX_LENGTH = 200;
 const WHITESPACE = /\s+/gu;
 
@@ -135,6 +137,7 @@ export interface GameState extends ActionCardState {
   logSeq: number;
   /** `logSeq` when the log was last cleared. Missing on rooms saved before the log started over each game. */
   logClearedAt?: number;
+  /** The seq of the newest draw. Never reset, so draws keep unique seqs for the life of the room. */
   drawSeq?: number;
   /** The most recent draws, oldest first. Missing on rooms saved before draws were recorded. */
   draws?: DrawEvent[];

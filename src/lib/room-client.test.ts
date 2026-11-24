@@ -1,6 +1,9 @@
+/* oxlint-disable eslint/no-await-in-loop -- Moves reach the room one at a time, in order. */
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { parseClientMessage } from "../game/client-message";
+import { DRAW_LIMIT } from "../game/engine";
 import { ROOM_REMOVED_CLOSE_CODE } from "../game/protocol";
 import type { ServerMessage } from "../game/protocol";
 import { createRoom, deliver, newStoredRoom } from "../game/room";
@@ -456,6 +459,215 @@ describe("the log through the room client", () => {
 
     net.flush();
     expect(logIds(ana)).toStrictEqual(serverLogIds(net));
+  });
+});
+
+type Network = ReturnType<typeof network>;
+
+const serverDraws = (net: Network) => ({
+  drawSeq: net.stored.game.drawSeq,
+  draws: net.stored.game.draws ?? [],
+});
+
+const drawsOf = (player: TestPlayer) => ({
+  drawSeq: player.client.state.room?.drawSeq,
+  draws: player.client.state.room?.draws,
+});
+
+const sendNextMove = async (net: Network) => {
+  const { game } = net.stored;
+
+  const byId = (id: string | null | undefined) =>
+    net.players.find(
+      (player) => player.link !== null && player.client.state.playerId === id
+    );
+
+  const host = byId(game.hostId);
+
+  if (!host) {
+    throw new Error("Expected the host to be online");
+  }
+
+  if (game.phase === "roundOver") {
+    return await host.client.send({ type: "nextRound" });
+  }
+
+  if (game.phase === "lobby" || game.phase === "gameOver") {
+    return await host.client.send({ type: "start" });
+  }
+
+  const moverId = game.choice?.chooserId ?? game.turnId ?? undefined;
+  const mover = byId(moverId);
+  const forId = mover ? undefined : moverId;
+
+  return game.choice
+    ? await (mover ?? host).client.send({
+        forId,
+        targetId: game.choice.options[0] ?? "",
+        type: "choose",
+      })
+    : await (mover ?? host).client.send({ forId, type: "hit" });
+};
+
+const moveTableOn = async (net: Network) => {
+  const sent = sendNextMove(net);
+  net.flush();
+
+  if (!(await sent)) {
+    throw new Error("The room didn't accept the move");
+  }
+};
+
+const deliverQueued = (
+  player: TestPlayer,
+  keep: (message: ServerMessage) => boolean = () => true
+) => {
+  for (const delivery of player.link?.toClient.splice(0) ?? []) {
+    if (!("closeCode" in delivery) && keep(delivery)) {
+      player.client.received(delivery);
+    }
+  }
+};
+
+const missABroadcastWithDraws = async () => {
+  const net = network();
+  const ana = net.join("Ana");
+  net.join("Ben");
+  await moveTableOn(net);
+  const shown = ana.client.state.room;
+
+  const missed = sendNextMove(net);
+  net.flushToServer();
+  deliverQueued(ana, (message) => message.type !== "state");
+  net.flush();
+
+  if (!(await missed) || net.stored.game.drawSeq === shown?.drawSeq) {
+    throw new Error("Expected the missed move to draw");
+  }
+
+  const next = sendNextMove(net);
+  net.flushToServer();
+  deliverQueued(ana);
+
+  return { ana, net, next, shown };
+};
+
+describe("draws through the room client", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("adds each broadcast's new draws to the draws it has", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    await moveTableOn(net);
+
+    for (let move = 0; move < 12; move += 1) {
+      const before = ben.client.state.room?.draws ?? [];
+      await moveTableOn(net);
+      const after = ben.client.state.room?.draws ?? [];
+      const kept = before.filter((draw) => after.includes(draw));
+
+      expect({
+        ana: drawsOf(ana),
+        ben: drawsOf(ben),
+        keptInOrder: after.slice(0, kept.length),
+      }).toStrictEqual({
+        ana: serverDraws(net),
+        ben: serverDraws(net),
+        keptInOrder: kept,
+      });
+    }
+
+    expect(net.syncs).toStrictEqual([]);
+  });
+
+  it("matches the room's draws across new rounds and a new game", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    const { game } = net.stored;
+    const secondRoundOfSecondGame = () => game.games === 2 && game.round >= 2;
+    await moveTableOn(net);
+
+    for (let move = 0; move < 1000 && !secondRoundOfSecondGame(); move += 1) {
+      if (
+        game.games === 1 &&
+        game.phase === "roundOver" &&
+        (game.drawSeq ?? 0) > DRAW_LIMIT
+      ) {
+        game.phase = "gameOver";
+      }
+
+      await moveTableOn(net);
+
+      expect([drawsOf(ana), drawsOf(ben)]).toStrictEqual([
+        serverDraws(net),
+        serverDraws(net),
+      ]);
+    }
+
+    expect({
+      draws: ben.client.state.room?.draws.length,
+      games: game.games,
+      syncs: net.syncs,
+    }).toStrictEqual({ draws: DRAW_LIMIT, games: 2, syncs: [] });
+  });
+
+  it("catches up on draws made while reconnecting", async () => {
+    const net = network();
+    net.join("Ben");
+    const ana = net.join("Ana");
+    await moveTableOn(net);
+    const seen = ana.client.state.room?.drawSeq ?? 0;
+
+    net.drop(ana);
+    net.flush();
+
+    while ((net.stored.game.drawSeq ?? 0) < seen + 3) {
+      await moveTableOn(net);
+    }
+
+    expect(ana.client.state.room?.drawSeq).toBe(seen);
+
+    net.connect(ana);
+    net.flush();
+
+    expect(drawsOf(ana)).toStrictEqual(serverDraws(net));
+    expect(net.syncs).toStrictEqual([]);
+  });
+
+  it("keeps showing the room it has while draws it missed are on the way", async () => {
+    const { ana, shown } = await missABroadcastWithDraws();
+
+    expect(ana.client.state.room).toBe(shown);
+    expect(
+      ana.link?.toServer.filter((frame) => frame.includes("sync"))
+    ).toHaveLength(1);
+  });
+
+  it("shows the room with every kept draw once they arrive, then carries on", async () => {
+    const { ana, net, next, shown } = await missABroadcastWithDraws();
+    net.flush();
+    await expect(next).resolves.toBeTruthy();
+
+    expect({ ...drawsOf(ana), syncs: net.syncs }).toStrictEqual({
+      ...serverDraws(net),
+      syncs: [ana.link?.id],
+    });
+    expect(ana.client.state.room?.drawSeq).toBeGreaterThan(shown?.drawSeq ?? 0);
+
+    await moveTableOn(net);
+
+    expect({ ...drawsOf(ana), syncs: net.syncs }).toStrictEqual({
+      ...serverDraws(net),
+      syncs: [ana.link?.id],
+    });
   });
 });
 
