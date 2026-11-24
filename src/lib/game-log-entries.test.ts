@@ -10,6 +10,8 @@ import {
   createGame,
   hit,
   nextRound,
+  playFor,
+  playForAbsent,
   startGame,
   stay,
 } from "../game/engine";
@@ -51,9 +53,9 @@ const secondChance = () =>
 
 const NAMES = { a: "Ada", b: "Bo", c: "Cy" };
 
-type Seat = keyof typeof NAMES;
+type PlayerId = keyof typeof NAMES;
 
-const seat = (state: GameState, id: Seat) => {
+const playerById = (state: GameState, id: PlayerId) => {
   const found = state.players.find((player) => player.id === id);
 
   if (found === undefined) {
@@ -64,28 +66,29 @@ const seat = (state: GameState, id: Seat) => {
 };
 
 const rig = (state: GameState, draws: Card[]) => {
-  state.deck = [...draws].toReversed();
+  state.deck = draws.toReversed();
 };
 
-const deal = (seats: Seat[], opening: Card[]) => {
+const deal = (playerIds: PlayerId[], opening: Card[]) => {
   const state = createGame();
 
-  for (const id of seats) {
+  for (const id of playerIds) {
     addPlayer(state, id, NAMES[id], 1);
   }
 
   startGame(state, "a", random);
   state.phase = "roundOver";
   state.round = 0;
-  state.dealerIndex = seats.length - 2;
+  state.dealerIndex = playerIds.length - 2;
   state.discard = [];
+  state.log = [];
   rig(state, opening);
   nextRound(state, "a", random);
 
   return state;
 };
 
-const lastCued =
+const cuedEntry =
   (cue: GameCue, nth = -1) =>
   (log: LogEntry[]) =>
     log.filter((entry) => entry.cue === cue).at(nth);
@@ -122,7 +125,7 @@ const scenarios = {
   },
   flipSeven: () => {
     const state = deal(["a", "b"], [num(1), num(12)]);
-    seat(state, "a").hand.push(num(2), num(3), num(4), num(5), num(6));
+    playerById(state, "a").hand.push(num(2), num(3), num(4), num(5), num(6));
     rig(state, [num(7)]);
     hit(state, "a", random);
 
@@ -180,6 +183,21 @@ const scenarios = {
 
     return state.log;
   },
+  offlineStayByGame: () => {
+    const state = deal(["a", "b"], [num(5), num(3)]);
+    playerById(state, "a").connected = false;
+    playForAbsent(state, random);
+
+    return state.log;
+  },
+  offlineStayByHost: () => {
+    const state = deal(["a", "b"], [num(5), num(3)]);
+    stay(state, "a", random);
+    playerById(state, "b").connected = false;
+    playFor(state, "a", "b", { type: "stay" }, random);
+
+    return state.log;
+  },
   outOfCards: () => {
     const state = deal(["a", "b"], [num(5), num(3)]);
     rig(state, []);
@@ -226,8 +244,8 @@ const scenarios = {
   },
   tied: () => {
     const state = deal(["a", "b"], [num(10), num(10)]);
-    seat(state, "a").score = DEFAULT_SETTINGS.targetScore;
-    seat(state, "b").score = DEFAULT_SETTINGS.targetScore;
+    playerById(state, "a").score = DEFAULT_SETTINGS.targetScore;
+    playerById(state, "b").score = DEFAULT_SETTINGS.targetScore;
     stay(state, "a", random);
     stay(state, "b", random);
 
@@ -235,7 +253,7 @@ const scenarios = {
   },
   winner: () => {
     const state = deal(["a", "b"], [num(10), num(3)]);
-    seat(state, "a").score = DEFAULT_SETTINGS.targetScore - 5;
+    playerById(state, "a").score = DEFAULT_SETTINGS.targetScore - 5;
     stay(state, "a", random);
     stay(state, "b", random);
 
@@ -245,7 +263,7 @@ const scenarios = {
 
 type Scenario = keyof typeof scenarios;
 
-const said = (
+const messageFrom = (
   scenario: Scenario,
   pick: (log: LogEntry[]) => LogEntry | undefined
 ) => {
@@ -272,54 +290,64 @@ const announcement = (outcome: string, icon?: string) => ({
   outcome,
 });
 
+const unchangedMessages = [
+  ["flipThreeOnSelf", cuedEntry("special", 0), "playing-cards-fan"],
+  ["joinLobby", cuedEntry("join"), "user-plus"],
+  ["joinMidRound", cuedEntry("join"), "user-plus"],
+  ["botAdded", cuedEntry("join"), "user-plus"],
+  ["offlineStayByGame", cuedEntry("bank"), "coins"],
+  ["offlineStayByHost", cuedEntry("bank"), "coins"],
+  ["winner", fromEnd(), "trophy"],
+] as const;
+
 describe("the engine's messages in the Chat & Log", () => {
   it.each([
-    ["stayPoints", lastCued("bank"), event("Ada stayed", "+10 pts", "coins")],
-    ["stayOnePoint", lastCued("bank"), event("Ada stayed", "+1 pts", "coins")],
-    ["bust", lastCued("bust"), event("Ada busted", "duplicate 5", "circle-x")],
+    ["stayPoints", cuedEntry("bank"), event("Ada stayed", "+10 pts", "coins")],
+    ["stayOnePoint", cuedEntry("bank"), event("Ada stayed", "+1 pts", "coins")],
+    ["bust", cuedEntry("bust"), event("Ada busted", "duplicate 5", "circle-x")],
     [
       "flipSeven",
-      lastCued("flipSeven"),
+      cuedEntry("flipSeven"),
       event("Ada flipped 7!", undefined, "flame"),
     ],
     [
       "freezeSelf",
-      lastCued("freeze"),
+      cuedEntry("freeze"),
       event("Ada froze themselves", "+5 pts", "snowflake"),
     ],
     [
       "freezeOther",
-      lastCued("freeze"),
+      cuedEntry("freeze"),
       event("Bo was frozen", "+3 pts · by Ada", "snowflake"),
     ],
     [
       "secondChanceSave",
-      lastCued("special"),
+      cuedEntry("special"),
       event("Ada used Second Chance", "duplicate 5", "heart"),
     ],
     [
       "secondChanceSave",
-      lastCued("special", 0),
+      cuedEntry("special", 0),
       event("Ada got a Second Chance", undefined, "heart"),
     ],
     [
       "flipThreeOnOther",
-      lastCued("special", 0),
+      cuedEntry("special", 0),
       event("Bo must flip three", "from Ada", "playing-cards-fan"),
     ],
     [
       "assign",
-      lastCued("special", 1),
+      cuedEntry("special", 1),
       event("Bo assigned Freeze", "to themselves", "arrow-right"),
     ],
     [
       "assign",
-      lastCued("special", 2),
+      cuedEntry("special", 2),
       event("Bo assigned Flip Three", "to Cy", "arrow-right"),
     ],
     [
       "giveSecondChance",
-      lastCued("special"),
+      cuedEntry("special"),
       event("Cy got Second Chance", "from Ada", "heart"),
     ],
     [
@@ -329,35 +357,34 @@ describe("the engine's messages in the Chat & Log", () => {
     ],
     ["outOfCards", fromEnd(2), announcement("Deck empty · round ended.")],
   ] as const)("shortens %s", (scenario, pick, expected) => {
-    expect(eventDetails(said(scenario, pick), true)).toStrictEqual(expected);
-  });
-
-  it.each([
-    ["flipThreeOnSelf", lastCued("special", 0), "playing-cards-fan"],
-    ["joinLobby", lastCued("join"), "user-plus"],
-    ["joinMidRound", lastCued("join"), "user-plus"],
-    ["botAdded", lastCued("join"), "user-plus"],
-    ["winner", fromEnd(), "trophy"],
-  ] as const)("shows %s as the engine wrote it", (scenario, pick, icon) => {
-    const entry = said(scenario, pick);
-
-    expect(eventDetails(entry, true)).toStrictEqual(
-      event(entry.text, undefined, icon)
+    expect(eventDetails(messageFrom(scenario, pick), true)).toStrictEqual(
+      expected
     );
   });
+
+  it.each(unchangedMessages)(
+    "shows %s as the engine wrote it",
+    (scenario, pick, icon) => {
+      const entry = messageFrom(scenario, pick);
+
+      expect(eventDetails(entry, true)).toStrictEqual(
+        event(entry.text, undefined, icon)
+      );
+    }
+  );
 
   it.each([
     ["roundOver", fromEnd(), "Round 1 is over."],
     ["tied", fromEnd(), "Round 1 is over. Tied at 210, so play continues."],
   ] as const)("announces %s as the engine wrote it", (scenario, pick, text) => {
-    const entry = said(scenario, pick);
+    const entry = messageFrom(scenario, pick);
 
     expect(entry.text).toBe(text);
     expect(eventDetails(entry, true)).toStrictEqual(announcement(text));
   });
 
   it("drops the round from a round's first message under its heading", () => {
-    const [begins] = [scenarios.roundOver().find((entry) => entry.round === 1)];
+    const [begins] = scenarios.roundOver();
 
     if (begins === undefined) {
       throw new Error("The round logged nothing");
@@ -399,12 +426,19 @@ describe("the Chat & Log's patterns", () => {
     expect(engineLog.some((entry) => pattern.test(entry.text))).toBeTruthy();
   });
 
-  it("matches every cued message the engine says", () => {
+  it("accounts for every cued message in the scenarios", () => {
+    const unchanged = new Set(
+      unchangedMessages.map(
+        ([scenario, pick]) => messageFrom(scenario, pick).text
+      )
+    );
+
     const unmatched = engineLog.filter(
       (entry) =>
         entry.cue !== undefined &&
-        entry.cue !== "join" &&
-        !eventCopy[entry.cue].some(([pattern]) => pattern.test(entry.text))
+        !unchanged.has(entry.text) &&
+        (entry.cue === "join" ||
+          !eventCopy[entry.cue].some(([pattern]) => pattern.test(entry.text)))
     );
 
     expect(unmatched.map((entry) => entry.text)).toStrictEqual([]);
@@ -423,11 +457,11 @@ const playTwoGames = () => {
   stay(first, "b", random);
   rig(first, [num(6), num(4)]);
   nextRound(first, "a", random);
+  playerById(first, "a").score = DEFAULT_SETTINGS.targetScore;
   stay(first, "b", random);
   stay(first, "a", random);
   const firstGame = [...first.log];
 
-  first.phase = "gameOver";
   backToLobby(first, "a");
   startGame(first, "a", random);
 
@@ -537,12 +571,15 @@ describe(timeLabel, () => {
     });
   });
 
-  it("gives the clock time from an hour on", () => {
-    expect(timeLabel(at, after(HOUR_MS), formats)).toStrictEqual({
-      long: formats.exact.format(at),
-      short: formats.clock.format(at),
-    });
-    expect(formats.clock.format(at)).toMatch(/^\d{1,2}:\d{2}\s[AP]M$/u);
-    expect(formats.exact.format(at)).toMatch(/^\d{1,2}:\d{2}:\d{2}\s[AP]M$/u);
-  });
+  it.each([HOUR_MS, HOUR_MS + MINUTE_MS])(
+    "gives the clock time after %i ms",
+    (elapsed) => {
+      expect(timeLabel(at, after(elapsed), formats)).toStrictEqual({
+        long: formats.exact.format(at),
+        short: formats.clock.format(at),
+      });
+      expect(formats.clock.format(at)).toMatch(/^\d{1,2}:\d{2}\s[AP]M$/u);
+      expect(formats.exact.format(at)).toMatch(/^\d{1,2}:\d{2}:\d{2}\s[AP]M$/u);
+    }
+  );
 });

@@ -22,7 +22,7 @@ export interface LogGroup {
   entries: LogEntry[];
 }
 
-export const groupHeading = (entry: LogEntry) => {
+const groupHeading = (entry: LogEntry) => {
   if (entry.round === 0) {
     return "Before the game";
   }
@@ -83,7 +83,7 @@ const cueIcons = {
   special: "playing-cards",
 } satisfies Record<Cue, EventIconKey>;
 
-export type EventRule = [RegExp, string, string?, EventIconKey?];
+type EventRule = [RegExp, string, string?, EventIconKey?];
 
 export const eventCopy = {
   bank: [
@@ -150,7 +150,7 @@ export const eventCopy = {
   ],
 } satisfies Partial<Record<Cue, EventRule[]>>;
 
-export const deckReshuffled = "The discard pile was shuffled into a new deck.";
+const deckReshuffled = "The discard pile was shuffled into a new deck.";
 
 export const roundAnnouncement =
   /^Round \d+ (?:begins\. .+ deals\.|is over\.(?: Tied at \d+, so play continues\.)?)$/u;
@@ -222,7 +222,7 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
   } satisfies LogEventCopy;
 };
 
-export type EventDetails = ReturnType<typeof eventDetails>;
+type EventDetails = ReturnType<typeof eventDetails>;
 
 export const sameDetails = (a: EventDetails, b: EventDetails) =>
   a.announcement === b.announcement &&
