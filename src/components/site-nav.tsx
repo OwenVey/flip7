@@ -7,7 +7,7 @@ export default function SiteNav(props: ParentProps) {
   return (
     <nav class="site-nav">
       <a href={paths()} class="nav-brand">
-        <img src={faviconUrl} alt="" width={18} height={18} />
+        <img src={faviconUrl} alt="" width={32} height={32} />
         Flip 7
       </a>
       {props.children}

@@ -132,14 +132,48 @@ main > p a {
   color: var(--gold);
 }
 
+/* The wordmark in miniature: the card mark set down at a slant, and gold letters stamped over red and ink like the home page's title. */
 .nav-brand {
+  --brand-mark-tilt: -8deg;
+
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.5rem;
   color: var(--gold);
   font-family: var(--font-display);
-  font-size: var(--text-lg);
+  /* A step smaller on phones, so the brand and the nav's buttons still fit side by side at 320px. */
+  font-size: 1.5rem;
+  line-height: var(--leading-none);
+  letter-spacing: var(--tracking-tight);
   text-decoration: none;
+  text-shadow:
+    1px 1px 0 var(--danger),
+    2px 2px 0 var(--danger),
+    3px 3px 0 var(--ink);
+
+  @media (--sm) {
+    font-size: 1.75rem;
+  }
+
+  & img {
+    inline-size: 1.4em;
+    block-size: 1.4em;
+    filter: drop-shadow(2px 2px 0 rgb(0 0 0 / 0.35));
+    rotate: var(--brand-mark-tilt);
+    transition: rotate var(--duration-base) var(--ease-pop);
+  }
+
+  @media (hover: hover) {
+    &:hover img {
+      --brand-mark-tilt: 6deg;
+    }
+  }
+
+  &:focus-visible {
+    border-radius: var(--radius-sm);
+    outline: 2px solid var(--gold);
+    outline-offset: 0.25rem;
+  }
 }
 
 main {
