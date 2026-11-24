@@ -135,6 +135,7 @@ p {
 
   &::placeholder {
     color: color-mix(in oklab, var(--ink-soft) 80%, var(--paper-light));
+    font-weight: 400;
     opacity: 1;
   }
 
