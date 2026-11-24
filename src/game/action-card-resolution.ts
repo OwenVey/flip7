@@ -42,7 +42,7 @@ export interface ActionCardState {
   actionQueue: QueuedAction[];
   assignment: DeferredAssignment | null;
   choice: ActionCardChoice | null;
-  flipRuns: FlipThreeSequence[];
+  flipSequences: FlipThreeSequence[];
 }
 
 export interface FlipDraw {
@@ -88,7 +88,7 @@ export const initialActionCards = () =>
     actionQueue: [],
     assignment: null,
     choice: null,
-    flipRuns: [],
+    flipSequences: [],
   }) satisfies ActionCardState;
 
 export const resetActionCards = (state: ActionCardState) => {
@@ -96,7 +96,7 @@ export const resetActionCards = (state: ActionCardState) => {
 };
 
 export const discardActionCards = (state: ResolutionState) => {
-  for (const sequence of state.flipRuns) {
+  for (const sequence of state.flipSequences) {
     state.discard.push(sequence.card, ...sequence.deferred);
   }
 
@@ -116,7 +116,7 @@ export const startFlipThree = (
   targetId: string,
   card: ActionCard
 ) => {
-  state.flipRuns.push({
+  state.flipSequences.push({
     card,
     deferred: [],
     remaining: FLIP_THREE_COUNT,
@@ -234,7 +234,7 @@ const stepAssignment = (state: ResolutionState, say: Say) => {
 };
 
 const stepFlipThree = (state: ResolutionState, effects: ResolutionEffects) => {
-  const sequence = state.flipRuns.at(-1);
+  const sequence = state.flipSequences.at(-1);
 
   if (!sequence) {
     return false;
@@ -243,7 +243,7 @@ const stepFlipThree = (state: ResolutionState, effects: ResolutionEffects) => {
   const target = findPlayer(state, sequence.targetId);
 
   if (sequence.remaining === 0 || target?.status !== "active") {
-    state.flipRuns.pop();
+    state.flipSequences.pop();
     state.discard.push(sequence.card);
 
     finishFlipThree(state, sequence, effects.say);
@@ -365,8 +365,8 @@ export const evictFromActionCards = (
 const heldCards = (state: ActionCardState) => {
   const { assignment } = state;
 
-  const held: HeldCard[] = state.flipRuns.flatMap((run) =>
-    run.deferred.map((card) => ({ card, ownerId: run.targetId }))
+  const held: HeldCard[] = state.flipSequences.flatMap((sequence) =>
+    sequence.deferred.map((card) => ({ card, ownerId: sequence.targetId }))
   );
 
   if (assignment) {
@@ -390,7 +390,7 @@ const heldCards = (state: ActionCardState) => {
 
 export const projectActionCards = (state: ActionCardState) => ({
   choice: state.choice,
-  flips: state.flipRuns.map(({ remaining, targetId }) => ({
+  flips: state.flipSequences.map(({ remaining, targetId }) => ({
     remaining,
     targetId,
   })),

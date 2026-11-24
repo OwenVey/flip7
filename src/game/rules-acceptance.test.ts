@@ -1000,8 +1000,8 @@ const cardsAtTable = (state: GameState) => {
     all.push(...player.hand, ...(player.bustCard ? [player.bustCard] : []));
   }
 
-  for (const run of state.flipRuns) {
-    all.push(...run.deferred, run.card);
+  for (const sequence of state.flipSequences) {
+    all.push(...sequence.deferred, sequence.card);
   }
 
   all.push(...state.actionQueue.map((queued) => queued.card));
