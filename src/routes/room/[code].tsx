@@ -34,6 +34,7 @@ import {
   createDealPlayback,
   initialDealPlayback,
 } from "../../lib/deal-playback";
+import { showFaviconDot } from "../../lib/favicon";
 import { MOTION_PREFERENCE_QUERY } from "../../lib/motion";
 import { createRoomConnection } from "../../lib/room-connection";
 import { createRoomSounds } from "../../lib/room-sounds";
@@ -113,6 +114,13 @@ const Room = (props: { code: string }) => {
     return connection.watching() ? "Watching · " : "";
   };
 
+  createEffect(
+    () => table().myMove,
+    (dot) => {
+      showFaviconDot(dot);
+    }
+  );
+
   const spectator = () => ({
     join: {
       error: connection.joinError(),
@@ -169,6 +177,7 @@ const Room = (props: { code: string }) => {
       document.removeEventListener("visibilitychange", playback.syncMotion);
       playback.dispose();
       toast.dismiss();
+      showFaviconDot(false);
     };
   });
 

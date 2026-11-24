@@ -28,6 +28,8 @@ A multiplayer push-your-luck card game played in shared rooms, where players joi
 
 **Waiting on**: The one player whose move the game needs next. _Avoid_: blocking player, whose turn (a choice can be owed outside a turn)
 
+**Move alert**: The signals that tell a player the game is waiting on them for a move: the page title, a sound, a vibration and a dot on the tab's icon. It is only for the player being waited on, never for spectators or for a host who could move for an offline player. _Avoid_: turn alert, your-turn notification
+
 **Held action card**: A Freeze or Flip Three set aside during a Flip Three. It stays held until it takes effect or is discarded, even if it has already been assigned to a player.
 
 **Deal playback**: The sequence in which the table reveals dealt cards and shows their results to a player.
