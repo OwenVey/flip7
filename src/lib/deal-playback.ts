@@ -9,10 +9,17 @@ import { dealFrame, planDeal } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
 import { roomCues } from "./room-cues";
 import type { RoomCue } from "./room-cues";
+import {
+  flipThreeHaptic,
+  landedHaptic,
+  settledHaptic,
+} from "./room-haptic-cues";
+import type { HapticOutcome } from "./room-haptic-cues";
 
 interface QueuedRoom {
   room: RoomView;
   deals: boolean;
+  hapticSyncId: number | null;
 }
 
 const FLIGHT_MS = 280;
@@ -41,6 +48,8 @@ export interface DealMotion {
 
 interface PlaybackInput {
   canAct: boolean;
+  hapticsVisible: boolean;
+  syncId: number;
   playerId: string | null;
   room: RoomView;
 }
@@ -138,7 +147,8 @@ const reshuffled = (previous: RoomView, current: RoomView) =>
 export const createDealPlayback = (
   motion: DealMotion,
   publish: (view: DealPlaybackView) => void,
-  cue: (cue: RoomCue) => void
+  cue: (cue: RoomCue) => void,
+  haptic: (cue: HapticOutcome | "turn") => void
 ) => {
   const queue: QueuedRoom[] = [];
   let latest: PlaybackInput | null = null;
@@ -147,6 +157,10 @@ export const createDealPlayback = (
   let pause: AbortController | null = null;
   let frame = emptyFrame;
   let moveCuePending = false;
+  let moveHapticPending = false;
+
+  const hapticPlayer = (item: QueuedRoom) =>
+    latest && item.hapticSyncId === latest.syncId ? latest.playerId : null;
 
   const behind = () => queue.some((queued) => queued.deals);
 
@@ -176,7 +190,11 @@ export const createDealPlayback = (
     }
   };
 
-  const show = (patch: Partial<Frame> = {}, sounds: RoomCue[] = []) => {
+  const show = (
+    patch: Partial<Frame> = {},
+    sounds: RoomCue[] = [],
+    outcome?: HapticOutcome | null
+  ) => {
     frame = { ...frame, ...patch };
 
     const actionsDisabled = run !== null || latest?.canAct !== true;
@@ -190,9 +208,22 @@ export const createDealPlayback = (
       cue(sound);
     }
 
+    let alert: "turn" | undefined;
+
     if (myMove && moveCuePending) {
       moveCuePending = false;
       cue("turn");
+
+      if (moveHapticPending) {
+        alert = "turn";
+        moveHapticPending = false;
+      }
+    }
+
+    const feedback = outcome ?? alert;
+
+    if (feedback) {
+      haptic(feedback);
     }
   };
 
@@ -201,6 +232,7 @@ export const createDealPlayback = (
     current: RoomView,
     steps: DealStep[],
     newRound: boolean,
+    item: QueuedRoom,
     signal: AbortSignal
   ) => {
     const bulkDeal =
@@ -212,9 +244,16 @@ export const createDealPlayback = (
       }
 
       const announced = steps[index - 1]?.to.kind === "played";
+      const flipHaptic = flipThreeHaptic(step, current, hapticPlayer(item));
+      const firstFlip = step.flip?.index === 1 ? step.flip : null;
+      const leadIn = firstFlip !== null && !behind() && !announced;
 
-      if (step.flip?.index === 1 && !behind() && !announced) {
-        show({ step: { ...step, flip: { ...step.flip, index: 0 } } });
+      if (leadIn) {
+        show(
+          { step: { ...step, flip: { ...firstFlip, index: 0 } } },
+          [],
+          flipHaptic
+        );
         await waitForPause(FLIP_LEAD_IN_MS, signal);
       }
 
@@ -229,18 +268,26 @@ export const createDealPlayback = (
         bulkCard || behind() ? HURRIED_FLIGHT_MS : FLIGHT_MS
       );
 
-      show({
-        incomingCardId: step.card.id,
-        room: dealFrame(previous, current, steps, index + 1),
-        step,
-      });
+      show(
+        {
+          incomingCardId: step.card.id,
+          room: dealFrame(previous, current, steps, index + 1),
+          step,
+        },
+        [],
+        leadIn ? undefined : flipHaptic
+      );
       await fly?.(signal);
 
       if (signal.aborted) {
         return;
       }
 
-      show({ incomingCardId: null });
+      show(
+        { incomingCardId: null },
+        [],
+        landedHaptic(step, hapticPlayer(item))
+      );
       cue("reveal");
       await motion.land(
         step,
@@ -258,6 +305,7 @@ export const createDealPlayback = (
     previous: RoomView,
     current: RoomView,
     steps: DealStep[],
+    item: QueuedRoom,
     signal: AbortSignal
   ) => {
     show({ dealing: true });
@@ -271,18 +319,17 @@ export const createDealPlayback = (
       await motion.sweep(signal);
     }
 
-    await playSteps(previous, current, steps, newRound, signal);
+    await playSteps(previous, current, steps, newRound, item, signal);
   };
 
   const drain = async (signal: AbortSignal) => {
-    for (
-      let current = queue.shift()?.room;
-      current;
-      current = queue.shift()?.room
-    ) {
+    for (let item = queue.shift(); item; item = queue.shift()) {
+      const { room: current } = item;
+
       const previous = settled;
       settled = current;
       let sounds: RoomCue[] = [];
+      let outcome: HapticOutcome | null = null;
 
       if (previous && latest) {
         const animate = motion.allowed();
@@ -293,11 +340,17 @@ export const createDealPlayback = (
         }
 
         if (steps.length > 0) {
-          await playTransition(previous, current, steps, signal);
+          await playTransition(previous, current, steps, item, signal);
         }
 
         if (signal.aborted) {
           return;
+        }
+
+        const playerId = hapticPlayer(item);
+
+        if (playerId !== null) {
+          outcome = settledHaptic(previous, current, playerId, steps);
         }
 
         sounds = roomCues(previous, current, latest.playerId).filter(
@@ -314,7 +367,8 @@ export const createDealPlayback = (
 
       show(
         { dealing: !caughtUp && frame.dealing, room: current, step: null },
-        sounds
+        sounds,
+        outcome
       );
     }
   };
@@ -332,11 +386,28 @@ export const createDealPlayback = (
     settled = null;
     frame = emptyFrame;
     moveCuePending = false;
+    moveHapticPending = false;
+  };
+
+  const updateMoveCue = (
+    previous: PlaybackInput | null,
+    next: PlaybackInput,
+    live: boolean
+  ) => {
+    moveHapticPending &&= live;
+    const move = ownMove(next);
+
+    if (move !== (previous && ownMove(previous))) {
+      moveCuePending = move !== null;
+      moveHapticPending = moveCuePending && live;
+    }
   };
 
   return {
     dispose: reset,
-    syncMotion: () => {
+    syncMotion: (visible: boolean) => {
+      moveHapticPending &&= visible;
+
       if (!run || !latest || motion.allowed()) {
         return;
       }
@@ -365,11 +436,8 @@ export const createDealPlayback = (
 
       const previous = latest;
       latest = next;
-      const move = ownMove(next);
-
-      if (move !== (previous && ownMove(previous))) {
-        moveCuePending = move !== null;
-      }
+      const live = previous?.syncId === next.syncId && next.hapticsVisible;
+      updateMoveCue(previous, next, live);
 
       if (previous?.room === next.room) {
         if (previous.canAct !== next.canAct && run === null) {
@@ -383,7 +451,11 @@ export const createDealPlayback = (
 
       const deals = target !== null && planDeal(target, next.room).length > 0;
 
-      queue.push({ deals, room: next.room });
+      queue.push({
+        deals,
+        hapticSyncId: live ? next.syncId : null,
+        room: next.room,
+      });
 
       if (deals) {
         pause?.abort();

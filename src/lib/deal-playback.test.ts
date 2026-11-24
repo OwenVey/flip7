@@ -25,6 +25,7 @@ import type { DealStep } from "./deal-plan";
 import { createDealPlayback, initialDealPlayback } from "./deal-playback";
 import type { DealMotion } from "./deal-playback";
 import type { RoomCue } from "./room-cues";
+import type { HapticOutcome } from "./room-haptic-cues";
 
 const random = () => 0.5;
 const freeze = { id: 1003, kind: "freeze" } as const;
@@ -53,6 +54,7 @@ const playback = (animate = true, playerId = "a") => {
   let shown = initialDealPlayback;
   let motionEnabled = animate;
   const cues: RoomCue[] = [];
+  const haptics: (HapticOutcome | "turn")[] = [];
   const readinessAtTurnCue: boolean[] = [];
   const flights: { cardId: number; duration: number }[] = [];
   const steps: DealStep[] = [];
@@ -90,6 +92,9 @@ const playback = (animate = true, playerId = "a") => {
       if (cue === "turn") {
         readinessAtTurnCue.push(shown.myMove && !shown.actionsDisabled);
       }
+    },
+    (cue) => {
+      haptics.push(cue);
     }
   );
 
@@ -97,13 +102,19 @@ const playback = (animate = true, playerId = "a") => {
     ...instance,
     cues,
     flights,
+    haptics,
     readinessAtTurnCue,
     setMotion: (enabled: boolean) => {
       motionEnabled = enabled;
-      instance.syncMotion();
+      instance.syncMotion(true);
     },
-    show: (room: RoomView, canAct = true) => {
-      instance.update({ canAct, playerId, room });
+    show: (
+      room: RoomView,
+      canAct = true,
+      syncId = 1,
+      hapticsVisible = true
+    ) => {
+      instance.update({ canAct, hapticsVisible, playerId, room, syncId });
     },
     steps,
     get shown() {
@@ -119,6 +130,131 @@ describe(createDealPlayback, () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("plays a Flip Three and its bust as separate cues at the affected seat", async () => {
+    const game = gameAtFirstTurn();
+    const flipThree = { id: 1005, kind: "flipThree" } as const;
+    const duplicate = { ...number, id: 1006 };
+    game.deck = [duplicate, number, flipThree];
+    hit(game, "a", random);
+
+    const ownTable = playback();
+    const otherTable = playback(true, "b");
+    const reducedTable = playback(false);
+
+    ownTable.show(view(game));
+    otherTable.show(view(game));
+    reducedTable.show(view(game));
+    choose(game, "a", "a", random);
+    const afterFlip = view(game);
+    ownTable.show(afterFlip);
+    otherTable.show(afterFlip);
+    reducedTable.show(afterFlip);
+
+    expect(ownTable.haptics).toStrictEqual([]);
+    expect(reducedTable.haptics).toStrictEqual(["bust"]);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(ownTable.haptics).toStrictEqual(["flipThree"]);
+    await vi.runAllTimersAsync();
+    expect(ownTable.haptics).toStrictEqual(["flipThree", "bust"]);
+    expect(otherTable.haptics).toStrictEqual(["turn"]);
+  });
+
+  it("gives a Second Chance save priority over a move alert in the same frame", () => {
+    const game = gameAtFirstTurn();
+    game.deck = [freeze];
+    hit(game, "a", random);
+    choose(game, "a", "b", random);
+    const [player] = game.players;
+
+    if (player === undefined) {
+      throw new Error("Expected Ada at the table");
+    }
+
+    player.hand = [number, { id: 1005, kind: "secondChance" }];
+
+    const table = playback(false);
+    table.show(view(game));
+    game.deck = [{ ...number, id: 1006 }];
+    hit(game, "a", random);
+    table.show(view(game));
+
+    expect(table.shown.myMove).toBeTruthy();
+    expect(table.haptics).toStrictEqual(["saved"]);
+  });
+
+  it("cues Freeze once when the chosen target is the local player", async () => {
+    const game = gameAtFirstTurn();
+    game.deck = [freeze];
+    hit(game, "a", random);
+    const table = playback(true, "b");
+    table.show(view(game));
+
+    choose(game, "a", "b", random);
+    table.show(view(game));
+    expect(table.haptics).toStrictEqual([]);
+
+    await vi.runAllTimersAsync();
+    expect(table.haptics).toStrictEqual(["freeze"]);
+  });
+
+  it("celebrates once when the same Flip 7 also wins the game", () => {
+    const game = gameAtFirstTurn();
+    const [player] = game.players;
+
+    if (player === undefined) {
+      throw new Error("Expected Ada at the table");
+    }
+
+    player.score = game.settings.targetScore - 1;
+    player.hand = Array.from({ length: 6 }, (_, value) => ({
+      id: 1100 + value,
+      kind: "number",
+      value,
+    }));
+
+    const table = playback(false);
+    const otherTable = playback(false, "b");
+    table.show(view(game));
+    otherTable.show(view(game));
+    game.deck = [number];
+    hit(game, "a", random);
+    table.show(view(game));
+    otherTable.show(view(game));
+
+    expect(table.shown.room?.winnerIds).toStrictEqual(["a"]);
+    expect(table.haptics).toStrictEqual(["celebrate"]);
+    expect(otherTable.haptics).toStrictEqual([]);
+  });
+
+  it("keeps initial, reconnecting and hidden move alerts quiet", () => {
+    const game = gameAtFirstTurn();
+    const table = playback(false);
+    table.show(view(game));
+    expect({
+      haptics: table.haptics,
+      myMove: table.shown.myMove,
+    }).toStrictEqual({ haptics: [], myMove: true });
+
+    game.deck = [freeze];
+    hit(game, "a", random);
+    table.show(view(game), true, 2);
+    expect(table.shown.myMove).toBeTruthy();
+    expect(table.haptics).toStrictEqual([]);
+
+    choose(game, "a", "b", random);
+    table.show(view(game), true, 2, false);
+    table.show(view(game), true, 2);
+    expect({
+      haptics: table.haptics,
+      myMove: table.shown.myMove,
+    }).toStrictEqual({ haptics: [], myMove: true });
+
+    game.deck = [number];
+    hit(game, "a", random);
+    table.show(view(game), true, 2);
+    expect(table.haptics).toStrictEqual(["turn"]);
   });
 
   it("reveals a landed choice before cueing its usable move", async () => {

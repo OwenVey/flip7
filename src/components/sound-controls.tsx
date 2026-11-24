@@ -15,6 +15,8 @@ import {
   SliderThumb,
   SliderTrack,
 } from "@ui-sdk/solid/slider";
+import { Switch, SwitchThumb } from "@ui-sdk/solid/switch";
+import { Show } from "solid-js";
 
 import ScrollFade from "./scroll-fade";
 import Tooltip from "./tooltip";
@@ -47,18 +49,23 @@ export default function SoundControls(props: {
   onEffectsVolumeChange: (value: number) => void;
   onMusicVolumeChange: (value: number) => void;
   onToggle: () => void;
+  hapticsEnabled?: boolean;
+  onHapticsChange?: (enabled: boolean) => void;
 }) {
+  const title = () =>
+    props.hapticsEnabled === undefined ? "Audio settings" : "Audio and haptics";
+
   const silent = () =>
     props.muted || (props.effectsVolume === 0 && props.musicVolume === 0);
 
   return (
     <Popover>
       <Tooltip
-        content="Audio settings"
+        content={title()}
         type="label"
         side="bottom"
         trigger={(hint) => (
-          <PopoverTrigger {...hint} aria-label="Audio settings" data-icon="" />
+          <PopoverTrigger {...hint} aria-label={title()} data-icon="" />
         )}
       >
         {silent() ? (
@@ -70,7 +77,7 @@ export default function SoundControls(props: {
       <PopoverContent class="audio-settings" side="bottom" align="end">
         <ScrollFade>
           <div class="audio-settings-body">
-            <PopoverTitle>Audio settings</PopoverTitle>
+            <PopoverTitle>{title()}</PopoverTitle>
             <VolumeControl
               label="Music volume"
               value={props.musicVolume}
@@ -84,6 +91,17 @@ export default function SoundControls(props: {
             <Button data-size="sm" onClick={props.onToggle}>
               {props.muted ? "Unmute all" : "Mute all"}
             </Button>
+            <Show when={props.hapticsEnabled !== undefined}>
+              <Field class="haptics-setting">
+                <FieldLabel>Gameplay haptics</FieldLabel>
+                <Switch
+                  checked={props.hapticsEnabled === true}
+                  onCheckedChange={props.onHapticsChange}
+                >
+                  <SwitchThumb />
+                </Switch>
+              </Field>
+            </Show>
           </div>
         </ScrollFade>
       </PopoverContent>

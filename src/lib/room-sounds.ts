@@ -3,6 +3,8 @@ import type { Audio, Sound as AudioSound } from "@nkzw/audio";
 import { makePersisted } from "@solid-primitives/storage";
 import { createSignal, onSettled } from "solid-js";
 
+import { preferenceStorage } from "./preference-storage";
+
 const SOUND_VOLUMES = [
   ["bank", 0.72],
   ["bust", 0.72],
@@ -27,30 +29,6 @@ const MUSIC_VOLUME_KEY = "flip7:music-volume";
 const MAX_PERCENT = 100;
 const DEFAULT_MUSIC_VOLUME = 25;
 const MUSIC_GAIN = 0.35;
-
-const preferenceStorage = {
-  getItem(key: string) {
-    try {
-      return localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  },
-  setItem(key: string, value: string) {
-    try {
-      localStorage.setItem(key, value);
-    } catch {
-      // WARNING: Browsers can deny preference writes even after a successful read.
-    }
-  },
-  removeItem(key: string) {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      // WARNING: Browsers can deny storage removal in private sessions.
-    }
-  },
-};
 
 const persistedVolume = (name: string, fallback: number) =>
   makePersisted(createSignal(fallback, { ownedWrite: true }), {

@@ -241,6 +241,7 @@ export default function Lobby(props: {
                     aria-describedby={
                       moves().host.start ? undefined : startHintId
                     }
+                    data-game-tap=""
                     data-variant="solid"
                     onClick={async () => {
                       if (moves().host.start) {
