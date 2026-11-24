@@ -73,7 +73,7 @@ export default function HomeGuide() {
           <RulesDialog
             targetScore={DEFAULT_SETTINGS.targetScore}
             label="Full rules"
-            variant="quiet"
+            size="sm"
           />
         </p>
       </div>

@@ -20,7 +20,7 @@ export type RoomCue =
   | "turn"
   | "win";
 
-const isChatFromOthers = (entry: LogEntry, playerId: string) =>
+const isChatFromOthers = (entry: LogEntry, playerId: string | null) =>
   entry.from !== undefined && entry.from.id !== playerId;
 
 const tableCue = (
@@ -58,7 +58,7 @@ const tableCue = (
 export const roomCues = (
   previous: RoomView,
   current: RoomView,
-  playerId: string
+  playerId: string | null
 ) => {
   const lastId = previous.log.at(-1)?.id ?? 0;
   const events = current.log.filter((entry) => entry.id > lastId);

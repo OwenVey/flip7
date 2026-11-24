@@ -19,6 +19,13 @@ const entries = (count: number) =>
 describe("<GameLog />", () => {
   afterEach(cleanup);
 
+  it("tells spectators why they can't chat", () => {
+    render(() => <GameLog log={entries(1)} playerId={null} />);
+
+    expect(screen.queryByRole("textbox", { name: "Chat message" })).toBeNull();
+    expect(screen.getByText("Join as a player to chat.")).toBeInTheDocument();
+  });
+
   it("keeps existing events quiet when a new snapshot repeats them", async () => {
     const [log, setLog] = createSignal(entries(2));
 

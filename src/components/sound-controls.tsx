@@ -81,11 +81,7 @@ export default function SoundControls(props: {
               value={props.effectsVolume}
               onValueChange={props.onEffectsVolumeChange}
             />
-            <Button
-              data-size="sm"
-              data-variant="quiet"
-              onClick={props.onToggle}
-            >
+            <Button data-size="sm" onClick={props.onToggle}>
               {props.muted ? "Unmute all" : "Mute all"}
             </Button>
           </div>

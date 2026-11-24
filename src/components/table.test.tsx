@@ -75,6 +75,7 @@ const room = (overrides: Partial<RoomView> = {}) => {
     ],
     round: 1,
     settings: { botSpeed: "normal", locked: false, targetScore: 200 },
+    spectatorCount: 0,
     turnId: "a",
     winnerIds: [],
     ...overrides,
@@ -238,6 +239,24 @@ describe("<Table />", () => {
       )
     ).toStrictEqual([]);
     expect(screen.getByText(", 2 of 3 flipped")).toBeInTheDocument();
+  });
+
+  it("gives spectators their own header actions instead of Leave", () => {
+    render(() => (
+      <Table
+        room={room({ spectatorCount: 2 })}
+        playerId={null}
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        spectatorActions={<button type="button">Spectator actions</button>}
+      />
+    ));
+
+    expect(
+      screen.getByRole("button", { name: "Spectator actions" })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Leave room" })).toBeNull();
+    expect(screen.getByText("2 watching")).toBeInTheDocument();
   });
 
   it("lets the host lock the room mid-game from the header, without the winning score", async () => {
@@ -2105,7 +2124,7 @@ describe("<Table />", () => {
       within(log)
         .getAllByRole("heading")
         .map((heading) => heading.textContent)
-    ).toStrictEqual(["Round 1", "Lobby", "Game 2 · Round 1"]);
+    ).toStrictEqual(["Round 1", "Before the game", "Game 2 · Round 1"]);
   });
 
   it("says when the player everyone is waiting on is offline", () => {

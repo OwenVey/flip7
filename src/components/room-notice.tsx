@@ -1,5 +1,6 @@
 import type { JSX } from "@solidjs/web";
 import { Button } from "@ui-sdk/solid/button";
+import { Show } from "solid-js";
 
 import { paths } from "../router";
 import CardBackMark from "./card-back-mark";
@@ -10,6 +11,7 @@ const RoomNotice = (props: {
   code?: string;
   card: "deck" | "empty";
   children: JSX.Element;
+  onReturn?: () => void;
 }) => (
   <RoomStatus
     title={props.title}
@@ -25,8 +27,13 @@ const RoomNotice = (props: {
     }
   >
     <p class="muted room-notice-message">{props.children}</p>
+    <Show when={props.onReturn}>
+      <Button data-variant="solid" onClick={() => props.onReturn?.()}>
+        Return to room
+      </Button>
+    </Show>
     <Button
-      data-variant="solid"
+      data-variant={props.onReturn ? undefined : "solid"}
       render={(buttonProps) => (
         <a {...buttonProps} href={paths()}>
           {buttonProps.children}

@@ -28,6 +28,21 @@ export type Move =
   | { type: "configure"; targetScore?: number }
   | { type: "kick"; playerId: string };
 
+/**
+ * Why a seated player can't give up their seat to watch, or null when they can.
+ * Leaving only bots would close the room, so someone else has to keep playing.
+ */
+export const rejectWatchInstead = (
+  view: Pick<MovesView, "players">,
+  playerId: string
+) => {
+  const others = view.players.filter((player) => player.id !== playerId);
+
+  return others.length > 0 && others.every((player) => player.bot)
+    ? "You're the only person playing. Leaving the bots alone would close the room."
+    : null;
+};
+
 /** A player may stay only once they have at least one card in front of them. */
 export const canStay = (player: { hand: readonly Card[] }) =>
   player.hand.length > 0;
@@ -151,9 +166,13 @@ const rejectMoveFor = (
 
 const rejectHostMove = (
   view: MovesView,
-  viewerId: string,
+  viewerId: string | null,
   move: Exclude<Move, { type: "choose" | "hit" | "stay" }>
 ) => {
+  if (viewerId === null) {
+    return "Join the room first.";
+  }
+
   if (move.type === "kick") {
     if (view.hostId !== viewerId) {
       return "Only the host can remove players.";
@@ -233,9 +252,9 @@ export const rejectMove = (view: MovesView, viewerId: string, move: Move) => {
  * Every move `viewerId` can make right now. `turn` and `choice` carry a
  * `forId` when the host is moving for an offline player.
  */
-export const availableMoves = (view: MovesView, viewerId: string) => {
+export const availableMoves = (view: MovesView, viewerId: string | null) => {
   const waiting = waitingOn(view);
-  const isHost = view.hostId === viewerId;
+  const isHost = viewerId !== null && view.hostId === viewerId;
   const mine = waiting?.playerId === viewerId;
   const forOffline = !mine && isHost && waiting?.offline === true;
   const owed = waiting !== null && (mine || forOffline);

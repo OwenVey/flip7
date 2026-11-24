@@ -38,7 +38,9 @@ describe("<Lobby />", () => {
     const send = vi.fn<RoomConnection["send"]>();
     const [room, setRoom] = createSignal<RoomView>(roomOf(MAX_PLAYERS - 1));
 
-    render(() => <Lobby room={room()} playerId="p0" send={send} />);
+    render(() => (
+      <Lobby chat={() => true} room={room()} playerId="p0" send={send} />
+    ));
     const button = addBotButton();
     expect(button).not.toHaveAttribute("aria-disabled");
 
@@ -56,6 +58,7 @@ describe("<Lobby />", () => {
     const [paused, setPaused] = createSignal(true);
     render(() => (
       <Lobby
+        chat={() => true}
         room={roomWithBot()}
         playerId="p0"
         send={send}
@@ -82,6 +85,7 @@ describe("<Lobby />", () => {
 
     render(() => (
       <Lobby
+        chat={() => true}
         room={room()}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
@@ -103,6 +107,7 @@ describe("<Lobby />", () => {
 
     render(() => (
       <Lobby
+        chat={() => true}
         room={room()}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
@@ -124,11 +129,48 @@ describe("<Lobby />", () => {
     expect(screen.getByText("Open seat")).toBe(seat);
   });
 
+  it("shows spectators the chat log and their actions, without Leave", () => {
+    render(() => (
+      <Lobby
+        chat={() => true}
+        room={roomOf(2)}
+        playerId={null}
+        send={vi.fn<RoomConnection["send"]>()}
+        spectatorActions={<button type="button">Spectator actions</button>}
+      />
+    ));
+
+    expect(
+      screen.getByRole("button", { name: "Spectator actions" })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Leave room" })).toBeNull();
+    expect(screen.getAllByText("Join as a player to chat.")).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: "Chat & Log" })
+    ).toBeInTheDocument();
+  });
+
+  it("lets seated players chat in the lobby", () => {
+    render(() => (
+      <Lobby
+        chat={() => true}
+        room={roomOf(2)}
+        playerId="p0"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+
+    expect(
+      screen.getByRole("textbox", { name: "Chat message" })
+    ).toBeInTheDocument();
+  });
+
   it("slides in only the players who join after the lobby shows", () => {
     const [room, setRoom] = createSignal<RoomView>(roomOf(2));
 
     render(() => (
       <Lobby
+        chat={() => true}
         room={room()}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
@@ -137,9 +179,9 @@ describe("<Lobby />", () => {
     setRoom(roomOf(3));
     flush();
 
-    const rows = screen
-      .getAllByRole("listitem")
-      .filter((row) => !row.classList.contains("open-seat"));
+    const rows = [
+      ...document.querySelectorAll<HTMLElement>(".roster > li"),
+    ].filter((row) => !row.classList.contains("open-seat"));
 
     expect(rows.map((row) => row.dataset.arrived)).toStrictEqual([
       undefined,
@@ -151,6 +193,7 @@ describe("<Lobby />", () => {
   it("shows guests the player count without the Add bot button", () => {
     render(() => (
       <Lobby
+        chat={() => true}
         room={roomOf(3)}
         playerId="p1"
         send={vi.fn<RoomConnection["send"]>()}
@@ -163,7 +206,9 @@ describe("<Lobby />", () => {
 
   it("removes a bot in one tap but asks before removing a person", () => {
     const send = vi.fn<RoomConnection["send"]>();
-    render(() => <Lobby room={roomWithBot()} playerId="p0" send={send} />);
+    render(() => (
+      <Lobby chat={() => true} room={roomWithBot()} playerId="p0" send={send} />
+    ));
     const [guest, bot] = screen.getAllByRole("button", { name: /^Remove/u });
 
     fireEvent.click(bot);
@@ -178,6 +223,7 @@ describe("<Lobby />", () => {
   it("offers the invite from the open seat", () => {
     render(() => (
       <Lobby
+        chat={() => true}
         room={roomOf(1)}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
@@ -191,7 +237,9 @@ describe("<Lobby />", () => {
 
   it("sends the host's settings changes and shows the room's saved values", () => {
     const send = vi.fn<RoomConnection["send"]>();
-    render(() => <Lobby room={roomWithBot()} playerId="p0" send={send} />);
+    render(() => (
+      <Lobby chat={() => true} room={roomWithBot()} playerId="p0" send={send} />
+    ));
 
     expect(screen.getByRole("radio", { name: "200" })).toBeChecked();
     fireEvent.click(screen.getByRole("radio", { name: "300" }));
@@ -209,6 +257,7 @@ describe("<Lobby />", () => {
   it("shows guests the settings and a locked seat instead of the invite", () => {
     render(() => (
       <Lobby
+        chat={() => true}
         room={{
           ...roomWithBot(),
           settings: { botSpeed: "fast", locked: true, targetScore: 100 },
@@ -229,6 +278,7 @@ describe("<Lobby />", () => {
   it("offers bot speed only once a bot is seated", () => {
     render(() => (
       <Lobby
+        chat={() => true}
         room={roomOf(2)}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
@@ -243,7 +293,9 @@ describe("<Lobby />", () => {
 
   it("shows the host a disabled Start game that says what it's waiting for", () => {
     const send = vi.fn<RoomConnection["send"]>();
-    render(() => <Lobby room={roomOf(1)} playerId="p0" send={send} />);
+    render(() => (
+      <Lobby chat={() => true} room={roomOf(1)} playerId="p0" send={send} />
+    ));
 
     const start = screen.getByRole("button", { name: "Start game" });
     expect(start).toHaveAttribute("aria-disabled", "true");

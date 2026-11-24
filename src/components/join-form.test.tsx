@@ -10,36 +10,23 @@ import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MAX_PLAYERS } from "../game/engine";
-import type { RoomView } from "../game/protocol";
+import type { RoomPreview } from "../game/protocol";
 import JoinForm from "./join-form";
 
-const roomWith = (names: string[], avatar = 1) => {
-  const view: Pick<RoomView, "phase" | "players"> = {
-    phase: "lobby",
-    players: names.map((name, index) => ({
-      avatar,
-      bot: false,
-      bustCard: null,
-      connected: true,
-      hand: [],
-      id: String(index),
-      lastRound: null,
-      name,
-      score: 0,
-      status: "out",
-    })),
-  };
-
-  // SAFETY: JoinForm reads only the phase and players.
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- A partial room is enough here.
-  return view as RoomView;
-};
+const roomWith = (names: string[], avatar = 1) => ({
+  phase: "lobby" as const,
+  players: names.map((name, index) => ({ avatar, id: String(index), name })),
+  spectatorCount: 0,
+});
 
 describe("<JoinForm />", () => {
   afterEach(cleanup);
 
   it("drops the saved name once the room shows someone already has it", () => {
-    const [room, setRoom] = createSignal<RoomView | null>(null);
+    const [room, setRoom] = createSignal<Pick<
+      RoomPreview,
+      "phase" | "players" | "spectatorCount"
+    > | null>(null);
 
     render(() => (
       <JoinForm
@@ -58,7 +45,10 @@ describe("<JoinForm />", () => {
   });
 
   it("keeps what the player typed when the room arrives", () => {
-    const [room, setRoom] = createSignal<RoomView | null>(null);
+    const [room, setRoom] = createSignal<Pick<
+      RoomPreview,
+      "phase" | "players" | "spectatorCount"
+    > | null>(null);
 
     render(() => (
       <JoinForm
@@ -99,8 +89,31 @@ describe("<JoinForm />", () => {
     expect(screen.queryByRole("textbox", { name: "Your name" })).toBeNull();
   });
 
+  it("offers Watch without a name when all player slots are full", () => {
+    const onWatch = vi.fn<() => void>();
+    const onJoin = vi.fn<(name: string, avatar: number) => void>();
+
+    render(() => (
+      <JoinForm
+        room={roomWith(
+          Array.from({ length: MAX_PLAYERS }, (_, index) => `Player ${index}`)
+        )}
+        savedName=""
+        savedAvatar={null}
+        onJoin={onJoin}
+        onWatch={onWatch}
+      />
+    ));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Watch without joining" })
+    );
+    expect(onWatch).toHaveBeenCalledOnce();
+    expect(onJoin).not.toHaveBeenCalled();
+  });
+
   it("tells players whether they will join the next round or the next game", () => {
-    const [phase, setPhase] = createSignal<RoomView["phase"]>("playing");
+    const [phase, setPhase] = createSignal<RoomPreview["phase"]>("playing");
     const room = roomWith(["Ana"]);
 
     render(() => (

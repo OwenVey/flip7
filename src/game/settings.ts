@@ -11,7 +11,7 @@ export type BotSpeed = (typeof BOT_SPEEDS)[number];
 export interface RoomSettings {
   /** How fast bots make their moves. */
   botSpeed: BotSpeed;
-  /** A locked room turns away new players. Anyone already seated can still rejoin. */
+  /** A locked room blocks new player and spectator admissions. Players can still rejoin. */
   locked: boolean;
   /** The score a sole leader needs at the end of a round to win. */
   targetScore: TargetScore;

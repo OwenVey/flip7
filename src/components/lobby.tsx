@@ -3,6 +3,7 @@ import Crown from "@lucide/solid/icons/crown";
 import Lock from "@lucide/solid/icons/lock";
 import Play from "@lucide/solid/icons/play";
 import UserPlus from "@lucide/solid/icons/user-plus";
+import type { JSX } from "@solidjs/web";
 import { Button } from "@ui-sdk/solid/button";
 import {
   createEffect,
@@ -21,12 +22,15 @@ import { hostName } from "../lib/host";
 import { createCopy, createInvite } from "../lib/invite";
 import type { RoomConnection } from "../lib/room-connection";
 import { pop } from "../lib/table-motion";
+import ChatSheet from "./chat-sheet";
+import GameLog from "./game-log";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
 import OfflineBadge from "./offline-badge";
 import PlayerAvatar from "./player-avatar";
 import RemovePlayer from "./remove-player";
 import RoomSettingsForm, { settingsSummary } from "./room-settings";
+import { WatchInstead, WatcherCount } from "./spectator-controls";
 
 const RoomCode = (props: { code: string }) => {
   const { copied, copy } = createCopy();
@@ -86,12 +90,18 @@ const LockedSeat = () => (
 
 export default function Lobby(props: {
   room: RoomView;
-  playerId: string;
+  playerId: string | null;
   send: RoomConnection["send"];
+  chat: RoomConnection["chat"];
   actionsDisabled?: boolean;
+  /** A spectator's Join and Leave, shown where a player's Leave goes. */
+  spectatorActions?: JSX.Element;
+  /** Gives up this player's seat and keeps watching on the same connection. */
+  onWatchInstead?: () => void;
+  watchInsteadPending?: boolean;
 }) {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
-  const isHost = () => props.room.hostId === props.playerId;
+  const isHost = () => moves().host.configure;
 
   const addBotBlocked = () =>
     props.actionsDisabled === true || !moves().host.addBot;
@@ -126,13 +136,38 @@ export default function Lobby(props: {
   return (
     <div class="lobby-page">
       <header class="page-header">
-        <h1>Get your table together</h1>
-        <LeaveRoom
-          disabled={props.actionsDisabled}
-          onLeave={() => {
-            void props.send({ type: "leave" });
-          }}
-        />
+        <h1>Lobby</h1>
+        <div class="row">
+          <WatcherCount
+            count={props.room.spectatorCount}
+            watching={props.playerId === null}
+          />
+          <ChatSheet
+            log={props.room.log}
+            playerId={props.playerId}
+            onChat={props.playerId === null ? undefined : props.chat}
+          />
+          <Show
+            when={props.playerId !== null}
+            fallback={props.spectatorActions}
+          >
+            <Show when={props.onWatchInstead}>
+              <WatchInstead
+                room={props.room}
+                playerId={props.playerId ?? ""}
+                disabled={props.actionsDisabled}
+                pending={props.watchInsteadPending}
+                onWatch={() => props.onWatchInstead?.()}
+              />
+            </Show>
+            <LeaveRoom
+              disabled={props.actionsDisabled}
+              onLeave={() => {
+                void props.send({ type: "leave" });
+              }}
+            />
+          </Show>
+        </div>
       </header>
 
       <div class="lobby">
@@ -146,7 +181,6 @@ export default function Lobby(props: {
             </p>
             <InviteButton solid />
           </section>
-
           <Show
             when={isHost()}
             fallback={
@@ -274,6 +308,12 @@ export default function Lobby(props: {
             </Repeat>
           </ul>
         </section>
+
+        <GameLog
+          log={props.room.log}
+          playerId={props.playerId}
+          onChat={props.playerId === null ? undefined : props.chat}
+        />
       </div>
     </div>
   );

@@ -52,7 +52,6 @@ export default function LeaveRoom(props: {
           <AlertDialogTrigger
             {...hint}
             aria-label="Leave room"
-            data-variant="quiet"
             data-tone="danger"
             data-collapsible={props.collapsible === true ? "" : undefined}
             aria-disabled={props.disabled === true ? "true" : undefined}

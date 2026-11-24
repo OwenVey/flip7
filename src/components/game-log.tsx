@@ -35,7 +35,7 @@ export const CHAT_AND_GAME_LOG_TITLE = "Chat & Log";
 
 export const countChatsAfter = (
   log: LogEntry[],
-  playerId: string,
+  playerId: string | null,
   seenId: number
 ) =>
   log.filter(
@@ -86,7 +86,7 @@ interface LogGroup {
 
 const groupHeading = (entry: LogEntry) => {
   if (entry.round === 0) {
-    return "Lobby";
+    return "Before the game";
   }
 
   const round = `Round ${entry.round}`;
@@ -451,8 +451,8 @@ const ChatForm = (props: { onSend: (text: string) => boolean }) => {
 
 export default function GameLog(props: {
   log: LogEntry[];
-  playerId: string;
-  onChat: (text: string) => boolean;
+  playerId: string | null;
+  onChat?: ((text: string) => boolean) | undefined;
   inSheet?: boolean;
 }) {
   const [filter, setFilter] = createSignal<LogFilter>("All");
@@ -566,7 +566,7 @@ export default function GameLog(props: {
               }
               aria-pressed={filter() === option ? "true" : "false"}
               data-size="sm"
-              data-variant={filter() === option ? "solid" : "quiet"}
+              data-variant={filter() === option ? "solid" : undefined}
               onClick={() => {
                 if (filter() !== option) {
                   pinned = true;
@@ -702,7 +702,12 @@ export default function GameLog(props: {
           </div>
         </Show>
       </div>
-      <ChatForm onSend={props.onChat} />
+      <Show
+        when={props.onChat}
+        fallback={<p class="muted chat-hint">Join as a player to chat.</p>}
+      >
+        {(onChat) => <ChatForm onSend={(message) => onChat()(message)} />}
+      </Show>
     </section>
   );
 }

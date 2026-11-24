@@ -53,13 +53,18 @@ const ClientMessageSchema = v.variant("type", [
     type: v.literal("chat"),
   }),
   v.object({ type: v.literal("sync") }),
+  v.object({ type: v.literal("watch") }),
+  v.object({ type: v.literal("watchInstead") }),
+  v.object({ type: v.literal("stopWatching") }),
 ]);
 
 export type ClientMessage = v.InferOutput<typeof ClientMessageSchema>;
 
 export type GameCommand = Exclude<
   ClientMessage,
-  { type: "chat" | "join" | "sync" }
+  {
+    type: "chat" | "join" | "stopWatching" | "sync" | "watch" | "watchInstead";
+  }
 >;
 
 /** Commands that can run alongside a pending move and need no reconnect confirmation. */

@@ -10,7 +10,7 @@ A multiplayer push-your-luck card game for **2–16 players**. Share a room link
 
 1. **Create a room** and share the invite link or room code.
 2. **Join with a display name.** The host can start once two players have joined. Playing alone or short-handed? The host can **add bots** in the lobby. Bots count toward the 16-player limit and make their own moves after a short pause, or a shorter one if the host sets them to Fast.
-3. **Set up the table.** In the lobby, the host picks the winning score (100, 200, or 300) and can **lock the room** so nobody new can join. Players already in the room can still rejoin. During a game, the host can still lock or unlock the room and change bot speed from **Settings** in the table header. The winning score only changes in the lobby.
+3. **Set up the table.** In the lobby, the host picks the winning score (100, 200, or 300) and can **lock the room** to block new players and Spectators. Players already in the room can still rejoin. During a game, the host can still lock or unlock the room and change bot speed from **Settings** in the table header. The winning score only changes in the lobby.
 4. **Hit or Stay.** Hit to draw another card, or Stay to bank your points and sit out the round. You need a card in front of you to Stay. Drawing a duplicate Number card makes you bust for zero points unless you have a Second Chance.
 
 ### Rounds and scoring
@@ -41,11 +41,17 @@ When the deck runs out, the discard pile is shuffled into a new deck. Table card
 
 </details>
 
+### Watching a room
+
+Open a room link or enter its code and choose **Watch without joining**. You can follow the table and scores, and read the chat, without a display name. Only players can send chat messages. A room can have up to 32 Spectators even when all 16 player slots are filled.
+
+From the header, choose **Join** to take an available place or **Leave** to stop watching and return to the join screen. A player in the lobby can choose **Watch instead** to give up their seat and keep watching, unless that would leave only bots at the table. Join is unavailable while the table is full or locked. A locked room lets current Spectators keep watching, but blocks new watch connections, including after a refresh or disconnect. If all players go offline, Spectators can keep the room open while play pauses.
+
 ### Rejoining and offline players
 
 The browser remembers your display name and room identity. Refreshing or reopening the link in the same browser profile returns you to the same player while that player is still in the room. Use **Leave** to give up your place at any time, even mid-deal.
 
-The host can remove players, from the player list in the lobby or the Scores list during a game, and move for an offline player the game is waiting on. While someone else is online, the host role passes to a connected player after 20 seconds away. After a 30-second stall, the game makes the missing move automatically. Bots only play while at least one person is online, and a room is deleted when the last person leaves a table of bots. A room expires after 24 hours of inactivity once all connections are closed.
+The host can remove players, from the player list in the lobby or the Scores list during a game, and move for an offline player the game is waiting on. While someone else is online, the host role passes to a connected player after 20 seconds away. After a 30-second stall, the game makes the missing move automatically. Bots only play while at least one human player is online, and a room is deleted when the last person leaves a table of bots. A room expires after 24 hours of inactivity once all connections are closed.
 
 ## Local development
 

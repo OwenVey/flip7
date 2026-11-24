@@ -772,7 +772,7 @@ const announceSettings = (
     say(
       state,
       after.locked
-        ? "The host locked the room. New players can't join."
+        ? "The host locked the room to new players and spectators."
         : "The host unlocked the room."
     );
   }
@@ -1000,6 +1000,15 @@ export const kick = (
 /** A player removes themselves from the room. */
 export const leave = (state: GameState, playerId: string, random: Random) => {
   evict(state, playerId, random, (name) => `${name} left.`);
+};
+
+/** A player gives up their seat to keep watching the room. */
+export const leaveToWatch = (
+  state: GameState,
+  playerId: string,
+  random: Random
+) => {
+  evict(state, playerId, random, (name) => `${name} left to watch.`);
 };
 
 export const backToLobby = (state: GameState, playerId: string) => {

@@ -318,13 +318,18 @@ p {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 1.25rem;
 }
 
 .lobby-page {
   display: grid;
+
+  /* "Lobby" is short enough to keep its desktop size beside the header's icon buttons on any phone. */
+  & > .page-header h1 {
+    font-size: 2rem;
+  }
 }
 
 .panel-title {
@@ -377,6 +382,7 @@ p {
 .lobby-side {
   display: grid;
   gap: 1.25rem;
+  min-width: 0;
 }
 
 /* Waiting messages where Start game will appear. */
@@ -682,18 +688,41 @@ button.room-code {
 }
 
 /*
- * Wide screens: the invite card stands beside the players as a sticky
- * sidebar, and narrower seats fit three across.
+ * Wide screens: three columns. The invite card and host controls stand in a
+ * sticky left column, the players fill the middle, and the log runs down the
+ * right at the table sidebar's width, so chat stays put when the game starts.
  */
 @media (min-width: 64rem) {
   .lobby {
-    grid-template-columns: 20rem minmax(0, 1fr);
+    grid-template-columns: 18rem minmax(0, 1fr) 18rem;
+    column-gap: 1rem;
     align-items: start;
   }
 
   .lobby-side {
     position: sticky;
-    inset-block-start: 1rem;
+    inset-block-start: 0.5rem;
+  }
+
+  .lobby > .players {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .lobby > .log {
+    grid-row: 1;
+    grid-column: 3;
+    padding-inline: 1rem;
+  }
+
+  /* The narrow column can't fit a label beside three score buttons, so each choice sits under its label at full width. Lock room keeps its switch beside its copy. */
+  .lobby-side .setting:has(> [data-slot="segmented-control"]) {
+    flex-direction: column;
+    align-items: stretch;
+
+    & [data-slot="segmented-control"] {
+      width: 100%;
+    }
   }
 
   .invite {
@@ -718,8 +747,25 @@ button.room-code {
     }
   }
 
-  .players .roster {
-    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  .lobby .players .roster {
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(max(14rem, calc((100% - 0.5rem) / 2)), 1fr)
+    );
+  }
+}
+
+/* Like the table sidebar, the log stops 1rem above the bottom edge and scrolls inside. It starts about 10.5rem down, below the nav and the lobby's taller heading. */
+@media (min-width: 64rem) and (height > 30rem) {
+  .lobby > .log {
+    position: sticky;
+    inset-block-start: 0.5rem;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    max-block-size: calc(100dvh - 11.5rem);
+
+    & .log-scroll {
+      max-block-size: none;
+    }
   }
 }
 
@@ -908,18 +954,8 @@ button.room-code {
     box-shadow: 0 0 0 var(--button-ink);
   }
 
-  &[data-variant="quiet"] {
-    color: var(--ink-soft);
-
-    @media (hover: hover) {
-      &:hover:not([data-disabled], [aria-disabled="true"]) {
-        color: var(--ink);
-      }
-    }
-  }
-
   /* A paper button whose red ink warns without competing with the main action. */
-  &[data-variant="quiet"][data-tone="danger"] {
+  &[data-tone="danger"]:not([data-variant]) {
     --button-ink: var(--danger-ink);
     color: var(--danger);
 
@@ -968,7 +1004,7 @@ button.room-code {
       color: var(--paper);
     }
 
-    &[data-variant="quiet"][data-tone="danger"] {
+    &[data-tone="danger"]:not([data-variant]) {
       --button-ink: color-mix(
         in oklab,
         var(--danger-ink) 35%,
@@ -1435,9 +1471,86 @@ main {
   padding: 1rem 1rem 4rem;
 }
 
-/* The table runs wider than other pages, so three or four seats fit across. */
-.room-page:has(.table) {
+/* On desktop the lobby's columns already stop short of the bottom edge, so the page doesn't need the usual bottom room, which would only add a small scroll. */
+@media (min-width: 64rem) {
+  .room-page:has(.lobby-page) {
+    padding-block-end: 1rem;
+  }
+}
+
+/* The table runs wider than other pages, so three or four seats fit across. The lobby matches it so the log stays put when the game starts. */
+.room-page:has(.table, .lobby-page) {
   width: min(90rem, 100%);
+}
+
+/* Spectators, on the felt beside the header's buttons: an eye and a label, or just the count where labels fold away. */
+.watcher-count {
+  display: inline-flex;
+  flex: none;
+  gap: 0.375rem;
+  align-items: center;
+  color: var(--on-felt-soft);
+  font-size: var(--ui-font-size);
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.35);
+  white-space: nowrap;
+}
+
+.watcher-count-short {
+  display: none;
+}
+
+[data-slot="dialog-content"].join-dialog {
+  gap: 0;
+  width: min(28rem, calc(100% - 2rem));
+  max-height: min(85dvh, calc(var(--visual-viewport-height, 100dvh) - 1rem));
+  padding: 0;
+  overflow: hidden;
+  background: var(--paper);
+
+  & .table-sheet-header {
+    padding-top: var(--dialog-inset);
+  }
+}
+
+.join-watch {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* A ruled "or" between joining and watching. */
+.join-divider {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+
+  &::before,
+  &::after {
+    flex: 1;
+    border-top: 1.5px dashed var(--rule);
+    content: "";
+  }
+}
+
+.join-watch-hint {
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.form-error {
+  color: var(--danger);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.chat-hint {
+  font-size: 0.875rem;
+  text-align: center;
 }
 
 /* The whole room route lines up with the table so the nav doesn't jump when the table replaces the connecting message or the lobby. */
@@ -1933,9 +2046,12 @@ main {
   gap: 1.25rem;
 }
 
-/* Players fill the width in columns, so a full room of 16 still fits above Start game. */
+/* Players fill the width in up to two columns, so a full room of 16 still fits above Start game. */
 .players .roster {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(100%, max(17rem, calc((100% - 0.5rem) / 2))), 1fr)
+  );
 }
 
 .room-code {
@@ -2302,11 +2418,11 @@ main {
       padding-inline: 0.75rem;
     }
   }
+}
 
-  /* The closed chat sheet keeps its viewport mounted to preserve drafts. */
-  & .row > [data-slot="dialog-viewport"] {
-    position: fixed;
-  }
+/* The closed chat sheet keeps its viewport mounted to preserve drafts, so take it out of the header's row of buttons. */
+:is(.table-header, .page-header) .row > [data-slot="dialog-viewport"] {
+  position: fixed;
 }
 
 /* Phones swap Invite, Settings, and Leave for this one menu. */
@@ -4133,6 +4249,8 @@ main {
 
 .log-scroll {
   max-height: min(22rem, 55svh);
+  /* Overlay scrollbars ignore the gutter, so keep timestamps clear of the thumb. */
+  padding-inline-end: 0.625rem;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -4288,9 +4406,11 @@ main {
     font-weight: 700;
   }
 
+  /* Bubbles take at least most of the column, so short messages line up with the log lines around them. */
   & li[data-kind="chat"] {
     justify-self: start;
-    min-inline-size: 0;
+    min-inline-size: 70%;
+    max-inline-size: 90%;
     margin-block: 0.125rem 0.25rem;
     margin-inline: 0.1875rem;
     padding: 0.375rem 0.625rem;
@@ -4847,7 +4967,7 @@ main {
   display: none;
 }
 
-.table-header [data-table-sheet-trigger] {
+:is(.table-header, .page-header) [data-table-sheet-trigger] {
   position: relative;
 }
 
@@ -4857,7 +4977,8 @@ main {
     display: inline-flex;
   }
 
-  .table-sidebar {
+  .table-sidebar,
+  .lobby > .log {
     display: none;
   }
 }
@@ -4872,6 +4993,26 @@ main {
     flex: none;
     inline-size: var(--button-height);
     padding-inline: 0;
+  }
+
+  /* A spectator has no ⋯ menu, so their actions and the watcher count shrink to icons instead. */
+  .table-header .spectator-action {
+    flex: none;
+    inline-size: var(--button-height);
+    padding-inline: 0;
+  }
+
+  .table-header :is(.spectator-action, .watcher-count) .button-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .table-header .watcher-count-short {
+    display: inline;
   }
 }
 
@@ -4894,6 +5035,10 @@ main {
       overflow: hidden;
       clip-path: inset(50%);
       white-space: nowrap;
+    }
+
+    & .watcher-count-short {
+      display: inline;
     }
   }
 }
@@ -4934,7 +5079,6 @@ main {
   .page-header {
     flex-wrap: nowrap;
     gap: 0.75rem;
-    align-items: center;
 
     & h1 {
       min-width: 0;
@@ -4950,6 +5094,7 @@ main {
     :is(
       [data-slot="button"],
       [data-slot="alert-dialog-trigger"],
+      [data-slot="dialog-trigger"],
       [data-slot="popover-trigger"]
     ):has(> .button-label) {
     flex: none;
@@ -4964,6 +5109,10 @@ main {
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  .page-header .watcher-count-short {
+    display: inline;
   }
 
   .seats {

@@ -112,7 +112,9 @@ export default function RoomSettingsForm(props: {
       <Field class="setting">
         <div class="setting-copy">
           <FieldLabel>Lock room</FieldLabel>
-          <FieldDescription>New players can't join.</FieldDescription>
+          <FieldDescription>
+            Blocks new players and spectators.
+          </FieldDescription>
         </div>
         <Switch
           checked={props.room.settings.locked}

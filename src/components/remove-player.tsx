@@ -44,7 +44,6 @@ export default function RemovePlayer(props: {
             <Button
               {...hint}
               class="remove-player"
-              data-variant="quiet"
               data-size="sm"
               aria-disabled={props.disabled === true ? "true" : undefined}
               onClick={() => {
@@ -82,7 +81,6 @@ export default function RemovePlayer(props: {
             <AlertDialogTrigger
               {...hint}
               class="remove-player"
-              data-variant="quiet"
               data-size="sm"
               aria-disabled={props.disabled === true ? "true" : undefined}
               onClick={(event) => {
