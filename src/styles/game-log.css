@@ -104,6 +104,17 @@
 
     &[data-orientation="horizontal"] {
       height: 0.5rem;
+      visibility: hidden;
+
+      &[data-dragging] {
+        visibility: visible;
+      }
+
+      @media (any-hover: hover) {
+        .scroll-fades:hover > & {
+          visibility: visible;
+        }
+      }
 
       & > [data-slot="scroll-area-thumb"] {
         background: color-mix(in srgb, var(--ink) 35%, transparent);
@@ -173,7 +184,7 @@
   overflow-x: clip;
 }
 
-[data-slot="scroll-area-content"] {
+.scroll-fades [data-slot="scroll-area-content"] {
   padding: 0;
 }
 

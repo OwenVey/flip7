@@ -45,6 +45,7 @@ describe("<Table />", () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it("sets held action cards beside the deck, not in the seat", () => {
@@ -880,10 +881,27 @@ describe("<Table />", () => {
     expect(log.getByText("Ben deals.")).toBeVisible();
   });
 
-  it("keeps the scroll position and counts new entries until jumping to latest", () => {
+  it("keeps the scroll position and counts new entries until jumping to latest", async () => {
     vi.useFakeTimers({
       toFake: ["requestAnimationFrame", "cancelAnimationFrame"],
     });
+    const resizeCallbacks = new Map<Element, () => void>();
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Deliver layout changes that jsdom cannot measure.
+    vi.stubGlobal(
+      "ResizeObserver",
+      class extends ResizeObserver {
+        // oxlint-disable-next-line promise/prefer-await-to-callbacks -- ResizeObserver delivers a callback.
+        constructor(callback: ResizeObserverCallback) {
+          super(callback);
+          this.observe = (element) => {
+            resizeCallbacks.set(element, () => {
+              // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Deliver the ResizeObserver notification.
+              callback([], this);
+            });
+          };
+        }
+      }
+    );
     const [view, setView] = createSignal(room());
     render(() => (
       <Table
@@ -897,7 +915,7 @@ describe("<Table />", () => {
     const log = screen.getByRole("log", { name: "Chat & Log" });
     const unread = screen.getByRole("status", { name: "Unread chat messages" });
     Object.defineProperties(log, {
-      clientHeight: { value: 200 },
+      clientHeight: { configurable: true, value: 200 },
       scrollHeight: { configurable: true, value: 500 },
     });
     log.scrollTop = 300;
@@ -906,6 +924,7 @@ describe("<Table />", () => {
     log.scrollTop = 100;
     fireEvent.scroll(log);
     vi.advanceTimersToNextFrame();
+    await Promise.resolve();
     flush();
 
     setView(
@@ -949,13 +968,18 @@ describe("<Table />", () => {
     });
     screen.getByRole("button", { name: "Jump to latest · 4 new" }).click();
     vi.advanceTimersToNextFrame();
+    await Promise.resolve();
     flush();
 
-    expect(log.scrollTop).toBe(log.scrollHeight - log.clientHeight);
-    expect(log).toHaveFocus();
-    expect(
-      screen.queryByRole("button", { name: /Jump to latest/u })
-    ).toBeNull();
+    expect({
+      focused: document.activeElement === log,
+      jump: screen.queryByRole("button", { name: /Jump to latest/u }),
+      top: log.scrollTop,
+    }).toStrictEqual({
+      focused: true,
+      jump: null,
+      top: log.scrollHeight - log.clientHeight,
+    });
 
     setView(
       room({
@@ -973,13 +997,37 @@ describe("<Table />", () => {
       })
     );
     flush();
+    Object.defineProperty(log, "scrollHeight", { value: 600 });
+    resizeCallbacks.get(log)?.();
+    vi.advanceTimersToNextFrame();
     expect({
       following: Object.hasOwn(log.dataset, "sticking"),
+      top: log.scrollTop,
       unread: unread.textContent,
     }).toStrictEqual({
       following: true,
+      top: 400,
       unread: "",
     });
+
+    log.scrollTop = 0;
+    fireEvent.scroll(log);
+    vi.advanceTimersToNextFrame();
+    await Promise.resolve();
+    flush();
+    expect(
+      screen.getByRole("button", { name: /Jump to latest/u })
+    ).toBeVisible();
+
+    Object.defineProperty(log, "clientHeight", { value: 600 });
+    resizeCallbacks.get(log)?.();
+    vi.advanceTimersToNextFrame();
+    await Promise.resolve();
+    flush();
+    expect({
+      jump: screen.queryByRole("button", { name: /Jump to latest/u }),
+      top: log.scrollTop,
+    }).toStrictEqual({ jump: null, top: 0 });
   });
 
   it("marks the score edges that have more rows to scroll to", () => {

@@ -28,6 +28,7 @@ import {
   createMemo,
   createSignal,
   For,
+  onSettled,
   Show,
   untrack,
 } from "solid-js";
@@ -501,6 +502,29 @@ export default function GameLog(props: {
     }
   };
 
+  onSettled(() => {
+    const viewport = scroller;
+
+    const observer = new MutationObserver(() => {
+      const bottom = viewport?.dataset.atYEnd !== undefined;
+      setAtBottom(bottom);
+
+      if (bottom) {
+        markSeen(latestId(), filter());
+      }
+    });
+
+    if (viewport) {
+      observer.observe(viewport, {
+        attributeFilter: ["data-at-y-end"],
+      });
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  });
+
   const pinToLatest = () => {
     setAtBottom(true);
     scroll.scrollToEnd({ behavior: "instant" });
@@ -583,14 +607,6 @@ export default function GameLog(props: {
           aria-label={CHAT_AND_GAME_LOG_TITLE}
           ref={(element) => {
             scroller = element;
-          }}
-          onScroll={() => {
-            const bottom = scroll.isAtEnd();
-            setAtBottom(bottom);
-
-            if (bottom) {
-              markSeen(latestId(), filter());
-            }
           }}
         >
           <ScrollAreaContent class="log-entries">
