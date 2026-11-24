@@ -1,7 +1,12 @@
-const PLAIN_ICON = "/favicon.svg";
-const DOT_ICON = "/favicon-dot.svg";
+import dotSvg from "../../public/favicon-dot.svg?raw";
+import plainSvg from "../../public/favicon.svg?raw";
 
-/** Shows or hides the move alert dot on the tab's icon. */
+const svgUrl = (svg: string) => `data:image/svg+xml,${encodeURIComponent(svg)}`;
+
+const PLAIN_ICON = svgUrl(plainSvg);
+const DOT_ICON = svgUrl(dotSvg);
+
+/** Shows or hides the move alert dot using embedded frames for prompt redraws. */
 export const showFaviconDot = (dot: boolean) => {
   const icon = document.querySelector<HTMLLinkElement>(
     'link[rel="icon"][type="image/svg+xml"]'

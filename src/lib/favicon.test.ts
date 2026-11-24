@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import dotSvg from "../../public/favicon-dot.svg?raw";
+import plainSvg from "../../public/favicon.svg?raw";
 import { showFaviconDot } from "./favicon";
 
 const svgIcon = () => document.head.querySelector('link[type="image/svg+xml"]');
+
+const embeddedIcon = () =>
+  decodeURIComponent(svgIcon()?.getAttribute("href") ?? "");
 
 describe(showFaviconDot, () => {
   beforeEach(() => {
@@ -15,7 +20,7 @@ describe(showFaviconDot, () => {
   it("swaps the SVG icon for the dotted one during a move alert", () => {
     showFaviconDot(true);
 
-    expect(svgIcon()?.getAttribute("href")).toBe("/favicon-dot.svg");
+    expect(embeddedIcon()).toBe(`data:image/svg+xml,${dotSvg}`);
     expect(
       document.head.querySelector('link[sizes="32x32"]')?.getAttribute("href")
     ).toBe("/favicon.ico");
@@ -25,7 +30,7 @@ describe(showFaviconDot, () => {
     showFaviconDot(true);
     showFaviconDot(false);
 
-    expect(svgIcon()?.getAttribute("href")).toBe("/favicon.svg");
+    expect(embeddedIcon()).toBe(`data:image/svg+xml,${plainSvg}`);
   });
 
   it("does nothing when the page has no SVG icon", () => {
