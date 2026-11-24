@@ -4,9 +4,11 @@ A multiplayer push-your-luck card game played in shared rooms, where players joi
 
 ## Rooms and people
 
-**Room**: One table, identified by a room code. It holds a game, the players seated at it, and the clocks that keep play moving when people drop out. _Avoid_: lobby (a lobby is a phase of the game), session, match
+**Room**: One table, identified by a room code. It holds a game, its players and spectators, and the clocks that keep play moving when players drop out. _Avoid_: lobby (a lobby is a phase of the game), session, match
 
 **Seat**: One open connection bound to a player. A player can have several seats (for example, two tabs) and is offline when they have none. _Avoid_: socket, connection (when you mean the player's presence)
+
+**Spectator**: A person watching a room's live table without a seat or a role in play.
 
 **Host**: The player who can start games, move the table on, remove players and move for offline players.
 

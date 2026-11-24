@@ -33,7 +33,7 @@ const send = (ws: WebSocket, message: ServerMessage) => {
   sendFrame(ws, JSON.stringify(message));
 };
 
-// WARNING: messages share arrays with the live room, so serialize them before awaiting storage lets another event change it.
+// WARNING: messages share arrays with the live room, so serialize them now to match the broadcast position just saved.
 const framesOf = (outcome: RoomOutcome) => {
   const frames = new Map<ServerMessage, string>();
 
