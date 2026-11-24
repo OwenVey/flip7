@@ -1,11 +1,13 @@
-// oxlint-disable-next-line landmines-style/no-comments -- Vite's config loader requires Node's file URL semantics.
+// oxlint-disable-next-line landmines-style/no-comments -- Fontaine reads font files through Node, not jsdom.
 // @vitest-environment node
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { loadConfigFromFile } from "vite";
+import { FontaineTransform } from "fontaine";
 import { describe, expect, it } from "vitest";
+
+import { fontaineOptions } from "./fontaine-options";
 
 const appCss = path.resolve(import.meta.dirname, "../app.css");
 const stylesIndex = path.resolve(import.meta.dirname, "index.css");
@@ -24,35 +26,15 @@ const fallbackFamilies = [
   "Bungee fallback",
 ];
 
+const fontaine = FontaineTransform.raw(fontaineOptions, { framework: "vite" });
+
+const fontainePlugin = Array.isArray(fontaine) ? fontaine[0] : fontaine;
+
 const transform = async (file: string) => {
-  const loaded = await loadConfigFromFile({
-    command: "build",
-    mode: "production",
-  });
-
-  const groups = await Promise.all(
-    (loaded?.config.plugins ?? []).map(async (plugin) => await plugin)
-  );
-
-  const fontaine = groups
-    .flat()
-    .find(
-      (plugin) =>
-        plugin instanceof Object &&
-        "name" in plugin &&
-        plugin.name === "fontaine-transform" &&
-        "transform" in plugin
-    );
-
-  const hook =
-    fontaine instanceof Object && "transform" in fontaine
-      ? fontaine.transform
-      : undefined;
+  const hook = fontainePlugin?.transform;
 
   if (hook === undefined || !("handler" in hook)) {
-    throw new Error(
-      "The Vite config must include Fontaine's transform handler."
-    );
+    throw new Error("Fontaine no longer exposes a transform handler.");
   }
 
   // SAFETY: Fontaine's transform handler never reads its plugin context.
@@ -69,7 +51,7 @@ const transform = async (file: string) => {
     return null;
   }
 
-  return result instanceof Object ? (result.code?.toString() ?? null) : result;
+  return result instanceof Object ? result.code : result;
 };
 
 const statements = (css: string) =>

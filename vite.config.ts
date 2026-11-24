@@ -4,6 +4,8 @@ import { fileRoutes } from "filesystem-routing/vite";
 import { FontaineTransform } from "fontaine";
 import { defineConfig } from "vitest/config";
 
+import { fontaineOptions } from "./src/styles/fontaine-options";
+
 export default defineConfig({
   plugins: [
     cloudflare({ viteEnvironment: { name: "ssr" } }),
@@ -15,7 +17,7 @@ export default defineConfig({
       diagnostics: true,
     }),
     fileRoutes({ types: true }),
-    FontaineTransform.vite({ fallbacks: {} }),
+    FontaineTransform.vite(fontaineOptions),
   ],
   optimizeDeps: {
     exclude: ["@ui-sdk/core"],
