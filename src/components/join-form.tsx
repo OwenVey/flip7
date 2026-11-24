@@ -12,7 +12,8 @@ import type { ParentProps } from "solid-js";
 
 import { pickAvatar, takenAvatars } from "../game/avatars";
 import { MAX_PLAYERS } from "../game/engine";
-import { MAX_SPECTATORS, NAME_MAX_LENGTH } from "../game/protocol";
+import { MAX_SPECTATORS } from "../game/moves";
+import { NAME_MAX_LENGTH } from "../game/protocol";
 import type { RoomPreview } from "../game/protocol";
 import { paths } from "../router";
 import AvatarPicker from "./avatar-picker";
@@ -30,6 +31,8 @@ const Frame = (props: ParentProps<{ embedded: boolean }>) => (
     <div class="stack join-embedded">{props.children}</div>
   </Show>
 );
+
+const FINE_POINTER_QUERY = "(pointer: fine)";
 
 export default function JoinForm(props: {
   /** Leaves out the card and heading so a dialog can frame the form. */
@@ -86,7 +89,12 @@ export default function JoinForm(props: {
   const [nameField, setNameField] = createSignal<HTMLDivElement>();
 
   onSettled(() => {
-    nameInput?.focus();
+    if (
+      props.embedded !== true &&
+      globalThis.matchMedia?.(FINE_POINTER_QUERY).matches
+    ) {
+      nameInput?.focus();
+    }
   });
 
   return (

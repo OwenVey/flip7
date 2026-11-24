@@ -28,14 +28,26 @@ export type Move =
   | { type: "configure"; targetScore?: number }
   | { type: "kick"; playerId: string };
 
+export const MAX_SPECTATORS = 32;
+
 /**
  * Why a seated player can't give up their seat to watch, or null when they can.
- * Leaving only bots would close the room, so someone else has to keep playing.
+ * Only in the lobby, so nobody leaves a hand already dealt; only with room for
+ * another Spectator; and never leaving only bots, which would close the room.
  */
 export const rejectWatchInstead = (
-  view: Pick<MovesView, "players">,
-  playerId: string
+  view: Pick<MovesView, "phase" | "players">,
+  playerId: string,
+  spectatorCount: number
 ) => {
+  if (view.phase !== "lobby") {
+    return "The game has started. Leave the room to stop playing.";
+  }
+
+  if (spectatorCount >= MAX_SPECTATORS) {
+    return "The spectator limit has been reached.";
+  }
+
   const others = view.players.filter((player) => player.id !== playerId);
 
   return others.length > 0 && others.every((player) => player.bot)

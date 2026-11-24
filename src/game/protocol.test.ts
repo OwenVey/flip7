@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { addBot, addPlayer, createGame } from "./engine";
-import { roundStarted, toRoomView } from "./protocol";
+import {
+  parseServerMessage,
+  roundStarted,
+  toRoomView,
+  toStateMessage,
+} from "./protocol";
 import type { RoomView } from "./protocol";
 
 const game = createGame();
@@ -57,5 +62,44 @@ describe(toRoomView, () => {
     expect(
       toRoomView("ABCDE", state).players.map((player) => player.avatar)
     ).toStrictEqual([4, null]);
+  });
+});
+
+const state = () => toStateMessage("ABCDE", game, {}, 1);
+
+describe(parseServerMessage, () => {
+  it("accepts a live room update the Worker sends", () => {
+    expect(parseServerMessage(JSON.stringify(state()))).toMatchObject({
+      lists: { draws: { after: null }, log: { after: null } },
+      room: { players: [{ name: "Ana" }, { name: "Ben" }], spectatorCount: 1 },
+      type: "state",
+    });
+  });
+
+  it.each([
+    ["without lists", { ...state(), lists: undefined }],
+    [
+      "with a draws update missing its entries",
+      {
+        ...state(),
+        lists: { ...state().lists, draws: { after: null, seq: 1 } },
+      },
+    ],
+    [
+      "with players that aren't a list",
+      { ...state(), room: { ...state().room, players: null } },
+    ],
+    [
+      "with unknown settings",
+      {
+        ...state(),
+        room: {
+          ...state().room,
+          settings: { ...state().room.settings, targetScore: 150 },
+        },
+      },
+    ],
+  ])("rejects a live room update %s", (_, message) => {
+    expect(parseServerMessage(JSON.stringify(message))).toBeNull();
   });
 });

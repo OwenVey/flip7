@@ -1,7 +1,15 @@
-import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@solidjs/testing-library";
+import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { addBot, addPlayer, createGame, MAX_PLAYERS } from "../game/engine";
+import { MAX_SPECTATORS } from "../game/moves";
 import { toRoomView } from "../game/protocol";
 import {
   SpectatorActions,
@@ -76,6 +84,24 @@ describe("<SpectatorActions />", () => {
     expect(onJoin.mock.calls[0]?.[0]).toBe("Cy");
   });
 
+  it("starts the join dialog in the name field", async () => {
+    render(() => (
+      <SpectatorActions
+        room={roomOf(2)}
+        join={join()}
+        onStopWatching={vi.fn<() => void>()}
+      />
+    ));
+
+    joinButton().click();
+    flush();
+    const dialog = await screen.findByRole("dialog", { name: "Take a seat" });
+
+    expect(
+      within(dialog).getByRole("textbox", { name: "Your name" })
+    ).toHaveFocus();
+  });
+
   it.each([
     ["full", roomOf(MAX_PLAYERS)],
     ["locked", roomOf(2, true)],
@@ -114,14 +140,66 @@ const watchButton = () => screen.getByRole("button", { name: "Watch instead" });
 describe("<WatchInstead />", () => {
   afterEach(cleanup);
 
-  it("gives up the seat to watch", () => {
-    const onWatch = vi.fn<() => void>();
+  it("gives up the seat to watch once the player confirms", async () => {
+    const watched = Promise.withResolvers<number>();
+    let watches = 0;
+
     render(() => (
-      <WatchInstead room={roomOf(2)} playerId="p1" onWatch={onWatch} />
+      <WatchInstead
+        room={roomOf(2)}
+        playerId="p1"
+        onWatch={() => {
+          watches += 1;
+          watched.resolve(watches);
+        }}
+      />
     ));
 
+    watchButton().click();
+    flush();
+
+    const dialog = await screen.findByRole("alertdialog", {
+      name: "Give up your seat and watch?",
+    });
+
+    expect(watches).toBe(0);
+    expect(dialog).not.toHaveTextContent("becomes the host");
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Give up seat and watch" })
+    );
+    await expect(watched.promise).resolves.toBe(1);
+  });
+
+  it("warns the host that hosting passes to another player", async () => {
+    render(() => (
+      <WatchInstead
+        room={roomOf(2)}
+        playerId="p0"
+        onWatch={vi.fn<() => void>()}
+      />
+    ));
+
+    watchButton().click();
+    flush();
+
+    await expect(
+      screen.findByRole("alertdialog", {
+        name: "Give up your seat and watch?",
+      })
+    ).resolves.toHaveTextContent("Another player becomes the host.");
+  });
+
+  it("stays put when the spectator limit is reached", () => {
+    const room = { ...roomOf(2), spectatorCount: MAX_SPECTATORS };
+    const onWatch = vi.fn<() => void>();
+
+    render(() => <WatchInstead room={room} playerId="p1" onWatch={onWatch} />);
+
     fireEvent.click(watchButton());
-    expect(onWatch).toHaveBeenCalledOnce();
+    flush();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(onWatch).not.toHaveBeenCalled();
   });
 
   it("stays put when only bots would be left", () => {

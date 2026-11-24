@@ -15,6 +15,7 @@ import type {
   Seats,
   StoredRoom,
 } from "../src/game/room";
+import { withServerConnectionId } from "./connection-id";
 
 const UINT32_RANGE = 2 ** 32;
 
@@ -111,7 +112,9 @@ export class GameRoom extends Server<Env> {
       return new Response("Expected a WebSocket", { status: 426 });
     }
 
-    return await super.fetch(request);
+    return await super.fetch(
+      withServerConnectionId(request, crypto.randomUUID())
+    );
   }
 
   override async onStart() {

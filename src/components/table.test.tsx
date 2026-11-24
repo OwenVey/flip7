@@ -112,6 +112,19 @@ const entries = () =>
     .snapshot()
     .filter((entry) => entry.offPage !== true && entry.component !== "more");
 
+const spectator = () => ({
+  join: {
+    error: "",
+    joining: false,
+    onEdit: vi.fn<() => void>(),
+    onJoin: vi.fn<(name: string, avatar: number) => void>(),
+    savedAvatar: null,
+    savedName: "",
+    unavailable: false,
+  },
+  onLeave: vi.fn<() => void>(),
+});
+
 describe("<Table />", () => {
   afterEach(cleanup);
 
@@ -248,14 +261,17 @@ describe("<Table />", () => {
         playerId={null}
         send={vi.fn<RoomConnection["send"]>()}
         chat={vi.fn<RoomConnection["chat"]>()}
-        spectatorActions={<button type="button">Spectator actions</button>}
+        spectator={spectator()}
       />
     ));
 
     expect(
-      screen.getByRole("button", { name: "Spectator actions" })
+      screen.getByRole("button", { name: "Join as player" })
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Leave room" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Leave room" })).toHaveLength(
+      1
+    );
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
     expect(screen.getByText("2 watching")).toBeInTheDocument();
   });
 

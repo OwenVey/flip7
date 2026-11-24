@@ -1,5 +1,11 @@
 import { captureArtifact, expectNoDiagnostics } from "@solidjs/diagnostics";
-import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -30,6 +36,19 @@ const roomWithBot = () => {
 
 const addBotButton = () =>
   screen.getByRole("button", { name: /Add bot|Table full/u });
+
+const spectator = () => ({
+  join: {
+    error: "",
+    joining: false,
+    onEdit: vi.fn<() => void>(),
+    onJoin: vi.fn<(name: string, avatar: number) => void>(),
+    savedAvatar: null,
+    savedName: "",
+    unavailable: false,
+  },
+  onLeave: vi.fn<() => void>(),
+});
 
 describe("<Lobby />", () => {
   afterEach(cleanup);
@@ -136,18 +155,51 @@ describe("<Lobby />", () => {
         room={roomOf(2)}
         playerId={null}
         send={vi.fn<RoomConnection["send"]>()}
-        spectatorActions={<button type="button">Spectator actions</button>}
+        spectator={spectator()}
       />
     ));
 
     expect(
-      screen.getByRole("button", { name: "Spectator actions" })
+      screen.getByRole("button", { name: "Join as player" })
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Leave room" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Leave room" })).toHaveLength(
+      1
+    );
+    expect(screen.queryByRole("button", { name: "Watch instead" })).toBeNull();
     expect(screen.getAllByText("Join as a player to chat.")).toHaveLength(2);
     expect(
       screen.getByRole("button", { name: "Chat & Log" })
     ).toBeInTheDocument();
+  });
+
+  it("keeps a Spectator's Join dialog and draft open when the room updates", async () => {
+    const [room, setRoom] = createSignal<RoomView>(roomOf(2));
+
+    render(() => (
+      <Lobby
+        chat={() => true}
+        room={room()}
+        playerId={null}
+        send={vi.fn<RoomConnection["send"]>()}
+        spectator={spectator()}
+      />
+    ));
+
+    fireEvent.click(screen.getByRole("button", { name: "Join as player" }));
+    const dialog = await screen.findByRole("dialog", { name: "Take a seat" });
+    const input = within(dialog).getByRole("textbox", { name: "Your name" });
+    // SAFETY: the textbox role only matches input elements here.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- getByRole returns HTMLElement.
+    (input as HTMLInputElement).value = "Cal";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    flush();
+
+    setRoom({ ...roomOf(3), spectatorCount: 2 });
+    flush();
+
+    expect(screen.getByRole("dialog", { name: "Take a seat" })).toBe(dialog);
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveValue("Cal");
   });
 
   it("lets seated players chat in the lobby", () => {

@@ -3,7 +3,6 @@ import Crown from "@lucide/solid/icons/crown";
 import Lock from "@lucide/solid/icons/lock";
 import Play from "@lucide/solid/icons/play";
 import UserPlus from "@lucide/solid/icons/user-plus";
-import type { JSX } from "@solidjs/web";
 import { Button } from "@ui-sdk/solid/button";
 import {
   createEffect,
@@ -30,7 +29,12 @@ import OfflineBadge from "./offline-badge";
 import PlayerAvatar from "./player-avatar";
 import RemovePlayer from "./remove-player";
 import RoomSettingsForm, { settingsSummary } from "./room-settings";
-import { WatchInstead, WatcherCount } from "./spectator-controls";
+import {
+  SpectatorActions,
+  WatchInstead,
+  WatcherCount,
+} from "./spectator-controls";
+import type { Spectator } from "./spectator-controls";
 
 const RoomCode = (props: { code: string }) => {
   const { copied, copy } = createCopy();
@@ -94,8 +98,8 @@ export default function Lobby(props: {
   send: RoomConnection["send"];
   chat: RoomConnection["chat"];
   actionsDisabled?: boolean;
-  /** A spectator's Join and Leave, shown where a player's Leave goes. */
-  spectatorActions?: JSX.Element;
+  /** A Spectator's Join and Leave, shown where a player's Leave goes. */
+  spectator?: Spectator;
   /** Gives up this player's seat and keeps watching on the same connection. */
   onWatchInstead?: () => void;
   watchInsteadPending?: boolean;
@@ -149,7 +153,17 @@ export default function Lobby(props: {
           />
           <Show
             when={props.playerId !== null}
-            fallback={props.spectatorActions}
+            fallback={
+              <Show when={props.spectator}>
+                {(spectator) => (
+                  <SpectatorActions
+                    room={props.room}
+                    join={spectator().join}
+                    onStopWatching={spectator().onLeave}
+                  />
+                )}
+              </Show>
+            }
           >
             <Show when={props.onWatchInstead}>
               <WatchInstead

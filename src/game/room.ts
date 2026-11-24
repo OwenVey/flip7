@@ -23,11 +23,10 @@ import {
   stay,
 } from "./engine";
 import type { GameState } from "./engine";
-import { rejectWatchInstead } from "./moves";
+import { MAX_SPECTATORS, rejectWatchInstead } from "./moves";
 import {
   cleanName,
   listSeqsOf,
-  MAX_SPECTATORS,
   ROOM_REMOVED_CLOSE_CODE,
   toRoomPreview,
   toStateMessage,
@@ -669,11 +668,7 @@ export const createRoom = (
         return reject("Join the room first.");
       }
 
-      const blocked =
-        rejectWatchInstead(game, playerId) ??
-        (spectatorCount() >= MAX_SPECTATORS
-          ? "The spectator limit has been reached."
-          : null);
+      const blocked = rejectWatchInstead(game, playerId, spectatorCount());
 
       if (blocked !== null) {
         return reject(blocked);

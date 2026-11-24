@@ -2,6 +2,15 @@ import Eye from "@lucide/solid/icons/eye";
 import LogOut from "@lucide/solid/icons/log-out";
 import UserPlus from "@lucide/solid/icons/user-plus";
 import X from "@lucide/solid/icons/x";
+import {
+  AlertDialog,
+  AlertDialogBackdrop,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@ui-sdk/solid/alert-dialog";
 import { Button } from "@ui-sdk/solid/button";
 import {
   Dialog,
@@ -40,38 +49,98 @@ export const WatchInstead = (props: {
   pending?: boolean;
   onWatch: () => void;
 }) => {
-  const blocked = () => rejectWatchInstead(props.room, props.playerId) ?? "";
+  let confirmed = false;
+
+  const blocked = () =>
+    rejectWatchInstead(props.room, props.playerId, props.room.spectatorCount) ??
+    "";
 
   const unavailable = () =>
     blocked() !== "" || props.disabled === true || props.pending === true;
 
   return (
-    <Tooltip
-      content={blocked() || "Watch instead"}
-      type={blocked() ? "description" : "label"}
-      compactOnly={!blocked()}
-      side="bottom"
-      trigger={(hint) => (
-        <Button
-          {...hint}
-          class="spectator-action"
-          aria-label="Watch instead"
-          aria-disabled={unavailable() ? "true" : undefined}
-          onClick={() => {
-            if (!unavailable()) {
-              props.onWatch();
-            }
-          }}
-        />
-      )}
+    <AlertDialog
+      onOpenChange={(open, details) => {
+        if (open && (confirmed || unavailable())) {
+          details.cancel();
+        } else if (!open) {
+          confirmed = details.returnValue === "confirm";
+        }
+      }}
+      onOpenChangeComplete={(open) => {
+        if (!open && confirmed) {
+          confirmed = false;
+
+          if (!unavailable()) {
+            props.onWatch();
+          }
+        }
+      }}
     >
-      <Eye size={16} aria-hidden="true" />
-      <span class="button-label" aria-hidden="true">
-        {props.pending === true ? "Switching…" : "Watch instead"}
-      </span>
-    </Tooltip>
+      <Tooltip
+        content={blocked() || "Watch instead"}
+        type={blocked() ? "description" : "label"}
+        compactOnly={!blocked()}
+        side="bottom"
+        trigger={(hint) => (
+          <AlertDialogTrigger
+            {...hint}
+            class="spectator-action"
+            aria-label="Watch instead"
+            aria-disabled={unavailable() ? "true" : undefined}
+            onClick={(event) => {
+              if (unavailable()) {
+                event.preventDefault();
+              }
+            }}
+          />
+        )}
+      >
+        <Eye size={16} aria-hidden="true" />
+        <span class="button-label" aria-hidden="true">
+          {props.pending === true ? "Switching…" : "Watch instead"}
+        </span>
+      </Tooltip>
+      <AlertDialogBackdrop />
+      <AlertDialogContent>
+        <ScrollFade>
+          <div class="alert-dialog-body">
+            <div class="alert-dialog-copy">
+              <AlertDialogTitle>Give up your seat and watch?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You leave the player list in every tab and keep watching.
+                {props.room.hostId === props.playerId
+                  ? " Another player becomes the host."
+                  : ""}{" "}
+                You can take a seat again while there's room.
+              </AlertDialogDescription>
+            </div>
+            <div data-slot="row">
+              <AlertDialogClose>Cancel</AlertDialogClose>
+              <AlertDialogClose
+                disabled={unavailable()}
+                value="confirm"
+                data-variant="solid"
+                data-agent-confirm="Gives up your seat in this room and keeps watching"
+              >
+                <Eye size={16} aria-hidden="true" />
+                <span>Give up seat and watch</span>
+              </AlertDialogClose>
+            </div>
+          </div>
+        </ScrollFade>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 };
+
+const JOIN_NAME_FIELD = 'input[autocomplete="nickname"]';
+
+/** What a Spectator's header controls need from the room connection. */
+export interface Spectator {
+  join: SpectatorJoin;
+  onLeave: () => void;
+}
 
 /** What a spectator's join form needs from the room connection. */
 export interface SpectatorJoin {
@@ -134,7 +203,7 @@ export const SpectatorActions = (props: {
             Join
           </span>
         </Tooltip>
-        <DialogContent class="join-dialog">
+        <DialogContent class="join-dialog" initialFocus={JOIN_NAME_FIELD}>
           <header class="table-sheet-header">
             <DialogTitle>Take a seat</DialogTitle>
             <Tooltip

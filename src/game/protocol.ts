@@ -3,8 +3,10 @@ import * as v from "valibot";
 import { projectActionCards } from "./action-card-resolution";
 import { DRAW_LIMIT, LOG_LIMIT } from "./engine";
 import type { DrawEvent, GameState, HeldCard, LogEntry } from "./engine";
+import { MAX_SPECTATORS } from "./moves";
 import { applyListUpdate, listUpdateSince } from "./sequenced-list";
 import type { ListSpec, ListUpdate, ReceivedList } from "./sequenced-list";
+import { BOT_SPEEDS, TARGET_SCORES } from "./settings";
 
 export const NAME_MAX_LENGTH = 20;
 export const HEARTBEAT_PING = "ping";
@@ -17,7 +19,6 @@ export const HEARTBEAT_INTERVAL_MS = 10_000;
 export const HEARTBEAT_STALE_MS = 25_000;
 export const ROOM_REMOVED_CLOSE_CODE = 4001;
 export const ROOM_MISSING_CLOSE_CODE = 4002;
-export const MAX_SPECTATORS = 32;
 export const ROOM_PARTY = "game-room";
 
 export const CODE_LENGTH = 5;
@@ -117,6 +118,38 @@ const RoomPreviewSchema = v.object({
 });
 
 export type RoomPreview = v.InferOutput<typeof RoomPreviewSchema>;
+
+const ListUpdateSchema = v.looseObject({
+  after: v.nullable(v.pipe(v.number(), v.integer())),
+  entries: v.array(v.unknown()),
+  seq: v.pipe(v.number(), v.integer()),
+});
+
+const StateMessageSchema = v.looseObject({
+  lists: v.looseObject({ draws: ListUpdateSchema, log: ListUpdateSchema }),
+  room: v.looseObject({
+    code: v.string(),
+    hostId: v.nullable(v.string()),
+    phase: v.picklist(["lobby", "playing", "roundOver", "gameOver"]),
+    players: v.array(
+      v.looseObject({
+        bot: v.boolean(),
+        connected: v.boolean(),
+        hand: v.array(v.unknown()),
+        id: v.string(),
+        name: v.string(),
+        score: v.number(),
+      })
+    ),
+    round: v.pipe(v.number(), v.integer()),
+    settings: v.looseObject({
+      botSpeed: v.picklist(BOT_SPEEDS),
+      locked: v.boolean(),
+      targetScore: v.picklist(TARGET_SCORES),
+    }),
+    spectatorCount: SpectatorCountSchema,
+  }),
+});
 
 export interface PreviewMessage {
   type: "preview";
@@ -292,9 +325,7 @@ export const parseServerMessage = (raw: string) => {
       }
 
       case "state": {
-        return v.is(SpectatorCountSchema, message.room?.spectatorCount)
-          ? message
-          : null;
+        return v.is(StateMessageSchema, message) ? message : null;
       }
 
       case "watchError": {

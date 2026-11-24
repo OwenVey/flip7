@@ -10,7 +10,6 @@ import RotateCcw from "@lucide/solid/icons/rotate-ccw";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import SquarePlus from "@lucide/solid/icons/square-plus";
 import Trophy from "@lucide/solid/icons/trophy";
-import type { JSX } from "@solidjs/web";
 import { createAlertDialogController } from "@ui-sdk/solid/alert-dialog";
 import { Button } from "@ui-sdk/solid/button";
 import { Meter, MeterIndicator, MeterTrack } from "@ui-sdk/solid/meter";
@@ -61,7 +60,8 @@ import PlayingCard from "./playing-card";
 import RemovePlayer from "./remove-player";
 import { RoomSettingsMenu } from "./room-settings";
 import ScrollFade from "./scroll-fade";
-import { WatcherCount } from "./spectator-controls";
+import { SpectatorActions, WatcherCount } from "./spectator-controls";
+import type { Spectator } from "./spectator-controls";
 import TableMoreMenu from "./table-more-menu";
 import TableSheet from "./table-sheet";
 import Tooltip from "./tooltip";
@@ -1344,8 +1344,8 @@ export default function Table(
        * a change shows as soon as the room accepts it, not after the deal.
        */
       latestRoom?: RoomView | null;
-      /** A spectator's Join and Leave, shown where a player's Leave and ⋯ go. */
-      spectatorActions?: JSX.Element;
+      /** A Spectator's Join and Leave, shown where a player's Leave and ⋯ go. */
+      spectator?: Spectator;
     }
 ) {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
@@ -1451,7 +1451,17 @@ export default function Table(
             </Show>
             <Show
               when={props.playerId !== null}
-              fallback={props.spectatorActions}
+              fallback={
+                <Show when={props.spectator}>
+                  {(spectator) => (
+                    <SpectatorActions
+                      room={props.latestRoom ?? props.room}
+                      join={spectator().join}
+                      onStopWatching={spectator().onLeave}
+                    />
+                  )}
+                </Show>
+              }
             >
               <LeaveRoom
                 disabled={props.offline}

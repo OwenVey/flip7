@@ -26,10 +26,8 @@ import RoomNotice from "../../components/room-notice";
 import RulesDialog from "../../components/rules-dialog";
 import SiteNav from "../../components/site-nav";
 import SoundControls from "../../components/sound-controls";
-import { SpectatorActions } from "../../components/spectator-controls";
 import Table from "../../components/table";
 import { normalizeCode } from "../../game/protocol";
-import type { RoomView } from "../../game/protocol";
 import { DEFAULT_SETTINGS } from "../../game/settings";
 import { createDealMotion } from "../../lib/deal-motion";
 import {
@@ -115,21 +113,18 @@ const Room = (props: { code: string }) => {
     return connection.watching() ? "Watching · " : "";
   };
 
-  const spectatorActions = (room: RoomView) => (
-    <SpectatorActions
-      room={connection.room() ?? room}
-      join={{
-        error: connection.joinError(),
-        joining: connection.joining(),
-        onEdit: connection.clearJoinError,
-        onJoin: connection.join,
-        savedAvatar: connection.savedAvatar(),
-        savedName: connection.savedName(),
-        unavailable: unavailable(),
-      }}
-      onStopWatching={connection.stopWatching}
-    />
-  );
+  const spectator = () => ({
+    join: {
+      error: connection.joinError(),
+      joining: connection.joining(),
+      onEdit: connection.clearJoinError,
+      onJoin: connection.join,
+      savedAvatar: connection.savedAvatar(),
+      savedName: connection.savedName(),
+      unavailable: unavailable(),
+    },
+    onLeave: connection.stopWatching,
+  });
 
   createEffect(
     () =>
@@ -299,7 +294,7 @@ const Room = (props: { code: string }) => {
                     dealing={table().dealing}
                     dealStep={table().step}
                     roundPoints={table().roundPoints}
-                    spectatorActions={spectatorActions(view().room)}
+                    spectator={spectator()}
                   />
                 }
               >
@@ -309,7 +304,7 @@ const Room = (props: { code: string }) => {
                   send={connection.send}
                   chat={connection.chat}
                   actionsDisabled={unavailable()}
-                  spectatorActions={spectatorActions(view().room)}
+                  spectator={spectator()}
                   onWatchInstead={connection.watchInstead}
                   watchInsteadPending={connection.watchPending()}
                 />

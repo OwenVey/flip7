@@ -3,11 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { Card } from "./cards";
 import { chat, DRAW_LIMIT, MAX_PLAYERS, nextRound, startGame } from "./engine";
 import type { DrawEvent } from "./engine";
-import {
-  HEARTBEAT_STALE_MS,
-  MAX_SPECTATORS,
-  ROOM_REMOVED_CLOSE_CODE,
-} from "./protocol";
+import { MAX_SPECTATORS } from "./moves";
+import { HEARTBEAT_STALE_MS, ROOM_REMOVED_CLOSE_CODE } from "./protocol";
 import type { ServerMessage } from "./protocol";
 import { createRoom, newStoredRoom } from "./room";
 import type { Admission, RoomOutcome, Seats } from "./room";
@@ -1132,6 +1129,39 @@ describe("spectating a room", () => {
     expect(replies(refused)).toMatchObject([{ type: "watchError" }]);
     expect(h.stored.game.players).toHaveLength(2);
     expect(h.seatOf("host")).toHaveProperty("playerId");
+  });
+
+  it("keeps a player seated when the game starts before their switch to watching arrives", () => {
+    const h = harness();
+    const host = joinAs(h, "host", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+    startGame(h.stored.game, host.playerId, random);
+
+    const refused = h.room.watchInstead("ben-tab");
+
+    expect(replies(refused)).toMatchObject([{ type: "watchError" }]);
+    expect(closes(refused)).toStrictEqual([]);
+    expect(h.stored.game.players.map(({ name }) => name)).toStrictEqual([
+      "Ana",
+      "Ben",
+    ]);
+    expect(h.seatOf("ben-tab")).toHaveProperty("playerId");
+  });
+
+  it("keeps a player seated when the spectator limit is reached", () => {
+    const h = harness();
+    joinAs(h, "host", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+
+    for (let index = 0; index < MAX_SPECTATORS; index += 1) {
+      h.connect(`watcher-${index}`);
+      h.room.watch(`watcher-${index}`);
+    }
+
+    expect(replies(h.room.watchInstead("ben-tab"))).toMatchObject([
+      { message: "The spectator limit has been reached.", type: "watchError" },
+    ]);
+    expect(h.seatOf("ben-tab")).toHaveProperty("playerId");
   });
 
   it("deletes a table of bots when the last human player leaves while someone watches", () => {
