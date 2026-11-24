@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { Card } from "./cards";
-import { chat, DRAW_LIMIT, nextRound, startGame } from "./engine";
+import { chat, DRAW_LIMIT, MAX_PLAYERS, nextRound, startGame } from "./engine";
 import type { DrawEvent } from "./engine";
+import { MAX_SPECTATORS } from "./moves";
 import { HEARTBEAT_STALE_MS, ROOM_REMOVED_CLOSE_CODE } from "./protocol";
 import type { ServerMessage } from "./protocol";
 import { createRoom, newStoredRoom } from "./room";
-import type { RoomOutcome, Seat, Seats } from "./room";
+import type { Admission, RoomOutcome, Seats } from "./room";
 import { ABSENT_GRACE_MS, HOST_GRACE_MS, IDLE_EXPIRY_MS } from "./timers";
 
 const START = 1_000_000;
@@ -16,7 +17,7 @@ const num = (id: number, value: number) =>
   ({ id, kind: "number", value }) satisfies Card;
 
 interface OpenConnection {
-  seat: Seat | null;
+  admission: Admission | null;
   lastPing: Date | null;
 }
 
@@ -30,7 +31,7 @@ const harness = () => {
       const connection = open.get(connectionId);
 
       if (connection) {
-        connection.seat = seat;
+        connection.admission = seat;
       }
     },
     connections: () =>
@@ -57,10 +58,10 @@ const harness = () => {
       open.delete(connectionId);
     },
     connect: (connectionId: string) => {
-      open.set(connectionId, { lastPing: null, seat: null });
+      open.set(connectionId, { admission: null, lastPing: null });
     },
     drop: (connectionId: string) => {
-      const seat = open.get(connectionId)?.seat ?? null;
+      const seat = open.get(connectionId)?.admission ?? null;
       open.delete(connectionId);
 
       return room.disconnect(seat);
@@ -74,7 +75,7 @@ const harness = () => {
       }
     },
     room,
-    seatOf: (connectionId: string) => open.get(connectionId)?.seat ?? null,
+    seatOf: (connectionId: string) => open.get(connectionId)?.admission ?? null,
     stored,
   };
 };
@@ -164,6 +165,7 @@ describe("joining a room", () => {
     const outcome = h.room.join("tab", "  Ana  ", null);
 
     expect(outcome.effects.map((effect) => effect.type)).toStrictEqual([
+      "reply",
       "reply",
       "broadcast",
     ]);
@@ -965,5 +967,210 @@ describe("sending draws", () => {
       entries: [drawn(before + 1, 7001)],
       seq: before + 1,
     });
+  });
+});
+
+describe("spectating a room", () => {
+  it("only shares live state after admission and returns to the preview after Stop watching", () => {
+    const h = harness();
+    joinAs(h, "host", "Ana");
+    h.room.chat("host", "Private table chat");
+    h.connect("guest");
+
+    expect(h.room.viewFor("guest")).toStrictEqual({
+      room: {
+        code: "ABCDE",
+        locked: false,
+        phase: "lobby",
+        players: [
+          { avatar: h.stored.game.players[0]?.avatar, id: "id-1", name: "Ana" },
+        ],
+        spectatorCount: 0,
+      },
+      type: "preview",
+    });
+    const admitted = h.room.watch("guest");
+    expect(replies(admitted)).toMatchObject([
+      { type: "watching" },
+      {
+        lists: { log: { after: null } },
+        room: { spectatorCount: 1 },
+        type: "state",
+      },
+    ]);
+    expect([
+      ...replies(h.room.chat("guest", "hi")),
+      ...replies(h.room.command("guest", { type: "start" })),
+    ]).toStrictEqual([
+      { message: "Join the room first.", type: "error" },
+      { message: "Join the room first.", type: "error" },
+    ]);
+
+    expect(broadcastOf(h.room.stopWatching("guest")).room.spectatorCount).toBe(
+      0
+    );
+    expect(h.room.viewFor("guest").type).toBe("preview");
+  });
+
+  it("allows watching a full roster and limits watchers independently", () => {
+    const h = harness();
+
+    for (let index = 0; index < MAX_PLAYERS; index += 1) {
+      joinAs(h, `player-${index}`, `Player ${index}`);
+    }
+
+    for (let index = 0; index < MAX_SPECTATORS; index += 1) {
+      const connection = `watcher-${index}`;
+      h.connect(connection);
+      expect(replies(h.room.watch(connection))[0]).toStrictEqual({
+        type: "watching",
+      });
+    }
+
+    h.connect("extra");
+    expect(replies(h.room.watch("extra"))[0]).toMatchObject({
+      type: "watchError",
+    });
+    expect(broadcastOf(h.drop("watcher-0")).room.spectatorCount).toBe(
+      MAX_SPECTATORS - 1
+    );
+    expect(broadcastOf(h.room.watch("extra")).room.spectatorCount).toBe(
+      MAX_SPECTATORS
+    );
+    expect(h.stored.game.players).toHaveLength(MAX_PLAYERS);
+  });
+
+  it("keeps play paused with only Spectators connected and clears stale watchers", () => {
+    const { h } = roundWhereHostMovesFirst();
+    h.connect("guest");
+    h.room.watch("guest");
+    h.drop("ana-tab");
+    h.drop("ben-tab");
+    const { drawSeq, hostId, turnId } = h.stored.game;
+
+    h.advance(IDLE_EXPIRY_MS);
+    h.ping("guest");
+    expect(h.room.alarm().expired).toBeFalsy();
+    expect(h.stored.game).toMatchObject({ drawSeq, hostId, turnId });
+    expect(h.stored).toMatchObject({
+      botTurn: null,
+      hostLeftAt: null,
+      stall: null,
+    });
+
+    h.advance(HEARTBEAT_STALE_MS);
+    const stale = h.room.alarm();
+    expect(closes(stale)).toMatchObject([{ connectionId: "guest" }]);
+    expect(broadcastOf(stale).room.spectatorCount).toBe(0);
+  });
+
+  it("pauses a scheduled bot move when its only human player disconnects", () => {
+    const h = harness();
+    const host = joinAs(h, "host", "Ana");
+    h.room.command("host", { type: "addBot" });
+    h.connect("guest");
+    h.room.watch("guest");
+
+    const { game } = h.stored;
+    startGame(game, host.playerId, random);
+    game.phase = "roundOver";
+    game.round = 0;
+    game.dealerIndex = 1;
+    game.deck = [num(901, 5), num(902, 3)].toReversed();
+    h.room.command("host", { type: "nextRound" });
+    expect(h.stored.botTurn).not.toBeNull();
+
+    const { drawSeq, turnId } = game;
+    h.drop("host");
+    h.advance(HOST_GRACE_MS);
+    h.ping("guest");
+    h.room.alarm();
+
+    expect(h.stored.botTurn).toBeNull();
+    expect(game).toMatchObject({ drawSeq, turnId });
+  });
+
+  it("lets a seated player give up their seat and keep watching on the same connection", () => {
+    const h = harness();
+    joinAs(h, "host", "Ana");
+    const ben = joinAs(h, "ben-tab", "Ben");
+    h.connect("ben-other-tab");
+    h.room.join("ben-other-tab", "", ben.token);
+
+    const switched = h.room.watchInstead("ben-tab");
+
+    expect(replies(switched)).toMatchObject([
+      { type: "watching" },
+      { room: { spectatorCount: 1 }, type: "state" },
+    ]);
+    expect(closes(switched)).toMatchObject([
+      { connectionId: "ben-other-tab", reason: "left" },
+    ]);
+    expect({
+      names: h.stored.game.players.map(({ name }) => name),
+      seat: h.seatOf("ben-tab"),
+      token: h.stored.tokens.has(ben.playerId),
+    }).toStrictEqual({
+      names: ["Ana"],
+      seat: { watchedAt: START },
+      token: false,
+    });
+    expect(logTexts(broadcastOf(switched))).toContain("Ben left to watch.");
+  });
+
+  it("keeps the last human seated when watching would leave only bots", () => {
+    const h = harness();
+    joinAs(h, "host", "Ana");
+    h.room.command("host", { type: "addBot" });
+
+    const refused = h.room.watchInstead("host");
+
+    expect(refused.expired).toBeFalsy();
+    expect(replies(refused)).toMatchObject([{ type: "watchError" }]);
+    expect(h.stored.game.players).toHaveLength(2);
+    expect(h.seatOf("host")).toHaveProperty("playerId");
+  });
+
+  it("keeps a player seated when the game starts before their switch to watching arrives", () => {
+    const h = harness();
+    const host = joinAs(h, "host", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+    startGame(h.stored.game, host.playerId, random);
+
+    const refused = h.room.watchInstead("ben-tab");
+
+    expect(replies(refused)).toMatchObject([{ type: "watchError" }]);
+    expect(closes(refused)).toStrictEqual([]);
+    expect(h.stored.game.players.map(({ name }) => name)).toStrictEqual([
+      "Ana",
+      "Ben",
+    ]);
+    expect(h.seatOf("ben-tab")).toHaveProperty("playerId");
+  });
+
+  it("keeps a player seated when the spectator limit is reached", () => {
+    const h = harness();
+    joinAs(h, "host", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+
+    for (let index = 0; index < MAX_SPECTATORS; index += 1) {
+      h.connect(`watcher-${index}`);
+      h.room.watch(`watcher-${index}`);
+    }
+
+    expect(replies(h.room.watchInstead("ben-tab"))).toMatchObject([
+      { message: "The spectator limit has been reached.", type: "watchError" },
+    ]);
+    expect(h.seatOf("ben-tab")).toHaveProperty("playerId");
+  });
+
+  it("deletes a table of bots when the last human player leaves while someone watches", () => {
+    const h = harness();
+    joinAs(h, "host", "Ana");
+    h.room.command("host", { type: "addBot" });
+    h.connect("guest");
+    h.room.watch("guest");
+
+    expect(h.room.command("host", { type: "leave" }).expired).toBeTruthy();
   });
 });

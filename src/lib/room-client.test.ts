@@ -7,7 +7,7 @@ import { DRAW_LIMIT } from "../game/engine";
 import { ROOM_REMOVED_CLOSE_CODE } from "../game/protocol";
 import type { ServerMessage } from "../game/protocol";
 import { createRoom, deliver, newStoredRoom } from "../game/room";
-import type { RoomOutcome, Seat, Seats } from "../game/room";
+import type { Admission, RoomOutcome, Seats } from "../game/room";
 import { createRoomClient } from "./room-client";
 import type { RoomClientDeps } from "./room-client";
 
@@ -26,7 +26,7 @@ interface Link {
 }
 
 interface ServerConnection {
-  seat: Seat | null;
+  admission: Admission | null;
   lastPing: Date | null;
 }
 
@@ -48,7 +48,7 @@ const network = () => {
       const connection = connections.get(connectionId);
 
       if (connection) {
-        connection.seat = seat;
+        connection.admission = seat;
       }
     },
     connections: () =>
@@ -69,10 +69,12 @@ const network = () => {
 
   const carryOut = (outcome: RoomOutcome, sender: Link | null) => {
     deliver(outcome, {
-      broadcast: (message) => {
+      broadcast: (message, preview) => {
         for (const link of links.values()) {
           if (link.open) {
-            link.toClient.push(message);
+            link.toClient.push(
+              connections.get(link.id)?.admission ? message : preview
+            );
           }
         }
       },
@@ -102,7 +104,13 @@ const network = () => {
       carryOut(room.chat(link.id, message.text), link);
     } else if (message.type === "sync") {
       syncs.push(link.id);
-      link.toClient.push(room.snapshot());
+      link.toClient.push(room.viewFor(link.id));
+    } else if (message.type === "watch") {
+      carryOut(room.watch(link.id), link);
+    } else if (message.type === "watchInstead") {
+      carryOut(room.watchInstead(link.id), link);
+    } else if (message.type === "stopWatching") {
+      carryOut(room.stopWatching(link.id), link);
     } else {
       carryOut(room.command(link.id, message), link);
     }
@@ -147,15 +155,17 @@ const network = () => {
   const connect = (player: TestPlayer) => {
     linkCount += 1;
 
+    const id = `conn-${linkCount}`;
+
     const link: Link = {
-      id: `conn-${linkCount}`,
+      id,
       open: true,
-      toClient: [room.snapshot()],
+      toClient: [room.viewFor(id)],
       toServer: [],
     };
 
     links.set(link.id, link);
-    connections.set(link.id, { lastPing: null, seat: null });
+    connections.set(link.id, { admission: null, lastPing: null });
     player.link = link;
     player.client.opened();
   };
@@ -170,7 +180,7 @@ const network = () => {
     link.open = false;
     links.delete(link.id);
     player.link = null;
-    const seat = connections.get(link.id)?.seat ?? null;
+    const seat = connections.get(link.id)?.admission ?? null;
     connections.delete(link.id);
     carryOut(room.disconnect(seat), null);
     player.client.closed(DROPPED_CLOSE_CODE, retryCount);
@@ -204,6 +214,7 @@ interface TestPlayer {
   link: Link | null;
   replacements: number;
   token: string | null;
+  watching: boolean;
 }
 
 const testPlayer = (players: TestPlayer[]) => {
@@ -230,6 +241,12 @@ const testPlayer = (players: TestPlayer[]) => {
           return true;
         },
       },
+      watchPreference: {
+        get: () => player.watching,
+        set: (watching) => {
+          player.watching = watching;
+        },
+      },
       token: {
         get: () => player.token,
         set: (token) => {
@@ -240,6 +257,7 @@ const testPlayer = (players: TestPlayer[]) => {
     link: null,
     replacements: 0,
     token: null,
+    watching: false,
   };
 
   players.push(player);
@@ -793,6 +811,169 @@ describe("recovering a stuck connection", () => {
   });
 });
 
+describe("watching a room", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows live updates, keeps watching after a failed join, then takes a Seat", async () => {
+    const net = network();
+    const host = net.join("Ana");
+    net.join("Ben");
+    const guest = net.testPlayer();
+    net.connect(guest);
+    net.flush();
+
+    guest.client.watch();
+    net.flush();
+    expect(guest.client.state).toMatchObject({
+      canAct: false,
+      needsName: false,
+      playerId: null,
+      room: { spectatorCount: 1 },
+      watching: true,
+    });
+    const started = host.client.send({ type: "start" });
+    net.flush();
+    await started;
+    host.client.chat("Good luck");
+    net.flush();
+    const live = guest.client.state.room;
+    expect({ phase: live?.phase, chat: live?.log.at(-1)?.text }).toStrictEqual({
+      chat: "Good luck",
+      phase: "playing",
+    });
+
+    guest.client.join("Ana");
+    net.flush();
+    expect(guest.client.state).toMatchObject({
+      joinError: "Someone here is already called Ana.",
+      room: { spectatorCount: 1 },
+      watching: true,
+    });
+    guest.client.join("Cara");
+    net.flush();
+    expect(guest.client.state).toMatchObject({
+      ready: true,
+      room: { spectatorCount: 0 },
+      watching: false,
+    });
+    expect({
+      newestPlayer: guest.client.state.room?.players.at(-1),
+      savedPlayer: guest.token !== null,
+      watchPreference: guest.watching,
+    }).toMatchObject({
+      newestPlayer: { name: "Cara", status: "out" },
+      savedPlayer: true,
+      watchPreference: false,
+    });
+  });
+
+  it("resumes watching after reconnect until the room is locked", async () => {
+    const net = network();
+    const host = net.join("Ana");
+    const guest = net.testPlayer();
+    net.connect(guest);
+    guest.client.watch();
+    net.flush();
+    net.drop(guest);
+    net.connect(guest);
+    net.flush();
+    expect(guest.client.state.watching).toBeTruthy();
+
+    const locked = host.client.send({ locked: true, type: "configure" });
+    net.flush();
+    await expect(locked).resolves.toBeTruthy();
+    expect(guest.client.state).toMatchObject({
+      room: { settings: { locked: true } },
+      watching: true,
+    });
+
+    net.drop(guest);
+    net.connect(guest);
+    net.flush();
+    expect(guest.client.state).toMatchObject({
+      needsName: true,
+      preview: { locked: true },
+      room: null,
+      watchError: "This room is locked. Ask the host to unlock it.",
+      watching: false,
+    });
+    expect(guest.watching).toBeFalsy();
+  });
+
+  it("returns to the join preview and stops resuming Watch after leaving Watch", () => {
+    const net = network();
+    const host = net.join("Ana");
+    const guest = net.testPlayer();
+    net.connect(guest);
+    guest.client.watch();
+    net.flush();
+    guest.client.stopWatching();
+    net.flush();
+
+    expect(host.client.state.room?.spectatorCount).toBe(0);
+    expect(guest.client.state).toMatchObject({
+      needsName: true,
+      preview: { spectatorCount: 0 },
+      room: null,
+      watching: false,
+    });
+    net.drop(guest);
+    net.connect(guest);
+    net.flush();
+    expect(guest.client.state.watching).toBeFalsy();
+  });
+
+  it("gives up a seat to watch, forgets the token, and resumes watching after a reconnect", () => {
+    const net = network();
+    const host = net.join("Ana");
+    const ben = net.join("Ben");
+
+    ben.client.watchInstead();
+    expect(ben.client.state.watchPending).toBeTruthy();
+    net.flush();
+
+    expect(ben.token).toBeNull();
+    expect(ben.client.state).toMatchObject({
+      canAct: false,
+      needsName: false,
+      playerId: null,
+      room: { players: [{ name: "Ana" }], spectatorCount: 1 },
+      watchPending: false,
+      watching: true,
+    });
+    expect(host.client.state.room?.players).toHaveLength(1);
+
+    net.drop(ben);
+    net.connect(ben);
+    net.flush();
+    expect(ben.client.state.watching).toBeTruthy();
+  });
+
+  it("keeps the seat and explains why when watching isn't allowed", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    void ana.client.send({ type: "addBot" });
+    net.flush();
+
+    ana.client.watchInstead();
+    net.flush();
+
+    expect(ana.token).not.toBeNull();
+    expect(ana.client.state.notice?.message).toContain("only person playing");
+    expect(ana.client.state.playerId).not.toBeNull();
+    expect(ana.client.state).toMatchObject({
+      watchPending: false,
+      watching: false,
+    });
+  });
+});
+
 describe("a pending move", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -1121,6 +1302,7 @@ const scripted = (overrides: Partial<RoomClientDeps> = {}) => {
         token = next;
       },
     },
+    watchPreference: { get: () => false, set: () => {} },
     ...overrides,
   });
 

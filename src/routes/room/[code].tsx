@@ -85,7 +85,7 @@ const Room = (props: { code: string }) => {
       const room = connection.room();
 
       return room &&
-        playerId !== null &&
+        (playerId !== null || connection.watching()) &&
         status !== "missing" &&
         status !== "removed"
         ? { canAct: connection.canAct(), playerId, room }
@@ -101,7 +101,30 @@ const Room = (props: { code: string }) => {
   );
 
   const toast = createToaster();
-  const hasRoom = createMemo(() => connection.room() !== null);
+
+  const unavailable = () =>
+    !connection.online() || connection.status() !== "open";
+
+  const titlePrefix = () => {
+    if (table().myMove) {
+      return "Your move · ";
+    }
+
+    return connection.watching() ? "Watching · " : "";
+  };
+
+  const spectator = () => ({
+    join: {
+      error: connection.joinError(),
+      joining: connection.joining(),
+      onEdit: connection.clearJoinError,
+      onJoin: connection.join,
+      savedAvatar: connection.savedAvatar(),
+      savedName: connection.savedName(),
+      unavailable: unavailable(),
+    },
+    onLeave: connection.stopWatching,
+  });
 
   createEffect(
     () =>
@@ -165,12 +188,14 @@ const Room = (props: { code: string }) => {
     return "";
   };
 
-  const seated = createMemo(
+  const tableView = createMemo(
     () => {
       const { room } = table();
       const playerId = connection.playerId();
 
-      return room && playerId !== null ? { playerId, room } : null;
+      return room && (playerId !== null || connection.watching())
+        ? { playerId, room }
+        : null;
     },
     {
       equals: (a, b) => a?.room === b?.room && a?.playerId === b?.playerId,
@@ -179,9 +204,7 @@ const Room = (props: { code: string }) => {
 
   return (
     <>
-      <Title>
-        {`${table().myMove ? "Your move · " : ""}Room ${props.code} · Flip 7`}
-      </Title>
+      <Title>{`${titlePrefix()}Room ${props.code} · Flip 7`}</Title>
       <PageMeta
         title={`Join room ${props.code} · Flip 7`}
         description={`You're invited to a game of Flip 7. Open the link to join room ${props.code}, pick a name and play. No accounts needed.`}
@@ -228,25 +251,34 @@ const Room = (props: { code: string }) => {
             </RoomNotice>
           </Match>
           <Match when={connection.status() === "removed"}>
-            <RoomNotice title="Out of the room" code={props.code} card="deck">
+            <RoomNotice
+              title="Out of the room"
+              code={props.code}
+              card="deck"
+              onReturn={connection.returnToRoom}
+            >
               You left, or the host removed you.
             </RoomNotice>
           </Match>
-          <Match when={connection.needsName() && hasRoom()}>
-            <JoinForm
-              room={connection.room()}
-              savedName={connection.savedName()}
-              savedAvatar={connection.savedAvatar()}
-              onJoin={connection.join}
-              error={connection.joinError()}
-              joining={connection.joining()}
-              unavailable={
-                !connection.online() || connection.status() !== "open"
-              }
-              onEdit={connection.clearJoinError}
-            />
+          <Match when={connection.needsName() && connection.preview()}>
+            {(preview) => (
+              <JoinForm
+                room={preview()}
+                locked={preview().locked}
+                onWatch={connection.watch}
+                watchError={connection.watchError()}
+                watchPending={connection.watchPending()}
+                savedName={connection.savedName()}
+                savedAvatar={connection.savedAvatar()}
+                onJoin={connection.join}
+                error={connection.joinError()}
+                joining={connection.joining()}
+                unavailable={unavailable()}
+                onEdit={connection.clearJoinError}
+              />
+            )}
           </Match>
-          <Match when={seated()}>
+          <Match when={tableView()}>
             {(view) => (
               <Show
                 when={view().room.phase === "lobby"}
@@ -257,13 +289,12 @@ const Room = (props: { code: string }) => {
                     send={connection.send}
                     chat={connection.chat}
                     actionsDisabled={table().actionsDisabled}
-                    offline={
-                      !connection.online() || connection.status() !== "open"
-                    }
+                    offline={unavailable()}
                     latestRoom={connection.room()}
                     dealing={table().dealing}
                     dealStep={table().step}
                     roundPoints={table().roundPoints}
+                    spectator={spectator()}
                   />
                 }
               >
@@ -271,9 +302,11 @@ const Room = (props: { code: string }) => {
                   room={view().room}
                   playerId={view().playerId}
                   send={connection.send}
-                  actionsDisabled={
-                    !connection.online() || connection.status() !== "open"
-                  }
+                  chat={connection.chat}
+                  actionsDisabled={unavailable()}
+                  spectator={spectator()}
+                  onWatchInstead={connection.watchInstead}
+                  watchInsteadPending={connection.watchPending()}
                 />
               </Show>
             )}

@@ -75,6 +75,7 @@ const room = (overrides: Partial<RoomView> = {}) => {
     ],
     round: 1,
     settings: { botSpeed: "normal", locked: false, targetScore: 200 },
+    spectatorCount: 0,
     turnId: "a",
     winnerIds: [],
     ...overrides,
@@ -110,6 +111,19 @@ const entries = () =>
   agent
     .snapshot()
     .filter((entry) => entry.offPage !== true && entry.component !== "more");
+
+const spectator = () => ({
+  join: {
+    error: "",
+    joining: false,
+    onEdit: vi.fn<() => void>(),
+    onJoin: vi.fn<(name: string, avatar: number) => void>(),
+    savedAvatar: null,
+    savedName: "",
+    unavailable: false,
+  },
+  onLeave: vi.fn<() => void>(),
+});
 
 describe("<Table />", () => {
   afterEach(cleanup);
@@ -238,6 +252,27 @@ describe("<Table />", () => {
       )
     ).toStrictEqual([]);
     expect(screen.getByText(", 2 of 3 flipped")).toBeInTheDocument();
+  });
+
+  it("gives spectators their own header actions instead of Leave", () => {
+    render(() => (
+      <Table
+        room={room({ spectatorCount: 2 })}
+        playerId={null}
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        spectator={spectator()}
+      />
+    ));
+
+    expect(
+      screen.getByRole("button", { name: "Join as player" })
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Leave room" })).toHaveLength(
+      1
+    );
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+    expect(screen.getByText("2 watching")).toBeInTheDocument();
   });
 
   it("lets the host lock the room mid-game from the header, without the winning score", async () => {
@@ -2105,7 +2140,7 @@ describe("<Table />", () => {
       within(log)
         .getAllByRole("heading")
         .map((heading) => heading.textContent)
-    ).toStrictEqual(["Round 1", "Lobby", "Game 2 · Round 1"]);
+    ).toStrictEqual(["Round 1", "Before the game", "Game 2 · Round 1"]);
   });
 
   it("says when the player everyone is waiting on is offline", () => {

@@ -28,6 +28,33 @@ export type Move =
   | { type: "configure"; targetScore?: number }
   | { type: "kick"; playerId: string };
 
+export const MAX_SPECTATORS = 32;
+
+/**
+ * Why a seated player can't give up their seat to watch, or null when they can.
+ * Only in the lobby, so nobody leaves a hand already dealt; only with room for
+ * another Spectator; and never leaving only bots, which would close the room.
+ */
+export const rejectWatchInstead = (
+  view: Pick<MovesView, "phase" | "players">,
+  playerId: string,
+  spectatorCount: number
+) => {
+  if (view.phase !== "lobby") {
+    return "The game has started. Leave the room to stop playing.";
+  }
+
+  if (spectatorCount >= MAX_SPECTATORS) {
+    return "The spectator limit has been reached.";
+  }
+
+  const others = view.players.filter((player) => player.id !== playerId);
+
+  return others.length > 0 && others.every((player) => player.bot)
+    ? "You're the only person playing. Leaving the bots alone would close the room."
+    : null;
+};
+
 /** A player may stay only once they have at least one card in front of them. */
 export const canStay = (player: { hand: readonly Card[] }) =>
   player.hand.length > 0;
@@ -151,9 +178,13 @@ const rejectMoveFor = (
 
 const rejectHostMove = (
   view: MovesView,
-  viewerId: string,
+  viewerId: string | null,
   move: Exclude<Move, { type: "choose" | "hit" | "stay" }>
 ) => {
+  if (viewerId === null) {
+    return "Join the room first.";
+  }
+
   if (move.type === "kick") {
     if (view.hostId !== viewerId) {
       return "Only the host can remove players.";
@@ -233,9 +264,9 @@ export const rejectMove = (view: MovesView, viewerId: string, move: Move) => {
  * Every move `viewerId` can make right now. `turn` and `choice` carry a
  * `forId` when the host is moving for an offline player.
  */
-export const availableMoves = (view: MovesView, viewerId: string) => {
+export const availableMoves = (view: MovesView, viewerId: string | null) => {
   const waiting = waitingOn(view);
-  const isHost = view.hostId === viewerId;
+  const isHost = viewerId !== null && view.hostId === viewerId;
   const mine = waiting?.playerId === viewerId;
   const forOffline = !mine && isHost && waiting?.offline === true;
   const owed = waiting !== null && (mine || forOffline);

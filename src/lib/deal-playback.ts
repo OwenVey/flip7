@@ -41,7 +41,7 @@ export interface DealMotion {
 
 interface PlaybackInput {
   canAct: boolean;
-  playerId: string;
+  playerId: string | null;
   room: RoomView;
 }
 

@@ -16,7 +16,7 @@ A multiplayer push-your-luck card game played in shared rooms, where players joi
 
 **Avatar**: The small picture a player picks when they join, chosen from a fixed set. It decorates a player and never identifies them, so two players can share one. A bot shows the bot mark instead of an avatar. _Avoid_: icon, profile picture
 
-**Room settings**: What the host sets in the lobby: the winning score, how fast bots move, and whether the room is **locked**. A locked room turns away new players, but anyone already in it can rejoin by token. The lock and bot speed can change at any time; the winning score only in the lobby. _Avoid_: options, config (in player-facing text)
+**Room settings**: What the host sets in the lobby: the winning score, how fast bots move, and whether the room is **locked**. A locked room blocks new players and new watch connections. Players can rejoin by token, and Spectators who stay connected can keep watching. The lock and bot speed can change at any time; the winning score only in the lobby. _Avoid_: options, config (in player-facing text)
 
 **Evict**: To remove a player from the room, either by a **kick** from the host or by the player choosing to **leave**. _Avoid_: remove (when you mean the room-level act)
 

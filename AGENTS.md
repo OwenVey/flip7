@@ -37,7 +37,7 @@ Read the Solid 2.0 skill before writing or reviewing Solid code. Check unfamilia
 
 Before using ui-sdk, follow the [ui-sdk skill](.agents/skills/ui-sdk/SKILL.md) and read `node_modules/@ui-sdk/solid/docs/llms.txt`. For new components, also look up the relevant heading in `core.md` and read `rendering.md` in the same directory.
 
-Button-like parts share the base `:is(...)` rule in `src/app.css`. Add the `data-slot` for any new trigger or close part to that rule. Use `data-variant` (`solid`, `quiet`, `destructive`) and `data-size="sm"` for variations. Keep sizing, padding, borders, and font in the shared rule.
+Button-like parts share the base `:is(...)` rule in `src/app.css`. Add the `data-slot` for any new trigger or close part to that rule. Use `data-variant` (`solid`, `destructive`), `data-tone="danger"` for a red paper button, and `data-size="sm"` for variations. Leave `data-variant` off for the default paper button. Keep sizing, padding, borders, and font in the shared rule.
 
 ## Verification
 

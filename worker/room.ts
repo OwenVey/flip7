@@ -2,10 +2,20 @@ import { Server } from "partyserver";
 import type { Connection, WSMessage } from "partyserver";
 
 import { parseClientMessage } from "../src/game/client-message";
-import { HEARTBEAT_PING, HEARTBEAT_PONG } from "../src/game/protocol";
+import {
+  HEARTBEAT_PING,
+  HEARTBEAT_PONG,
+  ROOM_MISSING_CLOSE_CODE,
+} from "../src/game/protocol";
 import type { ServerMessage } from "../src/game/protocol";
 import { createRoom, deliver, newStoredRoom } from "../src/game/room";
-import type { RoomOutcome, Seat, Seats, StoredRoom } from "../src/game/room";
+import type {
+  Admission,
+  RoomOutcome,
+  Seats,
+  StoredRoom,
+} from "../src/game/room";
+import { withServerConnectionId } from "./connection-id";
 
 const UINT32_RANGE = 2 ** 32;
 
@@ -38,6 +48,10 @@ const framesOf = (outcome: RoomOutcome) => {
   const frames = new Map<ServerMessage, string>();
 
   for (const effect of outcome.effects) {
+    if (effect.type === "broadcast" && !frames.has(effect.preview)) {
+      frames.set(effect.preview, JSON.stringify(effect.preview));
+    }
+
     if (effect.type !== "close" && !frames.has(effect.message)) {
       frames.set(effect.message, JSON.stringify(effect.message));
     }
@@ -53,14 +67,14 @@ export class GameRoom extends Server<Env> {
   private stored: StoredRoom | null = null;
 
   private readonly seats: Seats = {
-    assign: (connectionId, seat) => {
-      this.getConnection<Seat>(connectionId)?.setState(seat);
+    assign: (connectionId, admission) => {
+      this.getConnection<Admission>(connectionId)?.setState(admission);
     },
     connections: () =>
-      Array.from(this.getConnections<Seat>(), (connection) => ({
+      Array.from(this.getConnections<Admission>(), (connection) => ({
         id: connection.id,
         lastPing: this.ctx.getWebSocketAutoResponseTimestamp(connection),
-        seat: connection.state ?? null,
+        admission: connection.state ?? null,
       })),
   };
 
@@ -98,7 +112,9 @@ export class GameRoom extends Server<Env> {
       return new Response("Expected a WebSocket", { status: 426 });
     }
 
-    return await super.fetch(request);
+    return await super.fetch(
+      withServerConnectionId(request, crypto.randomUUID())
+    );
   }
 
   override async onStart() {
@@ -109,11 +125,11 @@ export class GameRoom extends Server<Env> {
     const room = this.room();
 
     if (room) {
-      send(connection, room.snapshot());
+      send(connection, room.viewFor(connection.id));
     }
   }
 
-  override async onMessage(ws: Connection<Seat>, data: WSMessage) {
+  override async onMessage(ws: Connection<Admission>, data: WSMessage) {
     const room = this.room();
 
     if (!room || data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
@@ -136,18 +152,28 @@ export class GameRoom extends Server<Env> {
     } else if (message.type === "chat") {
       await this.carryOut(room.chat(ws.id, message.text), ws);
     } else if (message.type === "sync") {
-      send(ws, room.snapshot());
+      send(ws, room.viewFor(ws.id));
+    } else if (message.type === "watch") {
+      await this.carryOut(room.watch(ws.id), ws);
+    } else if (message.type === "watchInstead") {
+      await this.carryOut(room.watchInstead(ws.id), ws);
+    } else if (message.type === "stopWatching") {
+      await this.carryOut(room.stopWatching(ws.id), ws);
     } else {
       await this.carryOut(room.command(ws.id, message), ws);
     }
   }
 
-  override async onClose(ws: Connection<Seat>) {
-    await this.carryOut(this.room()?.disconnect(ws.state ?? null));
+  override async onClose(ws: Connection<Admission>) {
+    const admission = ws.state ?? null;
+    ws.setState(null);
+    await this.carryOut(this.room()?.disconnect(admission));
   }
 
-  override async onError(ws: Connection<Seat>) {
-    await this.carryOut(this.room()?.disconnect(ws.state ?? null));
+  override async onError(ws: Connection<Admission>) {
+    const admission = ws.state ?? null;
+    ws.setState(null);
+    await this.carryOut(this.room()?.disconnect(admission));
   }
 
   override async onAlarm() {
@@ -178,8 +204,14 @@ export class GameRoom extends Server<Env> {
     }
 
     deliver(outcome, {
-      broadcast: (message) => {
-        this.broadcast(frameOf(message));
+      broadcast: (message, preview) => {
+        if (outcome.expired) {
+          return;
+        }
+
+        for (const connection of this.getConnections<Admission>()) {
+          sendFrame(connection, frameOf(connection.state ? message : preview));
+        }
       },
       close: (connectionId, code, reason) => {
         this.getConnection(connectionId)?.close(code, reason);
@@ -190,5 +222,13 @@ export class GameRoom extends Server<Env> {
         }
       },
     });
+
+    if (outcome.expired) {
+      for (const connection of this.getConnections()) {
+        if (connection.readyState === WebSocket.OPEN) {
+          connection.close(ROOM_MISSING_CLOSE_CODE, "Room closed");
+        }
+      }
+    }
   }
 }

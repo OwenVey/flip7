@@ -7,6 +7,7 @@ import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_PING,
   parseServerMessage,
+  ROOM_MISSING_CLOSE_CODE,
   ROOM_PARTY,
   ROOM_REMOVED_CLOSE_CODE,
 } from "../game/protocol";
@@ -89,6 +90,16 @@ export const createRoomConnection = (code: string) => {
     }
   );
 
+  const [watchPreference, setWatchPreference] = makePersisted(
+    createSignal(false, { ownedWrite: true }),
+    {
+      deserialize: (data) => data === "watch",
+      name: `flip7:watch:${code}`,
+      serialize: (watching) => (watching ? "watch" : ""),
+      storage: usableStorage(() => sessionStorage),
+    }
+  );
+
   let socket: PartySocket | null = null;
 
   const client = createRoomClient({
@@ -121,6 +132,12 @@ export const createRoomConnection = (code: string) => {
         return true;
       },
     },
+    watchPreference: {
+      get: () => untrack(watchPreference),
+      set: (watching) => {
+        setWatchPreference(watching);
+      },
+    },
     token: {
       get: () => untrack(token),
       set: (next) => {
@@ -149,7 +166,8 @@ export const createRoomConnection = (code: string) => {
       protocol: location.protocol === "https:" ? "wss" : "ws",
       room: code,
       shouldReconnectOnClose: ({ code: closeCode }) =>
-        closeCode !== ROOM_REMOVED_CLOSE_CODE,
+        closeCode !== ROOM_REMOVED_CLOSE_CODE &&
+        closeCode !== ROOM_MISSING_CLOSE_CODE,
     });
 
     socket = ws;
@@ -220,11 +238,19 @@ export const createRoomConnection = (code: string) => {
     online: createMemo(() => state().online),
     playerId: createMemo(() => state().playerId),
     room: createMemo(() => state().room),
+    preview: createMemo(() => state().preview),
     retry: client.retry,
+    returnToRoom: client.returnToRoom,
     savedAvatar,
     savedName,
     send: client.send,
     status: createMemo(() => state().status),
+    stopWatching: client.stopWatching,
+    watch: client.watch,
+    watchError: () => state().watchError,
+    watchInstead: client.watchInstead,
+    watchPending: () => state().watchPending,
+    watching: createMemo(() => state().watching),
   };
 };
 

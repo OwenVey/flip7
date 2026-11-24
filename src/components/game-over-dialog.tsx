@@ -85,7 +85,7 @@ const burstStyle = (index: number) => {
 
 export default function GameOverDialog(props: {
   room: RoomView;
-  playerId: string;
+  playerId: string | null;
   canPlayAgain: boolean;
   canReturnToLobby: boolean;
   actionsDisabled?: boolean;
@@ -111,7 +111,7 @@ export default function GameOverDialog(props: {
   const winners = () =>
     standings().filter((entry) => winnerIds().has(entry.player.id));
 
-  const iWon = () => winnerIds().has(props.playerId);
+  const iWon = () => props.playerId !== null && winnerIds().has(props.playerId);
 
   const title = () => {
     if (iWon()) {

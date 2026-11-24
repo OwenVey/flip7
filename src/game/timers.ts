@@ -68,9 +68,8 @@ const syncBotTurn = (
 };
 
 /**
- * Starts or clears the grace clocks to match the room. A clock only runs while
- * someone else is online, so an abandoned room doesn't hand off the host or
- * play itself out with nobody watching.
+ * Starts or clears the grace clocks based on player presence. Spectators keep
+ * the room open without starting a bot move, stall clock, or host handoff.
  */
 export const syncTimers = (room: RoomTimers, now: number) => {
   const { game } = room;

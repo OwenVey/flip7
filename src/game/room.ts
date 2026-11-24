@@ -16,19 +16,22 @@ import {
   hit,
   kick,
   leave,
+  leaveToWatch,
   nextRound,
   playFor,
   startGame,
   stay,
 } from "./engine";
 import type { GameState } from "./engine";
+import { MAX_SPECTATORS, rejectWatchInstead } from "./moves";
 import {
   cleanName,
   listSeqsOf,
   ROOM_REMOVED_CLOSE_CODE,
+  toRoomPreview,
   toStateMessage,
 } from "./protocol";
-import type { ListSeqs, ServerMessage } from "./protocol";
+import type { ListSeqs, PreviewMessage, ServerMessage } from "./protocol";
 import {
   heartbeatDeadline,
   nextAlarmAt,
@@ -55,16 +58,28 @@ export interface Seat {
   seatedAt: number;
 }
 
+/** Admission follows the connection across Worker hibernation. */
+export type Admission = Seat | { watchedAt: number };
+
+const playerSeat = (admission: Admission | null) =>
+  admission && "playerId" in admission ? admission : null;
+
+const isSpectator = (admission: Admission | null) =>
+  admission !== null && "watchedAt" in admission;
+
+const admittedAt = (admission: Admission) =>
+  "seatedAt" in admission ? admission.seatedAt : admission.watchedAt;
+
 export interface OpenConnection {
   id: string;
-  seat: Seat | null;
+  admission: Admission | null;
   lastPing: Date | null;
 }
 
 /** The room's view of its open connections, seated or not. */
 export interface Seats {
   connections: () => Iterable<OpenConnection>;
-  assign: (connectionId: string, seat: Seat | null) => void;
+  assign: (connectionId: string, admission: Admission | null) => void;
 }
 
 export interface RoomDeps {
@@ -75,12 +90,12 @@ export interface RoomDeps {
 
 /**
  * Something the transport must do, in order: reply to the sender, broadcast
- * the table to every connection, or close a connection. A broadcast carries
- * only the list entries added since the previous broadcast.
+ * the live table to admitted connections and the join preview to visitors,
+ * or close a connection. Live broadcasts carry new list entries only.
  */
 export type RoomEffect =
   | { type: "reply"; message: ServerMessage }
-  | { type: "broadcast"; message: ServerMessage }
+  | { type: "broadcast"; message: ServerMessage; preview: PreviewMessage }
   | { type: "close"; connectionId: string; code: number; reason: string };
 
 type PlannedEffect =
@@ -98,10 +113,10 @@ export interface RoomOutcome {
   alarmAt: number;
 }
 
-/** How a transport carries out effects: reply to the sender, broadcast the table to every seat, or close a connection. */
+/** How a transport delivers replies, audience-specific broadcasts, and closes. */
 export interface RoomTransport {
   reply: (message: ServerMessage) => void;
-  broadcast: (message: ServerMessage) => void;
+  broadcast: (message: ServerMessage, preview: PreviewMessage) => void;
   close: (connectionId: string, code: number, reason: string) => void;
 }
 
@@ -115,7 +130,7 @@ export const deliver = (outcome: RoomOutcome, transport: RoomTransport) => {
       }
 
       case "broadcast": {
-        transport.broadcast(effect.message);
+        transport.broadcast(effect.message, effect.preview);
         break;
       }
 
@@ -188,13 +203,20 @@ export const createRoom = (
 
   const seatedConnections = (playerId: string) =>
     [...seats.connections()].filter(
-      (connection) => connection.seat?.playerId === playerId
+      (connection) => playerSeat(connection.admission)?.playerId === playerId
     );
 
-  const seatOf = (connectionId: string) =>
+  const admissionOf = (connectionId: string) =>
     [...seats.connections()].find(
       (connection) => connection.id === connectionId
-    )?.seat ?? null;
+    )?.admission ?? null;
+
+  const seatOf = (connectionId: string) =>
+    playerSeat(admissionOf(connectionId));
+
+  const spectatorCount = () =>
+    [...seats.connections()].filter(({ admission }) => isSpectator(admission))
+      .length;
 
   const seatedPlayer = (connectionId: string) => {
     const playerId = seatOf(connectionId)?.playerId;
@@ -218,10 +240,19 @@ export const createRoom = (
       type: "welcome",
     });
 
-  const snapshot = () => toStateMessage(stored.code, game);
+  const snapshot = () =>
+    toStateMessage(stored.code, game, {}, spectatorCount());
+
+  const preview = () => toRoomPreview(stored.code, game, spectatorCount());
 
   const broadcastMessage = () => {
-    const message = toStateMessage(stored.code, game, stored.broadcastSeqs);
+    const message = toStateMessage(
+      stored.code,
+      game,
+      stored.broadcastSeqs,
+      spectatorCount()
+    );
+
     stored.broadcastSeqs = listSeqsOf(game);
 
     return message;
@@ -240,14 +271,18 @@ export const createRoom = (
 
       broadcast ??= broadcastMessage();
 
-      return { message: broadcast, type: "broadcast" } satisfies RoomEffect;
+      return {
+        message: broadcast,
+        preview: preview(),
+        type: "broadcast",
+      } satisfies RoomEffect;
     });
 
     const deadlines: number[] = [];
 
-    for (const { seat: open, lastPing } of seats.connections()) {
-      if (open) {
-        deadlines.push(heartbeatDeadline(open.seatedAt, lastPing));
+    for (const { admission, lastPing } of seats.connections()) {
+      if (admission) {
+        deadlines.push(heartbeatDeadline(admittedAt(admission), lastPing));
       }
     }
 
@@ -409,16 +444,27 @@ export const createRoom = (
     }
   };
 
-  const dropSilentSeats = (now: number) => {
+  const dropSilentConnections = (now: number) => {
     const silentIds = new Set<string>();
     const closes: PlannedEffect[] = [];
 
-    for (const { id, seat: open, lastPing } of seats.connections()) {
-      if (!open || now < heartbeatDeadline(open.seatedAt, lastPing)) {
+    let changed = false;
+
+    for (const { id, admission, lastPing } of seats.connections()) {
+      if (!admission) {
         continue;
       }
 
-      silentIds.add(open.playerId);
+      if (now < heartbeatDeadline(admittedAt(admission), lastPing)) {
+        continue;
+      }
+
+      if ("playerId" in admission) {
+        silentIds.add(admission.playerId);
+      } else {
+        changed = true;
+      }
+
       seats.assign(id, null);
       closes.push({
         code: HEARTBEAT_CLOSE_CODE,
@@ -427,8 +473,6 @@ export const createRoom = (
         type: "close",
       });
     }
-
-    let changed = false;
 
     for (const id of silentIds) {
       const player = findPlayer(game, id);
@@ -445,7 +489,7 @@ export const createRoom = (
   return {
     alarm: () => {
       const now = deps.now();
-      const dropped = dropSilentSeats(now);
+      const dropped = dropSilentConnections(now);
 
       if (dropped.changed) {
         syncTimers(stored, now);
@@ -511,7 +555,15 @@ export const createRoom = (
       );
     },
 
-    disconnect: (departed: Seat | null) => {
+    disconnect: (admission: Admission | null) => {
+      if (isSpectator(admission)) {
+        touch();
+
+        return finish([BROADCAST]);
+      }
+
+      const departed = playerSeat(admission);
+
       if (!departed) {
         return finish([]);
       }
@@ -537,7 +589,11 @@ export const createRoom = (
       touch();
 
       return finish(
-        attempt(() => [joinSeat(connectionId, name, token, avatar), BROADCAST])
+        attempt(() => [
+          joinSeat(connectionId, name, token, avatar),
+          reply(snapshot()),
+          BROADCAST,
+        ])
       );
     },
 
@@ -545,7 +601,7 @@ export const createRoom = (
       const seated = new Set(
         Array.from(
           seats.connections(),
-          (connection) => connection.seat?.playerId
+          (connection) => playerSeat(connection.admission)?.playerId
         )
       );
 
@@ -564,5 +620,86 @@ export const createRoom = (
     },
 
     snapshot,
+
+    viewFor: (connectionId: string) =>
+      admissionOf(connectionId) ? snapshot() : preview(),
+
+    watch: (connectionId: string) => {
+      const admission = admissionOf(connectionId);
+
+      const reject = (message: string) =>
+        finish([reply({ message, type: "watchError" })]);
+
+      if (playerSeat(admission)) {
+        return reject("Leave the room before choosing Watch.");
+      }
+
+      if (admission) {
+        return finish([reply({ type: "watching" }), reply(snapshot())]);
+      }
+
+      if (game.settings.locked) {
+        return reject("This room is locked. Ask the host to unlock it.");
+      }
+
+      if (spectatorCount() >= MAX_SPECTATORS) {
+        return reject(
+          "The spectator limit has been reached. You can still join as a player if there's room."
+        );
+      }
+
+      seats.assign(connectionId, { watchedAt: deps.now() });
+      touch();
+
+      return finish([
+        reply({ type: "watching" }),
+        reply(snapshot()),
+        BROADCAST,
+      ]);
+    },
+
+    watchInstead: (connectionId: string) => {
+      const playerId = seatOf(connectionId)?.playerId;
+
+      const reject = (message: string) =>
+        finish([reply({ message, type: "watchError" })]);
+
+      if (playerId === undefined || !findPlayer(game, playerId)) {
+        return reject("Join the room first.");
+      }
+
+      const blocked = rejectWatchInstead(game, playerId, spectatorCount());
+
+      if (blocked !== null) {
+        return reject(blocked);
+      }
+
+      touch();
+      leaveToWatch(game, playerId, deps.random);
+
+      const closes = evict(playerId, "left").filter(
+        (close) => close.connectionId !== connectionId
+      );
+
+      seats.assign(connectionId, { watchedAt: deps.now() });
+
+      return finish([
+        reply({ type: "watching" }),
+        reply(snapshot()),
+        BROADCAST,
+        ...closes,
+      ]);
+    },
+
+    stopWatching: (connectionId: string) => {
+      if (!isSpectator(admissionOf(connectionId))) {
+        return finish([]);
+      }
+
+      seats.assign(connectionId, null);
+      touch();
+
+      return finish([BROADCAST]);
+    },
   };
 };

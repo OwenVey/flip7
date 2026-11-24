@@ -4,7 +4,6 @@ import CircleX from "@lucide/solid/icons/circle-x";
 import Crown from "@lucide/solid/icons/crown";
 import Hand from "@lucide/solid/icons/hand";
 import LockKeyhole from "@lucide/solid/icons/lock-keyhole";
-import MessageCircle from "@lucide/solid/icons/message-circle";
 import PlayingCards from "@lucide/solid/icons/playing-cards";
 import PlayingCardsFan from "@lucide/solid/icons/playing-cards-fan";
 import RotateCcw from "@lucide/solid/icons/rotate-ccw";
@@ -24,7 +23,6 @@ import {
   Repeat,
   Show,
   Switch,
-  untrack,
 } from "solid-js";
 import type { ParentProps } from "solid-js";
 
@@ -51,7 +49,8 @@ import { passDealerChip, pop, slideRows } from "../lib/table-motion";
 import type { ChipSpot } from "../lib/table-motion";
 import CardBackMark from "./card-back-mark";
 import CardTooltips from "./card-tooltips";
-import GameLog, { CHAT_AND_GAME_LOG_TITLE, countChatsAfter } from "./game-log";
+import ChatSheet from "./chat-sheet";
+import GameLog from "./game-log";
 import GameOverDialog from "./game-over-dialog";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
@@ -61,6 +60,8 @@ import PlayingCard from "./playing-card";
 import RemovePlayer from "./remove-player";
 import { RoomSettingsMenu } from "./room-settings";
 import ScrollFade from "./scroll-fade";
+import { SpectatorActions, WatcherCount } from "./spectator-controls";
+import type { Spectator } from "./spectator-controls";
 import TableMoreMenu from "./table-more-menu";
 import TableSheet from "./table-sheet";
 import Tooltip from "./tooltip";
@@ -87,7 +88,7 @@ const STAMPED_STATUSES: ReadonlySet<RoundStatus> = new Set([
 
 interface TableProps {
   room: RoomView;
-  playerId: string;
+  playerId: string | null;
   send: RoomConnection["send"];
   actionsDisabled?: boolean;
   /**
@@ -113,8 +114,8 @@ type RoundPointsByPlayer = Pick<DealPlaybackView, "roundPoints">;
 
 const pointsOf = (
   roundPoints: RoundPointsByPlayer["roundPoints"],
-  playerId: string
-) => roundPoints.get(playerId) ?? 0;
+  playerId: string | null
+) => (playerId === null ? 0 : (roundPoints.get(playerId) ?? 0));
 
 interface FlipProgress {
   flipped: number;
@@ -283,7 +284,7 @@ const choiceVerb = (kind: ActionCardChoice["card"]["kind"]) => {
 
 const pickLabel = (
   room: RoomView,
-  playerId: string,
+  playerId: string | null,
   kind: ActionCardChoice["card"]["kind"],
   targetId: string,
   forId: string | undefined
@@ -643,6 +644,9 @@ const RoundPlayer = (
   );
 };
 
+const playPaused = (room: RoomView) =>
+  !room.players.some((player) => player.connected && !player.bot);
+
 const ActionCardPrompt = (
   props: Pick<TableProps, "room"> &
     Pick<MoveControls, "moves"> & {
@@ -668,8 +672,10 @@ const ActionCardPrompt = (
               >
                 is offline.{" "}
                 <span class="muted">
-                  · The game will play {cardLabel(props.choice.card)} for them
-                  soon.
+                  ·{" "}
+                  {playPaused(props.room)
+                    ? "Play resumes when a player reconnects."
+                    : `The game will play ${cardLabel(props.choice.card)} for them soon.`}
                 </span>
               </Show>
             </p>
@@ -1292,6 +1298,16 @@ const ActionBar = (
                 />
               )}
             </Match>
+            <Match when={playPaused(props.room) && props.moves.waitingOn}>
+              {(waiting) => (
+                <p class="headline">
+                  Waiting on {nameOf(props.room, waiting().playerId)}{" "}
+                  <span class="muted">
+                    · Play resumes when a player reconnects.
+                  </span>
+                </p>
+              )}
+            </Match>
             <Match when={props.room.turnId}>
               {(turnId) => (
                 <p class="headline">
@@ -1328,6 +1344,8 @@ export default function Table(
        * a change shows as soon as the room accepts it, not after the deal.
        */
       latestRoom?: RoomView | null;
+      /** A Spectator's Join and Leave, shown where a player's Leave and ⋯ go. */
+      spectator?: Spectator;
     }
 ) {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
@@ -1368,6 +1386,7 @@ export default function Table(
   );
 
   const [scoresOpen, setScoresOpen] = createSignal(false);
+  const [logOpen, setLogOpen] = createSignal(false);
 
   const resultsRound = createMemo(() =>
     props.room.phase === "roundOver" && props.dealing !== true
@@ -1384,34 +1403,16 @@ export default function Table(
     }
   });
 
-  const [logOpen, setLogOpen] = createSignal(false);
-  const latestLogId = () => props.room.log.at(-1)?.id ?? 0;
-  const [seenLogId, setSeenLogId] = createSignal(untrack(latestLogId));
-
-  const unreadChats = () =>
-    logOpen()
-      ? 0
-      : countChatsAfter(props.room.log, props.playerId, seenLogId());
-
-  const toggleLabel = () => {
-    const unread = unreadChats();
-
-    return unread > 0
-      ? `${CHAT_AND_GAME_LOG_TITLE}, ${unread} new ${unread === 1 ? "message" : "messages"}`
-      : CHAT_AND_GAME_LOG_TITLE;
-  };
-
-  const onLogOpenChange = (open: boolean) => {
-    setSeenLogId(latestLogId());
-    setLogOpen(open);
-  };
-
   return (
     <CardTooltips>
       <div class="table" data-phase={props.room.phase}>
         <header class="table-header">
           <h1>Round {props.room.round}</h1>
           <div class="row">
+            <WatcherCount
+              count={(props.latestRoom ?? props.room).spectatorCount}
+              watching={props.playerId === null}
+            />
             <TableSheet
               open={scoresOpen()}
               onOpenChange={(open) => {
@@ -1428,31 +1429,15 @@ export default function Table(
                 roundPoints={props.roundPoints}
               />
             </TableSheet>
-            <TableSheet
-              title={CHAT_AND_GAME_LOG_TITLE}
-              triggerLabel={toggleLabel()}
-              shortLabel="Chat"
-              keepMounted
+            <ChatSheet
               open={logOpen()}
-              onOpenChange={onLogOpenChange}
-              trigger={
-                <>
-                  <MessageCircle size={16} aria-hidden="true" />
-                  <Show when={unreadChats() > 0}>
-                    <span class="unread-count" aria-hidden="true">
-                      {unreadChats()}
-                    </span>
-                  </Show>
-                </>
-              }
-            >
-              <GameLog
-                inSheet
-                log={props.room.log}
-                playerId={props.playerId}
-                onChat={props.chat}
-              />
-            </TableSheet>
+              onOpenChange={(open) => {
+                setLogOpen(open);
+              }}
+              log={props.room.log}
+              playerId={props.playerId}
+              onChat={props.playerId === null ? undefined : props.chat}
+            />
             <InviteButton brief collapsible />
             <Show when={moves().host.configure}>
               <RoomSettingsMenu
@@ -1464,19 +1449,34 @@ export default function Table(
                 }}
               />
             </Show>
-            <LeaveRoom
-              disabled={props.offline}
-              controller={leave}
-              collapsible
-              onLeave={() => {
-                void props.send({ type: "leave" });
-              }}
-            />
-            <TableMoreMenu
-              leave={leave}
-              leaveDisabled={props.offline}
-              settings={moves().host.configure ? settings : undefined}
-            />
+            <Show
+              when={props.playerId !== null}
+              fallback={
+                <Show when={props.spectator}>
+                  {(spectator) => (
+                    <SpectatorActions
+                      room={props.latestRoom ?? props.room}
+                      join={spectator().join}
+                      onStopWatching={spectator().onLeave}
+                    />
+                  )}
+                </Show>
+              }
+            >
+              <LeaveRoom
+                disabled={props.offline}
+                controller={leave}
+                collapsible
+                onLeave={() => {
+                  void props.send({ type: "leave" });
+                }}
+              />
+              <TableMoreMenu
+                leave={leave}
+                leaveDisabled={props.offline}
+                settings={moves().host.configure ? settings : undefined}
+              />
+            </Show>
           </div>
         </header>
 
@@ -1529,7 +1529,7 @@ export default function Table(
             <GameLog
               log={props.room.log}
               playerId={props.playerId}
-              onChat={props.chat}
+              onChat={props.playerId === null ? undefined : props.chat}
             />
           </div>
         </div>

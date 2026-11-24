@@ -1,3 +1,4 @@
+import Eye from "@lucide/solid/icons/eye";
 import { Button } from "@ui-sdk/solid/button";
 import {
   Field,
@@ -7,16 +8,40 @@ import {
 } from "@ui-sdk/solid/field";
 import { Input } from "@ui-sdk/solid/input";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import type { ParentProps } from "solid-js";
 
 import { pickAvatar, takenAvatars } from "../game/avatars";
 import { MAX_PLAYERS } from "../game/engine";
+import { MAX_SPECTATORS } from "../game/moves";
 import { NAME_MAX_LENGTH } from "../game/protocol";
-import type { RoomView } from "../game/protocol";
+import type { RoomPreview } from "../game/protocol";
 import { paths } from "../router";
 import AvatarPicker from "./avatar-picker";
 
+const Frame = (props: ParentProps<{ embedded: boolean }>) => (
+  <Show
+    when={props.embedded}
+    fallback={
+      <section class="panel join">
+        <h1>Take a seat</h1>
+        {props.children}
+      </section>
+    }
+  >
+    <div class="stack join-embedded">{props.children}</div>
+  </Show>
+);
+
+const FINE_POINTER_QUERY = "(pointer: fine)";
+
 export default function JoinForm(props: {
-  room: RoomView | null;
+  /** Leaves out the card and heading so a dialog can frame the form. */
+  embedded?: boolean;
+  room: Pick<RoomPreview, "phase" | "players" | "spectatorCount"> | null;
+  locked?: boolean;
+  onWatch?: () => void;
+  watchError?: string;
+  watchPending?: boolean;
   savedName: string;
   savedAvatar: number | null;
   onJoin: (name: string, avatar: number) => void;
@@ -36,10 +61,18 @@ export default function JoinForm(props: {
 
   const [emptyName, setEmptyName] = createSignal(false);
   const full = () => (props.room?.players.length ?? 0) >= MAX_PLAYERS;
+
+  const joinLocked = () =>
+    props.locked === true && (props.room?.players.length ?? 0) > 0;
+
+  const watchFull = () => (props.room?.spectatorCount ?? 0) >= MAX_SPECTATORS;
   const error = () => (emptyName() ? "Enter your name." : (props.error ?? ""));
 
   const unavailable = () =>
-    props.joining === true || props.unavailable === true || props.room === null;
+    props.joining === true ||
+    props.watchPending === true ||
+    props.unavailable === true ||
+    props.room === null;
 
   const suggestion = createMemo(() => {
     const saved = props.savedName;
@@ -56,12 +89,16 @@ export default function JoinForm(props: {
   const [nameField, setNameField] = createSignal<HTMLDivElement>();
 
   onSettled(() => {
-    nameInput?.focus();
+    if (
+      props.embedded !== true &&
+      globalThis.matchMedia?.(FINE_POINTER_QUERY).matches
+    ) {
+      nameInput?.focus();
+    }
   });
 
   return (
-    <section class="panel join">
-      <h1>Take a seat</h1>
+    <Frame embedded={props.embedded === true}>
       <Show when={props.room?.players.length}>
         <p class="muted">
           At the table:{" "}
@@ -84,6 +121,13 @@ export default function JoinForm(props: {
             : "A game is in progress. You'll be dealt in next round."}
         </p>
       </Show>
+      <Show when={props.locked}>
+        <p class="muted">
+          {joinLocked()
+            ? "This room is locked. Ask the host to unlock it."
+            : "This room is locked to spectators."}
+        </p>
+      </Show>
       <Show
         when={!full() || props.joining}
         fallback={
@@ -104,7 +148,7 @@ export default function JoinForm(props: {
           onSubmit={(event) => {
             event.preventDefault();
 
-            if (unavailable() || full()) {
+            if (unavailable() || full() || joinLocked()) {
               return;
             }
 
@@ -160,11 +204,43 @@ export default function JoinForm(props: {
             </FieldDescription>
             <FieldError role="alert">{error()}</FieldError>
           </Field>
-          <Button type="submit" data-variant="solid" disabled={unavailable()}>
+          <Button
+            type="submit"
+            data-variant="solid"
+            disabled={unavailable() || joinLocked()}
+          >
             {props.joining === true ? "Joining…" : "Join room"}
           </Button>
         </form>
       </Show>
-    </section>
+      <Show when={props.onWatch}>
+        <div class="join-watch">
+          <p class="join-divider" aria-hidden="true">
+            <span>or</span>
+          </p>
+          <Button
+            onClick={() => props.onWatch?.()}
+            disabled={unavailable() || props.locked === true || watchFull()}
+            aria-describedby="join-watch-hint"
+          >
+            <Eye size={16} aria-hidden="true" />
+            {props.watchPending === true
+              ? "Connecting…"
+              : "Watch without joining"}
+          </Button>
+          <p id="join-watch-hint" class="muted join-watch-hint">
+            No name needed. You can take a seat any time.
+          </p>
+          <Show when={watchFull() && (props.watchError ?? "") === ""}>
+            <p class="muted">The spectator limit has been reached.</p>
+          </Show>
+          <Show when={(props.watchError ?? "") !== "" && props.locked !== true}>
+            <p class="form-error" role="alert">
+              {props.watchError}
+            </p>
+          </Show>
+        </div>
+      </Show>
+    </Frame>
   );
 }

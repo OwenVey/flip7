@@ -35,14 +35,11 @@ const CardRule = (props: ParentProps<{ cards?: Card[] }>) => (
 export default function RulesDialog(props: {
   targetScore: number;
   label?: string;
-  variant?: "quiet";
+  size?: "sm";
 }) {
   return (
     <Dialog presentation="auto">
-      <DialogTrigger
-        data-variant={props.variant}
-        data-size={props.variant ? "sm" : undefined}
-      >
+      <DialogTrigger data-size={props.size}>
         {props.label ?? "Rules"}
       </DialogTrigger>
       <DialogContent class="rules-dialog" initialFocus="content">

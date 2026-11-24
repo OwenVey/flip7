@@ -3,9 +3,15 @@ import type { ClientMessage, GameCommand } from "../game/client-message";
 import {
   NO_LISTS,
   receiveState,
+  ROOM_MISSING_CLOSE_CODE,
   ROOM_REMOVED_CLOSE_CODE,
 } from "../game/protocol";
-import type { ReceivedLists, RoomView, ServerMessage } from "../game/protocol";
+import type {
+  ReceivedLists,
+  RoomPreview,
+  RoomView,
+  ServerMessage,
+} from "../game/protocol";
 
 export type ConnectionStatus =
   | "connecting"
@@ -23,6 +29,10 @@ export interface Notice {
 export interface RoomClientState {
   status: ConnectionStatus;
   room: RoomView | null;
+  preview: RoomPreview | null;
+  watching: boolean;
+  watchError: string;
+  watchPending: boolean;
   playerId: string | null;
   needsName: boolean;
   joining: boolean;
@@ -60,6 +70,7 @@ export interface RoomClientDeps {
   newId: () => string;
   /** Where the rejoin token for this room is kept. */
   token: { get: () => string | null; set: (token: string | null) => void };
+  watchPreference: { get: () => boolean; set: (watching: boolean) => void };
 }
 
 interface PendingReply {
@@ -81,7 +92,7 @@ const shouldRecheck = (retryCount: number) =>
   (retryCount > 0 && retryCount % FAILURES_BEFORE_RECHECK === 0);
 
 /**
- * The player's side of the room protocol: joining and rejoining by token, the
+ * The browser side of the room protocol: watching, joining and rejoining by token, the
  * pending move and how it settles (a reply, a timeout, or the welcome after a
  * reconnect), connection status and the notices shown to the player. Feed it
  * browser and socket events; read `state` or subscribe for changes.
@@ -98,10 +109,14 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     notice: null,
     online: true,
     playerId: null,
+    preview: null,
     ready: false,
     room: null,
     sending: false,
     status: "connecting",
+    watchError: "",
+    watchPending: false,
+    watching: false,
   };
 
   let synced = false;
@@ -180,7 +195,11 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       finishJoin("Connection lost while joining. Try again when reconnected.");
     }
 
-    update({ ready: false });
+    update({
+      ready: false,
+      watchPending: false,
+      ...(state.watching && { room: null, watching: false }),
+    });
     dropRoomCommands();
 
     if (pendingMove) {
@@ -188,13 +207,13 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     }
   };
 
-  const stopWatchingSync = () => {
+  const clearSyncTimeout = () => {
     clearTimeout(resyncTimeout);
     resyncTimeout = undefined;
   };
 
   const stop = (status: ConnectionStatus) => {
-    stopWatchingSync();
+    clearSyncTimeout();
     settleMove(false);
     startSync();
     update({ status });
@@ -206,7 +225,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     seatedPlayerId = null;
     synced = false;
     deps.token.set(null);
-    update({ playerId: null });
+    update({ playerId: null, room: null });
   };
 
   const settleAfterReconnect = () => {
@@ -224,32 +243,106 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     );
   };
 
+  const receiveRoomState = (
+    message: Extract<ServerMessage, { type: "state" }>
+  ) => {
+    if (seatedPlayerId === null && !state.watching) {
+      return;
+    }
+
+    const received = receiveState(lists, message);
+    ({ lists } = received);
+
+    if (received.gaps.length === 0) {
+      askedForLists = false;
+    } else if (!askedForLists) {
+      askedForLists = raw({ type: "sync" });
+    }
+
+    // WARNING: deal playback reads the cards dealt since the shown room from draws, so keep showing that room until they arrive.
+    if (received.gaps.includes("draws")) {
+      return;
+    }
+
+    const firstSync = !synced;
+    synced = true;
+    update({ room: received.room });
+
+    if (firstSync) {
+      clearSyncTimeout();
+      settleAfterReconnect();
+      update({ ready: seatedPlayerId !== null, status: "open" });
+    }
+  };
+
+  const watched = () => {
+    if (!state.watchPending) {
+      return;
+    }
+
+    deps.watchPreference.set(true);
+
+    if (seatedPlayerId !== null) {
+      seatedPlayerId = null;
+      lastRequestId = undefined;
+      deps.token.set(null);
+      settleMove(false);
+      dropRoomCommands();
+      update({ playerId: null, ready: false });
+    }
+
+    update({
+      needsName: false,
+      watchError: "",
+      watchPending: false,
+      watching: true,
+    });
+  };
+
+  const watchRefused = (message: string) => {
+    if (!state.watchPending) {
+      return;
+    }
+
+    if (seatedPlayerId !== null) {
+      update({ watchPending: false });
+      notify(message);
+
+      return;
+    }
+
+    clearSyncTimeout();
+    deps.watchPreference.set(false);
+    update({
+      needsName: true,
+      status: "open",
+      watchError: message,
+      watchPending: false,
+    });
+  };
+
   const handle = (message: ServerMessage) => {
     switch (message.type) {
+      case "preview": {
+        update({ preview: message.room });
+
+        return;
+      }
+
+      case "watching": {
+        watched();
+
+        return;
+      }
+
+      case "watchError": {
+        watchRefused(message.message);
+
+        return;
+      }
+
       case "state": {
-        const received = receiveState(lists, message);
-        ({ lists } = received);
-
-        if (received.gaps.length === 0) {
-          askedForLists = false;
-        } else if (!askedForLists) {
-          askedForLists = raw({ type: "sync" });
-        }
-
-        // WARNING: deal playback reads the cards dealt since the shown room from draws, so keep showing that room until they arrive.
-        if (received.gaps.includes("draws")) {
-          return;
-        }
-
-        const firstSync = seatedPlayerId !== null && !synced;
-        synced = seatedPlayerId !== null;
-        update({ room: received.room });
-
-        if (firstSync) {
-          stopWatchingSync();
-          settleAfterReconnect();
-          update({ ready: true, status: "open" });
-        }
+        receiveRoomState(message);
 
         return;
       }
@@ -257,9 +350,15 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       case "welcome": {
         awaitingWelcome = false;
         deps.token.set(message.token);
+        deps.watchPreference.set(false);
+        synced = false;
         seatedPlayerId = message.playerId;
         ({ lastRequestId } = message);
-        update({ needsName: false, playerId: message.playerId });
+        update({
+          needsName: false,
+          playerId: message.playerId,
+          watching: false,
+        });
 
         if (state.joining) {
           finishJoin();
@@ -295,10 +394,14 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       case "error": {
         if (awaitingWelcome) {
           awaitingWelcome = false;
-          forget();
-          stopWatchingSync();
-          settleMove(false);
-          update({ needsName: true, status: "open" });
+          clearSyncTimeout();
+
+          if (!state.watching) {
+            forget();
+            settleMove(false);
+          }
+
+          update({ needsName: !state.watching, status: "open" });
 
           if (state.joining) {
             finishJoin(message.message);
@@ -327,7 +430,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   };
 
   const replaceConnection = () => {
-    stopWatchingSync();
+    clearSyncTimeout();
     startSync();
     update({ status: "reconnecting" });
     socket.replace();
@@ -348,6 +451,22 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   const startOver = () => {
     replaceConnection();
     watchSync();
+  };
+
+  const requestWatch = () => {
+    if (!raw({ type: "watch" })) {
+      update({ watchError: TRY_AGAIN });
+
+      return;
+    }
+
+    watchSync();
+    update({
+      needsName: true,
+      status: "open",
+      watchError: "",
+      watchPending: true,
+    });
   };
 
   return {
@@ -376,7 +495,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     },
 
     chat: (text: string) => {
-      if (!state.online || !synced || !raw({ text, type: "chat" })) {
+      if (!state.online || !state.ready || !raw({ text, type: "chat" })) {
         notify(TRY_AGAIN);
 
         return false;
@@ -387,6 +506,14 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
     closed: (code: number, retryCount: number) => {
       if (stopped) {
+        return;
+      }
+
+      if (code === ROOM_MISSING_CLOSE_CODE) {
+        deps.watchPreference.set(false);
+        forget();
+        stop("missing");
+
         return;
       }
 
@@ -413,7 +540,12 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     },
 
     join: (name: string, avatar?: number) => {
-      if (!state.needsName || awaitingWelcome || stopped) {
+      if (
+        (!state.needsName && !state.watching) ||
+        awaitingWelcome ||
+        state.watchPending ||
+        stopped
+      ) {
         return;
       }
 
@@ -442,13 +574,18 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       const saved = deps.token.get();
 
       if (saved === null) {
-        stopWatchingSync();
-        update({ needsName: true, status: "open" });
+        clearSyncTimeout();
+
+        if (deps.watchPreference.get()) {
+          requestWatch();
+        } else {
+          update({ needsName: true, status: "open" });
+        }
 
         return;
       }
 
-      stopWatchingSync();
+      clearSyncTimeout();
       watchSync();
       awaitingWelcome = true;
       raw({ name: "", token: saved, type: "join" });
@@ -457,6 +594,14 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     received: (message: ServerMessage) => {
       if (!stopped) {
         handle(message);
+      }
+    },
+
+    returnToRoom: () => {
+      if (state.status === "removed") {
+        stopped = false;
+        update({ needsName: false, preview: null });
+        startOver();
       }
     },
 
@@ -473,7 +618,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
         return false;
       }
 
-      if (!state.online || !synced || !socket.isOpen()) {
+      if (!state.online || !state.ready || !socket.isOpen()) {
         notify(TRY_AGAIN);
 
         return false;
@@ -510,6 +655,53 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       return await promise;
     },
 
+    watch: () => {
+      if (
+        state.needsName &&
+        state.online &&
+        !state.watchPending &&
+        !awaitingWelcome &&
+        !stopped
+      ) {
+        requestWatch();
+      }
+    },
+
+    watchInstead: () => {
+      if (
+        seatedPlayerId === null ||
+        state.watchPending ||
+        awaitingWelcome ||
+        stopped
+      ) {
+        return;
+      }
+
+      if (!state.online || !raw({ type: "watchInstead" })) {
+        notify(TRY_AGAIN);
+
+        return;
+      }
+
+      update({ watchPending: true });
+    },
+
+    stopWatching: () => {
+      if (!state.watching || awaitingWelcome || stopped) {
+        return;
+      }
+
+      deps.watchPreference.set(false);
+      synced = false;
+      lists = NO_LISTS;
+      askedForLists = false;
+      update({ needsName: true, room: null, watching: false });
+
+      if (!raw({ type: "stopWatching" })) {
+        startOver();
+      }
+    },
+
     get state() {
       return state;
     },
@@ -518,7 +710,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       if (!stopped) {
         stopped = true;
         clearTimeout(joinTimeout);
-        stopWatchingSync();
+        clearSyncTimeout();
         settleMove(false);
         dropRoomCommands();
         socket.close();

@@ -45,6 +45,7 @@ const room = () => {
     ],
     round: 6,
     settings: { botSpeed: "normal", locked: false, targetScore: 200 },
+    spectatorCount: 0,
     turnId: null,
     winnerIds: ["b"],
   };

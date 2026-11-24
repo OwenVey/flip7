@@ -23,7 +23,7 @@ import {
 } from "./engine";
 import type { GameState } from "./engine";
 import { waitingOn } from "./moves";
-import { parseServerMessage, toRoomView } from "./protocol";
+import { parseServerMessage, toRoomView, toStateMessage } from "./protocol";
 import { DEFAULT_SETTINGS } from "./settings";
 
 const random = () => 0.5;
@@ -217,8 +217,7 @@ describe("a round", () => {
     expect(player(state, "a").score).toBe(28 + 15);
     expect(player(state, "b").score).toBe(12 + 4);
 
-    const message = { room: toRoomView("ABCDE", state), type: "state" };
-    const raw = JSON.stringify(message);
+    const raw = JSON.stringify(toStateMessage("ABCDE", state, {}, 0));
     expect(raw).toContain('"kind":"modifier"');
     expect(parseServerMessage(raw)).toMatchObject({
       room: {
