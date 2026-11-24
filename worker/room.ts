@@ -21,12 +21,30 @@ const deps = {
   random,
 };
 
-const send = (ws: WebSocket, message: ServerMessage) => {
+const sendFrame = (ws: WebSocket, frame: string) => {
   try {
-    ws.send(JSON.stringify(message));
+    ws.send(frame);
   } catch {
     ws.close(1011, "Send failed");
   }
+};
+
+const send = (ws: WebSocket, message: ServerMessage) => {
+  sendFrame(ws, JSON.stringify(message));
+};
+
+// WARNING: messages share arrays with the live room, so serialize them before awaiting storage lets another event change it.
+const framesOf = (outcome: RoomOutcome) => {
+  const frames = new Map<ServerMessage, string>();
+
+  for (const effect of outcome.effects) {
+    if (effect.type !== "close" && !frames.has(effect.message)) {
+      frames.set(effect.message, JSON.stringify(effect.message));
+    }
+  }
+
+  return (message: ServerMessage) =>
+    frames.get(message) ?? JSON.stringify(message);
 };
 
 export class GameRoom extends Server<Env> {
@@ -91,7 +109,7 @@ export class GameRoom extends Server<Env> {
     const room = this.room();
 
     if (room) {
-      send(connection, room.state());
+      send(connection, room.snapshot());
     }
   }
 
@@ -117,6 +135,8 @@ export class GameRoom extends Server<Env> {
       );
     } else if (message.type === "chat") {
       await this.carryOut(room.chat(ws.id, message.text), ws);
+    } else if (message.type === "sync") {
+      await this.carryOut(room.sync(), ws);
     } else {
       await this.carryOut(room.command(ws.id, message), ws);
     }
@@ -145,7 +165,7 @@ export class GameRoom extends Server<Env> {
       return;
     }
 
-    const state = JSON.stringify(createRoom(stored, this.seats, deps).state());
+    const frameOf = framesOf(outcome);
 
     if (outcome.expired) {
       this.stored = null;
@@ -158,15 +178,15 @@ export class GameRoom extends Server<Env> {
     }
 
     deliver(outcome, {
-      broadcast: () => {
-        this.broadcast(state);
+      broadcast: (message) => {
+        this.broadcast(frameOf(message));
       },
       close: (connectionId, code, reason) => {
         this.getConnection(connectionId)?.close(code, reason);
       },
       reply: (message) => {
         if (sender) {
-          send(sender, message);
+          sendFrame(sender, frameOf(message));
         }
       },
     });

@@ -22,8 +22,13 @@ import {
   stay,
 } from "./engine";
 import type { GameState } from "./engine";
-import { cleanName, ROOM_REMOVED_CLOSE_CODE, toRoomView } from "./protocol";
-import type { ServerMessage } from "./protocol";
+import {
+  cleanName,
+  listSeqsOf,
+  ROOM_REMOVED_CLOSE_CODE,
+  toStateMessage,
+} from "./protocol";
+import type { ListSeqs, ServerMessage } from "./protocol";
 import {
   heartbeatDeadline,
   nextAlarmAt,
@@ -39,6 +44,12 @@ export interface StoredRoom extends RoomTimers {
   game: GameState;
   /** Each player's last accepted move. Missing on rooms saved before moves were recorded. */
   lastRequests?: Map<string, string>;
+  /**
+   * Each list's sequence number at the last broadcast, so the next one sends
+   * only newer entries. Missing on rooms saved before lists were sent as
+   * updates, which send them in full once.
+   */
+  broadcastSeqs?: ListSeqs;
   tokens: Map<string, string>;
 }
 
@@ -66,11 +77,19 @@ export interface RoomDeps {
   newId: () => string;
 }
 
-/** Something the transport must do, in order: reply to the sender, broadcast the table, or close a connection. */
+/**
+ * Something the transport must do, in order: reply to the sender, broadcast
+ * the table to every connection, or close a connection. A broadcast carries
+ * only the list entries added since the previous broadcast.
+ */
 export type RoomEffect =
   | { type: "reply"; message: ServerMessage }
-  | { type: "broadcast" }
+  | { type: "broadcast"; message: ServerMessage }
   | { type: "close"; connectionId: string; code: number; reason: string };
+
+type PlannedEffect =
+  | Exclude<RoomEffect, { type: "broadcast" }>
+  | { type: "broadcast" };
 
 /**
  * What the transport does after a call: save the room and set the alarm for
@@ -86,7 +105,7 @@ export interface RoomOutcome {
 /** How a transport carries out effects: reply to the sender, broadcast the table to every seat, or close a connection. */
 export interface RoomTransport {
   reply: (message: ServerMessage) => void;
-  broadcast: () => void;
+  broadcast: (message: ServerMessage) => void;
   close: (connectionId: string, code: number, reason: string) => void;
 }
 
@@ -100,7 +119,7 @@ export const deliver = (outcome: RoomOutcome, transport: RoomTransport) => {
       }
 
       case "broadcast": {
-        transport.broadcast();
+        transport.broadcast(effect.message);
         break;
       }
 
@@ -130,9 +149,9 @@ export const newStoredRoom = (code: string, now: number) => {
 };
 
 const reply = (message: ServerMessage) =>
-  ({ message, type: "reply" }) satisfies RoomEffect;
+  ({ message, type: "reply" }) satisfies PlannedEffect;
 
-const BROADCAST = { type: "broadcast" } satisfies RoomEffect;
+const BROADCAST = { type: "broadcast" } satisfies PlannedEffect;
 
 const rejection = (message: string, requestId?: string) =>
   reply(
@@ -141,7 +160,7 @@ const rejection = (message: string, requestId?: string) =>
       : { message, requestId, type: "rejected" }
   );
 
-const attempt = (run: () => RoomEffect[], requestId?: string) => {
+const attempt = (run: () => PlannedEffect[], requestId?: string) => {
   try {
     return run();
   } catch (error) {
@@ -198,9 +217,30 @@ export const createRoom = (
       type: "welcome",
     });
 
-  const finish = (effects: RoomEffect[], expired = false) => {
+  const snapshot = () => toStateMessage(stored.code, game);
+
+  const broadcastMessage = () => {
+    const message = toStateMessage(stored.code, game, stored.broadcastSeqs);
+    stored.broadcastSeqs = listSeqsOf(game);
+
+    return message;
+  };
+
+  const finish = (planned: PlannedEffect[], expired = false) => {
     const now = deps.now();
     syncTimers(stored, now);
+
+    let broadcast: ServerMessage | undefined;
+
+    const effects = planned.map((effect) => {
+      if (effect.type !== "broadcast") {
+        return effect;
+      }
+
+      broadcast ??= broadcastMessage();
+
+      return { message: broadcast, type: "broadcast" } satisfies RoomEffect;
+    });
 
     const deadlines: number[] = [];
 
@@ -282,12 +322,12 @@ export const createRoom = (
         connectionId: connection.id,
         reason,
         type: "close",
-      } satisfies RoomEffect;
+      } satisfies PlannedEffect;
     });
   };
 
   const act = (playerId: string, command: GameCommand) => {
-    const none: RoomEffect[] = [];
+    const none: PlannedEffect[] = [];
     const { random } = deps;
 
     switch (command.type) {
@@ -370,7 +410,7 @@ export const createRoom = (
 
   const dropSilentSeats = (now: number) => {
     const silentIds = new Set<string>();
-    const closes: RoomEffect[] = [];
+    const closes: PlannedEffect[] = [];
 
     for (const { id, seat: open, lastPing } of seats.connections()) {
       if (!open || now < heartbeatDeadline(open.seatedAt, lastPing)) {
@@ -427,7 +467,7 @@ export const createRoom = (
         hasConnections
       );
 
-      const effects: RoomEffect[] =
+      const effects: PlannedEffect[] =
         changed || dropped.changed
           ? [...dropped.closes, BROADCAST]
           : dropped.closes;
@@ -523,10 +563,8 @@ export const createRoom = (
       return finish(changed ? [BROADCAST] : []);
     },
 
-    state: () =>
-      ({
-        room: toRoomView(stored.code, game),
-        type: "state",
-      }) satisfies ServerMessage,
+    snapshot,
+
+    sync: () => finish([reply(snapshot())]),
   };
 };

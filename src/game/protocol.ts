@@ -1,6 +1,15 @@
 import { projectActionCards } from "./action-card-resolution";
 import { avatarOf } from "./avatars";
-import type { DrawEvent, GameState, HeldCard, Player } from "./engine";
+import { LOG_LIMIT } from "./engine";
+import type {
+  DrawEvent,
+  GameState,
+  HeldCard,
+  LogEntry,
+  Player,
+} from "./engine";
+import { applyListUpdate, listUpdateSince } from "./sequenced-list";
+import type { ListSpec, ListUpdate, ReceivedList } from "./sequenced-list";
 import { settingsOf } from "./settings";
 import type { BotSpeed } from "./settings";
 
@@ -68,6 +77,35 @@ export const roundStarted = (previous: RoomView, current: RoomView) =>
     (previous.phase === "gameOver" && current.phase !== "gameOver") ||
     current.round !== previous.round);
 
+/** The parts of the room view that are sent as new entries rather than in full. */
+export interface RoomLists {
+  log: LogEntry[];
+}
+
+export type RoomListName = keyof RoomLists;
+
+type ListEntry<K extends RoomListName> = RoomLists[K][number];
+
+const ROOM_LISTS = {
+  log: { limit: LOG_LIMIT, seqOf: (entry) => entry.id },
+} satisfies { [K in RoomListName]: ListSpec<ListEntry<K>> };
+
+/** The room view as sent: everything but the lists, which come as updates. */
+export type SentRoomView = Omit<RoomView, RoomListName>;
+
+/** Each list's new entries since the previous state message. */
+export type RoomListUpdates = { [K in RoomListName]: ListUpdate<ListEntry<K>> };
+
+/** The sequence each list had at the last broadcast. A missing list is sent in full. */
+export type ListSeqs = Partial<Record<RoomListName, number>>;
+
+/** A receiver's copy of each list, or null when it has none it can build on. */
+export type ReceivedLists = {
+  [K in RoomListName]: ReceivedList<ListEntry<K>> | null;
+};
+
+export const NO_LISTS: ReceivedLists = { log: null };
+
 export type ServerMessage =
   | {
       lastRequestId?: string;
@@ -77,7 +115,7 @@ export type ServerMessage =
     }
   | { requestId: string; type: "accepted" }
   | { message: string; requestId: string; type: "rejected" }
-  | { room: RoomView; type: "state" }
+  | { lists: RoomListUpdates; room: SentRoomView; type: "state" }
   | { message: string; type: "error" };
 
 export const toRoomView = (code: string, state: GameState) => {
@@ -121,6 +159,58 @@ export const toRoomView = (code: string, state: GameState) => {
   };
 
   return view;
+};
+
+/** The lists' sequence numbers now, to remember what a broadcast sent. */
+export const listSeqsOf = (state: GameState) => {
+  const seqs: Required<ListSeqs> = { log: state.logSeq };
+
+  return seqs;
+};
+
+/** A state message with each list sent since `since`, or in full where `since` doesn't say. */
+export const toStateMessage = (
+  code: string,
+  state: GameState,
+  since: ListSeqs = {}
+) => {
+  const { log, ...room } = toRoomView(code, state);
+
+  const message: ServerMessage = {
+    lists: {
+      log: listUpdateSince(
+        { clearedAt: state.logClearedAt ?? 0, entries: log, seq: state.logSeq },
+        since.log,
+        ROOM_LISTS.log
+      ),
+    },
+    room,
+    type: "state",
+  };
+
+  return message;
+};
+
+/**
+ * Rebuilds the full room view from a state message and the lists received so
+ * far. A list whose update doesn't follow on from what was received keeps its
+ * old entries and is named in `gaps`; ask the room for the full lists.
+ */
+export const receiveState = (
+  received: ReceivedLists,
+  message: Extract<ServerMessage, { type: "state" }>
+) => {
+  const gaps: RoomListName[] = [];
+  const log = applyListUpdate(received.log, message.lists.log, ROOM_LISTS.log);
+
+  if (!log) {
+    gaps.push("log");
+  }
+
+  const lists: ReceivedLists = { log: log ?? received.log };
+  const room: RoomView = { ...message.room, log: lists.log?.entries ?? [] };
+
+  return { gaps, lists, room };
 };
 
 export const parseServerMessage = (raw: string) => {

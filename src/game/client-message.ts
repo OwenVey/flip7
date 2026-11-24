@@ -52,11 +52,15 @@ const ClientMessageSchema = v.variant("type", [
     text: v.pipe(v.string(), v.maxLength(2000)),
     type: v.literal("chat"),
   }),
+  v.object({ type: v.literal("sync") }),
 ]);
 
 export type ClientMessage = v.InferOutput<typeof ClientMessageSchema>;
 
-export type GameCommand = Exclude<ClientMessage, { type: "chat" | "join" }>;
+export type GameCommand = Exclude<
+  ClientMessage,
+  { type: "chat" | "join" | "sync" }
+>;
 
 /** Commands that can run alongside a pending move and need no reconnect confirmation. */
 export const isRoomCommand = (command: GameCommand) =>

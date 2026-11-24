@@ -11,6 +11,7 @@ import {
   backToLobby,
   CHAT_MAX_LENGTH,
   chat,
+  LOG_LIMIT,
   choose,
   createGame,
   GameError,
@@ -635,6 +636,48 @@ describe("the game log", () => {
     startGame(state, "a", random);
     expect(state.log.at(-1)).toMatchObject({ game: 2, round: 1 });
   });
+
+  it("starts over for each game, lobby chat included, without reusing ids", () => {
+    const state = createGame();
+    addPlayer(state, "a", "a", 1);
+    addPlayer(state, "b", "b", 2);
+    chat(state, "a", "ready?");
+    const lobbySeq = state.logSeq;
+
+    startGame(state, "a", random);
+
+    expect(state.logClearedAt).toBe(lobbySeq);
+    expect(state.log.length).toBeGreaterThan(0);
+    expect(state.log.every((entry) => entry.game === 1)).toBeTruthy();
+    expect(state.log[0]?.id).toBe(lobbySeq + 1);
+    expect(state.log.some((entry) => entry.text === "ready?")).toBeFalsy();
+  });
+
+  it("keeps the log when a start is refused", () => {
+    const state = createGame();
+    addPlayer(state, "a", "a", 1);
+    chat(state, "a", "anyone?");
+
+    expect(() => {
+      startGame(state, "a", random);
+    }).toThrow(GameError);
+    expect(state.log.at(-1)?.text).toBe("anyone?");
+    expect(state.logClearedAt).toBeUndefined();
+  });
+
+  it("keeps only the newest entries once it reaches the cap", () => {
+    const state = createGame();
+    addPlayer(state, "a", "a", 1);
+
+    for (let count = 0; count < LOG_LIMIT + 5; count += 1) {
+      chat(state, "a", `message ${count}`);
+    }
+
+    expect(LOG_LIMIT).toBe(1000);
+    expect(state.log).toHaveLength(LOG_LIMIT);
+    expect(state.log.at(-1)?.id).toBe(state.logSeq);
+    expect(state.log[0]?.id).toBe(state.logSeq - LOG_LIMIT + 1);
+  });
 });
 
 describe("playing again", () => {
@@ -655,6 +698,19 @@ describe("playing again", () => {
     expect(state.winnerIds).toStrictEqual([]);
     expect(state.players.map(({ score }) => score)).toStrictEqual([0, 0]);
     expect(state.log.at(-1)?.game).toBe(2);
+  });
+
+  it("starts the log over, carrying on its ids", () => {
+    const state = setup(["a", "b"], [num(5), num(3)]);
+    state.phase = "gameOver";
+    chat(state, "b", "again!");
+    const lastSeq = state.logSeq;
+
+    startGame(state, "a", random);
+
+    expect(state.logClearedAt).toBe(lastSeq);
+    expect(state.log.every((entry) => entry.game === 2)).toBeTruthy();
+    expect(state.log[0]?.id).toBe(lastSeq + 1);
   });
 });
 
