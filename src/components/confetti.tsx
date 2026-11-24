@@ -5,8 +5,8 @@ const CONFETTI_PIECES = 56;
 const CONFETTI_COLORS = [
   "var(--gold)",
   "var(--accent)",
-  "var(--flip)",
-  "var(--good)",
+  "var(--flip-three)",
+  "var(--success)",
   "var(--danger)",
   "var(--freeze-ink)",
 ] as const;
@@ -23,12 +23,12 @@ const Confetti = () => (
         <span
           class="confetti-piece"
           style={{
-            "--color": CONFETTI_COLORS[index % CONFETTI_COLORS.length],
-            "--delay": `${Math.round(scatter(index, 0.11) * 600)}ms`,
-            "--drift": `${Math.round((scatter(index, 0.23) - 0.5) * 16)}rem`,
-            "--fall": `${Math.round(2200 + scatter(index, 0.37) * 1400)}ms`,
-            "--spin": `${Math.round((scatter(index, 0.41) - 0.5) * 1440)}deg`,
-            "--x": `${Math.round(scatter(index, 0) * 100)}%`,
+            "--confetti-color": CONFETTI_COLORS[index % CONFETTI_COLORS.length],
+            "--confetti-delay": `${Math.round(scatter(index, 0.11) * 600)}ms`,
+            "--confetti-drift": `${Math.round((scatter(index, 0.23) - 0.5) * 16)}rem`,
+            "--confetti-fall": `${Math.round(2200 + scatter(index, 0.37) * 1400)}ms`,
+            "--confetti-spin": `${Math.round((scatter(index, 0.41) - 0.5) * 1440)}deg`,
+            "--confetti-x": `${Math.round(scatter(index, 0) * 100)}%`,
           }}
         />
       )}

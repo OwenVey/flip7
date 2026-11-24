@@ -39,7 +39,7 @@ const cardFace = (card: HTMLElement) => {
 
   delete face.dataset.incoming;
   delete face.dataset.flown;
-  face.style.setProperty("--card-w", `${card.offsetWidth}px`);
+  face.style.setProperty("--card-width", `${card.offsetWidth}px`);
   face.classList.add("flying-card-face");
 
   return face;

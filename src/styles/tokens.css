@@ -1,0 +1,268 @@
+/*
+ * Design tokens: every value shared across areas, defined once. Other files
+ * take colors, sizes, timings and breakpoints from here; a variable that only
+ * one area reads stays in that area's file. The tests in this folder check it.
+ */
+
+/*
+ * Breakpoints: three sizes, each defined once. --sm and --lg are Tailwind's
+ * widths; --short is a phone on its side. Build other queries from them, such
+ * as "not (--sm)" or "(--lg) and (not (--short))", instead of writing a size in
+ * a media query. Lightning CSS replaces these at build time (vite.config.ts),
+ * and breakpoints.test.ts checks them.
+ */
+@custom-media --sm (width >= 40rem);
+@custom-media --lg (width >= 64rem);
+@custom-media --short (height <= 30rem);
+/* A phone held either way. */
+@custom-media --compact (not (--sm)) or (--short);
+/* The table keeps its sidebar in a sheet. table.tsx repeats this in SHEET_TABLE_QUERY. */
+@custom-media --sheet-table (not (--lg)) or (--short);
+
+:root {
+  /* ── Color ─────────────────────────────────────────────────────────────
+   * Each family runs light to dark: -light or -soft, the base color, then
+   * -deep or -ink (text on, or a darker line around, the base).
+   */
+
+  /* Paper and ink: panels, text, and the indigo of primary actions. */
+  --paper-light: #fffdf6;
+  --paper: #fff6df;
+  --paper-deep: #f5e9cc;
+  --ink-soft: #514968;
+  --ink: #262451;
+  --accent: #34327a;
+
+  /* Gold: the turn ring, highlights and rules. --gold-soft tints your own seat and row and makes the shine that sweeps across gold. */
+  --gold-soft: #fff0c6;
+  --gold: #ffd45f;
+  --gold-deep: #a37b2d;
+
+  /* The table: baize felt inside a walnut rail. */
+  --felt-light: #22704f;
+  --felt: #17543f;
+  --felt-deep: #0e3a2c;
+  --rail-light: #8a5a36;
+  --rail: #5a3520;
+  --rail-deep: #3f2414;
+  /* The dark line around the rail. */
+  --rail-edge: #2c180d;
+  /* Text and icons straight on the felt. */
+  --on-felt: var(--paper);
+  --on-felt-soft: #cfe3d4;
+
+  /* Status: banked and good news, busts and destructive actions. */
+  --success: #176356;
+  --danger: #a42d43;
+  --danger-ink: #6b1626;
+
+  /* Players: second and third place (first is --gold), and bots, whose badge and avatar mix lighter or darker from one lilac. */
+  --medal-silver: #dcdfe6;
+  --medal-bronze: #ebb985;
+  --bot: #baa1d9;
+
+  /* Action cards: each has a base color and the soft panel, ink and glow it uses. */
+  --freeze-soft: #e3f4fb;
+  --freeze-glow: #a9def0;
+  --freeze: #4f9fd0;
+  --freeze-ink: #22577a;
+  --flip-three-soft: var(--gold-soft);
+  --flip-three: #e8b824;
+  --flip-three-ink: #6e5200;
+  --second-chance-soft: #fde6e8;
+  --second-chance: #e0414f;
+  /* Score modifiers: flat points are orange; ×2 inverts to ink with an orange numeral. */
+  --score-modifier: #f0aa43;
+
+  /* Number cards: one color per value, matched to the printed deck. */
+  --number-0: #e9eef2;
+  --number-1: #bfab90;
+  --number-2: #d4dc33;
+  --number-3: #de485f;
+  --number-4: #4cb8ad;
+  --number-5: #3bab48;
+  --number-6: #aa4c8d;
+  --number-7: #cb7b72;
+  --number-8: #abcf76;
+  --number-9: #eb8b30;
+  --number-10: #d9252a;
+  --number-11: #759bc5;
+  --number-12: #8f7f6d;
+
+  /* ── Type ──────────────────────────────────────────────────────────── */
+
+  --font-display:
+    "Bungee", "Bungee fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-numeral:
+    "Big Shoulders Display Variable", "Big Shoulders Display Variable fallback",
+    "Bungee", ui-sans-serif, sans-serif;
+  --font-body:
+    "Inter Variable", "Inter Variable fallback", ui-sans-serif, system-ui,
+    sans-serif;
+
+  /*
+   * Text sizes for interface text. Display type (titles, the wordmark, card
+   * numerals) sizes itself with clamp() or the card width. Inputs on touch
+   * screens stay at 1rem, the size below which iOS zooms in on focus.
+   */
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+
+  /* Letter spacing: tight display type, and two widths for small capitals. */
+  --tracking-tight: -0.035em;
+  --tracking-wide: 0.04em;
+  --tracking-wider: 0.08em;
+
+  /* Line heights: one-line display type, headings, interface text, reading text. Fixed rem heights for pills stay as they are. */
+  --leading-none: 1;
+  --leading-tight: 1.2;
+  --leading-normal: 1.4;
+  --leading-relaxed: 1.5;
+
+  /* ── Size and shape ────────────────────────────────────────────────── */
+
+  /* Corners: small inner parts, controls and cards, felt wells, panels, pills. */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-full: 999px;
+
+  /* Control heights; the large one is the 44px touch size. */
+  --control-height-sm: 2rem;
+  --control-height: 2.5rem;
+  --control-height-lg: 2.75rem;
+  /* The space between neighboring buttons, side by side or stacked. */
+  --button-gap: 0.625rem;
+
+  --dialog-inset: 1rem;
+  --dialog-radius: var(--radius-xl);
+
+  /* A card's width; a hand, pile or animation sets its own, and every part of the card scales from it. */
+  --card-width: 3.75rem;
+
+  /* ── Depth ─────────────────────────────────────────────────────────── */
+
+  /* The offset ink shadow of printed panels and buttons. */
+  --shadow-print: 3px 3px 0 var(--ink);
+  /* A panel lifted off the felt. */
+  --shadow-table: 0 0.5rem 1.25rem rgb(4 20 14 / 0.45);
+  /* A card resting on the felt: its bevel and its drop shadow. */
+  --shadow-card-bevel: inset 0 0 0 1px rgb(255 255 255 / 0.55);
+  --shadow-card: 0 0.25rem 0.5rem rgb(4 20 14 / 0.4);
+  /* A felt well sunk into the table. */
+  --shadow-well: inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.45);
+  /* The fine dots in the felt, as one background layer. */
+  --felt-grain: radial-gradient(rgb(255 255 255 / 0.04) 0.6px, transparent 1px)
+    0 0 / 4px 4px;
+
+  /*
+   * The turn ring: a gold band outside the ink border, edged in ink and lifted
+   * by the usual print shadow, so it reads on both paper and felt. It reaches
+   * 6px out and 9px down-right, so the gaps around the action bar and seats
+   * are 1.25rem and 1rem to keep two rings apart. Set --turn-ring-color to recolor it.
+   */
+  --turn-ring-width: 4px;
+  --turn-ring-color: var(--gold);
+
+  /* ── Motion ────────────────────────────────────────────────────────── */
+
+  /* Curves: a smooth settle, a springy pop, and a heavier stamp. */
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-pop: cubic-bezier(0.3, 1.6, 0.5, 1);
+  --ease-stamp: cubic-bezier(0.5, 1.8, 0.6, 1);
+  /* Transition lengths: press feedback, small state changes, panels and fades, slow color shifts. Choreographed keyframe animations keep their own timings. */
+  --duration-instant: 80ms;
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+
+  /* ── ui-sdk ────────────────────────────────────────────────────────── */
+
+  /* ui-sdk's theme, pointed at the tokens above. */
+  --ui-background: var(--paper);
+  --ui-foreground: var(--ink);
+  --ui-muted: var(--paper-deep);
+  --ui-muted-foreground: var(--ink-soft);
+  --ui-border: var(--ink);
+  --ui-input: var(--ink-soft);
+  --ui-primary: var(--accent);
+  --ui-primary-foreground: var(--paper);
+  --ui-destructive: var(--danger);
+  --ui-ring: var(--gold);
+  --ui-ring-border: var(--accent);
+  --ui-overlay: color-mix(in oklab, var(--ink) 55%, transparent);
+  --ui-shadow: var(--shadow-print);
+  --ui-radius: var(--radius-md);
+  --ui-font-size: var(--text-base);
+  --ui-font-sans: var(--font-body);
+}
+
+/*
+ * On wide-gamut displays every hex color token above gets a P3 value. Each
+ * keeps its lightness and hue; its chroma is scaled so it sits as far toward
+ * the P3 edge as the hex value sits toward the sRGB edge, so muted colors stay
+ * muted. The one exception is --felt-deep, which must match the sRGB
+ * theme-color in document.tsx and the manifest. Browsers without oklch() keep
+ * the hex values. design-scale.test.ts checks that every token has one.
+ */
+@media (color-gamut: p3) {
+  @supports (color: oklch(0% 0 0)) {
+    :root {
+      --paper-light: oklch(99.4% 0.011 93.6);
+      --paper: oklch(97.4% 0.038 89.1);
+      --paper-deep: oklch(93.6% 0.049 88.2);
+      --ink-soft: oklch(42.6% 0.053 296);
+      --ink: oklch(28.9% 0.081 282.2);
+      --accent: oklch(36.3% 0.121 279.9);
+
+      --gold-soft: oklch(95.7% 0.069 90.7);
+      --gold: oklch(88.5% 0.173 88.9);
+      --gold-deep: oklch(60.8% 0.122 80.8);
+
+      --felt-light: oklch(48.9% 0.127 161.4);
+      --felt: oklch(40.1% 0.098 166.1);
+      --rail-light: oklch(51.2% 0.093 56.6);
+      --rail: oklch(36.9% 0.071 49.5);
+      --rail-deep: oklch(29.1% 0.056 50.5);
+      --rail-edge: oklch(23.3% 0.043 49);
+      --on-felt-soft: oklch(89.7% 0.033 153.3);
+
+      --success: oklch(45.1% 0.101 178.5);
+      --danger: oklch(48.6% 0.174 14.6);
+      --danger-ink: oklch(35.2% 0.133 15.4);
+
+      --medal-silver: oklch(90.3% 0.011 267.4);
+      --medal-bronze: oklch(81.9% 0.112 67.2);
+      --bot: oklch(75% 0.091 304.8);
+
+      --freeze-soft: oklch(95.7% 0.022 224.3);
+      --freeze-glow: oklch(87% 0.065 220.7);
+      --freeze: oklch(67.2% 0.14 238.1);
+      --freeze-ink: oklch(43.8% 0.105 241);
+      --flip-three: oklch(80.4% 0.181 88.5);
+      --flip-three-ink: oklch(45.6% 0.107 85.7);
+      --second-chance-soft: oklch(94.4% 0.033 11.6);
+      --second-chance: oklch(61.1% 0.22 20.4);
+      --score-modifier: oklch(78.7% 0.163 73.1);
+
+      --number-0: oklch(94.6% 0.008 241.7);
+      --number-1: oklch(75.1% 0.05 75.3);
+      --number-2: oklch(86.1% 0.206 112.4);
+      --number-3: oklch(61.8% 0.209 15.6);
+      --number-4: oklch(71.7% 0.135 186);
+      --number-5: oklch(65.6% 0.235 145.2);
+      --number-6: oklch(55.8% 0.162 340.9);
+      --number-7: oklch(66.6% 0.128 27);
+      --number-8: oklch(80.8% 0.143 127);
+      --number-9: oklch(72.5% 0.175 59);
+      --number-10: oklch(57.1% 0.24 26.3);
+      --number-11: oklch(67.7% 0.081 251.4);
+      --number-12: oklch(60.6% 0.038 70.4);
+    }
+  }
+}

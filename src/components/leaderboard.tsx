@@ -55,7 +55,7 @@ const LeaderboardRound = (props: {
       data-round-state={state()}
       data-scored={scored() ? "" : undefined}
       aria-label={`${props.points} ${props.points === 1 ? "point" : "points"}, ${roundPointsLabels[state()]}`}
-      style={{ "--row": props.index }}
+      style={{ "--row-index": props.index }}
     >
       <span>
         <Show when={state() === "banked" && !scored()}>

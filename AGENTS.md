@@ -15,7 +15,7 @@ Use the [README](README.md) for setup, game rules, and deployment. Before explor
 | Browser identity, reconnects, and pending moves | `src/lib/room-connection.ts`, `src/lib/room-client.ts` |
 | Lobby, table, and deal playback | `src/routes/room/[code].tsx`, `src/components/table.tsx`, `src/lib/deal-playback.ts`, `src/lib/deal-plan.ts` |
 | What the action bar says and offers (Table prompt) | `src/lib/table-prompt.ts`, `src/components/action-bar.tsx` |
-| Styles | `src/styles/index.css` imports the area files in cascade order. `src/app.css` holds only the font imports and `@layer ui-sdk;` |
+| Styles | `src/styles/index.css` imports the area files in cascade order. `src/styles/tokens.css` defines the shared tokens; a variable one area reads stays in that file. `src/app.css` holds only the font imports and `@layer ui-sdk;` |
 
 ## Room and game changes
 
@@ -25,6 +25,8 @@ Use the [README](README.md) for setup, game rules, and deployment. Before explor
 - Preserve rejoining by token, pending-move confirmation after reconnecting, and presence across multiple seats. Use `toRoomView` to project what the browser can see.
 - When changing a rule, check the in-game rules in `src/components/rules-dialog.tsx` and the README for descriptions that need updating.
 - Keep the font `@import`s in `src/app.css` and the style imports in `src/styles/index.css`. Fontaine inserts its fallback `@font-face` rules after the last `@import` in `app.css`. Rule order across the files in `src/styles/` is the cascade order, so add a rule to the file and position where it belongs. `src/styles/stylesheets.test.ts` checks both entry files and where Fontaine puts its fallbacks.
+- Use the `@custom-media` breakpoints in `src/styles/tokens.css` in every `@media`: `--sm` (40rem) and `--lg` (64rem) from Tailwind's scale, and `--short` (30rem tall). Combine them, as in `not (--sm)` or `(--lg) and (not (--short))`, and don't add a size. Lightning CSS resolves them, which `vite.config.ts` sets up. `SHEET_TABLE_QUERY` in `src/components/table.tsx` repeats `--sheet-table` for `matchMedia`. `src/styles/breakpoints.test.ts` checks all of this. For a component's own width, use a `@container` query.
+- Take values from the tokens in `src/styles/tokens.css`, which is the only file with hex colors, `@custom-media` or `:root` variables: colors, `--text-*` for interface text, `--tracking-*`, `--leading-*`, and `--duration-*` for transitions. Use font weights 400, 600, 700 and 800 for Inter and 900 for numerals. Spacing follows Tailwind's steps: 0.125rem up to 1rem, then 0.25rem. Give a choreographed animation's timing a named local property. `src/styles/design-scale.test.ts` checks these.
 - Keep the app and Worker TypeScript configurations separate. The Worker types are generated under `.cloudflare/types` by `pnpm typecheck`.
 
 ## Solid 2.0

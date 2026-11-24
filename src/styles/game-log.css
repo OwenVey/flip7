@@ -11,20 +11,20 @@
 .log-unread {
   min-width: 1rem;
   padding-inline: 0.25rem;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--danger);
   color: var(--paper);
   font-family: var(--font-body);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   line-height: 1rem;
   text-align: center;
 }
 
 .scroll-fades {
   --scroll-fade-stops:
-    var(--paper) 0 8%, color-mix(in srgb, var(--paper) 90%, transparent) 27%,
-    color-mix(in srgb, var(--paper) 52%, transparent) 55%,
-    color-mix(in srgb, var(--paper) 14%, transparent) 80%, transparent;
+    var(--paper) 0 8%, color-mix(in oklab, var(--paper) 90%, transparent) 27%,
+    color-mix(in oklab, var(--paper) 52%, transparent) 55%,
+    color-mix(in oklab, var(--paper) 14%, transparent) 80%, transparent;
   position: relative;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
@@ -105,7 +105,7 @@
       height: 0.5rem;
 
       & > [data-slot="scroll-area-thumb"] {
-        background: color-mix(in srgb, var(--ink) 35%, transparent);
+        background: color-mix(in oklab, var(--ink) 35%, transparent);
       }
     }
 
@@ -113,8 +113,8 @@
       --pip-size: 0.3125rem;
       width: 0.625rem;
       padding: calc(var(--pip-size) + 0.25rem) 0.125rem;
-      background: linear-gradient(var(--rule), var(--rule)) center / 1px
-        calc(100% - var(--pip-size)) no-repeat;
+      background: linear-gradient(var(--gold-deep), var(--gold-deep)) center /
+        1px calc(100% - var(--pip-size)) no-repeat;
 
       &::before,
       &::after {
@@ -122,7 +122,7 @@
         inset-inline-start: 50%;
         width: var(--pip-size);
         height: var(--pip-size);
-        background: var(--rule);
+        background: var(--gold-deep);
         content: "";
         translate: -50% 0;
         rotate: 45deg;
@@ -181,7 +181,7 @@
   /* Outside a card the thumb floats over the log, so keep timestamps clear of it. */
   padding-inline-end: 0.625rem;
   overscroll-behavior: contain;
-  border-block-end: 1px solid var(--rule);
+  border-block-end: 1px solid var(--gold-deep);
 
   .panel & {
     padding-inline-end: 0;
@@ -207,8 +207,8 @@
   opacity: 0;
   translate: 0 0.25rem;
   transition:
-    opacity 120ms ease-in,
-    translate 0s 120ms;
+    opacity var(--duration-fast) ease-in,
+    translate 0s var(--duration-fast);
 
   & > * {
     pointer-events: auto;
@@ -218,8 +218,8 @@
     opacity: 1;
     translate: none;
     transition:
-      opacity 180ms cubic-bezier(0.22, 1, 0.36, 1),
-      translate 180ms cubic-bezier(0.22, 1, 0.36, 1);
+      opacity var(--duration-base) var(--ease-settle),
+      translate var(--duration-base) var(--ease-settle);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -253,15 +253,15 @@
     align-items: baseline;
     justify-content: space-between;
     padding-block: 0.375rem 0.125rem;
-    border-block-start: 1px solid var(--rule);
+    border-block-start: 1px solid var(--gold-deep);
   }
 
   & h3 {
     margin: 0;
     color: var(--accent);
-    font-size: 0.6875rem;
+    font-size: var(--text-2xs);
     font-weight: 800;
-    letter-spacing: 0.08em;
+    letter-spacing: var(--tracking-wider);
     text-transform: uppercase;
   }
 
@@ -272,7 +272,7 @@
 
   & time {
     color: var(--ink-soft);
-    font-size: 0.6875rem;
+    font-size: var(--text-2xs);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -290,8 +290,8 @@
     padding-block: 0.125rem;
     overflow-wrap: anywhere;
     color: var(--ink-soft);
-    font-size: 0.8125rem;
-    line-height: 1.4;
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
   }
 
   & li[data-kind="game"]:has(> time:not(.log-time-heading)) {
@@ -332,7 +332,7 @@
   &
     li:is([data-cue="bank"], [data-cue="join"])
     :is(.log-event-icon, .log-outcome) {
-    color: var(--good);
+    color: var(--success);
   }
 
   & li[data-cue="bust"] :is(.log-event-icon, .log-outcome) {
@@ -366,19 +366,19 @@
     min-inline-size: 70%;
     max-inline-size: 90%;
     margin-block: 0.125rem 0.25rem;
-    margin-inline: 0.1875rem;
+    margin-inline: 0.25rem;
     padding: 0.375rem 0.625rem;
     border: 1px solid var(--ink);
     border-radius: var(--radius-sm);
     background: var(--paper-deep);
     box-shadow: 2px 2px 0 var(--ink);
     color: var(--ink);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
   }
 
   & li[data-kind="chat"][data-own] {
     justify-self: end;
-    background: color-mix(in srgb, var(--gold) 30%, var(--paper));
+    background: color-mix(in oklab, var(--gold) 30%, var(--paper));
   }
 
   & .log-message-header {
@@ -399,7 +399,7 @@
 
   & .log-author {
     color: var(--accent);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 800;
   }
 }
@@ -407,7 +407,7 @@
 .log-empty {
   margin: 0;
   color: var(--ink-soft);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 
 .unread-count {
@@ -415,12 +415,12 @@
   inset-block-start: -0.5rem;
   inset-inline-end: -0.5rem;
   min-width: 1.25rem;
-  padding-inline: 0.3125rem;
+  padding-inline: 0.375rem;
   border: 1.5px solid var(--ink);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--danger);
   color: var(--paper);
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: 800;
   line-height: 1.125rem;
   text-align: center;

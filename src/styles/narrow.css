@@ -9,7 +9,7 @@
 }
 
 /* Without room for the sidebar, scores and the log open as sheets from the header so they stay discoverable. */
-@media (width < 64rem), (max-height: 30rem) {
+@media (--sheet-table) {
   [data-table-sheet-trigger] {
     display: inline-flex;
   }
@@ -24,7 +24,7 @@
  * Phones, upright or sideways. One column of compact seats with yours first,
  * header controls as icons, and scores, log, and chat in sheets.
  */
-@media (max-width: 40rem), (max-height: 30rem) {
+@media (--compact) {
   .page-header [data-slot="tooltip-content"][data-compact-only] {
     visibility: visible;
   }
@@ -90,7 +90,7 @@
 
   .seat-header {
     height: auto;
-    min-height: 2rem;
+    min-height: var(--control-height-sm);
   }
 
   .home {
@@ -120,6 +120,6 @@
   }
 
   .lede {
-    font-size: 0.9375rem;
+    font-size: var(--text-base);
   }
 }

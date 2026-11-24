@@ -113,7 +113,7 @@ const FlipTracker = (props: {
       class="flip-run"
       data-waiting={props.progress.waiting ? "" : undefined}
       data-leaving={props.leaving ? "" : undefined}
-      style={{ "--flip-exit": `${FLIP_EXIT_MS}ms` }}
+      style={{ "--flip-tracker-exit": `${FLIP_EXIT_MS}ms` }}
     >
       <PlayingCardsFan size={12} aria-hidden="true" />
       <span class="flip-run-label">Flip Three</span>

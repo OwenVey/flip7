@@ -21,7 +21,7 @@
 .alert-dialog-body > [data-slot="row"] {
   justify-content: flex-end;
 
-  @media (max-width: 40rem) {
+  @media not (--sm) {
     flex-wrap: nowrap;
 
     & > * {
@@ -42,7 +42,7 @@
 }
 
 :is([data-slot="alert-dialog-title"], [data-slot="dialog-title"]) {
-  font-size: 1.125rem;
+  font-size: var(--text-lg);
 }
 
 /* Sheets slide and dim through ui-sdk so their motion follows the swipe gesture. */
@@ -51,9 +51,9 @@
   [data-slot="alert-dialog-content"]
 ) {
   transition:
-    opacity 180ms ease-out,
-    translate 220ms cubic-bezier(0.22, 1, 0.36, 1),
-    scale 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity var(--duration-base) ease-out,
+    translate var(--duration-base) var(--ease-settle),
+    scale var(--duration-base) var(--ease-settle);
 
   &:is([data-starting-style], [data-ending-style]) {
     opacity: 0;
@@ -62,12 +62,12 @@
   }
 
   &:where([data-ending-style]) {
-    transition-duration: 140ms;
+    transition-duration: var(--duration-fast);
     transition-timing-function: ease-in;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    transition: opacity 120ms linear;
+    transition: opacity var(--duration-fast) linear;
 
     &:is([data-starting-style], [data-ending-style]) {
       translate: none;
@@ -79,7 +79,7 @@
 [data-slot="alert-dialog-backdrop"],
 [data-slot="dialog-content"][data-presentation="dialog"]::backdrop {
   background: var(--ui-overlay);
-  transition: opacity 140ms ease-out;
+  transition: opacity var(--duration-fast) ease-out;
 }
 
 [data-slot="alert-dialog-backdrop"]:is(
@@ -99,21 +99,21 @@
   --tooltip-arrow: 0.625rem;
 
   max-inline-size: min(16rem, calc(100vw - 2rem));
-  padding: 0.3125rem 0.625rem;
+  padding: 0.375rem 0.625rem;
   border: 1.5px solid var(--ink);
   border-radius: var(--radius-md);
   overflow: visible;
   background: var(--paper);
   color: var(--ink);
   filter: drop-shadow(1px 1px 0 var(--ink));
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   font-weight: 700;
-  line-height: 1.35;
+  line-height: var(--leading-normal);
   transform-origin: var(--transform-origin);
   transition:
-    opacity 150ms ease-out,
-    scale 150ms ease-out,
-    translate 150ms ease-out;
+    opacity var(--duration-fast) ease-out,
+    scale var(--duration-fast) ease-out,
+    translate var(--duration-fast) ease-out;
 
   /* The arrow: a rotated square with the border on the two sides facing the trigger, centered on the trigger when there's room. */
   &::before {
@@ -191,7 +191,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    transition: opacity 120ms linear;
+    transition: opacity var(--duration-fast) linear;
   }
 
   &[data-instant] {
@@ -221,16 +221,16 @@
 
   transform-origin: var(--transform-origin, top);
   transition:
-    opacity 140ms ease-out,
-    scale 160ms cubic-bezier(0.2, 0.9, 0.3, 1.2),
-    translate 160ms cubic-bezier(0.2, 0.9, 0.3, 1);
+    opacity var(--duration-fast) ease-out,
+    scale var(--duration-fast) cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    translate var(--duration-fast) cubic-bezier(0.2, 0.9, 0.3, 1);
 
   &:is([data-starting-style], [data-ending-style]) {
     opacity: 0;
   }
 
   &:where([data-ending-style]) {
-    transition-duration: 110ms;
+    transition-duration: var(--duration-fast);
     transition-timing-function: ease-in;
   }
 
@@ -257,6 +257,6 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    transition: opacity 120ms linear;
+    transition: opacity var(--duration-fast) linear;
   }
 }

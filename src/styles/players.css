@@ -19,7 +19,7 @@
 .room-code {
   color: var(--accent);
   font-size: clamp(2.25rem, 9vw, 4rem);
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-wider);
   text-shadow: 2px 2px 0 var(--gold);
 }
 
@@ -81,7 +81,7 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    box-shadow: inset 0 -2px color-mix(in srgb, var(--ink) 25%, transparent);
+    box-shadow: inset 0 -2px color-mix(in oklab, var(--ink) 25%, transparent);
     pointer-events: none;
     content: "";
   }
@@ -98,8 +98,8 @@
   place-items: center;
   background: repeating-conic-gradient(
     from -10deg,
-    #baa1d9 0deg 14deg,
-    #d7c2eb 14deg 29deg
+    var(--bot) 0deg 14deg,
+    color-mix(in oklab, var(--bot) 65%, white) 14deg 29deg
   );
 
   & .bot-antenna {
@@ -139,7 +139,7 @@
     border-radius: 2px;
     background: var(--paper);
     box-shadow:
-      inset 0 -2px #dfc59a,
+      inset 0 -2px color-mix(in oklab, var(--gold-deep) 30%, var(--paper-deep)),
       0 1px var(--ink);
 
     &::before,
@@ -204,7 +204,7 @@
       &::before {
         content: "";
         position: absolute;
-        inset: calc((2.75rem - var(--avatar-size)) / -2);
+        inset: calc((var(--control-height-lg) - var(--avatar-size)) / -2);
       }
     }
   }
@@ -213,8 +213,8 @@
     width: var(--avatar-size);
     height: var(--avatar-size);
     transition:
-      transform 80ms ease,
-      box-shadow 80ms ease;
+      transform var(--duration-instant) ease,
+      box-shadow var(--duration-instant) ease;
   }
 
   /* Lifts onto an ink shadow like the app's buttons, and stays up while the picker is open. */
@@ -248,25 +248,25 @@
   padding: 0.75rem;
 
   & [data-slot="popover-title"] {
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
   }
 }
 
 .avatar-grid {
   display: grid;
-  grid-template-columns: repeat(5, 2.5rem);
+  grid-template-columns: repeat(5, var(--control-height));
   gap: 0.125rem;
 
   @media (pointer: coarse) {
-    grid-template-columns: repeat(5, 2.75rem);
+    grid-template-columns: repeat(5, var(--control-height-lg));
   }
 }
 
 .avatar-option {
   display: grid;
   place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: var(--control-height);
+  height: var(--control-height);
   padding: 0.25rem;
   border: 0;
   border-radius: calc(var(--radius-md) + 3px);
@@ -274,8 +274,8 @@
   cursor: pointer;
 
   @media (pointer: coarse) {
-    width: 2.75rem;
-    height: 2.75rem;
+    width: var(--control-height-lg);
+    height: var(--control-height-lg);
   }
 
   & .avatar {

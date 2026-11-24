@@ -1,5 +1,6 @@
 .action-bar {
   position: sticky;
+  container: action-bar / inline-size;
   top: 0.5rem;
   z-index: 1;
   display: grid;
@@ -8,9 +9,7 @@
   border: 2px solid var(--ink);
   border-radius: var(--radius-xl);
   background: var(--paper);
-  box-shadow:
-    3px 3px 0 var(--ink),
-    var(--shadow-table);
+  box-shadow: var(--shadow-print), var(--shadow-table);
   font-weight: 600;
 }
 
@@ -31,16 +30,16 @@
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  font-size: 1.25rem;
+  font-size: var(--text-xl);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 
   /* The clamp's overflow clips descenders at the display font's line-height: 1. */
   & .muted {
     font-family: var(--font-body);
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: 600;
-    line-height: 1.25;
+    line-height: var(--leading-tight);
   }
 }
 
@@ -69,8 +68,8 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: var(--control-height-lg);
+  height: var(--control-height-lg);
   border: 2px solid var(--ink);
   border-radius: 50%;
   background: var(--gold);
@@ -85,21 +84,22 @@
 
 .headline[data-winner-headline] {
   font-size: 1.625rem;
-  line-height: 1.05;
+  line-height: var(--leading-none);
   overflow-wrap: anywhere;
   text-shadow: 2px 2px 0 var(--gold);
 }
 
-/* Declared per element so a local --ring-color recolors it. */
+/* Declared per element so a local --turn-ring-color recolors it. */
 :is(.action-bar, .seat) {
-  --shadow-ring:
-    0 0 0 var(--ring-width) var(--ring-color),
-    0 0 0 calc(var(--ring-width) + 2px) var(--ink),
-    calc(var(--ring-width) + 3px) calc(var(--ring-width) + 3px) 0 2px var(--ink);
+  --turn-ring:
+    0 0 0 var(--turn-ring-width) var(--turn-ring-color),
+    0 0 0 calc(var(--turn-ring-width) + 2px) var(--ink),
+    calc(var(--turn-ring-width) + 3px) calc(var(--turn-ring-width) + 3px) 0 2px
+      var(--ink);
 }
 
 .action-bar[data-turn] {
-  box-shadow: var(--shadow-ring);
+  box-shadow: var(--turn-ring);
 }
 
 .dealt-action-card {
@@ -108,5 +108,5 @@
   margin-block: -0.5rem;
   padding: 0;
   list-style: none;
-  --card-w: 2.25rem;
+  --card-width: 2.25rem;
 }

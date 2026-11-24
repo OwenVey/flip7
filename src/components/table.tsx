@@ -32,7 +32,7 @@ import type {
 import TableMoreMenu from "./table-more-menu";
 import TableSheet from "./table-sheet";
 
-const SHEET_TABLE_QUERY = "(width < 64rem), (max-height: 30rem)";
+const SHEET_TABLE_QUERY = "(width < 64rem), (height <= 30rem)";
 
 export default function Table(
   props: TableProps &

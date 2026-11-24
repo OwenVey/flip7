@@ -1,7 +1,7 @@
 .seat-meter {
-  --round-fill: color-mix(in srgb, var(--accent) 58%, var(--paper-deep));
-  --round-stripe: color-mix(in srgb, var(--accent) 34%, var(--paper-deep));
-  --meter-ease: 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  --round-fill: color-mix(in oklab, var(--accent) 58%, var(--paper-deep));
+  --round-stripe: color-mix(in oklab, var(--accent) 34%, var(--paper-deep));
+  --meter-timing: 600ms var(--ease-settle);
   display: flex;
   gap: 0.5rem;
   align-items: center;
@@ -79,10 +79,10 @@
   & .seat-score {
     flex: none;
     font-family: var(--font-body);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     font-variant-numeric: tabular-nums;
     font-weight: 800;
-    line-height: 1;
+    line-height: var(--leading-none);
 
     &[data-projected] {
       color: var(--ink-soft);
@@ -90,7 +90,7 @@
   }
 
   &[data-round="locked"] .seat-score[data-projected] {
-    color: var(--good);
+    color: var(--success);
   }
 
   .seat[data-status="busted"] & .seat-score[data-projected] {
@@ -105,13 +105,13 @@
 @media (prefers-reduced-motion: no-preference) {
   .seat-meter {
     & [data-slot="meter-indicator"] {
-      transition: translate var(--meter-ease);
+      transition: translate var(--meter-timing);
     }
 
     & .meter-round {
       transition:
-        translate var(--meter-ease),
-        background-color 300ms;
+        translate var(--meter-timing),
+        background-color var(--duration-slow);
     }
 
     &[data-round="at-risk"] .meter-round::before {
@@ -145,7 +145,7 @@
   }
 }
 
-@media (max-width: 40rem), (max-height: 30rem) {
+@media (--compact) {
   .table {
     padding-bottom: 9rem;
   }
@@ -171,14 +171,14 @@
     gap: 0.5rem 0.75rem;
     padding: 0.625rem 0.75rem;
 
-    /* On the narrowest phones the held pile drops its label and stacks its cards, leaving the prompt room. */
-    @media (max-width: 25rem) {
+    /* In the narrowest bar (a phone 25rem wide or less) the held pile drops its label and stacks its cards, leaving the prompt room. */
+    @container action-bar (width <= 23.75rem) {
       & .held-pile-label {
         display: none;
       }
 
       & .held-pile-cards > .card + .card {
-        margin-inline-start: calc(var(--card-w) * -0.55);
+        margin-inline-start: calc(var(--card-width) * -0.55);
       }
     }
 
@@ -212,7 +212,7 @@
   }
 
   .headline {
-    font-size: 1.0625rem;
+    font-size: var(--text-lg);
   }
 }
 
@@ -236,33 +236,33 @@
   background: var(--paper);
   box-shadow: var(--shadow-print), var(--shadow-table);
   scroll-margin-block-start: 5.5rem;
-  transition: box-shadow 160ms ease;
+  transition: box-shadow var(--duration-fast) ease;
 
   &[data-me] {
-    background: #fff0c6;
+    background: var(--gold-soft);
   }
 
   &[data-turn] {
-    box-shadow: var(--shadow-ring);
+    box-shadow: var(--turn-ring);
   }
 
   /* A Flip Three under way: the ring takes the Flip Three card's deeper gold. */
   &[data-flipping] {
-    --ring-color: var(--flip);
-    box-shadow: var(--shadow-ring);
+    --turn-ring-color: var(--flip-three);
+    box-shadow: var(--turn-ring);
   }
 
   &[data-status="flipSeven"] .hand {
     box-shadow:
-      inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.45),
+      var(--shadow-well),
       0 0 0 2px var(--gold);
   }
 
   .table:not([data-phase="gameOver"]) &[data-status="flipSeven"] .hand {
     box-shadow:
-      inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.45),
+      var(--shadow-well),
       0 0 0 2px var(--gold),
-      0 0 1rem rgb(255 212 95 / 0.6);
+      0 0 1rem color-mix(in oklab, var(--gold) 60%, transparent);
   }
 
   &[data-offline] :is(.seat-meta, .seat-meter) {
@@ -271,7 +271,7 @@
   }
 
   & .hand-stamp {
-    --stamp-color: var(--good);
+    --stamp-color: var(--success);
     --stamp-face: var(--paper);
     position: absolute;
     z-index: 2;
@@ -285,9 +285,9 @@
     box-shadow: 2px 2px 0 color-mix(in oklab, var(--stamp-color), black 25%);
     color: var(--stamp-color);
     font-family: var(--font-display);
-    font-size: 1.125rem;
-    letter-spacing: 0.04em;
-    line-height: 1.2;
+    font-size: var(--text-lg);
+    letter-spacing: var(--tracking-wide);
+    line-height: var(--leading-tight);
     text-transform: uppercase;
     white-space: nowrap;
     overflow: hidden;
@@ -309,9 +309,12 @@
   &[data-status="busted"] {
     & .hand {
       background:
-        radial-gradient(rgb(255 255 255 / 0.04) 0.6px, transparent 1px) 0 0 /
-          4px 4px,
-        radial-gradient(ellipse at 50% 0%, #6e2533, #3a0f19);
+        var(--felt-grain),
+        radial-gradient(
+          ellipse at 50% 0%,
+          color-mix(in oklab, var(--danger) 75%, black),
+          color-mix(in oklab, var(--danger) 50%, black)
+        );
     }
 
     & .hand-stamp {
@@ -328,7 +331,7 @@
     --stamp-face: var(--gold);
     box-shadow:
       2px 2px 0 color-mix(in oklab, var(--ink), black 25%),
-      0 0 1rem rgb(255 212 95 / 0.7);
+      0 0 1rem color-mix(in oklab, var(--gold) 70%, transparent);
 
     & > .hand-stamp-points {
       color: var(--gold);
@@ -348,7 +351,7 @@
   }
 
   &[data-status="stayed"] {
-    --seat-ink: var(--good);
+    --seat-ink: var(--success);
   }
 
   &[data-status="busted"] {
@@ -356,7 +359,7 @@
   }
 
   &[data-status="flipSeven"] {
-    --seat-ink: var(--rule);
+    --seat-ink: var(--gold-deep);
   }
 
   &[data-status="frozen"] {
@@ -366,11 +369,16 @@
 
   &[data-winner] {
     border-color: var(--ink);
-    background: linear-gradient(170deg, #ffe6a0, #fff1cc 55%, var(--paper));
+    background: linear-gradient(
+      170deg,
+      color-mix(in oklab, var(--gold) 40%, var(--gold-soft)),
+      var(--gold-soft) 55%,
+      var(--paper)
+    );
     box-shadow:
-      inset 0 0 0 var(--ring-width) var(--gold),
+      inset 0 0 0 var(--turn-ring-width) var(--gold),
       4px 4px 0 var(--ink),
-      0 0 2rem 0.25rem rgb(255 212 95 / 0.55),
+      0 0 2rem 0.25rem color-mix(in oklab, var(--gold) 55%, transparent),
       var(--shadow-table);
   }
 
@@ -384,11 +392,15 @@
       ),
       radial-gradient(rgb(255 255 255 / 0.14) 0.6px, transparent 1px) 0 0 / 4px
         4px,
-      radial-gradient(ellipse at 50% 0%, #5f9fbb, #24546b);
+      radial-gradient(
+        ellipse at 50% 0%,
+        var(--freeze),
+        color-mix(in oklab, var(--freeze) 65%, black)
+      );
     box-shadow:
       inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.35),
-      inset 0 0 0 2px color-mix(in srgb, var(--freeze-glow) 75%, transparent),
-      inset 0 0 1.5rem color-mix(in srgb, var(--freeze-soft) 50%, transparent);
+      inset 0 0 0 2px color-mix(in oklab, var(--freeze-glow) 75%, transparent),
+      inset 0 0 1.5rem color-mix(in oklab, var(--freeze-soft) 50%, transparent);
   }
 }
 
@@ -402,7 +414,7 @@
   --pick-color: var(--accent);
   cursor: pointer;
   @media (prefers-reduced-motion: no-preference) {
-    transition: box-shadow 160ms ease;
+    transition: box-shadow var(--duration-fast) ease;
   }
 
   &[data-pickable="freeze"] {
@@ -410,7 +422,7 @@
   }
 
   &[data-pickable="flipThree"] {
-    --pick-color: var(--flip);
+    --pick-color: var(--flip-three);
   }
 
   &[data-pickable="secondChance"] {
@@ -426,10 +438,10 @@
   @media (hover: hover) and (pointer: fine) {
     &:has(.seat-pick:hover:not(:disabled)) {
       &:not(:has(.seat-pick:focus-visible)) {
-        --ring-color: var(--pick-color);
+        --turn-ring-color: var(--pick-color);
         z-index: 1;
         box-shadow:
-          var(--shadow-ring),
+          var(--turn-ring),
           0 1.25rem 2rem rgb(4 20 14 / 0.5);
 
         @media (prefers-reduced-motion: no-preference) {
@@ -440,8 +452,8 @@
 
     @media (prefers-reduced-motion: no-preference) {
       transition:
-        transform 140ms ease,
-        box-shadow 160ms ease;
+        transform var(--duration-fast) ease,
+        box-shadow var(--duration-fast) ease;
     }
   }
 
@@ -478,7 +490,7 @@
   width: 6rem;
   height: 6rem;
   margin: -3rem 0 0 -3rem;
-  color: #fff;
+  color: white;
   pointer-events: none;
   filter: drop-shadow(0 0 0.5rem var(--freeze-glow))
     drop-shadow(0 0 1px var(--freeze-ink));
@@ -528,7 +540,7 @@
   align-items: center;
   justify-content: space-between;
   /* Same height with or without the host's Remove button. */
-  min-height: 2rem;
+  min-height: var(--control-height-sm);
 }
 
 /* Name, then status, then the dealer chip and Remove, all on one row. */
@@ -542,7 +554,7 @@
 
   & strong {
     overflow: hidden;
-    font-size: 1.0625rem;
+    font-size: var(--text-lg);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -566,7 +578,7 @@
   gap: 0.5rem;
   align-items: center;
   min-width: 0;
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   white-space: nowrap;
 
   /* Badges keep their size; the points text gives way when the row is full. */
@@ -588,13 +600,13 @@
   gap: 0.375rem;
   align-items: center;
   padding: 0 0.5rem;
-  border: 1.5px solid var(--flip);
-  border-radius: 999px;
-  background: var(--flip-soft);
-  color: var(--flip-ink);
-  font-size: 0.75rem;
+  border: 1.5px solid var(--flip-three);
+  border-radius: var(--radius-full);
+  background: var(--flip-three-soft);
+  color: var(--flip-three-ink);
+  font-size: var(--text-xs);
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-wide);
   line-height: 1.25rem;
   text-transform: uppercase;
 
@@ -655,18 +667,19 @@
 .flip-pip {
   width: 0.5rem;
   height: 0.5rem;
-  border: 1.5px solid var(--flip);
+  border: 1.5px solid var(--flip-three);
   border-radius: 50%;
   transition:
-    background-color 200ms ease,
-    transform 200ms ease;
+    background-color var(--duration-base) ease,
+    transform var(--duration-base) ease;
 
   &[data-filled] {
-    background: var(--flip);
+    background: var(--flip-three);
   }
 
   &[data-current] {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--flip) 30%, transparent);
+    box-shadow: 0 0 0 3px
+      color-mix(in oklab, var(--flip-three) 30%, transparent);
     transform: scale(1.3);
   }
 }
@@ -678,22 +691,22 @@
   gap: 0.375rem;
   align-items: center;
   /* 1.5rem cards are 2.1rem tall; with this padding and border it fits the bar's 2.75rem row. */
-  padding: 0.1875rem 0.3125rem 0.1875rem 0.5rem;
-  border: 1.5px dashed var(--flip);
+  padding: 0.125rem 0.25rem 0.125rem 0.5rem;
+  border: 1.5px dashed var(--flip-three);
   border-radius: var(--radius-md);
-  background: var(--flip-soft);
+  background: var(--flip-three-soft);
 }
 
 .held-pile-label {
-  color: var(--flip-ink);
-  font-size: 0.625rem;
+  color: var(--flip-three-ink);
+  font-size: var(--text-2xs);
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
 .held-pile-cards {
-  --card-w: 1.5rem;
+  --card-width: 1.5rem;
   display: flex;
   gap: 0.25rem;
   margin: 0;
@@ -707,12 +720,12 @@
   align-items: center;
   padding: 0 0.5rem;
   border: 1.5px solid currentcolor;
-  border-radius: 999px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
   line-height: 1.25rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-wide);
 
   [data-status="busted"] & {
     color: var(--danger);
@@ -724,13 +737,8 @@
 
   [data-status="flipSeven"] &,
   [data-status="stayed"] & {
-    color: var(--good);
+    color: var(--success);
   }
-}
-
-.seat-tools {
-  display: flex;
-  justify-content: end;
 }
 
 .hand-area {
@@ -742,25 +750,24 @@
 }
 
 .hand {
-  --hand-card: 3.25rem;
+  --hand-card-width: 3.25rem;
   --hand-pad: 0.5rem;
   display: grid;
-  grid-auto-columns: minmax(0, calc(var(--hand-card) + 0.375rem));
+  grid-auto-columns: minmax(0, calc(var(--hand-card-width) + 0.375rem));
   grid-auto-flow: column;
   align-items: center;
   justify-content: start;
-  min-height: calc(var(--hand-card) * 1.4 + 2 * var(--hand-pad) + 0.5rem);
+  min-height: calc(var(--hand-card-width) * 1.4 + 2 * var(--hand-pad) + 0.5rem);
   margin: 0;
   /* Room at the end for the last card when the columns squeeze and cards overlap. */
-  padding: var(--hand-pad) calc(var(--hand-pad) + var(--hand-card))
+  padding: var(--hand-pad) calc(var(--hand-pad) + var(--hand-card-width))
     var(--hand-pad) var(--hand-pad);
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(rgb(255 255 255 / 0.04) 0.6px, transparent 1px) 0 0 / 4px
-      4px,
+    var(--felt-grain),
     radial-gradient(ellipse at 50% 0%, var(--felt-light), var(--felt-deep));
-  box-shadow: inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.45);
+  box-shadow: var(--shadow-well);
   list-style: none;
 
-  --card-w: var(--hand-card);
+  --card-width: var(--hand-card-width);
 }

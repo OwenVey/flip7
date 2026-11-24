@@ -9,12 +9,12 @@
 .confetti-piece {
   position: absolute;
   top: -1rem;
-  left: var(--x);
+  left: var(--confetti-x);
   width: 0.5rem;
   height: 0.875rem;
   border: 1px solid var(--ink);
   border-radius: 1px;
-  background: var(--color);
+  background: var(--confetti-color);
   opacity: 0;
 }
 
@@ -32,7 +32,7 @@
   background:
     radial-gradient(
       ellipse 80% 45% at 50% 0%,
-      color-mix(in srgb, var(--gold) 45%, transparent),
+      color-mix(in oklab, var(--gold) 45%, transparent),
       transparent 70%
     ),
     var(--paper);
@@ -65,7 +65,7 @@
   inset: -2.25rem;
   border-radius: 50%;
   background: repeating-conic-gradient(
-    color-mix(in srgb, var(--gold) 70%, transparent) 0deg 10deg,
+    color-mix(in oklab, var(--gold) 70%, transparent) 0deg 10deg,
     transparent 10deg 30deg
   );
   mask: radial-gradient(circle, black 30%, transparent 70%);
@@ -90,10 +90,10 @@
 
 .game-over-kicker {
   margin: 0;
-  color: var(--rule);
-  font-size: 0.75rem;
+  color: var(--gold-deep);
+  font-size: var(--text-xs);
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
 }
 
@@ -102,7 +102,7 @@
   font-family: var(--font-display);
   font-size: clamp(1.75rem, 7vw, 2.25rem);
   font-weight: 400;
-  line-height: 1.05;
+  line-height: var(--leading-none);
   overflow-wrap: anywhere;
   text-shadow: 2px 2px 0 var(--gold);
 }
@@ -133,7 +133,7 @@
     align-items: center;
     gap: 0.625rem;
     padding: 0.375rem 0.75rem 0.375rem 0.375rem;
-    border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+    border: 1px solid color-mix(in oklab, var(--ink) 18%, transparent);
     border-radius: var(--radius-md);
     background: var(--paper-deep);
   }
@@ -141,7 +141,7 @@
   /* Your own row, tinted like your seat at the table so you can find it in a long list. */
   & li[data-me] {
     border-color: var(--ink);
-    background: #fff0c6;
+    background: var(--gold-soft);
   }
 
   /* Medal rows: gold for the winner, silver and bronze for second and third, all printed the same way. */
@@ -155,11 +155,11 @@
   }
 
   & li[data-rank="2"] {
-    background: #dcdfe6;
+    background: var(--medal-silver);
   }
 
   & li[data-rank="3"] {
-    background: #ebb985;
+    background: var(--medal-bronze);
   }
 }
 
@@ -189,7 +189,7 @@
 
 .game-over-score {
   font-family: var(--font-numeral);
-  font-size: 1.25rem;
+  font-size: var(--text-xl);
   font-weight: 900;
 }
 
@@ -220,10 +220,11 @@
 
 @media (prefers-reduced-motion: no-preference) {
   [data-slot="dialog-content"].game-over-dialog {
+    --game-over-rise: 560ms;
     transition:
-      opacity 200ms ease-out,
-      translate 560ms cubic-bezier(0.3, 1.5, 0.5, 1),
-      scale 560ms cubic-bezier(0.3, 1.5, 0.5, 1);
+      opacity var(--duration-base) ease-out,
+      translate var(--game-over-rise) var(--ease-pop),
+      scale var(--game-over-rise) var(--ease-pop);
 
     &[data-starting-style] {
       translate: 0 2.5rem;
@@ -231,13 +232,13 @@
     }
 
     &[data-ending-style] {
-      transition-duration: 160ms;
+      transition-duration: var(--duration-fast);
       transition-timing-function: ease-in;
     }
   }
 
   .game-over-trophy {
-    animation: trophy-stamp 600ms cubic-bezier(0.3, 1.6, 0.5, 1) 180ms both;
+    animation: trophy-stamp 600ms var(--ease-pop) 180ms both;
   }
 
   .game-over-rays {
@@ -258,14 +259,15 @@
   }
 
   .game-over-standings li {
-    animation: rise-in 320ms ease-out calc(var(--row, 0) * 70ms + 450ms) both;
+    animation: rise-in 320ms ease-out calc(var(--row-index, 0) * 70ms + 450ms)
+      both;
   }
 
   .game-over-standings li[data-winner] {
     background: linear-gradient(
         100deg,
         var(--gold) 40%,
-        #fff4c9 50%,
+        var(--gold-soft) 50%,
         var(--gold) 60%
       )
       0 0 / 300% 100%;
