@@ -143,6 +143,38 @@ describe("<Table />", () => {
     expect(actionBar.getByRole("button", { name: "Stay" })).toBe(stay);
   });
 
+  it("keeps your Hit pending until the room confirms it", async () => {
+    const confirmed = Promise.withResolvers<boolean>();
+    const sent: Parameters<RoomConnection["send"]>[0][] = [];
+
+    const send: RoomConnection["send"] = async (command) => {
+      sent.push(command);
+
+      return await confirmed.promise;
+    };
+
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const hit = screen.getByRole("button", { name: "Hit" });
+    hit.click();
+    flush();
+
+    expect(sent).toStrictEqual([{ type: "hit" }]);
+    expect(hit).toHaveAttribute("data-pending");
+
+    confirmed.resolve(true);
+    await vi.waitFor(() => {
+      expect(hit).not.toHaveAttribute("data-pending");
+    });
+  });
+
   it("keeps the same Hit and Stay buttons for an offline player while their points change", () => {
     const [points, setPoints] = createSignal(7);
     const view = room({ turnId: "b" });

@@ -135,13 +135,15 @@ const ActionBar = (
     return controls.kind === "turn" ? controls : null;
   };
 
-  const offlineTurn = () => {
-    const controls = turn();
+  const forName = () => turn()?.for?.name ?? "";
 
-    return controls?.for === undefined ? null : controls;
+  const myTurn = () => kind() === "turn" && forName() === "";
+
+  const turnMove = (type: "hit" | "stay") => {
+    const target = turn()?.for;
+
+    return target === undefined ? { type } : { forId: target.id, type };
   };
-
-  const myTurn = () => kind() === "turn" && offlineTurn() === null;
 
   const canStart = () => {
     const { controls } = prompt();
@@ -248,16 +250,15 @@ const ActionBar = (
                 </Button>
               </ActionButtons>
             </Match>
-            <Match when={myTurn()}>
+            <Match when={kind() === "turn"}>
               <ActionButtons>
                 <Button
                   data-size="lg"
                   disabled={props.actionsDisabled}
                   data-variant="solid"
+                  aria-label={forName() ? `Hit for ${forName()}` : undefined}
                   data-game-tap=""
-                  onClick={() => {
-                    void props.send({ type: "hit" });
-                  }}
+                  onClick={async () => await props.send(turnMove("hit"))}
                 >
                   <SquarePlus size={16} />
                   Hit
@@ -266,58 +267,24 @@ const ActionBar = (
                   <Button
                     data-size="lg"
                     disabled={props.actionsDisabled}
+                    aria-label={
+                      forName()
+                        ? `Stay for ${forName()} with ${pointsLabel(turn()?.roundPoints ?? 0)}`
+                        : undefined
+                    }
                     data-game-tap=""
-                    onClick={() => {
-                      void props.send({ type: "stay" });
-                    }}
+                    onClick={async () => await props.send(turnMove("stay"))}
                   >
                     <Hand size={16} />
-                    Stay
+                    <Show when={forName()} fallback="Stay">
+                      <FitLabel
+                        long={`Stay · ${pointsLabel(turn()?.roundPoints ?? 0)}`}
+                        short="Stay"
+                      />
+                    </Show>
                   </Button>
                 </Show>
               </ActionButtons>
-            </Match>
-            <Match when={offlineTurn()}>
-              {(offline) => (
-                <ActionButtons>
-                  <Button
-                    data-size="lg"
-                    disabled={props.actionsDisabled}
-                    data-variant="solid"
-                    aria-label={`Hit for ${offline().for?.name}`}
-                    data-game-tap=""
-                    onClick={async () =>
-                      await props.send({
-                        forId: offline().for?.id,
-                        type: "hit",
-                      })
-                    }
-                  >
-                    <SquarePlus size={16} />
-                    Hit
-                  </Button>
-                  <Show when={offline().canStay}>
-                    <Button
-                      data-size="lg"
-                      disabled={props.actionsDisabled}
-                      aria-label={`Stay for ${offline().for?.name} with ${pointsLabel(offline().roundPoints)}`}
-                      data-game-tap=""
-                      onClick={async () =>
-                        await props.send({
-                          forId: offline().for?.id,
-                          type: "stay",
-                        })
-                      }
-                    >
-                      <Hand size={16} />
-                      <FitLabel
-                        long={`Stay · ${pointsLabel(offline().roundPoints)}`}
-                        short="Stay"
-                      />
-                    </Button>
-                  </Show>
-                </ActionButtons>
-              )}
             </Match>
           </Switch>
         </div>
