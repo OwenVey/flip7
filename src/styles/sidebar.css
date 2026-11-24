@@ -263,10 +263,6 @@
       );
     }
 
-    & .leaderboard-scroll {
-      scrollbar-gutter: stable;
-    }
-
     & .leaderboard {
       border-collapse: separate;
       border-spacing: 0;
@@ -279,7 +275,12 @@
       }
     }
 
-    & .leaderboard-scroll[data-scroll-before] thead th::after {
+    /* The track starts under the sticky header row, beside the rows it scrolls. */
+    & .leaderboard-body > [data-slot="scroll-area-scrollbar"] {
+      margin-block-start: 2rem;
+    }
+
+    & .leaderboard-body:not([data-at-y-start]) thead th::after {
       position: absolute;
       inset: 100% 0 auto;
       height: 1.125rem;

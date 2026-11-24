@@ -200,20 +200,22 @@ describe("<GameOverDialog />", () => {
 
     openDialog();
     const standings = screen.getByRole("region", { name: "Final standings" });
-    expect(standings).not.toHaveAttribute("data-scroll-after");
+    expect(standings).toHaveAttribute("data-at-y-end");
 
     Object.defineProperties(standings, {
       clientHeight: { value: 120 },
       scrollHeight: { value: 300 },
     });
     fireEvent.scroll(standings);
-    expect(standings).toHaveAttribute("data-scroll-after");
-    expect(standings).not.toHaveAttribute("data-scroll-before");
+    vi.advanceTimersToNextFrame();
+    expect(standings).not.toHaveAttribute("data-at-y-end");
+    expect(standings).toHaveAttribute("data-at-y-start");
 
     standings.scrollTop = 180;
     fireEvent.scroll(standings);
-    expect(standings).toHaveAttribute("data-scroll-before");
-    expect(standings).not.toHaveAttribute("data-scroll-after");
+    vi.advanceTimersToNextFrame();
+    expect(standings).not.toHaveAttribute("data-at-y-start");
+    expect(standings).toHaveAttribute("data-at-y-end");
   });
 
   it("counts final scores from the previous total when the dialog opens", () => {

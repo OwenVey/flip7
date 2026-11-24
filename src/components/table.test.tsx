@@ -7,7 +7,7 @@ import {
   within,
 } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, describe, expect, it, vi } from "vitest";
 
 import { calculateRoundScore } from "../game/cards";
 import type { RoomView } from "../game/protocol";
@@ -42,7 +42,11 @@ const spectator = () => ({
 });
 
 describe("<Table />", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 
   it("sets held action cards beside the deck, not in the seat", () => {
     render(() => (
@@ -295,8 +299,16 @@ describe("<Table />", () => {
     const scores = screen.getByRole("button", { name: "Scores" });
     scores.focus();
 
+    const scoresButton = agent
+      .snapshot()
+      .find(
+        (entry) => entry.label === "Scores" && entry.actions.includes("press")
+      );
+
+    assert.exists(scoresButton);
+
     const result = await agent.act({
-      steps: [{ action: "press", ref: "Scores" }],
+      steps: [{ action: "press", ref: scoresButton.ref }],
     });
 
     expect(result.error).toBeUndefined();
@@ -871,7 +883,27 @@ describe("<Table />", () => {
     expect(log.getByText("Ben deals.")).toBeVisible();
   });
 
-  it("keeps the scroll position and counts new entries until jumping to latest", () => {
+  it("keeps the scroll position and counts new entries until jumping to latest", async () => {
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
+    });
+    const resizeCallbacks = new Map<Element, () => void>();
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Deliver layout changes that jsdom cannot measure.
+    vi.stubGlobal(
+      "ResizeObserver",
+      class extends ResizeObserver {
+        // oxlint-disable-next-line promise/prefer-await-to-callbacks -- ResizeObserver delivers a callback.
+        constructor(callback: ResizeObserverCallback) {
+          super(callback);
+          this.observe = (element) => {
+            resizeCallbacks.set(element, () => {
+              // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Deliver the ResizeObserver notification.
+              callback([], this);
+            });
+          };
+        }
+      }
+    );
     const [view, setView] = createSignal(room());
     render(() => (
       <Table
@@ -885,11 +917,16 @@ describe("<Table />", () => {
     const log = screen.getByRole("log", { name: "Chat & Log" });
     const unread = screen.getByRole("status", { name: "Unread chat messages" });
     Object.defineProperties(log, {
-      clientHeight: { value: 200 },
+      clientHeight: { configurable: true, value: 200 },
       scrollHeight: { configurable: true, value: 500 },
     });
+    log.scrollTop = 300;
+    fireEvent.scroll(log);
+    vi.advanceTimersToNextFrame();
     log.scrollTop = 100;
     fireEvent.scroll(log);
+    vi.advanceTimersToNextFrame();
+    await Promise.resolve();
     flush();
 
     setView(
@@ -919,9 +956,10 @@ describe("<Table />", () => {
     );
     flush();
 
+    vi.advanceTimersToNextFrame();
     expect({
-      after: Object.hasOwn(log.dataset, "scrollAfter"),
-      before: Object.hasOwn(log.dataset, "scrollBefore"),
+      after: !Object.hasOwn(log.dataset, "atYEnd"),
+      before: !Object.hasOwn(log.dataset, "atYStart"),
       top: log.scrollTop,
       unread: unread.textContent,
     }).toStrictEqual({
@@ -930,16 +968,17 @@ describe("<Table />", () => {
       top: 100,
       unread: "1 unread message",
     });
-    screen.getByRole("button", { name: "Jump to latest · 4 new" }).click();
+    const jump = screen.getByRole("button", { name: "Jump to latest · 4 new" });
+    jump.click();
+    vi.advanceTimersByTime(1000);
+    await Promise.resolve();
     flush();
 
-    expect(log.scrollTop).toBe(log.scrollHeight);
-    expect(log).toHaveFocus();
-    expect(
-      screen.queryByRole("button", { name: /Jump to latest/u })
-    ).toBeNull();
+    expect({
+      following: Object.hasOwn(log.dataset, "sticking"),
+      jumpShown: Object.hasOwn(jump.dataset, "visible"),
+    }).toStrictEqual({ following: true, jumpShown: false });
 
-    Object.defineProperty(log, "scrollHeight", { value: 600 });
     setView(
       room({
         log: [
@@ -956,13 +995,41 @@ describe("<Table />", () => {
       })
     );
     flush();
-    expect({ top: log.scrollTop, unread: unread.textContent }).toStrictEqual({
-      top: log.scrollHeight,
+    Object.defineProperty(log, "scrollHeight", { value: 600 });
+    resizeCallbacks.get(log)?.();
+    vi.advanceTimersToNextFrame();
+    expect({
+      following: Object.hasOwn(log.dataset, "sticking"),
+      top: log.scrollTop,
+      unread: unread.textContent,
+    }).toStrictEqual({
+      following: true,
+      top: 400,
       unread: "",
     });
+
+    log.scrollTop = 0;
+    fireEvent.scroll(log);
+    vi.advanceTimersToNextFrame();
+    await Promise.resolve();
+    flush();
+    expect(jump).toHaveAttribute("data-visible");
+
+    Object.defineProperty(log, "clientHeight", { value: 600 });
+    resizeCallbacks.get(log)?.();
+    vi.advanceTimersToNextFrame();
+    await Promise.resolve();
+    flush();
+    expect({
+      jumpShown: Object.hasOwn(jump.dataset, "visible"),
+      top: log.scrollTop,
+    }).toStrictEqual({ jumpShown: false, top: 0 });
   });
 
   it("marks the score edges that have more rows to scroll to", () => {
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame"],
+    });
     render(() => (
       <Table
         room={room()}
@@ -973,20 +1040,22 @@ describe("<Table />", () => {
     ));
 
     const scores = screen.getByRole("region", { name: "Scores" });
-    expect(scores).not.toHaveAttribute("data-scroll-after");
+    expect(scores).toHaveAttribute("data-at-y-end");
 
     Object.defineProperties(scores, {
       clientHeight: { value: 120 },
       scrollHeight: { value: 300 },
     });
     fireEvent.scroll(scores);
-    expect(scores).not.toHaveAttribute("data-scroll-before");
-    expect(scores).toHaveAttribute("data-scroll-after");
+    vi.advanceTimersToNextFrame();
+    expect(scores).toHaveAttribute("data-at-y-start");
+    expect(scores).not.toHaveAttribute("data-at-y-end");
 
     scores.scrollTop = 180;
     fireEvent.scroll(scores);
-    expect(scores).toHaveAttribute("data-scroll-before");
-    expect(scores).not.toHaveAttribute("data-scroll-after");
+    vi.advanceTimersToNextFrame();
+    expect(scores).not.toHaveAttribute("data-at-y-start");
+    expect(scores).toHaveAttribute("data-at-y-end");
   });
 
   it("lets a player leave during the deal", async () => {

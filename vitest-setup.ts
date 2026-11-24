@@ -28,6 +28,13 @@ if (typeof document !== "undefined") {
   HTMLElement.prototype.hidePopover = vi.fn<() => void>();
   Element.prototype.getAnimations = () => [];
   Element.prototype.scrollIntoView = vi.fn<() => void>();
+  Object.defineProperty(Element.prototype, "scrollTo", {
+    configurable: true,
+    value(this: Element, options?: ScrollToOptions) {
+      this.scrollTop = options?.top ?? this.scrollTop;
+      this.scrollLeft = options?.left ?? this.scrollLeft;
+    },
+  });
   Element.prototype.checkVisibility = () => true;
   document.elementFromPoint = () => null;
   document.elementsFromPoint = () => [];
