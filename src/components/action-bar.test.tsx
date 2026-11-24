@@ -8,9 +8,32 @@ import {
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { RoomView } from "../game/protocol";
+import { roundPointsFor } from "../lib/deal-playback";
 import type { RoomConnection } from "../lib/room-connection";
 import { room } from "../test/room-view";
 import { Table } from "../test/table";
+import ActionBar from "./action-bar";
+
+const Bar = (props: {
+  room: RoomView;
+  playerId: string | null;
+  send: RoomConnection["send"];
+  actionsDisabled?: boolean;
+  roundPoints?: ReadonlyMap<string, number>;
+}) => (
+  <ActionBar
+    room={props.room}
+    playerId={props.playerId}
+    send={props.send}
+    actionsDisabled={props.actionsDisabled}
+    playback={{
+      dealing: false,
+      roundPoints: props.roundPoints ?? roundPointsFor(props.room),
+      step: null,
+    }}
+  />
+);
 
 describe("<ActionBar />", () => {
   afterEach(cleanup);
@@ -46,11 +69,10 @@ describe("<ActionBar />", () => {
     const [points, setPoints] = createSignal(7);
 
     render(() => (
-      <Table
+      <Bar
         room={room()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
         roundPoints={new Map([["a", points()]])}
       />
     ));
@@ -79,14 +101,7 @@ describe("<ActionBar />", () => {
       return await confirmed.promise;
     };
 
-    render(() => (
-      <Table
-        room={room()}
-        playerId="a"
-        send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
-    ));
+    render(() => <Bar room={room()} playerId="a" send={send} />);
 
     const hit = screen.getByRole("button", { name: "Hit" });
     hit.click();
@@ -109,11 +124,10 @@ describe("<ActionBar />", () => {
     );
 
     render(() => (
-      <Table
+      <Bar
         room={view}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
         roundPoints={new Map([["b", points()]])}
       />
     ));
@@ -143,12 +157,7 @@ describe("<ActionBar />", () => {
     try {
       const send = vi.fn<RoomConnection["send"]>();
       render(() => (
-        <Table
-          room={room({ phase: "roundOver" })}
-          playerId="a"
-          send={send}
-          chat={vi.fn<RoomConnection["chat"]>()}
-        />
+        <Bar room={room({ phase: "roundOver" })} playerId="a" send={send} />
       ));
       vi.advanceTimersByTime(60_000);
       expect(send).not.toHaveBeenCalled();
@@ -164,11 +173,10 @@ describe("<ActionBar />", () => {
   it("lets the host play again from the action bar once the game is over", () => {
     const send = vi.fn<RoomConnection["send"]>();
     render(() => (
-      <Table
+      <Bar
         room={room({ phase: "gameOver", winnerIds: ["b"] })}
         playerId="a"
         send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
       />
     ));
 
@@ -185,13 +193,7 @@ describe("<ActionBar />", () => {
     const send = vi.fn<RoomConnection["send"]>();
     const [syncing, setSyncing] = createSignal(true);
     render(() => (
-      <Table
-        room={room()}
-        playerId="a"
-        send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
-        actionsDisabled={syncing()}
-      />
+      <Bar room={room()} playerId="a" send={send} actionsDisabled={syncing()} />
     ));
 
     const hit = screen.getByRole("button", { name: "Hit" });
@@ -213,12 +215,7 @@ describe("<ActionBar />", () => {
     const [view, setView] = createSignal(room());
 
     render(() => (
-      <Table
-        room={view()}
-        playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
+      <Bar room={view()} playerId="a" send={vi.fn<RoomConnection["send"]>()} />
     ));
     expect(screen.getByRole("region", { name: "Your move" })).toBeVisible();
 
@@ -246,14 +243,7 @@ describe("<ActionBar />", () => {
       seat.id === "b" ? { ...seat, connected: false } : seat
     );
 
-    render(() => (
-      <Table
-        room={view}
-        playerId="a"
-        send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
-    ));
+    render(() => <Bar room={view} playerId="a" send={send} />);
     expect(
       screen.getByText(/Play for them, or the game will Stay soon/u)
     ).toBeVisible();
@@ -266,12 +256,7 @@ describe("<ActionBar />", () => {
     cleanup();
 
     render(() => (
-      <Table
-        room={{ ...view, hostId: "b" }}
-        playerId="a"
-        send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
+      <Bar room={{ ...view, hostId: "b" }} playerId="a" send={send} />
     ));
     expect(screen.queryByRole("button", { name: "Hit for Ben" })).toBeNull();
   });

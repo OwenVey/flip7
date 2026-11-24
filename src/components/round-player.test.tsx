@@ -10,9 +10,32 @@ import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { calculateRoundScore } from "../game/cards";
+import { availableMoves } from "../game/moves";
+import type { RoomView } from "../game/protocol";
+import { pointsOf, roundPointsFor } from "../lib/deal-playback";
 import type { RoomConnection } from "../lib/room-connection";
 import { room } from "../test/room-view";
 import { agent, agentApproval, Table } from "../test/table";
+import RoundPlayer from "./round-player";
+
+const Seat = (props: {
+  room: RoomView;
+  playerId: string | null;
+  seat: number;
+}) => (
+  <RoundPlayer
+    player={props.room.players[props.seat]}
+    room={props.room}
+    playerId={props.playerId}
+    roundPoints={pointsOf(
+      roundPointsFor(props.room),
+      props.room.players[props.seat].id
+    )}
+    moves={availableMoves(props.room, props.playerId)}
+    onPick={vi.fn<(targetId: string) => void>()}
+    onRemove={vi.fn<(playerId: string) => void>()}
+  />
+);
 
 const meterOf = (name: string) =>
   within(screen.getByRole("article", { name })).getByRole("meter", {
@@ -28,12 +51,10 @@ describe("<RoundPlayer />", () => {
     view.players = [ana, { ...ben, avatar: null, bot: true, name: "Torch" }];
 
     render(() => (
-      <Table
-        room={view}
-        playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
+      <>
+        <Seat seat={0} room={view} playerId="a" />
+        <Seat seat={1} room={view} playerId="a" />
+      </>
     ));
 
     const botSeat = screen.getByRole("article", { name: "Torch, 12 points" });
@@ -44,14 +65,7 @@ describe("<RoundPlayer />", () => {
   });
 
   it("shows the banked and round scores in the same label row", () => {
-    render(() => (
-      <Table
-        room={room()}
-        playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
-    ));
+    render(() => <Seat seat={0} room={room()} playerId="a" />);
 
     const seat = screen.getByRole("article", { name: "Ana, 40 points" });
     expect(within(seat).getByText("Your turn")).toBeVisible();
@@ -87,14 +101,7 @@ describe("<RoundPlayer />", () => {
       ben,
     ];
 
-    render(() => (
-      <Table
-        room={view}
-        playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
-    ));
+    render(() => <Seat seat={0} room={view} playerId="a" />);
 
     const mat = screen.getByRole("list", { name: "Ana's cards" });
 
@@ -118,14 +125,7 @@ describe("<RoundPlayer />", () => {
     const initial = room();
     const [view, setView] = createSignal(initial);
 
-    render(() => (
-      <Table
-        room={view()}
-        playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
-    ));
+    render(() => <Seat seat={0} room={view()} playerId="a" />);
 
     const seat = screen.getByRole("article", { name: "Ana, 40 points" });
     const meter = within(seat).getByRole("meter", { name: "Total score" });
@@ -181,7 +181,8 @@ describe("<RoundPlayer />", () => {
     const initial = room();
 
     render(() => (
-      <Table
+      <Seat
+        seat={0}
         room={room({
           phase: "roundOver",
           players: initial.players.map((player) =>
@@ -202,8 +203,6 @@ describe("<RoundPlayer />", () => {
           ),
         })}
         playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
       />
     ));
 
@@ -221,7 +220,8 @@ describe("<RoundPlayer />", () => {
     const initial = room();
 
     render(() => (
-      <Table
+      <Seat
+        seat={0}
         room={room({
           phase: "roundOver",
           players: initial.players.map((player) =>
@@ -236,8 +236,6 @@ describe("<RoundPlayer />", () => {
           ),
         })}
         playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
       />
     ));
 
@@ -251,12 +249,10 @@ describe("<RoundPlayer />", () => {
     const [view, setView] = createSignal(initial);
 
     render(() => (
-      <Table
-        room={view()}
-        playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
+      <>
+        <Seat seat={0} room={view()} playerId="a" />
+        <Seat seat={1} room={view()} playerId="a" />
+      </>
     ));
 
     expect(meterOf("Ana, 40 points")).toHaveAttribute("data-round", "at-risk");
@@ -290,14 +286,7 @@ describe("<RoundPlayer />", () => {
     const initial = room();
     const [view, setView] = createSignal(initial);
 
-    render(() => (
-      <Table
-        room={view()}
-        playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
-    ));
+    render(() => <Seat seat={0} room={view()} playerId="a" />);
 
     const meter = within(
       screen.getByRole("article", { name: "Ana, 40 points" })

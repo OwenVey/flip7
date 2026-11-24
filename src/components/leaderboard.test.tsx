@@ -1,13 +1,21 @@
 import { captureArtifact, expectNoDiagnostics } from "@solidjs/diagnostics";
 import { cleanup, render, screen, within } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { calculateRoundScore } from "../game/cards";
 import type { RoomView } from "../game/protocol";
-import type { RoomConnection } from "../lib/room-connection";
+import { roundPointsFor } from "../lib/deal-playback";
 import { room } from "../test/room-view";
-import { Table } from "../test/table";
+import Leaderboard from "./leaderboard";
+
+const Scores = (props: { room: RoomView; playerId: string | null }) => (
+  <Leaderboard
+    room={props.room}
+    playerId={props.playerId}
+    roundPoints={roundPointsFor(props.room)}
+  />
+);
 
 describe("<Leaderboard />", () => {
   afterEach(cleanup);
@@ -31,14 +39,7 @@ describe("<Leaderboard />", () => {
       room({ players: [benLive, ana, cara] })
     );
 
-    render(() => (
-      <Table
-        room={view()}
-        playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
-    ));
+    render(() => <Scores room={view()} playerId="a" />);
 
     const leaderboard = within(screen.getByRole("table", { name: "Scores" }));
 
@@ -95,7 +96,7 @@ describe("<Leaderboard />", () => {
     const [ana, ben] = room().players;
 
     render(() => (
-      <Table
+      <Scores
         room={room({
           players: [
             ana,
@@ -104,8 +105,6 @@ describe("<Leaderboard />", () => {
           ],
         })}
         playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
       />
     ));
 
@@ -145,14 +144,7 @@ describe("<Leaderboard />", () => {
       ],
     };
 
-    render(() => (
-      <Table
-        room={view}
-        playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
-      />
-    ));
+    render(() => <Scores room={view} playerId="a" />);
 
     const rows = within(
       screen.getByRole("table", { name: "Scores" })
