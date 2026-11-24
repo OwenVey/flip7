@@ -2,7 +2,8 @@ import MessageCircle from "@lucide/solid/icons/message-circle";
 import { createSignal, Show, untrack } from "solid-js";
 
 import type { LogEntry } from "../game/engine";
-import GameLog, { CHAT_AND_GAME_LOG_TITLE, countChatsAfter } from "./game-log";
+import { countChatsAfter } from "../lib/game-log-entries";
+import GameLog, { CHAT_AND_GAME_LOG_TITLE } from "./game-log";
 import TableSheet from "./table-sheet";
 
 /** Chat & Log as a sheet from the header, with an unread count, for screens without room for the log beside the page. */
