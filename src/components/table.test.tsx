@@ -23,6 +23,8 @@ const agent = createAgent({
   allow: (step) => (step.confirm ?? "") === "" || approve,
 });
 
+const LOGGED_AT = Date.now();
+
 const room = (overrides: Partial<RoomView> = {}) => {
   const view: RoomView = {
     botSpeed: "normal",
@@ -31,16 +33,26 @@ const room = (overrides: Partial<RoomView> = {}) => {
     dealerId: "b",
     deckCount: 80,
     discardCount: 0,
+    drawSeq: 0,
     draws: [],
     flips: [],
     held: [],
     hostId: "a",
     locked: false,
-    log: [{ id: 1, text: "Round 1 begins. Ben deals." }],
+    log: [
+      {
+        at: LOGGED_AT,
+        game: 1,
+        id: 1,
+        round: 1,
+        text: "Round 1 begins. Ben deals.",
+      },
+    ],
     phase: "playing",
     players: [
       {
         avatar: 1,
+        bot: false,
         bustCard: null,
         connected: true,
         hand: [{ id: 1, kind: "number", value: 7 }],
@@ -52,6 +64,7 @@ const room = (overrides: Partial<RoomView> = {}) => {
       },
       {
         avatar: 1,
+        bot: false,
         bustCard: null,
         connected: true,
         hand: [{ id: 2, kind: "number", value: 3 }],
@@ -1008,6 +1021,7 @@ describe("<Table />", () => {
         ...base.players,
         {
           avatar: 1,
+          bot: false,
           bustCard: null,
           connected: true,
           hand: [],
@@ -1098,8 +1112,21 @@ describe("<Table />", () => {
       <Table
         room={room({
           log: [
-            { id: 1, round: 1, text: "Round 1 begins. Ben deals." },
-            { from: { id: "b", name: "Ben" }, id: 2, round: 1, text: "gl" },
+            {
+              at: LOGGED_AT,
+              game: 1,
+              id: 1,
+              round: 1,
+              text: "Round 1 begins. Ben deals.",
+            },
+            {
+              at: LOGGED_AT,
+              from: { avatar: 1, id: "b", name: "Ben" },
+              game: 1,
+              id: 2,
+              round: 1,
+              text: "gl",
+            },
           ],
         })}
         playerId="a"
@@ -1129,11 +1156,17 @@ describe("<Table />", () => {
       <Table
         room={room({
           log: [
-            { id: 1, text: "Round 1 begins. Ben deals." },
-            { at, id: 2, round: 1, text: "Round 1 begins. Ben deals." },
+            {
+              at,
+              game: 1,
+              id: 2,
+              round: 1,
+              text: "Round 1 begins. Ben deals.",
+            },
             {
               at,
               cue: "bust",
+              game: 1,
               id: 3,
               round: 1,
               text: "Ben was dealt a duplicate 6 and busted.",
@@ -1141,6 +1174,7 @@ describe("<Table />", () => {
             {
               at: at + 1000,
               cue: "bank",
+              game: 1,
               id: 4,
               round: 1,
               text: "Ana stayed and banked 44 points.",
@@ -1148,6 +1182,7 @@ describe("<Table />", () => {
             {
               at: at + 2000,
               cue: "freeze",
+              game: 1,
               id: 5,
               round: 2,
               text: "Ben played Freeze on Ana, who banked 26 points.",
@@ -1155,6 +1190,7 @@ describe("<Table />", () => {
             {
               at: at + 3000,
               cue: "special",
+              game: 1,
               id: 6,
               round: 2,
               text: "Ben assigned Flip Three to Ana.",
@@ -1162,31 +1198,48 @@ describe("<Table />", () => {
             {
               at: at + 4000,
               cue: "special",
+              game: 1,
               id: 7,
               round: 2,
               text: "Ben is holding a Second Chance.",
             },
             {
               at: at + 60_000,
-              from: { id: "b", name: "Ben" },
+              from: { avatar: 1, id: "b", name: "Ben" },
+              game: 1,
               id: 8,
               round: 2,
               text: "Good round",
             },
             {
               at: at + 61_000,
-              from: { id: "a", name: "Ana" },
+              from: { avatar: 1, id: "a", name: "Ana" },
+              game: 1,
               id: 9,
               round: 2,
               text: "Thanks!",
             },
-            { id: 10, round: 2, text: "Round 2 is over." },
             {
+              at: at + 62_000,
+              game: 1,
+              id: 10,
+              round: 2,
+              text: "Round 2 is over.",
+            },
+            {
+              at: at + 62_000,
+              game: 1,
               id: 11,
               round: 2,
               text: "The discard pile was shuffled into a new deck.",
             },
-            { id: 12, round: 2, text: "Ben wins with 202 points!" },
+            {
+              at: at + 62_000,
+              game: 1,
+              id: 12,
+              round: 2,
+              text: "Ben wins with 202 points!",
+            },
           ],
         })}
         playerId="a"
@@ -1214,10 +1267,9 @@ describe("<Table />", () => {
       undefined,
       undefined,
       undefined,
-      undefined,
       new Date(at + 60_000).toISOString(),
       new Date(at + 61_000).toISOString(),
-      undefined,
+      new Date(at + 60_000).toISOString(),
       undefined,
       undefined,
     ]);
@@ -1231,9 +1283,9 @@ describe("<Table />", () => {
       new Date(at).toISOString(),
       new Date(at + 60_000).toISOString(),
       new Date(at + 61_000).toISOString(),
+      new Date(at + 60_000).toISOString(),
     ]);
-    expect(rows.slice(0, 7).map((row) => row.text)).toStrictEqual([
-      "Round 1 begins. Ben deals.",
+    expect(rows.slice(0, 6).map((row) => row.text)).toStrictEqual([
       "Ben deals.",
       "Ben busted · duplicate 6",
       "Ana stayed · +44 pts",
@@ -1244,7 +1296,6 @@ describe("<Table />", () => {
     expect(
       rows.filter((row) => row.announcement).map((row) => row.text)
     ).toStrictEqual([
-      "Round 1 begins. Ben deals.",
       "Ben deals.",
       "Round 2 is over.",
       "Deck rebuilt from the discard pile.",
@@ -1260,8 +1311,21 @@ describe("<Table />", () => {
         <Table
           room={room({
             log: [
-              { at, id: 1, text: "Round 1 begins. Ben deals." },
-              { at, from: { id: "b", name: "Ben" }, id: 2, text: "Good luck!" },
+              {
+                at,
+                game: 1,
+                id: 1,
+                round: 1,
+                text: "Round 1 begins. Ben deals.",
+              },
+              {
+                at,
+                from: { avatar: 1, id: "b", name: "Ben" },
+                game: 1,
+                id: 2,
+                round: 1,
+                text: "Good luck!",
+              },
             ],
           })}
           playerId="a"
@@ -1327,8 +1391,22 @@ describe("<Table />", () => {
       room({
         log: [
           ...view().log,
-          { from: { id: "b", name: "Ben" }, id: 2, text: "gl" },
-          { from: { id: "a", name: "Ana" }, id: 3, text: "you too" },
+          {
+            at: LOGGED_AT,
+            from: { avatar: 1, id: "b", name: "Ben" },
+            game: 1,
+            id: 2,
+            round: 1,
+            text: "gl",
+          },
+          {
+            at: LOGGED_AT,
+            from: { avatar: 1, id: "a", name: "Ana" },
+            game: 1,
+            id: 3,
+            round: 1,
+            text: "you too",
+          },
         ],
       })
     );
@@ -1352,7 +1430,7 @@ describe("<Table />", () => {
       filters.getByRole("button", { name: "Chat", pressed: true })
     ).toBeVisible();
     expect({
-      gameEvent: log.queryByText("Round 1 begins. Ben deals."),
+      gameEvent: log.queryByText("Ben deals."),
       unread: unread.textContent,
     }).toStrictEqual({
       gameEvent: null,
@@ -1361,7 +1439,7 @@ describe("<Table />", () => {
 
     filters.getByRole("button", { name: "All" }).click();
     flush();
-    expect(log.getByText("Round 1 begins. Ben deals.")).toBeVisible();
+    expect(log.getByText("Ben deals.")).toBeVisible();
   });
 
   it("keeps the scroll position and counts new entries until jumping to latest", () => {
@@ -1389,10 +1467,24 @@ describe("<Table />", () => {
       room({
         log: [
           ...view().log,
-          { id: 2, text: "Ben stayed." },
-          { id: 3, text: "Round 2 begins." },
-          { from: { id: "b", name: "Ben" }, id: 4, text: "Good luck!" },
-          { from: { id: "a", name: "Ana" }, id: 5, text: "Thanks!" },
+          { at: LOGGED_AT, game: 1, id: 2, round: 1, text: "Ben stayed." },
+          { at: LOGGED_AT, game: 1, id: 3, round: 1, text: "Round 2 begins." },
+          {
+            at: LOGGED_AT,
+            from: { avatar: 1, id: "b", name: "Ben" },
+            game: 1,
+            id: 4,
+            round: 1,
+            text: "Good luck!",
+          },
+          {
+            at: LOGGED_AT,
+            from: { avatar: 1, id: "a", name: "Ana" },
+            game: 1,
+            id: 5,
+            round: 1,
+            text: "Thanks!",
+          },
         ],
       })
     );
@@ -1423,7 +1515,14 @@ describe("<Table />", () => {
       room({
         log: [
           ...view().log,
-          { from: { id: "b", name: "Ben" }, id: 6, text: "Nice hand." },
+          {
+            at: LOGGED_AT,
+            from: { avatar: 1, id: "b", name: "Ben" },
+            game: 1,
+            id: 6,
+            round: 1,
+            text: "Nice hand.",
+          },
         ],
       })
     );
@@ -1761,9 +1860,29 @@ describe("<Table />", () => {
     setView(
       room({
         log: [
-          { id: 1, text: "Round 1 begins. Ben deals." },
-          { from: { id: "b", name: "Ben" }, id: 2, text: "gl" },
-          { from: { id: "a", name: "Ana" }, id: 3, text: "you too" },
+          {
+            at: LOGGED_AT,
+            game: 1,
+            id: 1,
+            round: 1,
+            text: "Round 1 begins. Ben deals.",
+          },
+          {
+            at: LOGGED_AT,
+            from: { avatar: 1, id: "b", name: "Ben" },
+            game: 1,
+            id: 2,
+            round: 1,
+            text: "gl",
+          },
+          {
+            at: LOGGED_AT,
+            from: { avatar: 1, id: "a", name: "Ana" },
+            game: 1,
+            id: 3,
+            round: 1,
+            text: "you too",
+          },
         ],
       })
     );
@@ -1959,9 +2078,21 @@ describe("<Table />", () => {
       <Table
         room={room({
           log: [
-            { game: 1, id: 1, round: 1, text: "Round 1 begins. Ben deals." },
-            { game: 1, id: 2, round: 0, text: "Cal joined." },
-            { game: 2, id: 3, round: 1, text: "Round 1 begins. Ana deals." },
+            {
+              at: LOGGED_AT,
+              game: 1,
+              id: 1,
+              round: 1,
+              text: "Round 1 begins. Ben deals.",
+            },
+            { at: LOGGED_AT, game: 1, id: 2, round: 0, text: "Cal joined." },
+            {
+              at: LOGGED_AT,
+              game: 2,
+              id: 3,
+              round: 1,
+              text: "Round 1 begins. Ana deals.",
+            },
           ],
         })}
         playerId="a"

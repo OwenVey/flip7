@@ -54,14 +54,11 @@ const locate = (room: RoomView, cardId: number) => {
 };
 
 const newDraws = (previous: RoomView, current: RoomView) => {
-  const since =
-    (current.drawSeq ?? 0) >= (previous.drawSeq ?? 0)
-      ? (previous.drawSeq ?? 0)
-      : 0;
+  const since = current.drawSeq >= previous.drawSeq ? previous.drawSeq : 0;
 
   const draws = current.draws.filter((draw) => draw.seq > since);
 
-  return draws.length === (current.drawSeq ?? 0) - since ? draws : null;
+  return draws.length === current.drawSeq - since ? draws : null;
 };
 
 const handOf = (table: Table, playerId: string) => {

@@ -466,7 +466,7 @@ type Network = ReturnType<typeof network>;
 
 const serverDraws = (net: Network) => ({
   drawSeq: net.stored.game.drawSeq,
-  draws: net.stored.game.draws ?? [],
+  draws: net.stored.game.draws,
 });
 
 const drawsOf = (player: TestPlayer) => ({
@@ -599,7 +599,7 @@ describe("draws through the room client", () => {
       if (
         game.games === 1 &&
         game.phase === "roundOver" &&
-        (game.drawSeq ?? 0) > DRAW_LIMIT
+        game.drawSeq > DRAW_LIMIT
       ) {
         game.phase = "gameOver";
       }
@@ -629,7 +629,7 @@ describe("draws through the room client", () => {
     net.drop(ana);
     net.flush();
 
-    while ((net.stored.game.drawSeq ?? 0) < seen + 3) {
+    while (net.stored.game.drawSeq < seen + 3) {
       await moveTableOn(net);
     }
 

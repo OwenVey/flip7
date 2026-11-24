@@ -48,7 +48,7 @@ const tableCue = (
     return "deal";
   }
 
-  if ((current.drawSeq ?? 0) > (previous.drawSeq ?? 0)) {
+  if (current.drawSeq > previous.drawSeq) {
     return "reveal";
   }
 

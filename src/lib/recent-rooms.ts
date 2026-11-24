@@ -11,10 +11,10 @@ const RECENT_LIMIT = 5;
 
 export const tokenKey = (code: string) => `${TOKEN_PREFIX}${code}`;
 
-/** A room this browser holds a seat in. `joinedAt` is null for seats saved before rooms were timestamped. */
+/** A room this browser holds a seat in. */
 export interface RecentRoom {
   code: string;
-  joinedAt: number | null;
+  joinedAt: number;
 }
 
 /** The part of `Storage` that saving a room needs, which the in-memory fallback also has. */
@@ -61,15 +61,19 @@ const savedSeatCodes = (storage: Storage) => {
   return codes;
 };
 
-/** Rooms with a saved rejoin token, most recently joined first. */
+/** Rooms with a saved rejoin token and join time, most recently joined first. */
 export const readRecentRooms = (storage: Storage) => {
   const times = readTimes(storage);
 
   return savedSeatCodes(storage)
-    .map(
-      (code) => ({ code, joinedAt: times[code] ?? null }) satisfies RecentRoom
-    )
-    .toSorted((a, b) => (b.joinedAt ?? 0) - (a.joinedAt ?? 0));
+    .flatMap((code) => {
+      const joinedAt = times[code];
+
+      return joinedAt === undefined
+        ? []
+        : [{ code, joinedAt } satisfies RecentRoom];
+    })
+    .toSorted((a, b) => b.joinedAt - a.joinedAt);
 };
 
 export const rememberRoom = (

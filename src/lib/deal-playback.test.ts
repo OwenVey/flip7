@@ -656,7 +656,7 @@ describe("deal playback from draws sent as new entries", () => {
 
     const seen = new Set<string>();
 
-    for (let move = 0; move < 400 && (game.games ?? 0) < 2; move += 1) {
+    for (let move = 0; move < 400 && game.games < 2; move += 1) {
       if (move === 6) {
         online = false;
       }
@@ -682,7 +682,7 @@ describe("deal playback from draws sent as new entries", () => {
     expect({
       games: game.games,
       manyDeals: full.flights.length > DRAW_LIMIT,
-      pastDrawLimit: (game.drawSeq ?? 0) > DRAW_LIMIT,
+      pastDrawLimit: game.drawSeq > DRAW_LIMIT,
       rounds: seen.size >= 4,
     }).toStrictEqual({
       games: 2,

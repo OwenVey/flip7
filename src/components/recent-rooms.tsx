@@ -110,7 +110,7 @@ export default function RecentRooms() {
               <li>
                 <span class="home-recent-code">{room.code}</span>
                 <span class="home-recent-time">
-                  {room.joinedAt === null ? "" : joinedAgo(room.joinedAt, now)}
+                  {joinedAgo(room.joinedAt, now)}
                 </span>
                 <Button
                   data-size="sm"

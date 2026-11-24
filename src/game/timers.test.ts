@@ -31,6 +31,7 @@ const room = (names: string[], playing = false) => {
   }
 
   const timers: RoomTimers = {
+    botTurn: null,
     game,
     hostLeftAt: null,
     lastActiveAt: START,

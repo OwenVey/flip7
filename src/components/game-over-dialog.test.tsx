@@ -9,6 +9,7 @@ import GameOverDialog from "./game-over-dialog";
 const player = (id: string, name: string, score: number) => {
   const view: PlayerView = {
     avatar: 1,
+    bot: false,
     bustCard: null,
     connected: true,
     hand: [],
@@ -30,6 +31,7 @@ const room = () => {
     dealerId: "a",
     deckCount: 40,
     discardCount: 0,
+    drawSeq: 0,
     draws: [],
     flips: [],
     held: [],

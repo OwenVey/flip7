@@ -27,7 +27,7 @@ const BOT_SPEED_LABELS: Record<BotSpeed, string> = {
 };
 
 const hasBots = (room: Pick<RoomView, "players">) =>
-  room.players.some((player) => player.bot === true);
+  room.players.some((player) => player.bot);
 
 /** A one-line summary of the room's settings, for guests who can't change them. */
 export const settingsSummary = (

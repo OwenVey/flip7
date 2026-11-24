@@ -664,18 +664,6 @@ describe("room settings", () => {
       },
     ]);
   });
-
-  it("reads settings as defaults on rooms saved before settings", () => {
-    const h = harness();
-    joinAs(h, "ana-tab", "Ana");
-    delete h.stored.game.settings;
-
-    expect(h.room.snapshot().room).toMatchObject({
-      botSpeed: "normal",
-      locked: false,
-      targetScore: 200,
-    });
-  });
 });
 
 describe("sending the log", () => {
@@ -807,19 +795,6 @@ describe("sending the log", () => {
       entries: [expect.objectContaining({ text: "after waking" })],
     });
   });
-
-  it("sends the whole log once to rooms saved before the log was sent as updates", () => {
-    const h = harness();
-    joinAs(h, "ana-tab", "Ana");
-    delete h.stored.broadcastSeqs;
-
-    const first = broadcastOf(h.room.chat("ana-tab", "one"));
-    const second = broadcastOf(h.room.chat("ana-tab", "two"));
-
-    expect(first.lists.log.after).toBeNull();
-    expect(logTexts(first)).toStrictEqual(["Ana joined.", "one"]);
-    expect(logTexts(second)).toStrictEqual(["two"]);
-  });
 });
 
 const drawn = (seq: number, id: number) =>
@@ -835,9 +810,9 @@ const drawQuietly = (h: Harness, count: number) => {
   const { game } = h.stored;
 
   for (let index = 0; index < count; index += 1) {
-    game.drawSeq = (game.drawSeq ?? 0) + 1;
+    game.drawSeq += 1;
     game.draws = [
-      ...(game.draws ?? []),
+      ...game.draws,
       drawn(game.drawSeq, 5000 + game.drawSeq),
     ].slice(-DRAW_LIMIT);
   }
@@ -867,7 +842,7 @@ describe("sending draws", () => {
   it("broadcasts only the draws made since the last broadcast", () => {
     const { h } = roundWhereHostMovesFirst();
     broadcastOf(h.room.chat("ana-tab", "ready"));
-    const before = h.stored.game.drawSeq ?? 0;
+    const before = h.stored.game.drawSeq;
     h.stored.game.deck = [num(903, 8)];
 
     const sent = broadcastOf(h.room.command("ana-tab", { type: "hit" }));
@@ -900,7 +875,7 @@ describe("sending draws", () => {
     const { h } = roundWhereHostMovesFirst();
     broadcastOf(h.room.chat("ana-tab", "ready"));
     const { game } = h.stored;
-    const endOfRound = game.drawSeq ?? 0;
+    const endOfRound = game.drawSeq;
 
     game.phase = "roundOver";
     game.deck = [num(904, 6), num(905, 9)];
@@ -913,7 +888,7 @@ describe("sending draws", () => {
     expect(drawSeqs(round)[0]).toBe(endOfRound + 1);
     expect(drawSeqs(round).at(-1)).toBe(game.drawSeq);
 
-    const endOfGame = game.drawSeq ?? 0;
+    const endOfGame = game.drawSeq;
     game.phase = "gameOver";
     const again = broadcastOf(h.room.command("ana-tab", { type: "start" }));
 
@@ -946,7 +921,7 @@ describe("sending draws", () => {
 
   it("sends every kept draw when the last broadcast is ahead of the room", () => {
     const { h } = roundWhereHostMovesFirst();
-    const drawSeq = h.stored.game.drawSeq ?? 0;
+    const { drawSeq } = h.stored.game;
     h.stored.broadcastSeqs = { draws: drawSeq + 5, log: h.stored.game.logSeq };
 
     const sent = broadcastOf(h.room.chat("ana-tab", "after a restore"));
@@ -973,7 +948,7 @@ describe("sending draws", () => {
   it("remembers which draws it broadcast across hibernation", () => {
     const { h } = roundWhereHostMovesFirst();
     broadcastOf(h.room.chat("ana-tab", "one"));
-    const before = h.stored.game.drawSeq ?? 0;
+    const before = h.stored.game.drawSeq;
     const saved = structuredClone(h.stored);
 
     const woken = createRoom(
@@ -983,45 +958,12 @@ describe("sending draws", () => {
     );
 
     saved.game.drawSeq = before + 1;
-    saved.game.draws = [...(saved.game.draws ?? []), drawn(before + 1, 7001)];
+    saved.game.draws = [...saved.game.draws, drawn(before + 1, 7001)];
 
     expect(broadcastOf(woken.reconcile()).lists.draws).toStrictEqual({
       after: before,
       entries: [drawn(before + 1, 7001)],
       seq: before + 1,
     });
-  });
-
-  it("sends every kept draw once to rooms saved before draws were sent as updates", () => {
-    const { h } = roundWhereHostMovesFirst();
-    broadcastOf(h.room.chat("ana-tab", "one"));
-    h.stored.broadcastSeqs = { log: h.stored.game.logSeq };
-    drawQuietly(h, 1);
-
-    const first = broadcastOf(h.room.chat("ana-tab", "two"));
-    drawQuietly(h, 1);
-    const second = broadcastOf(h.room.chat("ana-tab", "three"));
-
-    expect(first.lists.draws.after).toBeNull();
-    expect(first.lists.draws.entries).toStrictEqual(
-      h.stored.game.draws?.slice(0, -1)
-    );
-    expect(second.lists.draws.after).toBe(first.lists.draws.seq);
-    expect(drawSeqs(second)).toStrictEqual([first.lists.draws.seq + 1]);
-  });
-
-  it("reads rooms saved before draws were recorded", () => {
-    const h = harness();
-    joinAs(h, "ana-tab", "Ana");
-    delete h.stored.game.draws;
-    delete h.stored.game.drawSeq;
-
-    expect(h.room.snapshot()).toMatchObject({
-      lists: { draws: { after: null, entries: [], seq: 0 } },
-      room: { drawSeq: 0 },
-    });
-    expect(broadcastOf(h.room.chat("ana-tab", "hi")).lists.draws).toStrictEqual(
-      { after: null, entries: [], seq: 0 }
-    );
   });
 });

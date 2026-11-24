@@ -21,7 +21,7 @@ import {
 import type { ActionCard, Card, NumberCard, Random, RoundScore } from "./cards";
 import { MAX_PLAYERS, MIN_PLAYERS, rejectMove, waitingOn } from "./moves";
 import type { Move } from "./moves";
-import { DEFAULT_SETTINGS, settingsOf } from "./settings";
+import { DEFAULT_SETTINGS } from "./settings";
 import type { RoomSettings } from "./settings";
 
 /** The winning score a room starts with. */
@@ -60,20 +60,14 @@ export interface Player {
   score: number;
   /** Bots are always connected. */
   connected: boolean;
-  /** Set on players the room plays itself. Missing on rooms saved before bots. */
-  bot?: boolean;
-  /** The avatar a person picked. Missing on bots and rooms saved before avatars. */
-  avatar?: number;
+  /** Set on players the room plays itself. */
+  bot: boolean;
+  /** The avatar a person picked, or null for a bot. */
+  avatar: number | null;
   status: RoundStatus;
   hand: Card[];
   bustCard: Card | null;
   lastRound: RoundScore | null;
-  /**
-   * Flip Three cards played on this player, kept by rooms saved before a
-   * Flip Three went to the discard pile once its draws ended. They're
-   * discarded when the round ends.
-   */
-  played?: ActionCard[];
 }
 
 /**
@@ -102,16 +96,15 @@ export type GameCue =
   | "streak";
 
 export interface LogEntry {
-  /** Epoch milliseconds. Missing on entries saved before times were recorded. */
-  at?: number;
+  /** Epoch milliseconds. */
+  at: number;
   cue?: GameCue;
-  /** Set on chat messages: who sent it, with their name and avatar at the time. Avatar is missing on messages saved before avatars. */
-  from?: { id: string; name: string; avatar?: number };
-  /** Which game in this room, counting from 1; 0 before the first game starts. Missing on entries saved before games were counted. */
-  game?: number;
+  /** Set on chat messages: who sent it, with their name and avatar at the time. */
+  from?: { id: string; name: string; avatar: number | null };
+  /** Which game in this room, counting from 1; 0 before the first game starts. */
+  game: number;
   id: number;
-  /** Missing on entries saved before rounds were recorded. */
-  round?: number;
+  round: number;
   text: string;
 }
 
@@ -122,10 +115,10 @@ export interface GameState extends ActionCardState {
   deck: Card[];
   discard: Card[];
   /** Table cards from evicted players, held until round cleanup. */
-  evictedCards?: Card[];
+  evictedCards: Card[];
   round: number;
-  /** Games started in this room. Missing on rooms saved before games were counted. */
-  games?: number;
+  /** Games started in this room. */
+  games: number;
   dealerIndex: number;
   turnId: string | null;
   turnAnchor: number;
@@ -135,23 +128,23 @@ export interface GameState extends ActionCardState {
   log: LogEntry[];
   /** The id of the newest log entry. Never reset, so ids stay unique for the life of the room. */
   logSeq: number;
-  /** `logSeq` when the log was last cleared. Missing on rooms saved before the log started over each game. */
-  logClearedAt?: number;
+  /** `logSeq` when the log was last cleared. */
+  logClearedAt: number;
   /** The seq of the newest draw. Never reset, so draws keep unique seqs for the life of the room. */
-  drawSeq?: number;
-  /** The most recent draws, oldest first. Missing on rooms saved before draws were recorded. */
-  draws?: DrawEvent[];
+  drawSeq: number;
+  /** The most recent draws, oldest first. */
+  draws: DrawEvent[];
   /** Players dealt Flip Three cards this round, who get Hit or Stay at their opening deal slot. */
-  flippedIds?: string[];
+  flippedIds: string[];
   /** The current turn is an opening deal slot, so it doesn't move where play resumes. */
-  dealSlotTurn?: boolean;
+  dealSlotTurn: boolean;
   /**
    * A draw found both the deck and the discard pile empty, so the round ends
    * and every player who hasn't busted scores what they hold.
    */
-  outOfCards?: boolean;
-  /** How the host set up the room. Missing on rooms saved before settings. */
-  settings?: RoomSettings;
+  outOfCards: boolean;
+  /** How the host set up the room. */
+  settings: RoomSettings;
 }
 
 export class GameError extends Error {
@@ -162,15 +155,24 @@ export const createGame = () => {
   const state: GameState = {
     ...initialActionCards(),
     dealQueue: [],
+    dealSlotTurn: false,
     dealerIndex: -1,
     deck: [],
     discard: [],
+    drawSeq: 0,
+    draws: [],
+    evictedCards: [],
+    flippedIds: [],
+    games: 0,
     hostId: null,
     log: [],
+    logClearedAt: 0,
     logSeq: 0,
+    outOfCards: false,
     phase: "lobby",
     players: [],
     round: 0,
+    settings: { ...DEFAULT_SETTINGS },
     turnAnchor: 0,
     turnId: null,
     winnerIds: [],
@@ -187,7 +189,7 @@ const record = (
   state.log.push({
     ...entry,
     at: Date.now(),
-    game: state.games ?? 0,
+    game: state.games,
     id: state.logSeq,
     round: state.round,
   });
@@ -241,19 +243,18 @@ const hasSecondChance = (player: Player) =>
   player.hand.some((card) => card.kind === "secondChance");
 
 const clearTable = (cards: Card[], player: Player) => {
-  cards.push(...player.hand, ...(player.played ?? []));
+  cards.push(...player.hand);
 
   if (player.bustCard) {
     cards.push(player.bustCard);
   }
 
   player.hand = [];
-  player.played = [];
   player.bustCard = null;
 };
 
 const clearRoundTable = (state: GameState, status: RoundStatus) => {
-  state.discard.push(...(state.evictedCards ?? []));
+  state.discard.push(...state.evictedCards);
   state.evictedCards = [];
 
   for (const player of state.players) {
@@ -276,8 +277,8 @@ const draw = (state: GameState, random: Random) => {
   const card = state.deck.pop();
 
   if (card) {
-    state.drawSeq = (state.drawSeq ?? 0) + 1;
-  } else if (state.outOfCards !== true) {
+    state.drawSeq += 1;
+  } else if (!state.outOfCards) {
     state.outOfCards = true;
     say(state, "No cards are left to draw, so the round ends.");
   }
@@ -441,21 +442,19 @@ const resolveDealtCard = (
   const outcome =
     flip?.held === true ? "held" : placeDealtCard(state, player, card);
 
-  const draws = state.draws ?? [];
-
-  if (flip && state.flippedIds?.includes(player.id) !== true) {
-    state.flippedIds = [...(state.flippedIds ?? []), player.id];
+  if (flip && !state.flippedIds.includes(player.id)) {
+    state.flippedIds = [...state.flippedIds, player.id];
   }
 
-  draws.push({
+  state.draws.push({
     card,
     flip: flip?.progress ?? null,
     ...(source === "hit" && { hit: true }),
     outcome,
     playerId: player.id,
-    seq: state.drawSeq ?? 0,
+    seq: state.drawSeq,
   });
-  state.draws = draws.slice(-DRAW_LIMIT);
+  state.draws = state.draws.slice(-DRAW_LIMIT);
 };
 
 const nextActiveAfter = (state: GameState, index: number) => {
@@ -473,7 +472,7 @@ const nextActiveAfter = (state: GameState, index: number) => {
 };
 
 const roundIsOver = (state: GameState) =>
-  state.outOfCards === true ||
+  state.outOfCards ||
   state.players.some((player) => player.status === FLIP_SEVEN_STATUS) ||
   activePlayers(state).length === 0;
 
@@ -502,7 +501,7 @@ const finishRound = (state: GameState) => {
   const best = Math.max(...state.players.map((player) => player.score));
   const leaders = state.players.filter((player) => player.score === best);
   const [winner] = leaders;
-  const { targetScore } = settingsOf(state);
+  const { targetScore } = state.settings;
 
   if (best >= targetScore && leaders.length === 1 && winner !== undefined) {
     state.phase = "gameOver";
@@ -534,7 +533,7 @@ const stepDeal = (state: GameState, random: Random) => {
     return true;
   }
 
-  if (state.flippedIds?.includes(player.id) === true) {
+  if (state.flippedIds.includes(player.id)) {
     state.turnId = player.id;
     state.dealSlotTurn = true;
 
@@ -579,7 +578,7 @@ const advance = (state: GameState, random: Random) => {
       continue;
     }
 
-    if (state.dealSlotTurn === true) {
+    if (state.dealSlotTurn) {
       if (state.turnId !== null && isActive(state, state.turnId)) {
         return;
       }
@@ -646,7 +645,7 @@ export const addPlayer = (
     throw new GameError(`This room is full (${MAX_PLAYERS} players).`);
   }
 
-  if (settingsOf(state).locked && state.players.length > 0) {
+  if (state.settings.locked && state.players.length > 0) {
     throw new GameError("This room is locked. Ask the host to unlock it.");
   }
 
@@ -660,6 +659,7 @@ export const addPlayer = (
 
   state.players.push({
     avatar,
+    bot: false,
     bustCard: null,
     connected: true,
     hand: [],
@@ -733,6 +733,7 @@ export const addBot = (
   const name = botName(state, random);
 
   state.players.push({
+    avatar: null,
     bot: true,
     bustCard: null,
     connected: true,
@@ -787,7 +788,7 @@ export const configure = (
     type: "configure",
   });
 
-  const before = settingsOf(state);
+  const before = state.settings;
   const after: RoomSettings = { ...before, ...changes };
   state.settings = after;
   announceSettings(state, before, after);
@@ -795,10 +796,9 @@ export const configure = (
 
 /** Whether anyone in the room is a person rather than a bot. */
 export const hasHumans = (state: GameState) =>
-  state.players.some((player) => player.bot !== true);
+  state.players.some((player) => !player.bot);
 
-const isOnlineHuman = (player: Player) =>
-  player.connected && player.bot !== true;
+const isOnlineHuman = (player: Player) => player.connected && !player.bot;
 
 export const startGame = (
   state: GameState,
@@ -813,7 +813,6 @@ export const startGame = (
   for (const player of state.players) {
     player.score = 0;
     player.hand = [];
-    player.played = [];
     player.bustCard = null;
     player.lastRound = null;
   }
@@ -821,7 +820,7 @@ export const startGame = (
   state.deck = shuffle(buildDeck(), random);
   state.discard = [];
   state.evictedCards = [];
-  state.games = (state.games ?? 0) + 1;
+  state.games += 1;
   state.round = 0;
   state.winnerIds = [];
   state.dealerIndex = Math.floor(random() * state.players.length) - 1;
@@ -839,7 +838,7 @@ export const nextRound = (
 };
 
 const endTurn = (state: GameState, player: Player) => {
-  if (state.dealSlotTurn === true) {
+  if (state.dealSlotTurn) {
     state.dealSlotTurn = false;
   } else {
     state.turnAnchor = state.players.indexOf(player);
@@ -929,7 +928,7 @@ export const removePlayer = (
   state.players.splice(index, 1);
 
   const tableCards =
-    state.phase === "lobby" ? state.discard : (state.evictedCards ??= []);
+    state.phase === "lobby" ? state.discard : state.evictedCards;
 
   clearTable(tableCards, player);
 
@@ -947,7 +946,7 @@ export const removePlayer = (
   if (state.hostId === playerId) {
     state.hostId =
       state.players.find(isOnlineHuman)?.id ??
-      state.players.find((other) => other.bot !== true)?.id ??
+      state.players.find((other) => !other.bot)?.id ??
       null;
   }
 
@@ -1098,7 +1097,7 @@ export const playForBot = (state: GameState, random: Random) => {
     {
       choice: state.choice,
       players: state.players,
-      targetScore: settingsOf(state).targetScore,
+      targetScore: state.settings.targetScore,
     },
     player.id
   );

@@ -15,11 +15,8 @@ export interface HeldCard {
 }
 
 interface FlipThreeSequence {
-  /**
-   * The Flip Three card being resolved. It goes to the discard pile once its
-   * draws end. Missing on rooms saved before the card was tracked here.
-   */
-  card?: ActionCard;
+  /** The Flip Three card being resolved. It goes to the discard pile once its draws end. */
+  card: ActionCard;
   targetId: string;
   remaining: number;
   deferred: ActionCard[];
@@ -28,8 +25,7 @@ interface FlipThreeSequence {
 interface QueuedAction {
   ownerId: string;
   card: ActionCard;
-  /** Missing on rooms saved before deferred actions were assigned up front. */
-  targetId?: string;
+  targetId: string;
 }
 
 /**
@@ -44,7 +40,7 @@ interface DeferredAssignment {
 
 export interface ActionCardState {
   actionQueue: QueuedAction[];
-  assignment?: DeferredAssignment | null;
+  assignment: DeferredAssignment | null;
   choice: ActionCardChoice | null;
   flipRuns: FlipThreeSequence[];
 }
@@ -90,21 +86,18 @@ const discardAssignment = (
 export const initialActionCards = () =>
   ({
     actionQueue: [],
+    assignment: null,
     choice: null,
     flipRuns: [],
   }) satisfies ActionCardState;
 
 export const resetActionCards = (state: ActionCardState) => {
-  Object.assign(state, initialActionCards(), { assignment: null });
+  Object.assign(state, initialActionCards());
 };
 
 export const discardActionCards = (state: ResolutionState) => {
   for (const sequence of state.flipRuns) {
-    if (sequence.card) {
-      state.discard.push(sequence.card);
-    }
-
-    state.discard.push(...sequence.deferred);
+    state.discard.push(sequence.card, ...sequence.deferred);
   }
 
   state.discard.push(...state.actionQueue.map(({ card }) => card));
@@ -251,10 +244,7 @@ const stepFlipThree = (state: ResolutionState, effects: ResolutionEffects) => {
 
   if (sequence.remaining === 0 || target?.status !== "active") {
     state.flipRuns.pop();
-
-    if (sequence.card) {
-      state.discard.push(sequence.card);
-    }
+    state.discard.push(sequence.card);
 
     finishFlipThree(state, sequence, effects.say);
 
@@ -298,20 +288,6 @@ const stepActionQueue = (
   }
 
   const owner = findPlayer(state, queued.ownerId);
-
-  if (queued.targetId === undefined) {
-    if (owner?.status === "active") {
-      state.assignment = {
-        assigned: [],
-        cards: [queued.card],
-        chooserId: owner.id,
-      };
-    } else {
-      state.discard.push(queued.card);
-    }
-
-    return true;
-  }
 
   const target = findPlayer(state, queued.targetId);
 
@@ -387,7 +363,7 @@ export const evictFromActionCards = (
 };
 
 const heldCards = (state: ActionCardState) => {
-  const assignment = state.assignment ?? null;
+  const { assignment } = state;
 
   const held: HeldCard[] = state.flipRuns.flatMap((run) =>
     run.deferred.map((card) => ({ card, ownerId: run.targetId }))
@@ -400,13 +376,13 @@ const heldCards = (state: ActionCardState) => {
       }
     }
 
-    for (const { card, ownerId, targetId } of assignment.assigned) {
-      held.push({ card, ownerId: targetId ?? ownerId });
+    for (const { card, targetId } of assignment.assigned) {
+      held.push({ card, ownerId: targetId });
     }
   }
 
-  for (const { card, ownerId, targetId } of state.actionQueue) {
-    held.push({ card, ownerId: targetId ?? ownerId });
+  for (const { card, targetId } of state.actionQueue) {
+    held.push({ card, ownerId: targetId });
   }
 
   return held;

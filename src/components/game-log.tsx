@@ -25,7 +25,6 @@ import {
   untrack,
 } from "solid-js";
 
-import { fallbackAvatar } from "../game/avatars";
 import { CHAT_MAX_LENGTH } from "../game/engine";
 import type { LogEntry } from "../game/engine";
 import { observeScrollEdges } from "../lib/scroll-edges";
@@ -86,19 +85,13 @@ interface LogGroup {
 }
 
 const groupHeading = (entry: LogEntry) => {
-  if (entry.round === undefined) {
-    return "";
-  }
-
   if (entry.round === 0) {
     return "Lobby";
   }
 
   const round = `Round ${entry.round}`;
 
-  return entry.game !== undefined && entry.game > 1
-    ? `Game ${entry.game} · ${round}`
-    : round;
+  return entry.game > 1 ? `Game ${entry.game} · ${round}` : round;
 };
 
 const groupLog = (entries: LogEntry[]) => {
@@ -301,38 +294,27 @@ const timeLabel = (at: Date, now: number) => {
   return { long: exactTime.format(at), short: clockTime.format(at) };
 };
 
-const LogTime = (props: { at: number | undefined; now: () => number }) => {
-  const time = createMemo(() =>
-    props.at === undefined ? undefined : new Date(props.at)
-  );
+const LogTime = (props: { at: number; now: () => number }) => {
+  const time = createMemo(() => new Date(props.at));
 
-  const label = createMemo(
-    () => {
-      const at = time();
-
-      return at ? timeLabel(at, props.now()) : undefined;
-    },
-    { equals: (a, b) => a?.long === b?.long && a?.short === b?.short }
-  );
+  const label = createMemo(() => timeLabel(time(), props.now()), {
+    equals: (a, b) => a.long === b.long && a.short === b.short,
+  });
 
   return (
-    <Show when={time()}>
-      {(at) => (
-        <time
-          aria-label={label()?.long}
-          datetime={at().toISOString()}
-          title={exactTime.format(at())}
-        >
-          {label()?.short}
-        </time>
-      )}
-    </Show>
+    <time
+      aria-label={label().long}
+      datetime={time().toISOString()}
+      title={exactTime.format(time())}
+    >
+      {label().short}
+    </time>
   );
 };
 
 const oldGameMinute = (entry: LogEntry | undefined, now: () => number) => {
   if (
-    entry?.at === undefined ||
+    entry === undefined ||
     entry.from !== undefined ||
     entry.at > now() - HOUR_MS
   ) {
@@ -680,11 +662,7 @@ export default function GameLog(props: {
                                   <div class="log-message-header">
                                     <span class="log-author-line">
                                       <PlayerAvatar
-                                        player={{
-                                          avatar:
-                                            author().avatar ??
-                                            fallbackAvatar(author().id),
-                                        }}
+                                        player={author()}
                                         size="sm"
                                       />
                                       <strong class="log-author">

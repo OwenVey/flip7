@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { fallbackAvatar } from "./avatars";
 import { addBot, addPlayer, createGame } from "./engine";
 import { roundStarted, toRoomView } from "./protocol";
 import type { RoomView } from "./protocol";
@@ -58,16 +57,5 @@ describe(toRoomView, () => {
     expect(
       toRoomView("ABCDE", state).players.map((player) => player.avatar)
     ).toStrictEqual([4, null]);
-  });
-
-  it("gives a player saved before avatars the same avatar every time", () => {
-    const state = createGame();
-    addPlayer(state, "saved-player", "Ana", 4);
-    delete state.players[0]?.avatar;
-
-    const first = toRoomView("ABCDE", state).players[0]?.avatar;
-
-    expect(first).toBe(fallbackAvatar("saved-player"));
-    expect(toRoomView("ABCDE", state).players[0]?.avatar).toBe(first);
   });
 });

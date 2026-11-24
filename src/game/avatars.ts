@@ -32,17 +32,6 @@ export const pickAvatar = (seed: number, taken: Iterable<number> = []) => {
   return start + 1;
 };
 
-/** A stable avatar for a player saved before players picked one. */
-export const fallbackAvatar = (playerId: string) => {
-  let hash = 0;
-
-  for (const char of playerId) {
-    hash = (hash * 31 + (char.codePointAt(0) ?? 0)) % 1_000_003;
-  }
-
-  return 1 + (hash % AVATAR_COUNT);
-};
-
 /** Reads an avatar saved in browser storage, or null if it isn't one. */
 export const parseSavedAvatar = (data: string) => {
   const avatar = Number(data);
@@ -50,15 +39,6 @@ export const parseSavedAvatar = (data: string) => {
   return isAvatar(avatar) ? avatar : null;
 };
 
-interface AvatarHolder {
-  id: string;
-  bot?: boolean;
-  avatar?: number;
-}
-
-/** The avatar a player shows, or null for a bot. */
-export const avatarOf = (player: AvatarHolder) =>
-  player.bot === true ? null : (player.avatar ?? fallbackAvatar(player.id));
-
-export const takenAvatars = (players: readonly AvatarHolder[]) =>
-  players.flatMap((player) => avatarOf(player) ?? []);
+/** The avatars people in the room have picked. Bots have none. */
+export const takenAvatars = (players: readonly { avatar: number | null }[]) =>
+  players.flatMap((player) => player.avatar ?? []);
