@@ -143,6 +143,74 @@ describe("<Table />", () => {
     expect(actionBar.getByRole("button", { name: "Stay" })).toBe(stay);
   });
 
+  it("keeps your Hit pending until the room confirms it", async () => {
+    const confirmed = Promise.withResolvers<boolean>();
+    const sent: Parameters<RoomConnection["send"]>[0][] = [];
+
+    const send: RoomConnection["send"] = async (command) => {
+      sent.push(command);
+
+      return await confirmed.promise;
+    };
+
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={send}
+        chat={vi.fn<RoomConnection["chat"]>()}
+      />
+    ));
+
+    const hit = screen.getByRole("button", { name: "Hit" });
+    hit.click();
+    flush();
+
+    expect(sent).toStrictEqual([{ type: "hit" }]);
+    expect(hit).toHaveAttribute("data-pending");
+
+    confirmed.resolve(true);
+    await vi.waitFor(() => {
+      expect(hit).not.toHaveAttribute("data-pending");
+    });
+  });
+
+  it("keeps the same Hit and Stay buttons for an offline player while their points change", () => {
+    const [points, setPoints] = createSignal(7);
+    const view = room({ turnId: "b" });
+    view.players = view.players.map((player) =>
+      player.id === "b" ? { ...player, connected: false } : player
+    );
+
+    render(() => (
+      <Table
+        room={view}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={vi.fn<RoomConnection["chat"]>()}
+        roundPoints={new Map([["b", points()]])}
+      />
+    ));
+
+    const actionBar = within(
+      screen.getByRole("region", { name: "Game status" })
+    );
+
+    const hit = actionBar.getByRole("button", { name: "Hit for Ben" });
+
+    const stay = actionBar.getByRole("button", {
+      name: "Stay for Ben with 7 points",
+    });
+
+    setPoints(9);
+    flush();
+
+    expect(actionBar.getByRole("button", { name: "Hit for Ben" })).toBe(hit);
+    expect(
+      actionBar.getByRole("button", { name: "Stay for Ben with 9 points" })
+    ).toBe(stay);
+  });
+
   it("sets held action cards beside the deck, not in the seat", () => {
     render(() => (
       <Table

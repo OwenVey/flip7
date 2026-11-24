@@ -107,6 +107,11 @@ export const roundPointsFor = (
     ])
   );
 
+export const pointsOf = (
+  roundPoints: DealPlaybackView["roundPoints"],
+  playerId: string | null
+) => (playerId === null ? 0 : (roundPoints.get(playerId) ?? 0));
+
 const displayOf = ({ incomingCardId, room, ...display }: Frame) => ({
   ...display,
   room,

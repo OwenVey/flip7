@@ -4,10 +4,10 @@ import { createEffect, createMemo, createSignal, Repeat, Show } from "solid-js";
 import type { Card } from "../game/cards";
 import { FLIP_THREE_COUNT } from "../game/engine";
 import type { RoomView } from "../game/protocol";
+import { stepPlayerId } from "../lib/deal-plan";
 import type { DealStep } from "../lib/deal-plan";
 import { motionAllowed } from "../lib/motion";
 import PlayingCard from "./playing-card";
-import { stepPlayerId } from "./table-common";
 
 interface FlipProgress {
   flipped: number;

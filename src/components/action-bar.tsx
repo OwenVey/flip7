@@ -10,13 +10,13 @@ import type { ParentProps } from "solid-js";
 
 import type { HeldCard } from "../game/engine";
 import type { RoomView } from "../game/protocol";
+import { nameOf } from "../lib/player-name";
 import { pop } from "../lib/table-motion";
 import { samePrompt, tablePrompt } from "../lib/table-prompt";
 import type { PromptPlayback } from "../lib/table-prompt";
 import CardBackMark from "./card-back-mark";
 import PlayingCard from "./playing-card";
 import ScrollFade from "./scroll-fade";
-import { nameOf } from "./table-common";
 import type { TableProps } from "./table-common";
 
 const sameHeldCards = (a: HeldCard[], b: HeldCard[]) =>
@@ -135,13 +135,16 @@ const ActionBar = (
     return controls.kind === "turn" ? controls : null;
   };
 
-  const offlineTurn = () => {
-    const controls = turn();
+  const offlinePlayer = () => turn()?.for;
+  const turnPointsLabel = () => pointsLabel(turn()?.roundPoints ?? 0);
 
-    return controls?.forId === undefined ? null : controls;
+  const myTurn = () => kind() === "turn" && offlinePlayer() === undefined;
+
+  const turnMove = (type: "hit" | "stay") => {
+    const target = offlinePlayer();
+
+    return target === undefined ? { type } : { forId: target.id, type };
   };
-
-  const myTurn = () => kind() === "turn" && offlineTurn() === null;
 
   const canStart = () => {
     const { controls } = prompt();
@@ -248,16 +251,19 @@ const ActionBar = (
                 </Button>
               </ActionButtons>
             </Match>
-            <Match when={myTurn()}>
+            <Match when={kind() === "turn"}>
               <ActionButtons>
                 <Button
                   data-size="lg"
                   disabled={props.actionsDisabled}
                   data-variant="solid"
+                  aria-label={
+                    offlinePlayer()
+                      ? `Hit for ${offlinePlayer()?.name}`
+                      : undefined
+                  }
                   data-game-tap=""
-                  onClick={() => {
-                    void props.send({ type: "hit" });
-                  }}
+                  onClick={async () => await props.send(turnMove("hit"))}
                 >
                   <SquarePlus size={16} />
                   Hit
@@ -266,55 +272,24 @@ const ActionBar = (
                   <Button
                     data-size="lg"
                     disabled={props.actionsDisabled}
+                    aria-label={
+                      offlinePlayer()
+                        ? `Stay for ${offlinePlayer()?.name} with ${turnPointsLabel()}`
+                        : undefined
+                    }
                     data-game-tap=""
-                    onClick={() => {
-                      void props.send({ type: "stay" });
-                    }}
+                    onClick={async () => await props.send(turnMove("stay"))}
                   >
                     <Hand size={16} />
-                    Stay
+                    <Show when={offlinePlayer()} fallback="Stay">
+                      <FitLabel
+                        long={`Stay · ${turnPointsLabel()}`}
+                        short="Stay"
+                      />
+                    </Show>
                   </Button>
                 </Show>
               </ActionButtons>
-            </Match>
-            <Match when={offlineTurn()}>
-              {(offline) => (
-                <ActionButtons>
-                  <Button
-                    data-size="lg"
-                    disabled={props.actionsDisabled}
-                    data-variant="solid"
-                    aria-label={`Hit for ${offline().forName}`}
-                    data-game-tap=""
-                    onClick={async () =>
-                      await props.send({ forId: offline().forId, type: "hit" })
-                    }
-                  >
-                    <SquarePlus size={16} />
-                    Hit
-                  </Button>
-                  <Show when={offline().canStay}>
-                    <Button
-                      data-size="lg"
-                      disabled={props.actionsDisabled}
-                      aria-label={`Stay for ${offline().forName} with ${pointsLabel(offline().roundPoints)}`}
-                      data-game-tap=""
-                      onClick={async () =>
-                        await props.send({
-                          forId: offline().forId,
-                          type: "stay",
-                        })
-                      }
-                    >
-                      <Hand size={16} />
-                      <FitLabel
-                        long={`Stay · ${pointsLabel(offline().roundPoints)}`}
-                        short="Stay"
-                      />
-                    </Button>
-                  </Show>
-                </ActionButtons>
-              )}
             </Match>
           </Switch>
         </div>

@@ -113,8 +113,7 @@ describe(tablePrompt, () => {
       expected: {
         controls: {
           canStay: true,
-          forId: "b",
-          forName: "Ben",
+          for: { id: "b", name: "Ben" },
           kind: "turn",
           roundPoints: 3,
         },

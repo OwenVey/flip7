@@ -7,13 +7,15 @@ import type { AvailableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { stepPlayerId } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
+import { pointsOf } from "./deal-playback";
 import type { DealPlaybackView } from "./deal-playback";
 import { hostName } from "./host";
+import { nameOf } from "./player-name";
 import { rankPlayers } from "./standings";
 
 /**
  * Which controls the action bar offers alongside the Table prompt: Hit and
- * Stay (for an offline player when `forId` is set), Start next round, Back to
+ * Stay (for an offline player when `for` is set), Start next round, Back to
  * lobby with Play again when `canStart`, or a line saying who the room is
  * waiting for in place of the host's buttons.
  */
@@ -21,8 +23,7 @@ export type PromptControls =
   | { kind: "none" }
   | {
       kind: "turn";
-      forId?: string;
-      forName?: string;
+      for?: { id: string; name: string };
       canStay: boolean;
       roundPoints: number;
     }
@@ -52,14 +53,6 @@ export type PromptPlayback = Pick<
 
 const NONE: PromptControls = { kind: "none" };
 const RECONNECT_NOTE = "Play resumes when a player reconnects.";
-
-const nameOf = (room: RoomView, id: string | null) =>
-  room.players.find((player) => player.id === id)?.name ?? "Someone";
-
-const pointsOf = (
-  roundPoints: PromptPlayback["roundPoints"],
-  playerId: string | null
-) => (playerId === null ? 0 : (roundPoints.get(playerId) ?? 0));
 
 const playPaused = (room: RoomView) =>
   !room.players.some((player) => player.connected && !player.bot);
@@ -261,8 +254,7 @@ const turnPrompt = (
     return {
       controls: {
         canStay: turn.canStay,
-        forId: turn.forId,
-        forName,
+        for: { id: turn.forId, name: forName },
         kind: "turn",
         roundPoints: pointsOf(roundPoints, turn.forId),
       },
