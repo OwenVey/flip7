@@ -35,6 +35,7 @@ import {
   initialDealPlayback,
 } from "../../lib/deal-playback";
 import { MOTION_PREFERENCE_QUERY } from "../../lib/motion";
+import { createMoveAlert } from "../../lib/move-alert";
 import { createRoomConnection } from "../../lib/room-connection";
 import { createRoomSounds } from "../../lib/room-sounds";
 import {
@@ -112,6 +113,11 @@ const Room = (props: { code: string }) => {
 
     return connection.watching() ? "Watching · " : "";
   };
+
+  const pageTitle = createMoveAlert(
+    () => table().myMove,
+    () => `${titlePrefix()}Room ${props.code} · Flip 7`
+  );
 
   const spectator = () => ({
     join: {
@@ -204,7 +210,7 @@ const Room = (props: { code: string }) => {
 
   return (
     <>
-      <Title>{`${titlePrefix()}Room ${props.code} · Flip 7`}</Title>
+      <Title>{pageTitle()}</Title>
       <PageMeta
         title={`Join room ${props.code} · Flip 7`}
         description={`You're invited to a game of Flip 7. Open the link to join room ${props.code}, pick a name and play. No accounts needed.`}
