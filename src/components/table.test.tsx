@@ -15,6 +15,7 @@ import { calculateRoundScore } from "../game/cards";
 import type { RoomView } from "../game/protocol";
 import { roundPointsFor } from "../lib/deal-playback";
 import type { RoomConnection } from "../lib/room-connection";
+import { LOGGED_AT, room } from "../test/room-view";
 import TableView from "./table";
 
 let approve = false;
@@ -22,67 +23,6 @@ let approve = false;
 const agent = createAgent({
   allow: (step) => (step.confirm ?? "") === "" || approve,
 });
-
-const LOGGED_AT = Date.now();
-
-const room = (overrides: Partial<RoomView> = {}) => {
-  const view: RoomView = {
-    choice: null,
-    code: "ABCDE",
-    dealerId: "b",
-    deckCount: 80,
-    discardCount: 0,
-    drawSeq: 0,
-    draws: [],
-    flips: [],
-    held: [],
-    hostId: "a",
-    log: [
-      {
-        at: LOGGED_AT,
-        game: 1,
-        id: 1,
-        round: 1,
-        text: "Round 1 begins. Ben deals.",
-      },
-    ],
-    phase: "playing",
-    players: [
-      {
-        avatar: 1,
-        bot: false,
-        bustCard: null,
-        connected: true,
-        hand: [{ id: 1, kind: "number", value: 7 }],
-        id: "a",
-        lastRound: null,
-        name: "Ana",
-        score: 40,
-        status: "active",
-      },
-      {
-        avatar: 1,
-        bot: false,
-        bustCard: null,
-        connected: true,
-        hand: [{ id: 2, kind: "number", value: 3 }],
-        id: "b",
-        lastRound: null,
-        name: "Ben",
-        score: 12,
-        status: "active",
-      },
-    ],
-    round: 1,
-    settings: { botSpeed: "normal", locked: false, targetScore: 200 },
-    spectatorCount: 0,
-    turnId: "a",
-    winnerIds: [],
-    ...overrides,
-  };
-
-  return view;
-};
 
 const withBot = (overrides: Partial<RoomView> = {}) => {
   const view = room(overrides);
