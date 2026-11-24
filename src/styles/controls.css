@@ -1,0 +1,263 @@
+.link {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.row,
+.alert-dialog-body > [data-slot="row"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--button-gap);
+  align-items: center;
+}
+
+.stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.panel {
+  display: grid;
+  gap: 0.875rem;
+  align-content: start;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 2px solid var(--ink);
+  border-radius: var(--dialog-radius);
+  background: var(--paper);
+  box-shadow: var(--shadow-print), var(--shadow-table);
+}
+
+/* Panel titles sit centred between two gold rules, each capped with a diamond pip. */
+.panel > h2,
+.panel-title {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+
+  &::before,
+  &::after {
+    content: "\2666";
+    content: "\2666" / "";
+    flex: 1 1 0;
+    min-width: 1.5rem;
+    background: linear-gradient(var(--rule) 0 0) no-repeat;
+    background-size: calc(100% - 1.25em) 2px;
+    color: var(--rule);
+    font-family: var(--font-body);
+    font-size: 0.625rem;
+    line-height: 1;
+  }
+
+  &::before {
+    background-position: left center;
+    text-align: end;
+  }
+
+  &::after {
+    background-position: right center;
+    text-align: start;
+  }
+}
+
+.panel > h2,
+.panel-title h2 {
+  letter-spacing: 0.035em;
+}
+
+.badge {
+  padding: 0.0625rem 0.5rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+
+  &[data-tone="muted"] {
+    background: var(--paper-deep);
+  }
+
+  &[data-tone="bot"] {
+    padding-inline: 0.375rem;
+    border-color: #a596b5;
+    background: #f1e7f5;
+    color: var(--ink-soft);
+    font-size: 0.625rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  &[data-tone="danger"] {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    border-color: var(--danger);
+    background: var(--danger);
+    color: var(--paper);
+  }
+
+  &[data-tone="turn"] {
+    background: var(--accent);
+    color: var(--paper);
+    white-space: nowrap;
+  }
+
+  /* Host is a role, not you: a light pill with a crown, so it never reads as the gold You badge. */
+  &[data-tone="host"] {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    background: var(--paper);
+  }
+
+  &[data-tone="winner"] {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    white-space: nowrap;
+  }
+}
+
+/* One base for every button-like part, so neighbors always match. Change looks with data-variant, size with data-size. */
+:is(
+  [data-slot="button"],
+  [data-slot="alert-dialog-trigger"],
+  [data-slot="alert-dialog-close"],
+  [data-slot="dialog-trigger"],
+  [data-slot="dialog-close"],
+  [data-slot="popover-trigger"],
+  [data-slot="menu-trigger"]
+) {
+  --button-height: var(--control-height);
+  height: auto;
+  min-height: var(--button-height);
+  --button-ink: var(--ink);
+  padding-inline: 1.125rem;
+  border: 1px solid var(--button-ink);
+  box-shadow: 2px 2px 0 var(--button-ink);
+  font-size: var(--ui-font-size);
+  font-weight: 700;
+  /* Rapid taps register as taps instead of a double-tap zoom. */
+  touch-action: manipulation;
+  transition:
+    transform 80ms ease,
+    box-shadow 80ms ease;
+
+  &:active:not([data-disabled], [aria-disabled="true"]) {
+    transform: translate(2px, 2px);
+    box-shadow: 0 0 0 var(--button-ink);
+  }
+
+  /* A paper button whose red ink warns without competing with the main action. */
+  &[data-tone="danger"]:not([data-variant]) {
+    --button-ink: var(--danger-ink);
+    color: var(--danger);
+
+    @media (hover: hover) {
+      &:hover:not([data-disabled], [aria-disabled="true"]) {
+        color: color-mix(in srgb, var(--danger) 80%, black);
+      }
+    }
+  }
+
+  /* A solid printed red, so it reads as a warning on paper and on felt. */
+  &[data-variant="destructive"] {
+    --button-ink: var(--danger-ink);
+    background: var(--danger);
+    color: var(--paper);
+
+    @media (hover: hover) {
+      &:hover:not([data-disabled], [aria-disabled="true"]) {
+        background: color-mix(in srgb, var(--danger) 85%, black);
+      }
+    }
+  }
+
+  /* Disabled buttons stay opaque in a faded version of their own color, so nothing shows through when they float over the page. */
+  &:is([data-disabled], [aria-disabled="true"]) {
+    --button-ink: color-mix(in oklab, var(--ink) 35%, var(--paper-deep));
+    opacity: 1;
+    background: var(--paper-deep);
+    color: color-mix(in oklab, var(--ink-soft) 55%, var(--paper-deep));
+    cursor: not-allowed;
+
+    &[data-variant="solid"] {
+      border-color: var(--button-ink);
+      background: color-mix(in oklab, var(--accent) 40%, var(--paper-deep));
+      color: var(--paper);
+    }
+
+    &[data-variant="destructive"] {
+      --button-ink: color-mix(
+        in oklab,
+        var(--danger-ink) 40%,
+        var(--paper-deep)
+      );
+      border-color: var(--button-ink);
+      background: color-mix(in oklab, var(--danger) 40%, var(--paper-deep));
+      color: var(--paper);
+    }
+
+    &[data-tone="danger"]:not([data-variant]) {
+      --button-ink: color-mix(
+        in oklab,
+        var(--danger-ink) 35%,
+        var(--paper-deep)
+      );
+      color: color-mix(in oklab, var(--danger) 50%, var(--paper-deep));
+    }
+  }
+
+  &:where([data-size="sm"]) {
+    --button-height: var(--control-height-sm);
+    padding-inline: 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  &:where([data-size="lg"]) {
+    --button-height: var(--control-height-lg);
+  }
+
+  &[data-icon] {
+    inline-size: var(--button-height);
+    padding-inline: 0;
+  }
+
+  @media (pointer: coarse) {
+    --button-height: var(--control-height-lg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:active:not([data-disabled], [aria-disabled="true"]) {
+      transform: none;
+    }
+  }
+}
+
+/*
+ * Touch screens keep :hover on the last thing tapped, so a button would stay
+ * in its hover color. These undo ui-sdk's button hovers there; :where keeps
+ * them at zero specificity so any button with its own background keeps it.
+ */
+@media (hover: none) {
+  :where(
+    [data-slot="button"],
+    [data-slot="alert-dialog-trigger"],
+    [data-slot="alert-dialog-close"],
+    [data-slot="dialog-trigger"],
+    [data-slot="dialog-close"],
+    [data-slot="popover-trigger"],
+    [data-slot="menu-trigger"]
+  ):where(:hover) {
+    background: var(--ui-background);
+  }
+
+  :where([data-variant="solid"]):where(:hover) {
+    background: var(--ui-primary);
+  }
+}

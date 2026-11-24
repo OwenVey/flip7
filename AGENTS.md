@@ -15,6 +15,7 @@ Use the [README](README.md) for setup, game rules, and deployment. Before explor
 | Browser identity, reconnects, and pending moves | `src/lib/room-connection.ts`, `src/lib/room-client.ts` |
 | Lobby, table, and deal playback | `src/routes/room/[code].tsx`, `src/components/table.tsx`, `src/lib/deal-playback.ts`, `src/lib/deal-plan.ts` |
 | What the action bar says and offers (Table prompt) | `src/lib/table-prompt.ts`, `src/components/action-bar.tsx` |
+| Styles | `src/styles/index.css` imports the area files in cascade order. `src/app.css` holds only the font imports and `@layer ui-sdk;` |
 
 ## Room and game changes
 
@@ -23,6 +24,7 @@ Use the [README](README.md) for setup, game rules, and deployment. Before explor
 - **Pre-launch: one current format.** The site hasn't launched, so no stored rooms, browser data or clients exist in an older shape. Change persisted room state (`GameState`, `StoredRoom`), browser storage and the wire protocol in place: make new fields required, set them in the constructors (`createGame`, `newStoredRoom`, `addPlayer`, `addBot`), and update every reader and fixture to the new shape. Leave out "saved before" fallbacks, `??` defaults for old data, migrations and tests of old shapes. Keep validating everything from the network or browser storage, so corrupt data is rejected or reset. Revisit this rule at launch.
 - Preserve rejoining by token, pending-move confirmation after reconnecting, and presence across multiple seats. Use `toRoomView` to project what the browser can see.
 - When changing a rule, check the in-game rules in `src/components/rules-dialog.tsx` and the README for descriptions that need updating.
+- Keep the font `@import`s in `src/app.css` and the style imports in `src/styles/index.css`. Fontaine inserts its fallback `@font-face` rules after the last `@import` in `app.css`. Rule order across the files in `src/styles/` is the cascade order, so add a rule to the file and position where it belongs. `src/styles/stylesheets.test.ts` checks both entry files and where Fontaine puts its fallbacks.
 - Keep the app and Worker TypeScript configurations separate. The Worker types are generated under `.cloudflare/types` by `pnpm typecheck`.
 
 ## Solid 2.0
@@ -33,12 +35,13 @@ Read the Solid 2.0 skill before writing or reviewing Solid code. Check unfamilia
 - Use `createEffect(compute, apply)`, `onSettled` for setup and cleanup, and draft setters for stores. Write from event handlers, effect apply callbacks, `onSettled`, or actions.
 - Use `solid-js` for reactive primitives and `@solidjs/web` for DOM APIs. In tests, use `flush()` before asserting on batched updates when needed.
 - For a Solid diagnostic code, use the reactivity-diagnostics skill or the installed diagnostic reference named in the console footer. Use the agent-loops skill when you need to verify reactive behavior with a diagnostics capture.
+- When a test asserts `expectNoDiagnostics`, capture with `captureScenario` from `src/test/diagnostics.ts`. It turns off HOT_SCOPE_TIME and WASTED_RECOMPUTE, which measure wall-clock time and fail on a busy machine.
 
 ## ui-sdk
 
 Before using ui-sdk, follow the [ui-sdk skill](.agents/skills/ui-sdk/SKILL.md) and read `node_modules/@ui-sdk/solid/docs/llms.txt`. For new components, also look up the relevant heading in `core.md` and read `rendering.md` in the same directory.
 
-Button-like parts share the base `:is(...)` rule in `src/app.css`. Add the `data-slot` for any new trigger or close part to that rule. Use `data-variant` (`solid`, `destructive`), `data-tone="danger"` for a red paper button, and `data-size="sm"` for variations. Leave `data-variant` off for the default paper button. Keep sizing, padding, borders, and font in the shared rule.
+Button-like parts share the base `:is(...)` rule in `src/styles/controls.css`. Add the `data-slot` for any new trigger or close part to that rule. Use `data-variant` (`solid`, `destructive`), `data-tone="danger"` for a red paper button, and `data-size="sm"` for variations. Leave `data-variant` off for the default paper button. Keep sizing, padding, borders, and font in the shared rule.
 
 ## Verification
 

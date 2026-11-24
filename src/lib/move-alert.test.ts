@@ -1,7 +1,8 @@
 import { createRoot, createSignal, flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import plainSvg from "../../public/favicon.svg?raw";
+import plainSvg from "../assets/favicon.svg?raw";
+import siteIcon from "../assets/favicon.svg?url";
 import { createMoveAlert } from "./move-alert";
 
 const ROOM_TITLE = "Your move · Room ABCDE · Flip 7";
@@ -56,7 +57,7 @@ describe(createMoveAlert, () => {
     vi.useFakeTimers();
     document.head.innerHTML = `
       <link rel="icon" href="/favicon.ico" sizes="32x32" />
-      <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+      <link rel="icon" type="image/svg+xml" href="${siteIcon}" />
     `;
   });
 
@@ -71,7 +72,7 @@ describe(createMoveAlert, () => {
     tick();
 
     expect(alert.title()).toBe(ROOM_TITLE);
-    expect(icon()).toBe("/favicon.svg");
+    expect(icon()).toBe(siteIcon);
     alert.dispose();
   });
 
@@ -128,7 +129,7 @@ describe(createMoveAlert, () => {
     alert.setHidden(true);
     tick();
     alert.setAlerting(false);
-    expect([alert.title(), icon()]).toStrictEqual([ROOM_TITLE, "/favicon.svg"]);
+    expect([alert.title(), icon()]).toStrictEqual([ROOM_TITLE, siteIcon]);
 
     alert.setAlerting(true);
     expect([alert.title(), icon()]).toStrictEqual([ALERT_TITLE, "dot"]);
@@ -142,7 +143,7 @@ describe(createMoveAlert, () => {
     alert.dispose();
 
     expect(vi.getTimerCount()).toBe(0);
-    expect(icon()).toBe("/favicon.svg");
+    expect(icon()).toBe(siteIcon);
   });
 
   it("does nothing to a page without an SVG icon", () => {
