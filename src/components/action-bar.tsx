@@ -10,13 +10,13 @@ import type { ParentProps } from "solid-js";
 
 import type { HeldCard } from "../game/engine";
 import type { RoomView } from "../game/protocol";
+import { nameOf } from "../lib/player-name";
 import { pop } from "../lib/table-motion";
 import { samePrompt, tablePrompt } from "../lib/table-prompt";
 import type { PromptPlayback } from "../lib/table-prompt";
 import CardBackMark from "./card-back-mark";
 import PlayingCard from "./playing-card";
 import ScrollFade from "./scroll-fade";
-import { nameOf } from "./table-common";
 import type { TableProps } from "./table-common";
 
 const sameHeldCards = (a: HeldCard[], b: HeldCard[]) =>

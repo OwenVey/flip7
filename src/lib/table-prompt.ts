@@ -7,8 +7,10 @@ import type { AvailableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { stepPlayerId } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
+import { pointsOf } from "./deal-playback";
 import type { DealPlaybackView } from "./deal-playback";
 import { hostName } from "./host";
+import { nameOf } from "./player-name";
 import { rankPlayers } from "./standings";
 
 /**
@@ -51,14 +53,6 @@ export type PromptPlayback = Pick<
 
 const NONE: PromptControls = { kind: "none" };
 const RECONNECT_NOTE = "Play resumes when a player reconnects.";
-
-const nameOf = (room: RoomView, id: string | null) =>
-  room.players.find((player) => player.id === id)?.name ?? "Someone";
-
-const pointsOf = (
-  roundPoints: PromptPlayback["roundPoints"],
-  playerId: string | null
-) => (playerId === null ? 0 : (roundPoints.get(playerId) ?? 0));
 
 const playPaused = (room: RoomView) =>
   !room.players.some((player) => player.connected && !player.bot);

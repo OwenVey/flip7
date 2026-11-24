@@ -5,6 +5,7 @@ import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 
 import { availableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
+import { pointsOf } from "../lib/deal-playback";
 import type { RoomConnection } from "../lib/room-connection";
 import { passDealerChip } from "../lib/table-motion";
 import type { ChipSpot } from "../lib/table-motion";
@@ -22,7 +23,7 @@ import RoundPlayer from "./round-player";
 import ScrollFade from "./scroll-fade";
 import { SpectatorActions, WatcherCount } from "./spectator-controls";
 import type { Spectator } from "./spectator-controls";
-import { pointsOf, samePlayerIds, SCORES_TITLE } from "./table-common";
+import { samePlayerIds, SCORES_TITLE } from "./table-common";
 import type {
   DealProps,
   RoundPointsByPlayer,

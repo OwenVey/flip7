@@ -5,14 +5,10 @@ import { createEffect, createMemo, For, Show } from "solid-js";
 import type { Player, RoundStatus } from "../game/engine";
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
+import { pointsOf } from "../lib/deal-playback";
 import { rankPlayers } from "../lib/standings";
 import { slideRows } from "../lib/table-motion";
-import {
-  pointsOf,
-  ROUND_COUNT_MS,
-  samePlayerIds,
-  SCORES_TITLE,
-} from "./table-common";
+import { ROUND_COUNT_MS, samePlayerIds, SCORES_TITLE } from "./table-common";
 import type { RoundPointsByPlayer, TableProps } from "./table-common";
 
 const CountUp = (props: { value: number }) => {

@@ -11,6 +11,7 @@ import type { AvailableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
+import { nameOf } from "../lib/player-name";
 import { scoreMeter } from "../lib/score-meter";
 import { pop } from "../lib/table-motion";
 import FlipTracker, {
@@ -22,7 +23,7 @@ import OfflineBadge from "./offline-badge";
 import PlayerAvatar from "./player-avatar";
 import PlayingCard from "./playing-card";
 import RemovePlayer from "./remove-player";
-import { nameOf, ROUND_COUNT_MS } from "./table-common";
+import { ROUND_COUNT_MS } from "./table-common";
 import Tooltip from "./tooltip";
 
 const STATUS_LABELS = {
