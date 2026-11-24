@@ -34,8 +34,8 @@ const BURST_PIECES = 28;
 const BURST_COLORS = [
   "var(--gold)",
   "var(--accent)",
-  "var(--flip)",
-  "var(--good)",
+  "var(--flip-three)",
+  "var(--success)",
   "var(--danger)",
   "var(--freeze)",
 ] as const;
@@ -186,7 +186,7 @@ export default function GameOverDialog(props: {
             <For each={standings()} keyed={(entry) => entry.player.id}>
               {(entry) => (
                 <li
-                  style={{ "--row": entry().index }}
+                  style={{ "--row-index": entry().index }}
                   data-rank={entry().rank <= 3 ? entry().rank : undefined}
                   data-me={
                     entry().player.id === props.playerId ? "" : undefined

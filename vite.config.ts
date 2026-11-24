@@ -17,6 +17,13 @@ export default defineConfig({
     fileRoutes({ types: true }),
     FontaineTransform.vite({ fallbacks: {} }),
   ],
+  css: {
+    transformer: "lightningcss",
+    lightningcss: {
+      drafts: { customMedia: true },
+      targets: {},
+    },
+  },
   optimizeDeps: {
     exclude: ["@ui-sdk/core"],
   },

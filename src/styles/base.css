@@ -1,104 +1,5 @@
 :root {
   color-scheme: light;
-  --paper: #fff6df;
-  --paper-light: #fffdf6;
-  --paper-deep: #f5e9cc;
-  --ink: #262451;
-  --ink-soft: #514968;
-  --accent: #34327a;
-  --gold: #ffd45f;
-  --rule: #a37b2d;
-  --danger: #a42d43;
-  --danger-ink: #6b1626;
-  --good: #176356;
-
-  /* One family per action card: base, soft panel, ink, glow. */
-  --freeze: #4f9fd0;
-  --freeze-soft: #e3f4fb;
-  --freeze-ink: #22577a;
-  --freeze-glow: #a9def0;
-  --flip: #e8b824;
-  --flip-soft: #fff4cf;
-  --flip-ink: #6e5200;
-  --flip-glow: #f7dc84;
-  --second-chance: #e0414f;
-  --second-chance-soft: #fde6e8;
-  --second-chance-ink: #8e1b27;
-  --second-chance-glow: #f5a5ad;
-  /* Score Modifiers: flat points are orange; ×2 inverts to ink with an orange numeral. */
-  --modifier: #f0aa43;
-  --shadow-print: 3px 3px 0 var(--ink);
-  /*
-   * The turn ring: a gold band outside the ink border, edged in ink and lifted
-   * by the usual print shadow, so it reads on both paper and felt. It reaches
-   * 6px out and 9px down-right, so the gaps around the action bar and seats
-   * are 1.25rem and 1rem to keep two rings apart. Set --ring-color to recolor it.
-   */
-  --ring-width: 4px;
-  --ring-color: var(--gold);
-
-  /* The table: baize felt inside a walnut rail. */
-  --felt: #17543f;
-  --felt-deep: #0e3a2c;
-  --felt-light: #22704f;
-  --rail: #5a3520;
-  --rail-light: #8a5a36;
-  --on-felt: #fff6df;
-  --on-felt-soft: #cfe3d4;
-  --shadow-table: 0 0.5rem 1.25rem rgb(4 20 14 / 0.45);
-
-  /* Each number card has its own color, matched to the printed deck. */
-  --heat-0: #e9eef2;
-  --heat-1: #bfab90;
-  --heat-2: #d4dc33;
-  --heat-3: #de485f;
-  --heat-4: #4cb8ad;
-  --heat-5: #3bab48;
-  --heat-6: #aa4c8d;
-  --heat-7: #cb7b72;
-  --heat-8: #abcf76;
-  --heat-9: #eb8b30;
-  --heat-10: #d9252a;
-  --heat-11: #759bc5;
-  --heat-12: #8f7f6d;
-
-  --font-display:
-    "Bungee", "Bungee fallback", ui-sans-serif, system-ui, sans-serif;
-  --font-numeral:
-    "Big Shoulders Display Variable", "Big Shoulders Display Variable fallback",
-    "Bungee", ui-sans-serif, sans-serif;
-  --font-body:
-    "Inter Variable", "Inter Variable fallback", ui-sans-serif, system-ui,
-    sans-serif;
-
-  --ui-background: var(--paper);
-  --ui-foreground: var(--ink);
-  --ui-muted: var(--paper-deep);
-  --ui-muted-foreground: var(--ink-soft);
-  --ui-border: var(--ink);
-  --ui-input: var(--ink-soft);
-  --ui-primary: var(--accent);
-  --ui-primary-foreground: var(--paper);
-  --ui-destructive: var(--danger);
-  --ui-ring: var(--gold);
-  --ui-ring-border: var(--accent);
-  --ui-overlay: rgb(38 36 81 / 0.55);
-  --ui-shadow: var(--shadow-print);
-  /* Corner scale: small inner parts, controls and cards, felt wells, panels. */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.625rem;
-  --radius-xl: 0.875rem;
-  --ui-radius: var(--radius-md);
-  --ui-font-size: 0.9375rem;
-  --ui-font-sans: var(--font-body);
-  --control-height-sm: 2rem;
-  --control-height: 2.5rem;
-  --control-height-lg: 2.75rem;
-  /* The space between neighboring buttons, side by side or stacked. */
-  --button-gap: 0.625rem;
-  --dialog-inset: 1rem;
-  --dialog-radius: var(--radius-xl);
 }
 
 *,
@@ -149,7 +50,7 @@ body {
   background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-body);
-  line-height: 1.5;
+  line-height: var(--leading-relaxed);
 
   /* The felt's dot texture fades out at the top and bottom, so it doesn't end in a hard line against Safari's flat bars. */
   &::before {
@@ -165,7 +66,7 @@ body {
     background-size:
       4px 4px,
       5px 5px;
-    mask-image: linear-gradient(transparent, #000 12%, #000 80%, transparent);
+    mask-image: linear-gradient(transparent, black 12%, black 80%, transparent);
     pointer-events: none;
     content: "";
   }
@@ -178,7 +79,7 @@ h2,
 .headline {
   font-family: var(--font-display);
   font-weight: 400;
-  line-height: 1;
+  line-height: var(--leading-none);
 }
 
 h1 {
@@ -188,7 +89,7 @@ h1 {
 
 h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 
 p {
@@ -226,14 +127,14 @@ p {
   background: var(--paper-light);
   box-shadow: 2px 2px 0 var(--field-ink);
   caret-color: var(--accent);
-  font-weight: 500;
+  font-weight: 600;
 
   &:where([data-size="sm"]) {
     height: var(--control-height-sm);
   }
 
   &::placeholder {
-    color: color-mix(in srgb, var(--ink-soft) 80%, var(--paper-light));
+    color: color-mix(in oklab, var(--ink-soft) 80%, var(--paper-light));
     opacity: 1;
   }
 
@@ -275,14 +176,14 @@ p {
     box-shadow: 2px 2px 0 var(--ink);
     font-family: var(--font-display);
     font-size: 1.75rem;
-    line-height: 1;
+    line-height: var(--leading-none);
     transition:
-      transform 80ms ease,
-      box-shadow 80ms ease;
+      transform var(--duration-instant) ease,
+      box-shadow var(--duration-instant) ease;
 
     &[data-active] {
       transform: translate(-1px, -1px);
-      box-shadow: 3px 3px 0 var(--ink);
+      box-shadow: var(--shadow-print);
       outline-offset: 0;
     }
 

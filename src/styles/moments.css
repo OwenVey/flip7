@@ -36,7 +36,7 @@
 
   /* Bust: the stamp slams down, the duplicate shakes, and the seat flinches. */
   .card[data-bust]:not([data-incoming])::after {
-    animation: bust-stamp 360ms cubic-bezier(0.5, 1.8, 0.6, 1) both;
+    animation: bust-stamp 360ms var(--ease-stamp) both;
   }
 
   .hand:has(.card[data-bust]:not([data-incoming])) .card[data-dupe] {
@@ -55,7 +55,7 @@
     position: absolute;
     inset: -2px;
     border-radius: inherit;
-    outline: var(--ring-width) solid var(--gold);
+    outline: var(--turn-ring-width) solid var(--gold);
     opacity: 0;
     pointer-events: none;
     content: "";
@@ -63,12 +63,12 @@
   }
 
   .action-bar {
-    transition: box-shadow 300ms ease;
+    transition: box-shadow var(--duration-slow) ease;
   }
 
   /* Status changes pop in, and Stayed stamps like a banked chip. */
   .seat-meta > :is(.status-pill, .badge) {
-    animation: pop-in 240ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+    animation: pop-in 240ms var(--ease-pop) both;
   }
 
   /* The badge fades as its run ends, rather than vanishing with the result. */
@@ -86,17 +86,17 @@
   }
 
   .seat-meta > .flip-run[data-leaving] {
-    animation: pop-out var(--flip-exit) cubic-bezier(0.23, 1, 0.32, 1) both;
+    animation: pop-out var(--flip-tracker-exit) var(--ease-settle) both;
   }
 
   .seat[data-status="stayed"] .status-pill,
   .seat:not([data-status="flipSeven"]) .hand-stamp {
-    animation: stamp-in 380ms cubic-bezier(0.5, 1.8, 0.6, 1) both;
+    animation: stamp-in 380ms var(--ease-stamp) both;
   }
 
   /* Flip 7 stamps once the run has hopped in and the shine is sweeping. */
   .seat[data-status="flipSeven"] .hand-stamp {
-    animation: stamp-in 380ms cubic-bezier(0.5, 1.8, 0.6, 1) 1000ms both;
+    animation: stamp-in 380ms var(--ease-stamp) 1000ms both;
   }
 
   .seat-meter[data-round="locked"] {
@@ -105,7 +105,7 @@
     }
 
     & .seat-score[data-projected] {
-      animation: score-bank 480ms cubic-bezier(0.3, 1.6, 0.5, 1);
+      animation: score-bank 480ms var(--ease-pop);
     }
   }
 
@@ -116,8 +116,8 @@
     }
 
     & .hand .card {
-      animation: flip-seven-hop 520ms cubic-bezier(0.3, 1.6, 0.5, 1)
-        calc(var(--i, 0) * 70ms) both;
+      animation: flip-seven-hop 520ms var(--ease-pop)
+        calc(var(--card-index, 0) * 70ms) both;
     }
 
     & .hand .card:not([data-bust])::after {
@@ -132,38 +132,38 @@
         )
         0 0 / 250% 100% no-repeat;
       content: "";
-      animation: card-shine 900ms ease-in-out calc(var(--i, 0) * 70ms + 200ms)
-        both;
+      animation: card-shine 900ms ease-in-out
+        calc(var(--card-index, 0) * 70ms + 200ms) both;
     }
   }
 
   .hand .card {
     &:nth-child(2) {
-      --i: 1;
+      --card-index: 1;
     }
 
     &:nth-child(3) {
-      --i: 2;
+      --card-index: 2;
     }
 
     &:nth-child(4) {
-      --i: 3;
+      --card-index: 3;
     }
 
     &:nth-child(5) {
-      --i: 4;
+      --card-index: 4;
     }
 
     &:nth-child(6) {
-      --i: 5;
+      --card-index: 5;
     }
 
     &:nth-child(7) {
-      --i: 6;
+      --card-index: 6;
     }
 
     &:nth-child(8) {
-      --i: 7;
+      --card-index: 7;
     }
   }
 
@@ -177,7 +177,7 @@
     position: absolute;
     inset: -2px;
     border-radius: inherit;
-    box-shadow: 0 0 0 var(--ring-width) var(--pick-color);
+    box-shadow: 0 0 0 var(--turn-ring-width) var(--pick-color);
     opacity: 0;
     pointer-events: none;
     content: "";
@@ -198,19 +198,20 @@
   .seat[data-pickable][data-turn]:where(
       :has(.seat-pick:not(:disabled)):not(:has(.seat-pick:focus-visible))
     ) {
-    --ring-color: var(--felt);
+    --turn-ring-color: var(--felt);
   }
 
   /* Round and game over. */
   .leaderboard-round[data-scored] {
-    animation: rise-in 320ms ease-out calc(var(--row, 0) * 60ms + 150ms) both;
+    animation: rise-in 320ms ease-out calc(var(--row-index, 0) * 60ms + 150ms)
+      both;
   }
 
   .leaderboard tr[data-winner] {
     background: linear-gradient(
         100deg,
         var(--gold) 40%,
-        #fff4c9 50%,
+        var(--gold-soft) 50%,
         var(--gold) 60%
       )
       0 0 / 300% 100%;
@@ -218,8 +219,8 @@
   }
 
   .confetti-piece {
-    animation: confetti-fall var(--fall) cubic-bezier(0.3, 0.4, 0.6, 1)
-      var(--delay) both;
+    animation: confetti-fall var(--confetti-fall) cubic-bezier(0.3, 0.4, 0.6, 1)
+      var(--confetti-delay) both;
   }
 
   /* Lobby and log: arrivals slide in. */
@@ -229,10 +230,10 @@
 
   .log-group li {
     animation: log-in 260ms ease-out both;
-    transition: background-color 400ms ease;
+    transition: background-color var(--duration-slow) ease;
 
     &[data-kind="chat"]:not([data-own]) {
-      animation: pop-in 300ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+      animation: pop-in 300ms var(--ease-pop) both;
     }
   }
 }
@@ -260,9 +261,7 @@
   0%,
   100% {
     translate: 0 0;
-    box-shadow:
-      inset 0 0 0 1px rgb(255 255 255 / 0.55),
-      0 0.25rem 0.5rem rgb(4 20 14 / 0.4);
+    box-shadow: var(--shadow-card-bevel), var(--shadow-card);
   }
 
   15%,
@@ -271,7 +270,7 @@
     translate: -3px 0;
     box-shadow:
       0 0 0 3px var(--danger),
-      0 0 1rem rgb(164 45 67 / 0.7);
+      0 0 1rem color-mix(in oklab, var(--danger) 70%, transparent);
   }
 
   30%,
@@ -345,7 +344,7 @@
 
 @keyframes score-bank {
   35% {
-    color: var(--good);
+    color: var(--success);
     scale: 1.35;
   }
 }
@@ -353,9 +352,9 @@
 @keyframes flip-seven-flare {
   25% {
     box-shadow:
-      inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.45),
+      var(--shadow-well),
       0 0 0 3px var(--gold),
-      0 0 2.5rem 0.5rem rgb(255 212 95 / 0.9);
+      0 0 2.5rem 0.5rem color-mix(in oklab, var(--gold) 90%, transparent);
   }
 }
 
@@ -414,7 +413,8 @@
 
   100% {
     opacity: 0;
-    transform: translate(var(--drift), 105vh) rotate(var(--spin));
+    transform: translate(var(--confetti-drift), 105vh)
+      rotate(var(--confetti-spin));
   }
 }
 
