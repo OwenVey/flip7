@@ -138,7 +138,7 @@ const ActionBar = (
   const offlineTurn = () => {
     const controls = turn();
 
-    return controls?.forId === undefined ? null : controls;
+    return controls?.for === undefined ? null : controls;
   };
 
   const myTurn = () => kind() === "turn" && offlineTurn() === null;
@@ -284,10 +284,13 @@ const ActionBar = (
                     data-size="lg"
                     disabled={props.actionsDisabled}
                     data-variant="solid"
-                    aria-label={`Hit for ${offline().forName}`}
+                    aria-label={`Hit for ${offline().for?.name}`}
                     data-game-tap=""
                     onClick={async () =>
-                      await props.send({ forId: offline().forId, type: "hit" })
+                      await props.send({
+                        forId: offline().for?.id,
+                        type: "hit",
+                      })
                     }
                   >
                     <SquarePlus size={16} />
@@ -297,11 +300,11 @@ const ActionBar = (
                     <Button
                       data-size="lg"
                       disabled={props.actionsDisabled}
-                      aria-label={`Stay for ${offline().forName} with ${pointsLabel(offline().roundPoints)}`}
+                      aria-label={`Stay for ${offline().for?.name} with ${pointsLabel(offline().roundPoints)}`}
                       data-game-tap=""
                       onClick={async () =>
                         await props.send({
-                          forId: offline().forId,
+                          forId: offline().for?.id,
                           type: "stay",
                         })
                       }

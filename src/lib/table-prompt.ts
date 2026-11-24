@@ -13,7 +13,7 @@ import { rankPlayers } from "./standings";
 
 /**
  * Which controls the action bar offers alongside the Table prompt: Hit and
- * Stay (for an offline player when `forId` is set), Start next round, Back to
+ * Stay (for an offline player when `for` is set), Start next round, Back to
  * lobby with Play again when `canStart`, or a line saying who the room is
  * waiting for in place of the host's buttons.
  */
@@ -21,8 +21,7 @@ export type PromptControls =
   | { kind: "none" }
   | {
       kind: "turn";
-      forId?: string;
-      forName?: string;
+      for?: { id: string; name: string };
       canStay: boolean;
       roundPoints: number;
     }
@@ -261,8 +260,7 @@ const turnPrompt = (
     return {
       controls: {
         canStay: turn.canStay,
-        forId: turn.forId,
-        forName,
+        for: { id: turn.forId, name: forName },
         kind: "turn",
         roundPoints: pointsOf(roundPoints, turn.forId),
       },
