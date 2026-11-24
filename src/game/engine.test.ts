@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  ADDITIVE_MODIFIER_KIND,
-  buildDeck,
-  calculateRoundScore,
-} from "./cards";
+import { buildDeck, calculateRoundScore } from "./cards";
 import type { Card } from "./cards";
 import {
   addPlayer,
@@ -44,7 +40,7 @@ const num = (value: number) =>
   ({ id: id(), kind: "number", value }) satisfies Card;
 
 const additiveModifier = (value: number) =>
-  ({ id: id(), kind: ADDITIVE_MODIFIER_KIND, value }) satisfies Card;
+  ({ id: id(), kind: "modifier", value }) satisfies Card;
 
 const multiplierCard = () => ({ id: id(), kind: "double" }) satisfies Card;
 const freeze = () => ({ id: id(), kind: "freeze" }) satisfies Card;
@@ -223,12 +219,12 @@ describe("a round", () => {
 
     const message = { room: toRoomView("ABCDE", state), type: "state" };
     const raw = JSON.stringify(message);
-    expect(raw).toContain('"kind":"bonus"');
+    expect(raw).toContain('"kind":"modifier"');
     expect(parseServerMessage(raw)).toMatchObject({
       room: {
         players: [
-          { lastRound: { streak: true }, status: "streak" },
-          { lastRound: { bonus: 4 } },
+          { lastRound: { flipSeven: true }, status: "flipSeven" },
+          { lastRound: { modifiers: 4 } },
         ],
       },
       type: "state",
@@ -839,12 +835,12 @@ describe("Flip Three", () => {
     hit(state, "a", random);
     choose(state, "a", "b", random);
 
-    expect(player(state, "b").lastRound?.streak).toBeTruthy();
+    expect(player(state, "b").lastRound?.flipSeven).toBeTruthy();
     expect(table(state, mark)).toMatchObject({
       deck: [unflipped.id],
       discarded: [trigger.id, nested.id],
       phase: "roundOver",
-      players: { a: { score: 5 }, b: { score: 28 + 15, status: "streak" } },
+      players: { a: { score: 5 }, b: { score: 28 + 15, status: "flipSeven" } },
       turnId: null,
     });
   });

@@ -20,7 +20,6 @@ import PageMeta, {
 } from "../components/page-meta";
 import PlayingCard from "../components/playing-card";
 import RecentRooms from "../components/recent-rooms";
-import { ADDITIVE_MODIFIER_KIND } from "../game/cards";
 import type { Card } from "../game/cards";
 import { CODE_ALPHABET, CODE_LENGTH, normalizeCode } from "../game/protocol";
 import { createRoom, roomExists } from "../lib/room-functions";
@@ -30,7 +29,7 @@ const HERO_CARDS: Card[] = [
   { id: 1, kind: "number", value: 3 },
   { id: 2, kind: "number", value: 7 },
   { id: 3, kind: "freeze" },
-  { id: 4, kind: ADDITIVE_MODIFIER_KIND, value: 4 },
+  { id: 4, kind: "modifier", value: 4 },
   { id: 5, kind: "number", value: 12 },
 ];
 

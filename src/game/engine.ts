@@ -33,9 +33,6 @@ export { FLIP_THREE_COUNT } from "./action-card-resolution";
 
 export type { ActionCardChoice, HeldCard } from "./action-card-resolution";
 
-/** This status is stored in rooms and sent in WebSocket state messages. */
-export const FLIP_SEVEN_STATUS = "streak";
-
 /** The most log entries a room keeps. The log starts over each game, so this only guards against runaway chat. */
 export const LOG_LIMIT = 1000;
 
@@ -52,7 +49,7 @@ export type RoundStatus =
   | "stayed"
   | "frozen"
   | "busted"
-  | typeof FLIP_SEVEN_STATUS;
+  | "flipSeven";
 
 export interface Player {
   id: string;
@@ -93,7 +90,7 @@ export type GameCue =
   | "freeze"
   | "join"
   | "special"
-  | "streak";
+  | "flipSeven";
 
 export interface LogEntry {
   /** Epoch milliseconds. */
@@ -299,8 +296,8 @@ const placeNumberCard = (
     player.hand.push(card);
 
     if (countUniqueNumberCards(player.hand) >= FLIP_SEVEN_COUNT) {
-      player.status = FLIP_SEVEN_STATUS;
-      say(state, `${player.name} earned the Flip 7 bonus!`, "streak");
+      player.status = "flipSeven";
+      say(state, `${player.name} earned the Flip 7 bonus!`, "flipSeven");
     }
 
     return;
@@ -473,7 +470,7 @@ const nextActiveAfter = (state: GameState, index: number) => {
 
 const roundIsOver = (state: GameState) =>
   state.outOfCards ||
-  state.players.some((player) => player.status === FLIP_SEVEN_STATUS) ||
+  state.players.some((player) => player.status === "flipSeven") ||
   activePlayers(state).length === 0;
 
 const finishRound = (state: GameState) => {
@@ -491,7 +488,13 @@ const finishRound = (state: GameState) => {
 
     const score: RoundScore =
       player.status === "busted"
-        ? { bonus: 0, doubled: false, numbers: 0, streak: false, total: 0 }
+        ? {
+            doubled: false,
+            flipSeven: false,
+            modifiers: 0,
+            numbers: 0,
+            total: 0,
+          }
         : calculateRoundScore(player.hand);
 
     player.lastRound = score;

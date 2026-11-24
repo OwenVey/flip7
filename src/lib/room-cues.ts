@@ -3,7 +3,7 @@ import { roundStarted } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 
 const GAME_CUE_PRIORITY = [
-  "streak",
+  "flipSeven",
   "bust",
   "freeze",
   "special",

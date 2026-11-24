@@ -4272,7 +4272,7 @@ main {
   }
 
   &
-    li:is([data-cue="streak"], [data-cue="special"])
+    li:is([data-cue="flipSeven"], [data-cue="special"])
     :is(.log-event-icon, .log-outcome) {
     color: var(--accent);
   }
@@ -4282,7 +4282,7 @@ main {
       [data-cue="bank"],
       [data-cue="bust"],
       [data-cue="freeze"],
-      [data-cue="streak"]
+      [data-cue="flipSeven"]
     )
     .log-outcome {
     font-weight: 700;
@@ -4440,7 +4440,7 @@ main {
 
 /*
  * Moments of play. Each runs once when its state arrives, so the room can
- * follow who busted, stayed, hit a streak or is up next.
+ * follow who busted, stayed, flipped 7 or is up next.
  */
 @media (prefers-reduced-motion: no-preference) {
   .table,
@@ -4528,11 +4528,11 @@ main {
   /* Flip 7: the run hops in order with a shine, and the mat flares gold. */
   .seat[data-status="flipSeven"] {
     & .hand {
-      animation: streak-flare 1400ms ease-out;
+      animation: flip-seven-flare 1400ms ease-out;
     }
 
     & .hand .card {
-      animation: streak-hop 520ms cubic-bezier(0.3, 1.6, 0.5, 1)
+      animation: flip-seven-hop 520ms cubic-bezier(0.3, 1.6, 0.5, 1)
         calc(var(--i, 0) * 70ms) both;
     }
 
@@ -4766,7 +4766,7 @@ main {
   }
 }
 
-@keyframes streak-flare {
+@keyframes flip-seven-flare {
   25% {
     box-shadow:
       inset 0 0.25rem 0.75rem rgb(0 0 0 / 0.45),
@@ -4775,7 +4775,7 @@ main {
   }
 }
 
-@keyframes streak-hop {
+@keyframes flip-seven-hop {
   40% {
     translate: 0 -0.75rem;
     rotate: -4deg;

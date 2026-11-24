@@ -30,7 +30,7 @@ import type { ParentProps } from "solid-js";
 
 import { cardLabel, calculateRoundScore } from "../game/cards";
 import type { Card } from "../game/cards";
-import { FLIP_SEVEN_STATUS, FLIP_THREE_COUNT } from "../game/engine";
+import { FLIP_THREE_COUNT } from "../game/engine";
 import type { ActionCardChoice, HeldCard, RoundStatus } from "../game/engine";
 import { availableMoves } from "../game/moves";
 import type { AvailableMoves } from "../game/moves";
@@ -66,7 +66,7 @@ const STATUS_LABELS = {
   frozen: "Frozen",
   out: "Sitting out",
   stayed: "Stayed",
-  [FLIP_SEVEN_STATUS]: "Flip 7!",
+  flipSeven: "Flip 7!",
 } as const satisfies Record<RoundStatus, string>;
 
 const SCORES_TITLE = "Scores";
@@ -75,7 +75,7 @@ const SHEET_TABLE_QUERY = "(width < 64rem), (max-height: 30rem)";
 
 const STAMPED_STATUSES: ReadonlySet<RoundStatus> = new Set([
   "busted",
-  FLIP_SEVEN_STATUS,
+  "flipSeven",
   "frozen",
   "stayed",
 ]);
@@ -446,11 +446,7 @@ const RoundPlayer = (
   return (
     <article
       class="seat"
-      data-status={
-        props.player.status === FLIP_SEVEN_STATUS
-          ? "flipSeven"
-          : props.player.status
-      }
+      data-status={props.player.status}
       data-seat={props.player.id}
       data-flipping={flip()?.waiting === false ? "" : undefined}
       data-turn={hasDecision() ? "" : undefined}
@@ -1041,7 +1037,7 @@ const previousScore = (player: PlayerView) =>
 
 const roundEndHeadline = (room: RoomView) => {
   const flippedSeven = room.players.find(
-    (player) => player.status === FLIP_SEVEN_STATUS
+    (player) => player.status === "flipSeven"
   );
 
   if (flippedSeven) {

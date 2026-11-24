@@ -9,7 +9,7 @@ import {
 import { For } from "solid-js";
 import type { ParentProps } from "solid-js";
 
-import { ADDITIVE_MODIFIER_KIND, FLIP_SEVEN_BONUS } from "../game/cards";
+import { FLIP_SEVEN_BONUS } from "../game/cards";
 import type { Card } from "../game/cards";
 import PlayingCard from "./playing-card";
 import ScrollFade from "./scroll-fade";
@@ -19,7 +19,7 @@ const freeze: Card = { id: 0, kind: "freeze" };
 const flipThree: Card = { id: 1, kind: "flipThree" };
 const secondChance: Card = { id: 2, kind: "secondChance" };
 const double: Card = { id: 3, kind: "double" };
-const plusFour: Card = { id: 4, kind: ADDITIVE_MODIFIER_KIND, value: 4 };
+const plusFour: Card = { id: 4, kind: "modifier", value: 4 };
 
 const CardRule = (props: ParentProps<{ cards?: Card[] }>) => (
   <li class="rules-card-rule">

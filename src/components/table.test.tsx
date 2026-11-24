@@ -545,7 +545,7 @@ describe("<Table />", () => {
         ...ana,
         hand: [
           { id: 1, kind: "number", value: 7 },
-          { id: 90, kind: "bonus", value: 4 },
+          { id: 90, kind: "modifier", value: 4 },
           { id: 91, kind: "secondChance" },
           { id: 3, kind: "number", value: 2 },
         ],
@@ -624,10 +624,10 @@ describe("<Table />", () => {
             ? {
                 ...player,
                 lastRound: {
-                  bonus: 0,
+                  modifiers: 0,
                   doubled: false,
                   numbers: 7,
-                  streak: false,
+                  flipSeven: false,
                   total: 7,
                 },
                 score: 47,
@@ -655,10 +655,10 @@ describe("<Table />", () => {
               ? {
                   ...player,
                   lastRound: {
-                    bonus: 0,
+                    modifiers: 0,
                     doubled: false,
                     numbers: 7,
-                    streak: false,
+                    flipSeven: false,
                     total: 7,
                   },
                   score: 47,
