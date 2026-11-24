@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+
 import type { StoredRoom } from "../src/game/room";
 
 const ROOM_KEY = "room";
@@ -11,25 +13,13 @@ export interface RoomStorage {
   setAlarm: (scheduledTime: number) => Promise<void>;
 }
 
-type JsonScalar = string | number | boolean | null | undefined;
-
-type JsonCompatible<Value> = Value extends JsonScalar
-  ? Value
-  : Value extends (...args: never[]) => void
-    ? never
-    : Value extends object
-      ? { [Key in keyof Value]: JsonCompatible<Value[Key]> }
-      : never;
-
-const snapshotOf = (room: JsonCompatible<StoredRoom>) => JSON.stringify(room);
-
 /**
  * Saves the room and its alarm, skipping writes that wouldn't change what's
  * stored. Durable Objects bill every `put` and `setAlarm` as a row written,
  * and most heartbeat alarms change nothing.
  */
 export const createRoomStore = (storage: RoomStorage) => {
-  let savedSnapshot: string | null = null;
+  let savedSnapshot: StoredRoom | null = null;
   let pendingAlarm: number | null = null;
 
   return {
@@ -39,7 +29,7 @@ export const createRoomStore = (storage: RoomStorage) => {
         storage.getAlarm(),
       ]);
 
-      savedSnapshot = room ? snapshotOf(room) : null;
+      savedSnapshot = room ? structuredClone(room) : null;
       pendingAlarm = alarm;
 
       return room ?? null;
@@ -50,11 +40,12 @@ export const createRoomStore = (storage: RoomStorage) => {
     },
 
     async save(room: StoredRoom, alarmAt: number) {
-      const snapshot = snapshotOf(room);
       const writes: Promise<void>[] = [];
+      let snapshot = savedSnapshot;
 
-      if (snapshot !== savedSnapshot) {
-        writes.push(storage.put(ROOM_KEY, room));
+      if (!isDeepStrictEqual(room, savedSnapshot)) {
+        snapshot = structuredClone(room);
+        writes.push(storage.put(ROOM_KEY, snapshot));
       }
 
       if (alarmAt !== pendingAlarm) {

@@ -125,6 +125,21 @@ describe(createRoomStore, () => {
     expect(takeWrites()).toStrictEqual(["put"]);
   });
 
+  it("detects changes inside structured storage values", async () => {
+    const { room, store, takeWrites } = await loadedStore();
+    const metadata = new Map([["key", "original"]]);
+    const roomWithMetadata = { ...room, metadata };
+    await store.save(roomWithMetadata, NOW + 500);
+    expect(takeWrites()).toStrictEqual(["put"]);
+
+    metadata.set("key", "updated");
+    await store.save(roomWithMetadata, NOW + 500);
+    expect(takeWrites()).toStrictEqual(["put"]);
+
+    await store.save(roomWithMetadata, NOW + 500);
+    expect(takeWrites()).toStrictEqual([]);
+  });
+
   it("sets the alarm again after it fires, even for the same time", async () => {
     const { fireAlarm, room, store, takeWrites } = await loadedStore();
 
