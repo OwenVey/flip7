@@ -467,6 +467,7 @@ const RoundPlayer = (
         {(kind) => (
           <button
             type="button"
+            data-game-tap=""
             class="seat-pick"
             disabled={props.actionsDisabled}
             aria-label={pickLabel(
@@ -1018,6 +1019,7 @@ const OfflineTurn = (
           disabled={props.actionsDisabled}
           data-variant="solid"
           aria-label={`Hit for ${name()}`}
+          data-game-tap=""
           onClick={async () =>
             await props.send({ forId: props.playerId, type: "hit" })
           }
@@ -1030,6 +1032,7 @@ const OfflineTurn = (
             data-size="lg"
             disabled={props.actionsDisabled}
             aria-label={`Stay for ${name()} with ${bankedPoints()}`}
+            data-game-tap=""
             onClick={async () =>
               await props.send({ forId: props.playerId, type: "stay" })
             }
@@ -1203,6 +1206,7 @@ const ActionBar = (
                       data-size="lg"
                       disabled={props.actionsDisabled}
                       data-variant="solid"
+                      data-game-tap=""
                       onClick={async () => await props.send({ type: "start" })}
                     >
                       <RotateCcw size={16} />
@@ -1227,6 +1231,7 @@ const ActionBar = (
                     data-size="lg"
                     disabled={props.actionsDisabled}
                     data-variant="solid"
+                    data-game-tap=""
                     onClick={nextRound}
                   >
                     <ArrowRight size={16} />
@@ -1265,6 +1270,7 @@ const ActionBar = (
                   data-size="lg"
                   disabled={props.actionsDisabled}
                   data-variant="solid"
+                  data-game-tap=""
                   onClick={() => {
                     void props.send({ type: "hit" });
                   }}
@@ -1276,6 +1282,7 @@ const ActionBar = (
                   <Button
                     data-size="lg"
                     disabled={props.actionsDisabled}
+                    data-game-tap=""
                     onClick={() => {
                       void props.send({ type: "stay" });
                     }}

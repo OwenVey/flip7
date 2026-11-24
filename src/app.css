@@ -1425,6 +1425,14 @@ button.room-code {
   padding: 0.75rem;
 }
 
+.haptics-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-block-size: 2.75rem;
+}
+
 .volume-label {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

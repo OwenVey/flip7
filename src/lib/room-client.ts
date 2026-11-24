@@ -28,6 +28,8 @@ export interface Notice {
 
 export interface RoomClientState {
   status: ConnectionStatus;
+  /** Advances with the first room snapshot received on each connection. */
+  syncId: number;
   room: RoomView | null;
   preview: RoomPreview | null;
   watching: boolean;
@@ -114,6 +116,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     room: null,
     sending: false,
     status: "connecting",
+    syncId: 0,
     watchError: "",
     watchPending: false,
     watching: false,
@@ -266,7 +269,10 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
     const firstSync = !synced;
     synced = true;
-    update({ room: received.room });
+    update({
+      room: received.room,
+      ...(firstSync && { syncId: state.syncId + 1 }),
+    });
 
     if (firstSync) {
       clearSyncTimeout();

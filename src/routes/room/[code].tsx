@@ -37,6 +37,7 @@ import {
 import { MOTION_PREFERENCE_QUERY } from "../../lib/motion";
 import { createMoveAlert } from "../../lib/move-alert";
 import { createRoomConnection } from "../../lib/room-connection";
+import { createRoomHaptics } from "../../lib/room-haptics";
 import { createRoomSounds } from "../../lib/room-sounds";
 import {
   createTableOpening,
@@ -45,12 +46,17 @@ import {
 } from "../../lib/table-motion";
 import { paths } from "../../router";
 
-const TURN_VIBRATION_MS = 200;
-
 const Room = (props: { code: string }) => {
   const sounds = createRoomSounds();
 
   const connection = createRoomConnection(untrack(() => props.code));
+
+  const haptics = createRoomHaptics(
+    () =>
+      connection.playerId() !== null &&
+      connection.online() &&
+      connection.status() === "open"
+  );
 
   let roomPage: HTMLElement | undefined;
   let disposed = false;
@@ -71,12 +77,9 @@ const Room = (props: { code: string }) => {
       if (cue === "turn") {
         nudge(roomPage?.querySelector("[data-action-bar]") ?? null);
         revealOwnSeat(roomPage);
-
-        if ("vibrate" in navigator) {
-          navigator.vibrate(TURN_VIBRATION_MS);
-        }
       }
-    }
+    },
+    haptics.play
   );
 
   createEffect(
@@ -89,13 +92,23 @@ const Room = (props: { code: string }) => {
         (playerId !== null || connection.watching()) &&
         status !== "missing" &&
         status !== "removed"
-        ? { canAct: connection.canAct(), playerId, room }
+        ? {
+            canAct: connection.canAct(),
+            playerId,
+            room,
+            syncId: connection.syncId(),
+          }
         : null;
     },
     (next) => {
       queueMicrotask(() => {
         if (!disposed) {
-          playback.update(next);
+          playback.update(
+            next && {
+              ...next,
+              hapticsVisible: document.visibilityState === "visible",
+            }
+          );
         }
       });
     }
@@ -159,20 +172,25 @@ const Room = (props: { code: string }) => {
         } else {
           toast.error(notice.message);
           sounds.play("error", effectsEnabled);
+          haptics.play("error");
         }
       }
     }
   );
 
+  const syncVisibility = () => {
+    playback.syncMotion(document.visibilityState === "visible");
+  };
+
   onSettled(() => {
     const motionPreference = globalThis.matchMedia?.(MOTION_PREFERENCE_QUERY);
-    motionPreference?.addEventListener("change", playback.syncMotion);
-    document.addEventListener("visibilitychange", playback.syncMotion);
+    motionPreference?.addEventListener("change", syncVisibility);
+    document.addEventListener("visibilitychange", syncVisibility);
 
     return () => {
       disposed = true;
-      motionPreference?.removeEventListener("change", playback.syncMotion);
-      document.removeEventListener("visibilitychange", playback.syncMotion);
+      motionPreference?.removeEventListener("change", syncVisibility);
+      document.removeEventListener("visibilitychange", syncVisibility);
       playback.dispose();
       toast.dismiss();
     };
@@ -232,6 +250,8 @@ const Room = (props: { code: string }) => {
             onEffectsVolumeChange={sounds.changeEffectsVolume}
             onMusicVolumeChange={sounds.changeMusicVolume}
             onToggle={sounds.toggle}
+            hapticsEnabled={haptics.supported() ? haptics.enabled() : undefined}
+            onHapticsChange={haptics.setEnabled}
           />
         </div>
       </SiteNav>

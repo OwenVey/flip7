@@ -47,6 +47,10 @@ Open a room link or enter its code and choose **Watch without joining**. You can
 
 From the header, choose **Join** to take an available place or **Leave** to stop watching and return to the join screen. Before the game starts, a player can choose **Watch instead** and confirm to give up their seat and keep watching. It's unavailable when that would leave only bots at the table or when the Spectator limit is reached. If the host switches, another player takes over hosting. Join is unavailable while the table is full or locked. A locked room lets current Spectators keep watching, but blocks new watch connections, including after a refresh or disconnect. If all players go offline, Spectators can keep the room open while play pauses.
 
+### Mobile haptics
+
+On mobile browsers that support vibration, haptics are on by default. Feel taps on game controls, move alerts, and outcomes at your seat such as a bust, a Second Chance save, or a Flip 7. Open **Audio and haptics** to turn them off independently of sound. Your browser remembers the setting across rooms.
+
 ### Rejoining and offline players
 
 The browser remembers your display name and room identity. Refreshing or reopening the link in the same browser profile returns you to the same player while that player is still in the room. Use **Leave** to give up your place at any time, even mid-deal.

@@ -243,6 +243,7 @@ export default function GameOverDialog(props: {
                 data-size="lg"
                 data-variant="solid"
                 disabled={props.actionsDisabled}
+                data-game-tap=""
                 onClick={props.onPlayAgain}
               >
                 <RotateCcw size={16} />

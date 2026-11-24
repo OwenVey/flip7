@@ -246,6 +246,7 @@ export const createRoomConnection = (code: string) => {
     send: client.send,
     status: createMemo(() => state().status),
     stopWatching: client.stopWatching,
+    syncId: createMemo(() => state().syncId),
     watch: client.watch,
     watchError: () => state().watchError,
     watchInstead: client.watchInstead,
