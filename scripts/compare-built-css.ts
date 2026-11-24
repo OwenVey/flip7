@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { isDeepStrictEqual } from "node:util";
 
 const repo = execFileSync("git", ["rev-parse", "--show-toplevel"], {
   encoding: "utf-8",
@@ -25,10 +26,48 @@ const run = (command: string, args: string[], cwd: string) => {
   execFileSync(command, args, { cwd, stdio: ["ignore", "ignore", "inherit"] });
 };
 
+const readPackage = (cwd: string) => {
+  const manifest: unknown = JSON.parse(
+    readFileSync(path.join(cwd, "package.json"), "utf-8")
+  );
+
+  if (!(manifest instanceof Object) || Array.isArray(manifest)) {
+    throw new TypeError(`Invalid package.json in ${cwd}.`);
+  }
+
+  Reflect.deleteProperty(manifest, "scripts");
+
+  return manifest;
+};
+
+const checkDependencyInputs = () => {
+  for (const file of ["pnpm-lock.yaml", "pnpm-workspace.yaml"]) {
+    if (
+      !readFileSync(path.join(baseTree, file)).equals(
+        readFileSync(path.join(repo, file))
+      )
+    ) {
+      throw new Error(
+        `Cannot compare CSS with shared dependencies because ${file} differs from ${baseRef}.`
+      );
+    }
+  }
+
+  if (!isDeepStrictEqual(readPackage(baseTree), readPackage(repo))) {
+    throw new Error(
+      `Cannot compare CSS with shared dependencies because package.json differs from ${baseRef} beyond scripts.`
+    );
+  }
+};
+
 const buildCss = (cwd: string, label: string) => {
   process.stdout.write(`Building ${label}…\n`);
   rmSync(path.join(cwd, outputDir), { force: true, recursive: true });
-  run("pnpm", ["exec", "vite", "build"], cwd);
+  run(
+    process.execPath,
+    [path.join(repo, "node_modules/vite/bin/vite.js"), "build"],
+    cwd
+  );
 
   const output = path.join(cwd, outputDir);
   const bundles = new Map<string, string>();
@@ -67,6 +106,7 @@ const showDiff = (key: string, before: string, after: string) => {
 
 try {
   run("git", ["worktree", "add", "--detach", baseTree, baseRef], repo);
+  checkDependencyInputs();
   symlinkSync(
     path.join(repo, "node_modules"),
     path.join(baseTree, "node_modules")

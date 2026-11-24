@@ -1,7 +1,10 @@
+// oxlint-disable-next-line landmines-style/no-comments -- Vite's config loader requires Node's file URL semantics.
+// @vitest-environment node
+
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { FontaineTransform } from "fontaine";
+import { loadConfigFromFile } from "vite";
 import { describe, expect, it } from "vitest";
 
 const appCss = path.resolve(import.meta.dirname, "../app.css");
@@ -21,19 +24,35 @@ const fallbackFamilies = [
   "Bungee fallback",
 ];
 
-// WARNING: keep these options the same as the FontaineTransform in vite.config.ts.
-const fontaine = FontaineTransform.raw(
-  { fallbacks: {} },
-  { framework: "vite" }
-);
-
-const fontainePlugin = Array.isArray(fontaine) ? fontaine[0] : fontaine;
-
 const transform = async (file: string) => {
-  const hook = fontainePlugin?.transform;
+  const loaded = await loadConfigFromFile({
+    command: "build",
+    mode: "production",
+  });
+
+  const groups = await Promise.all(
+    (loaded?.config.plugins ?? []).map(async (plugin) => await plugin)
+  );
+
+  const fontaine = groups
+    .flat()
+    .find(
+      (plugin) =>
+        plugin instanceof Object &&
+        "name" in plugin &&
+        plugin.name === "fontaine-transform" &&
+        "transform" in plugin
+    );
+
+  const hook =
+    fontaine instanceof Object && "transform" in fontaine
+      ? fontaine.transform
+      : undefined;
 
   if (hook === undefined || !("handler" in hook)) {
-    throw new Error("Fontaine no longer exposes a transform handler.");
+    throw new Error(
+      "The Vite config must include Fontaine's transform handler."
+    );
   }
 
   // SAFETY: Fontaine's transform handler never reads its plugin context.
@@ -50,7 +69,7 @@ const transform = async (file: string) => {
     return null;
   }
 
-  return result instanceof Object ? result.code : result;
+  return result instanceof Object ? (result.code?.toString() ?? null) : result;
 };
 
 const statements = (css: string) =>
