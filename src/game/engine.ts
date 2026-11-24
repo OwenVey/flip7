@@ -35,7 +35,9 @@ export type { ActionCardChoice, HeldCard } from "./action-card-resolution";
 
 /** This status is stored in rooms and sent in WebSocket state messages. */
 export const FLIP_SEVEN_STATUS = "streak";
-const LOG_LIMIT = 100;
+
+/** The most log entries a room keeps. The log starts over each game, so this only guards against runaway chat. */
+export const LOG_LIMIT = 1000;
 const DRAW_LIMIT = 40;
 export const CHAT_MAX_LENGTH = 200;
 const WHITESPACE = /\s+/gu;
@@ -127,8 +129,12 @@ export interface GameState extends ActionCardState {
   turnAnchor: number;
   dealQueue: string[];
   winnerIds: string[];
+  /** This game's log, oldest first. Cleared when a game starts. */
   log: LogEntry[];
+  /** The id of the newest log entry. Never reset, so ids stay unique for the life of the room. */
   logSeq: number;
+  /** `logSeq` when the log was last cleared. Missing on rooms saved before the log started over each game. */
+  logClearedAt?: number;
   drawSeq?: number;
   /** The most recent draws, oldest first. Missing on rooms saved before draws were recorded. */
   draws?: DrawEvent[];
@@ -797,6 +803,9 @@ export const startGame = (
   random: Random
 ) => {
   assertMove(state, playerId, { type: "start" });
+
+  state.log = [];
+  state.logClearedAt = state.logSeq;
 
   for (const player of state.players) {
     player.score = 0;

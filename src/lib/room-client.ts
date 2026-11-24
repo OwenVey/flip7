@@ -1,7 +1,11 @@
 import { isRoomCommand } from "../game/client-message";
 import type { ClientMessage, GameCommand } from "../game/client-message";
-import { ROOM_REMOVED_CLOSE_CODE } from "../game/protocol";
-import type { RoomView, ServerMessage } from "../game/protocol";
+import {
+  NO_LISTS,
+  receiveState,
+  ROOM_REMOVED_CLOSE_CODE,
+} from "../game/protocol";
+import type { ReceivedLists, RoomView, ServerMessage } from "../game/protocol";
 
 export type ConnectionStatus =
   | "connecting"
@@ -101,6 +105,8 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   };
 
   let synced = false;
+  let lists: ReceivedLists = NO_LISTS;
+  let askedForLists = false;
   let seatedPlayerId: string | null = null;
   let awaitingWelcome = false;
   let joinTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -163,6 +169,9 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
   const startSync = () => {
     synced = false;
+    // WARNING: a new socket starts with the full lists, so don't build on what the old one sent.
+    lists = NO_LISTS;
+    askedForLists = false;
     seatedPlayerId = null;
     lastRequestId = undefined;
     awaitingWelcome = false;
@@ -218,9 +227,18 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   const handle = (message: ServerMessage) => {
     switch (message.type) {
       case "state": {
+        const received = receiveState(lists, message);
+        ({ lists } = received);
+
+        if (received.gaps.length === 0) {
+          askedForLists = false;
+        } else if (!askedForLists) {
+          askedForLists = raw({ type: "sync" });
+        }
+
         const firstSync = seatedPlayerId !== null && !synced;
         synced = seatedPlayerId !== null;
-        update({ room: message.room });
+        update({ room: received.room });
 
         if (firstSync) {
           stopWatchingSync();

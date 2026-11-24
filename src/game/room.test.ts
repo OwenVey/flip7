@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Card } from "./cards";
-import { nextRound, startGame } from "./engine";
+import { chat, nextRound, startGame } from "./engine";
 import { HEARTBEAT_STALE_MS, ROOM_REMOVED_CLOSE_CODE } from "./protocol";
 import type { ServerMessage } from "./protocol";
 import { createRoom, newStoredRoom } from "./room";
@@ -105,6 +105,21 @@ const closes = (outcome: RoomOutcome) =>
 
 const broadcasts = (outcome: RoomOutcome) =>
   outcome.effects.some((effect) => effect.type === "broadcast");
+
+type StateMessage = Extract<ServerMessage, { type: "state" }>;
+
+const broadcastOf = (outcome: RoomOutcome) => {
+  const found = outcome.effects.find((effect) => effect.type === "broadcast");
+
+  if (found?.message.type !== "state") {
+    throw new Error("Expected a broadcast of the table");
+  }
+
+  return found.message;
+};
+
+const logTexts = (message: StateMessage) =>
+  message.lists.log.entries.map((entry) => entry.text);
 
 const joinAs = (h: Harness, connectionId: string, name: string) => {
   h.connect(connectionId);
@@ -246,8 +261,8 @@ describe("commands", () => {
       type: "start",
     });
 
-    expect(outcome.effects).toStrictEqual([
-      { type: "broadcast" },
+    expect(outcome.effects).toMatchObject([
+      { message: { type: "state" }, type: "broadcast" },
       { message: { requestId: "move-1", type: "accepted" }, type: "reply" },
     ]);
     expect(h.stored.game.phase).toBe("playing");
@@ -302,8 +317,8 @@ describe("evicting a player", () => {
       type: "kick",
     });
 
-    expect(outcome.effects).toStrictEqual([
-      { type: "broadcast" },
+    expect(outcome.effects).toMatchObject([
+      { message: { type: "state" }, type: "broadcast" },
       { message: { requestId: "kick-1", type: "accepted" }, type: "reply" },
       {
         code: ROOM_REMOVED_CLOSE_CODE,
@@ -558,7 +573,7 @@ describe("room settings", () => {
       requestId: "00000000-0000-4000-8000-000000000001",
       type: "accepted",
     });
-    expect(h.room.state().room).toMatchObject({
+    expect(h.room.snapshot().room).toMatchObject({
       botSpeed: "fast",
       locked: false,
       targetScore: 100,
@@ -584,7 +599,7 @@ describe("room settings", () => {
       requestId: "00000000-0000-4000-8000-000000000001",
       type: "rejected",
     });
-    expect(h.room.state().room.targetScore).toBe(200);
+    expect(h.room.snapshot().room.targetScore).toBe(200);
   });
 
   it("turns new players away from a locked room but lets seated players rejoin", () => {
@@ -619,7 +634,7 @@ describe("room settings", () => {
       locked: true,
       type: "configure",
     });
-    expect(h.room.state().room).toMatchObject({
+    expect(h.room.snapshot().room).toMatchObject({
       botSpeed: "fast",
       locked: true,
     });
@@ -635,7 +650,7 @@ describe("room settings", () => {
       requestId: "00000000-0000-4000-8000-000000000002",
       type: "rejected",
     });
-    expect(h.room.state().room.targetScore).toBe(200);
+    expect(h.room.snapshot().room.targetScore).toBe(200);
 
     h.connect("cara-tab");
     expect(replies(h.room.join("cara-tab", "Cara", null))).toStrictEqual([
@@ -651,10 +666,154 @@ describe("room settings", () => {
     joinAs(h, "ana-tab", "Ana");
     delete h.stored.game.settings;
 
-    expect(h.room.state().room).toMatchObject({
+    expect(h.room.snapshot().room).toMatchObject({
       botSpeed: "normal",
       locked: false,
       targetScore: 200,
     });
+  });
+});
+
+describe("sending the log", () => {
+  it("sends the whole log to a tab that opens, and to one that rejoins", () => {
+    const h = harness();
+    const ana = joinAs(h, "ana-tab", "Ana");
+    h.room.chat("ana-tab", "hello");
+
+    h.connect("ben-tab");
+    expect(h.room.snapshot().lists.log).toStrictEqual({
+      after: null,
+      entries: h.stored.game.log,
+      seq: h.stored.game.logSeq,
+    });
+
+    h.drop("ana-tab");
+    h.connect("ana-tab-2");
+    const opened = h.room.snapshot();
+    h.room.join("ana-tab-2", "", ana.token);
+
+    expect(opened.lists.log.after).toBeNull();
+    expect(logTexts(opened)).toStrictEqual(["Ana joined.", "hello"]);
+  });
+
+  it("broadcasts only the entries added since the last broadcast", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    const seqAfterJoin = h.stored.game.logSeq;
+
+    const sent = broadcastOf(h.room.chat("ana-tab", "hi"));
+
+    expect(sent.lists.log).toStrictEqual({
+      after: seqAfterJoin,
+      entries: [expect.objectContaining({ text: "hi" })],
+      seq: seqAfterJoin + 1,
+    });
+    expect(sent.room).not.toHaveProperty("log");
+    expect(sent.room.players.map((p) => p.name)).toStrictEqual(["Ana"]);
+  });
+
+  it("sends nothing new when the log hasn't changed", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+    h.connect("ben-phone");
+
+    const sent = broadcastOf(h.drop("ben-tab"));
+
+    expect(sent.lists.log).toMatchObject({
+      after: h.stored.game.logSeq,
+      entries: [],
+    });
+  });
+
+  it("includes entries logged without a broadcast in the next one", () => {
+    const h = harness();
+    const ana = joinAs(h, "ana-tab", "Ana");
+    const before = h.stored.game.logSeq;
+    chat(h.stored.game, ana.playerId, "quiet");
+
+    expect(logTexts(broadcastOf(h.room.chat("ana-tab", "loud")))).toStrictEqual(
+      ["quiet", "loud"]
+    );
+    expect(broadcastOf(h.room.chat("ana-tab", "again")).lists.log.after).toBe(
+      before + 2
+    );
+  });
+
+  it("replaces the log when a game starts, then carries on from it", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+    h.room.chat("ben-tab", "lobby chat");
+
+    const started = broadcastOf(h.room.command("ana-tab", { type: "start" }));
+
+    expect(started.lists.log.after).toBeNull();
+    expect(logTexts(started)).not.toContain("lobby chat");
+    expect(started.lists.log.entries).toStrictEqual(h.stored.game.log);
+
+    const next = broadcastOf(h.room.chat("ben-tab", "good luck"));
+    expect(next.lists.log.after).toBe(started.lists.log.seq);
+    expect(logTexts(next)).toStrictEqual(["good luck"]);
+  });
+
+  it("replaces the log on play again", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+    h.room.command("ana-tab", { type: "start" });
+    h.stored.game.phase = "gameOver";
+    h.room.chat("ben-tab", "gg");
+
+    const again = broadcastOf(h.room.command("ana-tab", { type: "start" }));
+
+    expect(again.lists.log.after).toBeNull();
+    expect(logTexts(again)).not.toContain("gg");
+  });
+
+  it("builds a full recovery snapshot without changing the stored room", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    h.room.chat("ana-tab", "one");
+    const stored = structuredClone(h.stored);
+    h.advance(1000);
+
+    const snapshot = h.room.snapshot();
+
+    expect(snapshot.lists.log.after).toBeNull();
+    expect(logTexts(snapshot)).toStrictEqual(["Ana joined.", "one"]);
+    expect(h.stored).toStrictEqual(stored);
+  });
+
+  it("remembers what it broadcast across hibernation", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    const saved = structuredClone(h.stored);
+
+    const woken = createRoom(
+      saved,
+      { assign: () => {}, connections: () => [] },
+      { newId: () => "x", now: () => START, random }
+    );
+
+    chat(saved.game, saved.game.players[0]?.id ?? "", "after waking");
+
+    expect(broadcastOf(woken.reconcile()).lists.log).toMatchObject({
+      after: h.stored.game.logSeq,
+      entries: [expect.objectContaining({ text: "after waking" })],
+    });
+  });
+
+  it("sends the whole log once to rooms saved before the log was sent as updates", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    delete h.stored.broadcastSeqs;
+
+    const first = broadcastOf(h.room.chat("ana-tab", "one"));
+    const second = broadcastOf(h.room.chat("ana-tab", "two"));
+
+    expect(first.lists.log.after).toBeNull();
+    expect(logTexts(first)).toStrictEqual(["Ana joined.", "one"]);
+    expect(logTexts(second)).toStrictEqual(["two"]);
   });
 });

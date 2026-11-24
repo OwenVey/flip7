@@ -38,6 +38,7 @@ const network = () => {
   const connections = new Map<string, ServerConnection>();
   const links = new Map<string, Link>();
   const players: TestPlayer[] = [];
+  const syncs: string[] = [];
 
   const seats: Seats = {
     assign: (connectionId, seat) => {
@@ -65,10 +66,10 @@ const network = () => {
 
   const carryOut = (outcome: RoomOutcome, sender: Link | null) => {
     deliver(outcome, {
-      broadcast: () => {
+      broadcast: (message) => {
         for (const link of links.values()) {
           if (link.open) {
-            link.toClient.push(room.state());
+            link.toClient.push(message);
           }
         }
       },
@@ -96,6 +97,9 @@ const network = () => {
       );
     } else if (message.type === "chat") {
       carryOut(room.chat(link.id, message.text), link);
+    } else if (message.type === "sync") {
+      syncs.push(link.id);
+      link.toClient.push(room.snapshot());
     } else {
       carryOut(room.command(link.id, message), link);
     }
@@ -143,7 +147,7 @@ const network = () => {
     const link: Link = {
       id: `conn-${linkCount}`,
       open: true,
-      toClient: [room.state()],
+      toClient: [room.snapshot()],
       toServer: [],
     };
 
@@ -187,6 +191,7 @@ const network = () => {
     join,
     players,
     stored,
+    syncs,
     testPlayer: () => testPlayer(players),
   };
 };
@@ -316,6 +321,141 @@ describe("joining through the room client", () => {
       needsName: false,
       ready: true,
     });
+  });
+});
+
+const logIds = (player: TestPlayer) =>
+  player.client.state.room?.log.map((entry) => entry.id);
+
+const serverLogIds = (net: ReturnType<typeof network>) =>
+  net.stored.game.log.map((entry) => entry.id);
+
+describe("the log through the room client", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("adds each broadcast's new entries to the log it has", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    const before = ben.client.state.room?.log;
+
+    ana.client.chat("hi Ben");
+    net.flush();
+
+    expect(logIds(ben)).toStrictEqual(serverLogIds(net));
+    expect(ben.client.state.room?.log.slice(0, -1)).toStrictEqual(before);
+    expect(ben.client.state.room?.log.at(-1)?.text).toBe("hi Ben");
+    expect(net.syncs).toStrictEqual([]);
+  });
+
+  it("keeps the same log when a broadcast adds nothing", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    net.connect(net.testPlayer());
+    const before = ana.client.state.room?.log;
+
+    net.drop(ben);
+    net.flush();
+
+    expect(ana.client.state.room?.log).toBe(before);
+  });
+
+  it("replaces the log when a game starts", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    ben.client.chat("lobby chat");
+    net.flush();
+
+    const sent = ana.client.send({ type: "start" });
+    net.flush();
+    await sent;
+
+    for (const player of [ana, ben]) {
+      expect(logIds(player)).toStrictEqual(serverLogIds(net));
+      expect(
+        player.client.state.room?.log.some(
+          (entry) => entry.text === "lobby chat"
+        )
+      ).toBeFalsy();
+    }
+  });
+
+  it("catches up on entries missed while reconnecting", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    const sent = ana.client.send({ type: "start" });
+    net.flushToServer();
+    net.drop(ana);
+    ben.client.chat("you there?");
+    net.flush();
+
+    net.connect(ana);
+    net.flush();
+
+    await expect(sent).resolves.toBeTruthy();
+    expect(logIds(ana)).toStrictEqual(serverLogIds(net));
+    expect(ana.client.state.room?.log.at(-1)?.text).toBe("you there?");
+    expect(net.syncs).toStrictEqual([]);
+  });
+
+  it("asks for the whole log when it misses a broadcast, then carries on", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+
+    ben.client.chat("one");
+    net.flushToServer();
+    ana.link?.toClient.splice(0);
+    ben.client.chat("two");
+    net.flush();
+
+    expect(net.syncs).toStrictEqual([ana.link?.id]);
+    expect(logIds(ana)).toStrictEqual(serverLogIds(net));
+
+    ben.client.chat("three");
+    net.flush();
+
+    expect(logIds(ana)).toStrictEqual(serverLogIds(net));
+    expect(net.syncs).toHaveLength(1);
+  });
+
+  it("asks only once while waiting for the whole log", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+
+    ben.client.chat("one");
+    net.flushToServer();
+    ana.link?.toClient.splice(0);
+    ben.client.chat("two");
+    ben.client.chat("three");
+    net.flushToServer();
+    const queued = ana.link?.toClient.splice(0) ?? [];
+
+    for (const delivery of queued) {
+      if (!("closeCode" in delivery)) {
+        ana.client.received(delivery);
+      }
+    }
+
+    expect(
+      ana.link?.toServer.filter((frame) => frame.includes("sync"))
+    ).toHaveLength(1);
+    expect(
+      ana.client.state.room?.log.some((entry) => entry.text === "two")
+    ).toBeFalsy();
+
+    net.flush();
+    expect(logIds(ana)).toStrictEqual(serverLogIds(net));
   });
 });
 
