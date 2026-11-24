@@ -7,8 +7,6 @@ import path from "node:path";
 import { FontaineTransform } from "fontaine";
 import { describe, expect, it } from "vitest";
 
-import { fontaineOptions } from "./fontaine-options";
-
 const appCss = path.resolve(import.meta.dirname, "../app.css");
 const stylesIndex = path.resolve(import.meta.dirname, "index.css");
 
@@ -26,7 +24,11 @@ const fallbackFamilies = [
   "Bungee fallback",
 ];
 
-const fontaine = FontaineTransform.raw(fontaineOptions, { framework: "vite" });
+// WARNING: keep these options the same as the FontaineTransform in vite.config.ts.
+const fontaine = FontaineTransform.raw(
+  { fallbacks: {} },
+  { framework: "vite" }
+);
 
 const fontainePlugin = Array.isArray(fontaine) ? fontaine[0] : fontaine;
 
