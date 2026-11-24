@@ -180,7 +180,7 @@ export class GameRoom extends Server<Env> {
   }
 
   override async onAlarm() {
-    this.store.alarmFired();
+    await this.store.refreshAlarm();
     await this.carryOut(this.room()?.alarm());
   }
 

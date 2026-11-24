@@ -11,7 +11,17 @@ export interface RoomStorage {
   setAlarm: (scheduledTime: number) => Promise<void>;
 }
 
-const snapshotOf = (room: StoredRoom) => JSON.stringify(room);
+type JsonScalar = string | number | boolean | null | undefined;
+
+type JsonCompatible<Value> = Value extends JsonScalar
+  ? Value
+  : Value extends (...args: never[]) => void
+    ? never
+    : Value extends object
+      ? { [Key in keyof Value]: JsonCompatible<Value[Key]> }
+      : never;
+
+const snapshotOf = (room: JsonCompatible<StoredRoom>) => JSON.stringify(room);
 
 /**
  * Saves the room and its alarm, skipping writes that wouldn't change what's
@@ -35,8 +45,8 @@ export const createRoomStore = (storage: RoomStorage) => {
       return room ?? null;
     },
 
-    alarmFired() {
-      pendingAlarm = null;
+    async refreshAlarm() {
+      pendingAlarm = await storage.getAlarm();
     },
 
     async save(room: StoredRoom, alarmAt: number) {

@@ -59,6 +59,9 @@ const fakeStorage = (initial: { room?: StoredRoom; alarm?: number } = {}) => {
     failNextWrite: () => {
       failNext = true;
     },
+    fireAlarm: () => {
+      alarm = null;
+    },
     storage,
     takeWrites: () => writes.splice(0),
   };
@@ -123,12 +126,24 @@ describe(createRoomStore, () => {
   });
 
   it("sets the alarm again after it fires, even for the same time", async () => {
-    const { room, store, takeWrites } = await loadedStore();
+    const { fireAlarm, room, store, takeWrites } = await loadedStore();
 
-    store.alarmFired();
+    fireAlarm();
+    await store.refreshAlarm();
     await store.save(room, NOW + 500);
 
     expect(takeWrites()).toStrictEqual([`setAlarm ${NOW + 500}`]);
+  });
+
+  it("keeps the replacement alarm scheduled during startup on an alarm wake", async () => {
+    const { fireAlarm, room, store, takeWrites } = await loadedStore();
+
+    fireAlarm();
+    await store.save(room, NOW + 900);
+    await store.refreshAlarm();
+    await store.save(room, NOW + 900);
+
+    expect(takeWrites()).toStrictEqual([`setAlarm ${NOW + 900}`]);
   });
 
   it("retries writes after one fails", async () => {
