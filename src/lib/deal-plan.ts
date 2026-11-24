@@ -1,8 +1,8 @@
 import { isActionCard } from "../game/cards";
 import type { Card } from "../game/cards";
-import type { DrawEvent, HeldCard } from "../game/engine";
+import type { DrawEvent, HeldCard, Player } from "../game/engine";
 import { roundStarted } from "../game/protocol";
-import type { PlayerView, RoomView } from "../game/protocol";
+import type { RoomView } from "../game/protocol";
 
 /** Beyond this many cards in one update, show the result without dealing it out. */
 export const MAX_DEALT_CARDS = 20;
@@ -260,7 +260,7 @@ export const planDeal = (previous: RoomView, current: RoomView) => {
 };
 
 interface Seat {
-  player: PlayerView;
+  player: Player;
   hand: Card[];
   bustCard: Card | null;
 }

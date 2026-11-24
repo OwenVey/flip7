@@ -577,7 +577,7 @@ describe("room settings", () => {
       requestId: "00000000-0000-4000-8000-000000000001",
       type: "accepted",
     });
-    expect(h.room.snapshot().room).toMatchObject({
+    expect(h.room.snapshot().room.settings).toStrictEqual({
       botSpeed: "fast",
       locked: false,
       targetScore: 100,
@@ -603,7 +603,7 @@ describe("room settings", () => {
       requestId: "00000000-0000-4000-8000-000000000001",
       type: "rejected",
     });
-    expect(h.room.snapshot().room.targetScore).toBe(200);
+    expect(h.room.snapshot().room.settings.targetScore).toBe(200);
   });
 
   it("turns new players away from a locked room but lets seated players rejoin", () => {
@@ -638,7 +638,7 @@ describe("room settings", () => {
       locked: true,
       type: "configure",
     });
-    expect(h.room.snapshot().room).toMatchObject({
+    expect(h.room.snapshot().room.settings).toMatchObject({
       botSpeed: "fast",
       locked: true,
     });
@@ -654,7 +654,7 @@ describe("room settings", () => {
       requestId: "00000000-0000-4000-8000-000000000002",
       type: "rejected",
     });
-    expect(h.room.snapshot().room.targetScore).toBe(200);
+    expect(h.room.snapshot().room.settings.targetScore).toBe(200);
 
     h.connect("cara-tab");
     expect(replies(h.room.join("cara-tab", "Cara", null))).toStrictEqual([

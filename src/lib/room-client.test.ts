@@ -954,8 +954,8 @@ describe("room commands", () => {
     await expect(configured).resolves.toBeTruthy();
     await expect(started).resolves.toBeTruthy();
     expect(ana.client.state.room).toMatchObject({
-      botSpeed: "fast",
       phase: "playing",
+      settings: { botSpeed: "fast" },
     });
   });
 

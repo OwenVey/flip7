@@ -1,11 +1,11 @@
 import { Show } from "solid-js";
 
-import type { PlayerView } from "../game/protocol";
+import type { Player } from "../game/engine";
 import AvatarImage from "./avatar-image";
 
 /** A player's avatar, or the bot mark for a bot. */
 export default function PlayerAvatar(props: {
-  player: Pick<PlayerView, "avatar">;
+  player: Pick<Player, "avatar">;
   size?: "sm";
 }) {
   return (

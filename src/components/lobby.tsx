@@ -267,7 +267,7 @@ export default function Lobby(props: {
             </For>
             <Repeat count={openSeats()}>
               {() => (
-                <Show when={props.room.locked} fallback={<OpenSeat />}>
+                <Show when={props.room.settings.locked} fallback={<OpenSeat />}>
                   <LockedSeat />
                 </Show>
               )}

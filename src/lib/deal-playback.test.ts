@@ -274,7 +274,11 @@ describe(createDealPlayback, () => {
     expect(table.cues).toStrictEqual(["reveal"]);
     expect(table.shown.actionsDisabled).toBeTruthy();
 
-    const latest = { ...afterHit, botSpeed: "fast" } satisfies RoomView;
+    const latest = {
+      ...afterHit,
+      settings: { ...afterHit.settings, botSpeed: "fast" },
+    } satisfies RoomView;
+
     table.show(latest);
     await vi.advanceTimersByTimeAsync(1);
     expect(table.shown.actionsDisabled).toBeTruthy();
@@ -297,7 +301,10 @@ describe(createDealPlayback, () => {
     table.show(view(game));
     choose(game, "a", "a", random);
     table.show(view(game));
-    table.show({ ...view(game), locked: true });
+    table.show({
+      ...view(game),
+      settings: { ...game.settings, locked: true },
+    });
     hit(game, "b", random);
 
     const finalRoom = view(game);
@@ -327,7 +334,10 @@ describe(createDealPlayback, () => {
     table.show(view(game));
     choose(game, "a", "a", random);
     table.show(view(game));
-    table.show({ ...view(game), botSpeed: "fast" });
+    table.show({
+      ...view(game),
+      settings: { ...game.settings, botSpeed: "fast" },
+    });
 
     await vi.runAllTimersAsync();
 

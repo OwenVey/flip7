@@ -1,9 +1,10 @@
 /* oxlint-disable eslint/no-await-in-loop, react-doctor/async-await-in-loop -- Card flights and Room updates must play in order. */
 
 import { calculateRoundScore, isActionCard } from "../game/cards";
+import type { Player } from "../game/engine";
 import { waitingOn } from "../game/moves";
 import { roundStarted } from "../game/protocol";
-import type { PlayerView, RoomView } from "../game/protocol";
+import type { RoomView } from "../game/protocol";
 import { dealFrame, planDeal } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
 import { roomCues } from "./room-cues";
@@ -65,7 +66,7 @@ const emptyFrame: Frame = {
 };
 
 const visibleRoundPoints = (
-  player: PlayerView,
+  player: Player,
   phase: RoomView["phase"],
   incomingCardId: Frame["incomingCardId"]
 ) => {

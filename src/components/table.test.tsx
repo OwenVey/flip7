@@ -27,7 +27,6 @@ const LOGGED_AT = Date.now();
 
 const room = (overrides: Partial<RoomView> = {}) => {
   const view: RoomView = {
-    botSpeed: "normal",
     choice: null,
     code: "ABCDE",
     dealerId: "b",
@@ -38,7 +37,6 @@ const room = (overrides: Partial<RoomView> = {}) => {
     flips: [],
     held: [],
     hostId: "a",
-    locked: false,
     log: [
       {
         at: LOGGED_AT,
@@ -76,7 +74,7 @@ const room = (overrides: Partial<RoomView> = {}) => {
       },
     ],
     round: 1,
-    targetScore: 200,
+    settings: { botSpeed: "normal", locked: false, targetScore: 200 },
     turnId: "a",
     winnerIds: [],
     ...overrides,
@@ -276,7 +274,9 @@ describe("<Table />", () => {
     render(() => (
       <Table
         room={withBot()}
-        latestRoom={withBot({ botSpeed: "fast" })}
+        latestRoom={withBot({
+          settings: { botSpeed: "fast", locked: false, targetScore: 200 },
+        })}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
         chat={vi.fn<RoomConnection["chat"]>()}

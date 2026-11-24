@@ -20,11 +20,11 @@ import {
   removePlayer,
   startGame,
   stay,
-  TARGET_SCORE,
 } from "./engine";
 import type { GameState } from "./engine";
 import { waitingOn } from "./moves";
 import { parseServerMessage, toRoomView } from "./protocol";
+import { DEFAULT_SETTINGS } from "./settings";
 
 const random = () => 0.5;
 
@@ -355,7 +355,7 @@ describe("rules from the FAQ", () => {
 describe("winning and leaving", () => {
   it("ends the game when one player reaches the target alone", () => {
     const state = setup(["a", "b"], [num(10), num(3)]);
-    player(state, "a").score = TARGET_SCORE - 5;
+    player(state, "a").score = DEFAULT_SETTINGS.targetScore - 5;
     stay(state, "a", random);
     stay(state, "b", random);
     expect(state.phase).toBe("gameOver");
@@ -374,8 +374,8 @@ describe("winning and leaving", () => {
 
   it("keeps playing when the leaders are tied", () => {
     const state = setup(["a", "b"], [num(10), num(10)]);
-    player(state, "a").score = TARGET_SCORE;
-    player(state, "b").score = TARGET_SCORE;
+    player(state, "a").score = DEFAULT_SETTINGS.targetScore;
+    player(state, "b").score = DEFAULT_SETTINGS.targetScore;
     stay(state, "a", random);
     stay(state, "b", random);
     expect(state.phase).toBe("roundOver");

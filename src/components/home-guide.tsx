@@ -3,7 +3,7 @@ import type { ParentProps } from "solid-js";
 
 import { FLIP_SEVEN_BONUS } from "../game/cards";
 import type { Card } from "../game/cards";
-import { TARGET_SCORE } from "../game/engine";
+import { DEFAULT_SETTINGS } from "../game/settings";
 import CardBackMark from "./card-back-mark";
 import PlayingCard from "./playing-card";
 import RulesDialog from "./rules-dialog";
@@ -67,10 +67,11 @@ export default function HomeGuide() {
         </ul>
         <p class="home-steps-goal">
           <span>
-            First to <strong>{TARGET_SCORE}</strong> points wins.
+            First to <strong>{DEFAULT_SETTINGS.targetScore}</strong> points
+            wins.
           </span>
           <RulesDialog
-            targetScore={TARGET_SCORE}
+            targetScore={DEFAULT_SETTINGS.targetScore}
             label="Full rules"
             variant="quiet"
           />

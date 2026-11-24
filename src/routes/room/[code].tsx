@@ -27,8 +27,8 @@ import RulesDialog from "../../components/rules-dialog";
 import SiteNav from "../../components/site-nav";
 import SoundControls from "../../components/sound-controls";
 import Table from "../../components/table";
-import { TARGET_SCORE } from "../../game/engine";
 import { normalizeCode } from "../../game/protocol";
+import { DEFAULT_SETTINGS } from "../../game/settings";
 import { createDealMotion } from "../../lib/deal-motion";
 import {
   createDealPlayback,
@@ -191,7 +191,10 @@ const Room = (props: { code: string }) => {
       <SiteNav>
         <div class="room-nav-actions">
           <RulesDialog
-            targetScore={connection.room()?.targetScore ?? TARGET_SCORE}
+            targetScore={
+              connection.room()?.settings.targetScore ??
+              DEFAULT_SETTINGS.targetScore
+            }
           />
           <SoundControls
             muted={sounds.muted()}

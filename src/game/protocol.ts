@@ -1,15 +1,8 @@
 import { projectActionCards } from "./action-card-resolution";
 import { DRAW_LIMIT, LOG_LIMIT } from "./engine";
-import type {
-  DrawEvent,
-  GameState,
-  HeldCard,
-  LogEntry,
-  Player,
-} from "./engine";
+import type { DrawEvent, GameState, HeldCard, LogEntry } from "./engine";
 import { applyListUpdate, listUpdateSince } from "./sequenced-list";
 import type { ListSpec, ListUpdate, ReceivedList } from "./sequenced-list";
-import type { BotSpeed } from "./settings";
 
 export const NAME_MAX_LENGTH = 20;
 export const HEARTBEAT_PING = "ping";
@@ -36,8 +29,6 @@ export const normalizeCode = (raw: string) => {
 export const cleanName = (raw: string) =>
   raw.replaceAll(/\s+/gu, " ").trim().slice(0, NAME_MAX_LENGTH);
 
-export type PlayerView = Player;
-
 export interface RoomView extends Pick<
   GameState,
   | "choice"
@@ -45,7 +36,9 @@ export interface RoomView extends Pick<
   | "hostId"
   | "log"
   | "phase"
+  | "players"
   | "round"
+  | "settings"
   | "turnId"
   | "winnerIds"
 > {
@@ -57,12 +50,6 @@ export interface RoomView extends Pick<
   /** Flip Threes still under way, waiting on a choice. */
   flips: { targetId: string; remaining: number }[];
   held: HeldCard[];
-  players: PlayerView[];
-  /** How fast bots move, set by the host. */
-  botSpeed: BotSpeed;
-  /** Whether the host has stopped new players joining. */
-  locked: boolean;
-  targetScore: number;
 }
 
 /** A round was dealt between two views of the room: a game started, or the next round began. */
@@ -93,8 +80,8 @@ export type SentRoomView = Omit<RoomView, RoomListName>;
 /** Each list's new entries since the previous state message. */
 export type RoomListUpdates = { [K in RoomListName]: ListUpdate<ListEntry<K>> };
 
-/** The sequence each list had at the last broadcast. A missing list is sent in full. */
-export type ListSeqs = Partial<Record<RoomListName, number>>;
+/** Each list's sequence number, to remember what a broadcast sent. */
+export type ListSeqs = Record<RoomListName, number>;
 
 /** A receiver's copy of each list, or null when it has none it can build on. */
 export type ReceivedLists = {
@@ -117,10 +104,8 @@ export type ServerMessage =
 
 export const toRoomView = (code: string, state: GameState) => {
   const { choice, flips, held } = projectActionCards(state);
-  const { botSpeed, locked, targetScore } = state.settings;
 
   const view: RoomView = {
-    botSpeed,
     choice,
     code,
     dealerId:
@@ -134,23 +119,11 @@ export const toRoomView = (code: string, state: GameState) => {
     flips,
     held,
     hostId: state.hostId,
-    locked,
     log: state.log,
     phase: state.phase,
-    players: state.players.map((player) => ({
-      avatar: player.avatar,
-      bot: player.bot,
-      bustCard: player.bustCard,
-      connected: player.connected,
-      hand: player.hand,
-      id: player.id,
-      lastRound: player.lastRound,
-      name: player.name,
-      score: player.score,
-      status: player.status,
-    })),
+    players: state.players.map((player) => ({ ...player })),
     round: state.round,
-    targetScore,
+    settings: state.settings,
     turnId: state.turnId,
     winnerIds: state.winnerIds,
   };
@@ -160,7 +133,7 @@ export const toRoomView = (code: string, state: GameState) => {
 
 /** The lists' sequence numbers now, to remember what a broadcast sent. */
 export const listSeqsOf = (state: GameState) => {
-  const seqs: Required<ListSeqs> = {
+  const seqs: ListSeqs = {
     draws: state.drawSeq,
     log: state.logSeq,
   };
@@ -172,7 +145,7 @@ export const listSeqsOf = (state: GameState) => {
 export const toStateMessage = (
   code: string,
   state: GameState,
-  since: ListSeqs = {}
+  since: Partial<ListSeqs> = {}
 ) => {
   const { draws, log, ...room } = toRoomView(code, state);
 

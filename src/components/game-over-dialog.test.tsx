@@ -3,11 +3,12 @@ import { flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { calculateRoundScore } from "../game/cards";
-import type { PlayerView, RoomView } from "../game/protocol";
+import type { Player } from "../game/engine";
+import type { RoomView } from "../game/protocol";
 import GameOverDialog from "./game-over-dialog";
 
 const player = (id: string, name: string, score: number) => {
-  const view: PlayerView = {
+  const view: Player = {
     avatar: 1,
     bot: false,
     bustCard: null,
@@ -25,7 +26,6 @@ const player = (id: string, name: string, score: number) => {
 
 const room = () => {
   const view: RoomView = {
-    botSpeed: "normal",
     choice: null,
     code: "ABCDE",
     dealerId: "a",
@@ -36,7 +36,6 @@ const room = () => {
     flips: [],
     held: [],
     hostId: "a",
-    locked: false,
     log: [],
     phase: "gameOver",
     players: [
@@ -45,7 +44,7 @@ const room = () => {
       player("c", "Cara", 90),
     ],
     round: 6,
-    targetScore: 200,
+    settings: { botSpeed: "normal", locked: false, targetScore: 200 },
     turnId: null,
     winnerIds: ["b"],
   };

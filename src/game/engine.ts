@@ -24,9 +24,6 @@ import type { Move } from "./moves";
 import { DEFAULT_SETTINGS } from "./settings";
 import type { RoomSettings } from "./settings";
 
-/** The winning score a room starts with. */
-export const TARGET_SCORE = DEFAULT_SETTINGS.targetScore;
-
 export { MAX_PLAYERS } from "./moves";
 
 export { FLIP_THREE_COUNT } from "./action-card-resolution";
