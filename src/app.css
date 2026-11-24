@@ -4251,7 +4251,8 @@ main {
   max-height: min(22rem, 55svh);
   /* Overlay scrollbars ignore the gutter, so keep timestamps clear of the thumb. */
   padding-inline-end: 0.625rem;
-  overflow-y: auto;
+  /* The log only scrolls vertically; pop-in overshoot or a stray wide entry must never add a sideways scrollbar. */
+  overflow: hidden auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   border-block-end: 1px solid var(--rule);
@@ -4259,6 +4260,7 @@ main {
 
 .log-entries {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.875rem;
   align-content: start;
   padding-block-end: 0.5rem;
@@ -4291,6 +4293,7 @@ main {
 
 .log-group {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.375rem;
 
   & .log-round-heading {
@@ -4326,6 +4329,7 @@ main {
 
   & ol {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.25rem;
     margin: 0;
     padding: 0;
