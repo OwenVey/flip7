@@ -4,6 +4,8 @@ import CircleX from "@lucide/solid/icons/circle-x";
 import Coins from "@lucide/solid/icons/coins";
 import Flame from "@lucide/solid/icons/flame";
 import Heart from "@lucide/solid/icons/heart";
+import Lock from "@lucide/solid/icons/lock";
+import LockOpen from "@lucide/solid/icons/lock-open";
 import PlayingCards from "@lucide/solid/icons/playing-cards";
 import PlayingCardsFan from "@lucide/solid/icons/playing-cards-fan";
 import Send from "@lucide/solid/icons/send";
@@ -73,6 +75,8 @@ const eventIcons = {
   coins: Coins,
   flame: Flame,
   heart: Heart,
+  lock: Lock,
+  "lock-open": LockOpen,
   "playing-cards": PlayingCards,
   "playing-cards-fan": PlayingCardsFan,
   shuffle: Shuffle,

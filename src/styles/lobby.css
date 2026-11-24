@@ -7,42 +7,36 @@
   }
 }
 
-/* The open seat is a button that shares the invite link. */
 .roster .open-seat {
-  padding: 0;
+  justify-content: flex-start;
   border-style: dashed;
+  border-color: color-mix(in oklab, var(--ink-soft) 50%, transparent);
   background: transparent;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
 
-  & button {
-    display: flex;
-    flex: 1;
-    flex-wrap: wrap;
-    gap: 0.25rem 0.5rem;
-    align-items: center;
-    justify-content: center;
-    align-self: stretch;
-    padding: 0.5rem 0.75rem;
-    border: 0;
-    border-radius: inherit;
-    background: none;
-    color: var(--ink-soft);
-    font: inherit;
-    font-size: var(--text-sm);
-    cursor: pointer;
-    touch-action: manipulation;
+  /* A locked room's vacant seats are hatched shut, each with a faint lock. */
+  &[data-locked] {
+    background: repeating-linear-gradient(
+      -45deg,
+      transparent 0 6px,
+      color-mix(in oklab, var(--ink-soft) 10%, transparent) 6px 8px
+    );
+    color: color-mix(in oklab, var(--ink-soft) 60%, var(--paper));
 
-    @media (hover: hover) {
-      &:hover {
-        background: var(--paper-deep);
-        color: var(--ink);
-      }
+    /* The lock sits centred where a player's avatar would, its body filled and edged in paper so the hatch stops short of it. */
+    & svg {
+      box-sizing: content-box;
+      padding-inline: calc((1.75rem - 16px) / 2);
+      filter: drop-shadow(1px 0 0 var(--paper))
+        drop-shadow(-1px 0 0 var(--paper)) drop-shadow(0 1px 0 var(--paper))
+        drop-shadow(0 -1px 0 var(--paper));
+    }
+
+    & svg rect {
+      fill: var(--paper);
     }
   }
-}
-
-.open-seat-action {
-  color: var(--accent);
-  font-weight: 700;
 }
 
 /* The invite card, then the host's controls or a guest's waiting note. */
@@ -82,17 +76,6 @@
   color: var(--ink-soft);
   font-size: var(--text-sm);
   font-weight: 400;
-}
-
-/* A locked room's empty seat says so instead of offering the invite link. */
-.roster .open-seat[data-locked] > span {
-  display: flex;
-  flex: 1;
-  gap: 0.5rem;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-soft);
-  font-size: var(--text-sm);
 }
 
 /* The host's settings: two segmented rows, then the lock switch beside its copy. */

@@ -768,9 +768,7 @@ const announceSettings = (
   if (after.locked !== before.locked) {
     say(
       state,
-      after.locked
-        ? "The host locked the room to new players and spectators."
-        : "The host unlocked the room."
+      after.locked ? "The host locked the room." : "The host unlocked the room."
     );
   }
 };

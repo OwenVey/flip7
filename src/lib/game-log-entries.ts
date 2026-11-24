@@ -65,6 +65,8 @@ export type EventIconKey =
   | "coins"
   | "flame"
   | "heart"
+  | "lock"
+  | "lock-open"
   | "playing-cards"
   | "playing-cards-fan"
   | "shuffle"
@@ -152,6 +154,12 @@ export const eventCopy = {
 
 const deckReshuffled = "The discard pile was shuffled into a new deck.";
 
+const systemIcons = new Map<string, EventIconKey>([
+  [deckReshuffled, "shuffle"],
+  ["The host locked the room.", "lock"],
+  ["The host unlocked the room.", "lock-open"],
+]);
+
 export const roundAnnouncement =
   /^Round \d+ (?:begins\. .+ deals\.|is over\.(?: Tied at \d+, so play continues\.)?)$/u;
 
@@ -203,13 +211,9 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
     }
   }
 
-  let icon: EventIconKey | undefined = cueIcon;
-
-  if (entry.text === deckReshuffled) {
-    icon = "shuffle";
-  } else if (winnerAnnouncement.test(entry.text)) {
-    icon = "trophy";
-  }
+  const icon = winnerAnnouncement.test(entry.text)
+    ? "trophy"
+    : (systemIcons.get(entry.text) ?? cueIcon);
 
   const systemText = systemCopy.get(entry.text);
 

@@ -79,7 +79,10 @@ const RoomConnecting = (props: {
         </span>
       </output>
       <Show when={exitsStayOffered()}>
-        <div class="connecting-actions">
+        <div class="room-status-actions connecting-actions">
+          <a class="link" href={paths()}>
+            Back to home
+          </a>
           <Button
             data-variant="solid"
             aria-disabled={props.online ? undefined : "true"}
@@ -87,9 +90,6 @@ const RoomConnecting = (props: {
           >
             Try again
           </Button>
-          <a class="link" href={paths()}>
-            Back to home
-          </a>
         </div>
       </Show>
     </RoomStatus>
