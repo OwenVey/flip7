@@ -1,50 +1,87 @@
-import { createEffect, createMemo, createSignal, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal } from "solid-js";
 
 import type { LogEntry } from "../game/engine";
 import { countChatsAfter } from "./game-log-entries";
 
 export const LOG_FILTERS = ["All", "Chat", "Game"] as const;
 
-export type LogFilter = (typeof LOG_FILTERS)[number];
+type LogFilter = (typeof LOG_FILTERS)[number];
 
 interface ReadSource {
   log: () => LogEntry[];
   playerId: () => string | null;
-  /** Chat & Log is on screen: always for the side panel, while open for the sheet. */
   shown: () => boolean;
 }
 
+interface ScrollPosition {
+  atEnd: boolean;
+  following: boolean;
+}
+
+interface ReadPositions {
+  limit: number;
+  log: LogEntry[];
+  readChatId: number;
+  viewedId: number;
+}
+
 export interface ChatLogReads {
-  /** Drops the New marker, as after sending a message. */
   clearNewFrom: () => void;
   filter: () => LogFilter;
-  /** Entries behind Jump to latest. */
+  log: ReadSource["log"];
   newEntries: () => number;
-  /** The entry the New marker sits above. */
   newFrom: () => number | undefined;
+  playerId: ReadSource["playerId"];
   setFilter: (next: LogFilter) => void;
-  /** Whether the log is scrolled to its end, following new entries. */
-  setFollowing: (following: boolean) => void;
-  /** Chat from other players that hasn't been read. */
+  setScrollPosition: (position: ScrollPosition) => void;
   unreadChats: () => number;
-  /** The entries the current filter shows. */
   visible: () => LogEntry[];
 }
 
-/**
- * What the reader has seen in Chat & Log, for the side panel or the sheet and
- * its trigger. Entries count as seen only while the log is shown and scrolled
- * to its end, so closing the sheet by any path keeps what was read.
- *
- * It keeps two read positions:
- * - the newest entry seen in the current filter, which places the New marker
- *   and counts the entries behind Jump to latest;
- * - the newest entry seen with chat in view, which counts unread chat on the
- *   sheet trigger, the panel heading and the Chat filter.
- */
+const sameEntry = (a: LogEntry, b: LogEntry | undefined) =>
+  a === b ||
+  (b !== undefined &&
+    a.id === b.id &&
+    a.at === b.at &&
+    a.game === b.game &&
+    a.round === b.round &&
+    a.text === b.text &&
+    a.from?.id === b.from?.id);
+
+const survivingReadLimit = (before: LogEntry[], log: LogEntry[]) => {
+  const oldTail = before.at(-1);
+  const tail = log.at(-1);
+
+  if (!oldTail || before === log || (log[0]?.id ?? 0) > oldTail.id) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  if (!tail) {
+    return 0;
+  }
+
+  const formerTail = log.at(oldTail.id - tail.id - 1);
+
+  if (tail.id >= oldTail.id && sameEntry(oldTail, formerTail)) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const oldEntries = new Map(before.map((entry) => [entry.id, entry]));
+
+  return (
+    log.findLast((entry) => sameEntry(entry, oldEntries.get(entry.id)))?.id ?? 0
+  );
+};
+
 export const createChatLogReads = (source: ReadSource) => {
   const [filter, setFilterValue] = createSignal<LogFilter>("All");
-  const [following, setFollowing] = createSignal(true);
+
+  const [position, setScrollPosition] = createSignal<ScrollPosition>({
+    atEnd: true,
+    following: true,
+  });
+
+  const following = () => position().following;
 
   const visible = createMemo(() => {
     const log = source.log();
@@ -60,24 +97,41 @@ export const createChatLogReads = (source: ReadSource) => {
   });
 
   const latestId = createMemo(() => visible().at(-1)?.id ?? 0);
-  const watching = createMemo(() => source.shown() && following());
-  const readingChat = createMemo(() => watching() && filter() !== "Game");
 
-  const [viewedId, setViewedId] = createSignal(0);
-
-  const [readChatId, setReadChatId] = createSignal(
-    untrack(() => source.log().at(-1)?.id ?? 0)
+  const watching = createMemo(
+    () => source.shown() && position().atEnd && following()
   );
 
-  createEffect(
-    () => ({ chat: readingChat(), id: latestId(), viewing: watching() }),
-    ({ chat, id, viewing }) => {
-      if (viewing) {
-        setViewedId(id);
-      }
+  const readingChat = createMemo(() => watching() && filter() !== "Game");
 
-      if (chat) {
-        setReadChatId((previous) => Math.max(previous, id));
+  const [newFrom, setNewFrom] = createSignal<number | undefined>();
+
+  const readPositions = createMemo<ReadPositions>((previous) => {
+    const log = source.log();
+    const limit = survivingReadLimit(previous?.log ?? log, log);
+
+    const readChatId = Math.min(
+      previous?.readChatId ?? log.at(-1)?.id ?? 0,
+      limit
+    );
+
+    return {
+      limit,
+      log,
+      readChatId: readingChat() ? Math.max(readChatId, latestId()) : readChatId,
+      viewedId: watching()
+        ? latestId()
+        : Math.min(previous?.viewedId ?? 0, limit),
+    };
+  });
+
+  createEffect(
+    () => readPositions().limit,
+    (limit) => {
+      if (Number.isFinite(limit)) {
+        setNewFrom((marker) =>
+          marker !== undefined && marker > limit ? undefined : marker
+        );
       }
     }
   );
@@ -85,19 +139,23 @@ export const createChatLogReads = (source: ReadSource) => {
   const unreadChats = createMemo(() =>
     readingChat()
       ? 0
-      : countChatsAfter(source.log(), source.playerId(), readChatId())
+      : countChatsAfter(
+          source.log(),
+          source.playerId(),
+          readPositions().readChatId
+        )
   );
 
   const newEntries = createMemo(() =>
-    following() ? 0 : visible().filter((entry) => entry.id > viewedId()).length
+    following()
+      ? 0
+      : visible().filter((entry) => entry.id > readPositions().viewedId).length
   );
-
-  const [newFrom, setNewFrom] = createSignal<number | undefined>();
 
   const firstUnseen = createMemo(() =>
     following()
       ? undefined
-      : visible().find((entry) => entry.id > viewedId())?.id
+      : visible().find((entry) => entry.id > readPositions().viewedId)?.id
   );
 
   createEffect(firstUnseen, (id) => {
@@ -120,14 +178,16 @@ export const createChatLogReads = (source: ReadSource) => {
       setNewFrom(undefined);
     },
     filter,
+    log: source.log,
     newEntries,
     newFrom,
+    playerId: source.playerId,
     setFilter: (next) => {
       setNewFrom(undefined);
       setFilterValue(next);
     },
-    setFollowing: (next) => {
-      setFollowing(next);
+    setScrollPosition: (next) => {
+      setScrollPosition(next);
     },
     unreadChats,
     visible,

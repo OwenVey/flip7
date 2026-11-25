@@ -560,9 +560,7 @@ const typingLabel = (names: readonly string[]) => {
     : "Several people are typing…";
 };
 
-interface ChatLogProps {
-  log: LogEntry[];
-  playerId: string | null;
+interface ChatLogContentProps {
   /** Missing for a spectator, who can read the chat but not send to it. */
   chat?: ChatControls | undefined;
   players: readonly LogPlayer[];
@@ -570,14 +568,18 @@ interface ChatLogProps {
   typing: readonly string[];
 }
 
-/** Chat & Log, with read state from `createChatLogReads`. */
+export interface ChatLogProps extends ChatLogContentProps {
+  log: LogEntry[];
+  playerId: string | null;
+}
+
 export const ChatLog = (
-  props: ChatLogProps & { reads: ChatLogReads; inSheet?: boolean }
+  props: ChatLogContentProps & { reads: ChatLogReads; inSheet?: boolean }
 ) => {
   const now = createPolled(Date.now, SECOND_MS);
 
   const continuations = createMemo(() => {
-    const { log } = props;
+    const log = props.reads.log();
     const ids = new Set<number>();
 
     for (const [index, entry] of log.entries()) {
@@ -692,9 +694,9 @@ export const ChatLog = (
         >
           {(state) => {
             createEffect(
-              () => state.sticking,
-              (sticking) => {
-                props.reads.setFollowing(sticking);
+              () => ({ atEnd: state.atEnd, following: state.sticking }),
+              (position) => {
+                props.reads.setScrollPosition(position);
               }
             );
 
@@ -725,7 +727,7 @@ export const ChatLog = (
                                 (entry) => entry.scores !== undefined
                               )
                             }
-                            playerId={props.playerId}
+                            playerId={props.reads.playerId()}
                             newFrom={props.reads.newFrom()}
                             now={now()}
                           />
@@ -795,7 +797,6 @@ export const ChatLog = (
   );
 };
 
-/** Chat & Log as the side panel, which is always on screen. */
 export default function GameLog(props: ChatLogProps) {
   const reads = createChatLogReads({
     log: () => props.log,
@@ -806,8 +807,6 @@ export default function GameLog(props: ChatLogProps) {
   return (
     <ChatLog
       reads={reads}
-      log={props.log}
-      playerId={props.playerId}
       chat={props.chat}
       players={props.players}
       typing={props.typing}

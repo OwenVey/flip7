@@ -12,10 +12,9 @@ import {
 import type { SnapPoint } from "@ui-sdk/solid/drawer";
 import { createSignal, Show } from "solid-js";
 
-import type { LogEntry, LogPlayer } from "../game/engine";
 import { createChatLogReads } from "../lib/chat-log-reads";
-import type { ChatControls } from "../lib/room-connection";
 import { CHAT_AND_GAME_LOG_TITLE, ChatLog } from "./game-log";
+import type { ChatLogProps } from "./game-log";
 import Tooltip from "./tooltip";
 
 const HALF = 0.5;
@@ -27,18 +26,13 @@ const SNAP_POINTS: SnapPoint[] = [HALF, "content"];
  * down to half, the table above stays usable, so players can chat while they
  * watch.
  */
-export default function ChatSheet(props: {
-  log: LogEntry[];
-  playerId: string | null;
-  /** Missing for a spectator, who can read the chat but not send to it. */
-  chat?: ChatControls | undefined;
-  players: readonly LogPlayer[];
-  /** Other players typing a chat message, by player ID. */
-  typing: readonly string[];
-  /** Set with `onOpenChange` when the page also needs to close the sheet. */
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}) {
+export default function ChatSheet(
+  props: ChatLogProps & {
+    /** Set with `onOpenChange` when the page also needs to close the sheet. */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+  }
+) {
   const [ownOpen, setOwnOpen] = createSignal(false);
   const open = () => props.open ?? ownOpen();
 
@@ -121,8 +115,6 @@ export default function ChatSheet(props: {
           <ChatLog
             reads={reads}
             inSheet
-            log={props.log}
-            playerId={props.playerId}
             chat={props.chat}
             players={props.players}
             typing={props.typing}

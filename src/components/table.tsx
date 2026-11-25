@@ -93,7 +93,7 @@ export default function Table(
   );
 
   const [scoresOpen, setScoresOpen] = createSignal(false);
-  const [logOpen, setLogOpen] = createSignal(false);
+  const [logOpenedAt, setLogOpenedAt] = createSignal<number | null>();
 
   const resultsRound = createMemo(() =>
     props.room.phase === "roundOver" && props.dealing !== true
@@ -101,9 +101,24 @@ export default function Table(
       : null
   );
 
+  const sheetResultsRound = createMemo(() => {
+    const round = resultsRound();
+
+    return round !== null && globalThis.matchMedia?.(SHEET_TABLE_QUERY).matches
+      ? round
+      : null;
+  });
+
+  const logOpen = () => {
+    const openedAt = logOpenedAt();
+    const round = sheetResultsRound();
+
+    return openedAt !== undefined && (round === null || openedAt === round);
+  };
+
   createEffect(resultsRound, (round, previous) => {
-    if (round !== null && globalThis.matchMedia?.(SHEET_TABLE_QUERY).matches) {
-      setLogOpen(false);
+    if (round !== null && sheetResultsRound() === round) {
+      setLogOpenedAt(undefined);
       setScoresOpen(true);
     } else if (previous !== null && previous !== undefined) {
       setScoresOpen(false);
@@ -139,7 +154,7 @@ export default function Table(
             <ChatSheet
               open={logOpen()}
               onOpenChange={(open) => {
-                setLogOpen(open);
+                setLogOpenedAt(open ? sheetResultsRound() : undefined);
               }}
               log={props.room.log}
               playerId={props.playerId}

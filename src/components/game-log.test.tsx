@@ -411,16 +411,7 @@ describe("<GameLog />", () => {
           shown: () => true,
         });
 
-        return (
-          <ChatLog
-            inSheet
-            reads={reads}
-            log={log()}
-            playerId="a"
-            players={players}
-            typing={[]}
-          />
-        );
+        return <ChatLog inSheet reads={reads} players={players} typing={[]} />;
       });
       const viewport = screen.getByRole("log");
       Object.defineProperties(viewport, {
