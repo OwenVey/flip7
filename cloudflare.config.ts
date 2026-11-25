@@ -3,6 +3,9 @@ import { bindings, defineConfig, defineWorker, exports } from "cf/config";
 import * as entrypoint from "./worker" with { type: "cf-worker" };
 
 const gameWorker = defineWorker({
+  assets: {
+    runWorkerFirst: ["/", "!/.env", "!/.git/*", "!/config.php"],
+  },
   compatibilityDate: "2026-07-22",
   compatibilityFlags: ["nodejs_compat"],
   entrypoint,
