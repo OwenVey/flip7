@@ -1,5 +1,5 @@
 // oxlint-disable landmines-structure/colocated-tests -- This tests the Worker store; src/game only supplies the room fixture.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { addPlayer, startGame } from "../src/game/engine";
 import { newStoredRoom } from "../src/game/room";
@@ -81,6 +81,7 @@ const loadedStore = async (room = newStoredRoom("ABCDE", NOW)) => {
 
 describe(createRoomStore, () => {
   it("treats a room with invalid deal history as missing", async () => {
+    using warn = vi.spyOn(console, "warn");
     const room = newStoredRoom("ABCDE", NOW);
 
     const fake = fakeStorage({
@@ -91,6 +92,11 @@ describe(createRoomStore, () => {
     const store = createRoomStore(fake.storage);
 
     await expect(store.load()).resolves.toBeNull();
+    expect(warn).toHaveBeenCalledExactlyOnceWith({
+      event: "stored_room_rejected",
+      field: "game.dealHistory",
+      validation: "array",
+    });
     expect(fake.takeWrites()).toStrictEqual([]);
 
     await store.save(room, NOW + 500);
@@ -98,6 +104,22 @@ describe(createRoomStore, () => {
     await expect(createRoomStore(fake.storage).load()).resolves.toStrictEqual(
       room
     );
+  });
+
+  it("redacts record keys and values from rejection warnings", async () => {
+    using warn = vi.spyOn(console, "warn");
+    const room = newStoredRoom("ABCDE", NOW);
+
+    const { storage } = fakeStorage({
+      room: { ...room, tokens: { privatePlayerId: ["private token"] } },
+    });
+
+    await expect(createRoomStore(storage).load()).resolves.toBeNull();
+    expect(warn).toHaveBeenCalledExactlyOnceWith({
+      event: "stored_room_rejected",
+      field: "tokens.*",
+      validation: "string",
+    });
   });
 
   it("restores an in-progress room with deal history and structured log entries", async () => {
@@ -122,10 +144,12 @@ describe(createRoomStore, () => {
   });
 
   it("saves a new room and sets its alarm", async () => {
+    using warn = vi.spyOn(console, "warn");
     const fake = fakeStorage();
     const store = createRoomStore(fake.storage);
 
     await expect(store.load()).resolves.toBeNull();
+    expect(warn).not.toHaveBeenCalled();
 
     await store.save(newStoredRoom("ABCDE", NOW), NOW + 500);
 

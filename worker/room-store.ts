@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 
-import { safeParse } from "valibot";
+import { getDotPath, safeParse } from "valibot";
 
 import type { StoredRoom } from "../src/game/room";
 import { StoredRoomSchema } from "./stored-room-schema";
@@ -38,6 +38,24 @@ export const createRoomStore = (storage: RoomStorage) => {
       const result = safeParse(StoredRoomSchema, record, { abortEarly: true });
 
       if (!result.success) {
+        if (record !== undefined) {
+          const [issue] = result.issues;
+
+          const [root, child] = issue.path ?? [];
+          const recordKey = root?.key;
+
+          const field =
+            child && (recordKey === "tokens" || recordKey === "lastRequests")
+              ? `${recordKey}.*`
+              : getDotPath(issue);
+
+          console.warn({
+            event: "stored_room_rejected",
+            field: field ?? "room",
+            validation: issue.type,
+          });
+        }
+
         savedSnapshot = null;
 
         return null;
