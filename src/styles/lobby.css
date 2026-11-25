@@ -273,7 +273,7 @@ button.room-code {
  */
 @media (--lg) {
   .lobby {
-    grid-template-columns: 18rem minmax(0, 1fr) 18rem;
+    grid-template-columns: 18rem minmax(0, 1fr) 19rem;
     column-gap: 1rem;
     align-items: start;
   }

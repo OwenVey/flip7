@@ -54,9 +54,12 @@ describe("<Leaderboard />", () => {
 
     expect(
       leaderboard.getAllByRole("columnheader").map((cell) => cell.textContent)
-    ).toStrictEqual(["Rank", "Player", "Round", "Total"]);
+    ).toStrictEqual(["#", "Player", "Round", "Total"]);
+    expect(
+      leaderboard.getByRole("columnheader", { name: "Rank" })
+    ).toHaveTextContent("#");
     expect(rows()).toStrictEqual([
-      ["1", "Ana You", "+7", "40"],
+      ["1", "Ana (You)", "+7", "40"],
       ["2", "Ben", "+36", "12"],
       ["2", "Cara", "+0", "12"],
     ]);
@@ -84,7 +87,7 @@ describe("<Leaderboard />", () => {
     expectNoDiagnostics(artifact);
     expect(rows()).toStrictEqual([
       ["1", "Ben", "+3", "202"],
-      ["2", "Ana You", "+0", "40"],
+      ["2", "Ana (You)", "+0", "40"],
       ["3", "Cara", "+0", "12"],
     ]);
     expect(leaderboard.getByRole("row", { name: /Ben/u })).toHaveAttribute(

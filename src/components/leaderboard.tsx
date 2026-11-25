@@ -92,7 +92,9 @@ const Leaderboard = (
     <table class="leaderboard" aria-label={SCORES_TITLE}>
       <thead>
         <tr>
-          <th scope="col">Rank</th>
+          <th scope="col" aria-label="Rank">
+            #
+          </th>
           <th scope="col">Player</th>
           <th scope="col">Round</th>
           <th scope="col">Total</th>
@@ -125,10 +127,11 @@ const Leaderboard = (
                   >
                     <td>{entry().rank}</td>
                     <th scope="row">
-                      {entry().player.name}
+                      <span class="leaderboard-name">
+                        {entry().player.name}
+                      </span>
                       <Show when={id === props.playerId}>
-                        {" "}
-                        <span class="badge">You</span>
+                        <span class="sr-only"> (You)</span>
                       </Show>
                     </th>
                     <LeaderboardRound
