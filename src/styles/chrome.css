@@ -190,6 +190,13 @@ main {
   }
 }
 
+/* The viewport-height sidebar already leaves room at the bottom of the table. */
+@media (--lg) and (not (--short)) {
+  .room-page:has(.table) {
+    padding-block-end: 1rem;
+  }
+}
+
 /* The table runs wider than other pages, so three or four seats fit across. The lobby matches it so the log stays put when the game starts. */
 .room-page:has(.table, .lobby-page) {
   width: min(90rem, 100%);
