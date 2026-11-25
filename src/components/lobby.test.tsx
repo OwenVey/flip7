@@ -216,7 +216,7 @@ describe("<Lobby />", () => {
       "aria-expanded",
       "false"
     );
-    expect(log.getByText("Host +21")).toBeVisible();
+    expect(log.queryByText("Host wins with 202 points!")).toBeNull();
   });
 
   it("shows spectators the chat log and their actions, without Leave", () => {

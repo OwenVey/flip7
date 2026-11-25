@@ -185,11 +185,14 @@ describe("a round", () => {
     choose(state, "a", "b", random);
 
     expect(
-      state.draws?.slice(-4).map(({ flip, outcome, playerId }) => ({
-        flip: flip?.index ?? null,
-        outcome,
-        playerId,
-      }))
+      state.dealHistory
+        .filter((event) => event.type === "draw")
+        .slice(-4)
+        .map(({ flip, outcome, playerId }) => ({
+          flip: flip?.index ?? null,
+          outcome,
+          playerId,
+        }))
     ).toStrictEqual([
       { flip: null, outcome: "action", playerId: "a" },
       { flip: 1, outcome: "kept", playerId: "b" },

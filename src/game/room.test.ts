@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { Card } from "./cards";
-import { chat, DRAW_LIMIT, MAX_PLAYERS, nextRound, startGame } from "./engine";
-import type { DrawEvent } from "./engine";
+import {
+  chat,
+  DEAL_HISTORY_LIMIT,
+  MAX_PLAYERS,
+  nextRound,
+  startGame,
+} from "./engine";
+import type { DealEvent } from "./engine";
 import { MAX_SPECTATORS } from "./moves";
 import {
   HEARTBEAT_STALE_MS,
@@ -127,8 +133,8 @@ const broadcastOf = (outcome: RoomOutcome) => {
 const logTexts = (message: StateMessage) =>
   message.lists.log.entries.map((entry) => entry.text);
 
-const drawSeqs = (message: StateMessage) =>
-  message.lists.draws.entries.map((draw) => draw.seq);
+const dealSeqs = (message: StateMessage) =>
+  message.lists.dealHistory.entries.map((event) => event.seq);
 
 const joinAs = (h: Harness, connectionId: string, name: string) => {
   h.connect(connectionId);
@@ -913,29 +919,31 @@ const drawn = (seq: number, id: number) =>
     outcome: "kept",
     playerId: "id-1",
     seq,
-  }) satisfies DrawEvent;
+    type: "draw",
+  }) satisfies DealEvent;
 
 const drawQuietly = (h: Harness, count: number) => {
   const { game } = h.stored;
 
   for (let index = 0; index < count; index += 1) {
     game.drawSeq += 1;
-    game.draws = [
-      ...game.draws,
-      drawn(game.drawSeq, 5000 + game.drawSeq),
-    ].slice(-DRAW_LIMIT);
+    game.dealSeq += 1;
+    game.dealHistory = [
+      ...game.dealHistory,
+      drawn(game.dealSeq, 5000 + game.drawSeq),
+    ].slice(-DEAL_HISTORY_LIMIT);
   }
 };
 
-describe("sending draws", () => {
+describe("sending Deal playback history", () => {
   it("sends every kept draw to a tab that opens, and to one that rejoins", () => {
     const { ana, h } = roundWhereHostMovesFirst();
 
     h.connect("cat-tab");
-    expect(h.room.snapshot().lists.draws).toStrictEqual({
+    expect(h.room.snapshot().lists.dealHistory).toStrictEqual({
       after: null,
-      entries: h.stored.game.draws,
-      seq: h.stored.game.drawSeq,
+      entries: h.stored.game.dealHistory,
+      seq: h.stored.game.dealSeq,
     });
 
     h.drop("ana-tab");
@@ -943,28 +951,30 @@ describe("sending draws", () => {
     const opened = h.room.snapshot();
     h.room.join("ana-tab-2", "", ana.token);
 
-    expect(opened.lists.draws.after).toBeNull();
-    expect(opened.lists.draws.entries).toStrictEqual(h.stored.game.draws);
+    expect(opened.lists.dealHistory.after).toBeNull();
+    expect(opened.lists.dealHistory.entries).toStrictEqual(
+      h.stored.game.dealHistory
+    );
     expect(opened.room.drawSeq).toBe(h.stored.game.drawSeq);
   });
 
   it("broadcasts only the draws made since the last broadcast", () => {
     const { h } = roundWhereHostMovesFirst();
     broadcastOf(h.room.chat("ana-tab", "ready"));
-    const before = h.stored.game.drawSeq;
+    const { dealSeq: before, drawSeq } = h.stored.game;
     h.stored.game.deck = [num(903, 8)];
 
     const sent = broadcastOf(h.room.command("ana-tab", { type: "hit" }));
 
-    expect(sent.lists.draws).toStrictEqual({
+    expect(sent.lists.dealHistory).toStrictEqual({
       after: before,
       entries: [
         expect.objectContaining({ card: num(903, 8), seq: before + 1 }),
       ],
       seq: before + 1,
     });
-    expect(sent.room).not.toHaveProperty("draws");
-    expect(sent.room.drawSeq).toBe(before + 1);
+    expect(sent.room).not.toHaveProperty("dealHistory");
+    expect(sent.room.drawSeq).toBe(drawSeq + 1);
   });
 
   it("sends no draws when nothing was drawn", () => {
@@ -973,10 +983,10 @@ describe("sending draws", () => {
 
     const sent = broadcastOf(h.room.chat("ana-tab", "two"));
 
-    expect(sent.lists.draws).toStrictEqual({
-      after: h.stored.game.drawSeq,
+    expect(sent.lists.dealHistory).toStrictEqual({
+      after: h.stored.game.dealSeq,
       entries: [],
-      seq: h.stored.game.drawSeq,
+      seq: h.stored.game.dealSeq,
     });
   });
 
@@ -984,7 +994,7 @@ describe("sending draws", () => {
     const { h } = roundWhereHostMovesFirst();
     broadcastOf(h.room.chat("ana-tab", "ready"));
     const { game } = h.stored;
-    const endOfRound = game.drawSeq;
+    const endOfRound = game.dealSeq;
 
     game.phase = "roundOver";
     game.deck = [num(904, 6), num(905, 9)];
@@ -993,52 +1003,60 @@ describe("sending draws", () => {
       h.room.command("ana-tab", { requestId: "r1", type: "nextRound" })
     );
 
-    expect(round.lists.draws.after).toBe(endOfRound);
-    expect(drawSeqs(round)[0]).toBe(endOfRound + 1);
-    expect(drawSeqs(round).at(-1)).toBe(game.drawSeq);
+    expect(round.lists.dealHistory.after).toBe(endOfRound);
+    expect(dealSeqs(round)[0]).toBe(endOfRound + 1);
+    expect(dealSeqs(round).at(-1)).toBe(game.dealSeq);
 
-    const endOfGame = game.drawSeq;
+    const endOfGame = game.dealSeq;
     game.phase = "gameOver";
     const again = broadcastOf(h.room.command("ana-tab", { type: "start" }));
 
-    expect(again.lists.draws.after).toBe(endOfGame);
-    expect(drawSeqs(again)[0]).toBe(endOfGame + 1);
+    expect(again.lists.dealHistory.after).toBe(endOfGame);
+    expect(dealSeqs(again)[0]).toBe(endOfGame + 1);
   });
 
   it("includes draws made without a broadcast in the next one", () => {
     const { h } = roundWhereHostMovesFirst();
-    const before = broadcastOf(h.room.chat("ana-tab", "one")).lists.draws.seq;
+
+    const before = broadcastOf(h.room.chat("ana-tab", "one")).lists.dealHistory
+      .seq;
+
     drawQuietly(h, 3);
 
     const sent = broadcastOf(h.room.chat("ana-tab", "two"));
 
-    expect(sent.lists.draws.after).toBe(before);
-    expect(drawSeqs(sent)).toStrictEqual([before + 1, before + 2, before + 3]);
+    expect(sent.lists.dealHistory.after).toBe(before);
+    expect(dealSeqs(sent)).toStrictEqual([before + 1, before + 2, before + 3]);
   });
 
   it("sends every kept draw when more were made than it keeps", () => {
     const { h } = roundWhereHostMovesFirst();
     broadcastOf(h.room.chat("ana-tab", "one"));
-    drawQuietly(h, DRAW_LIMIT + 1);
+    drawQuietly(h, DEAL_HISTORY_LIMIT + 1);
 
     const sent = broadcastOf(h.room.chat("ana-tab", "two"));
 
-    expect(sent.lists.draws.after).toBeNull();
-    expect(sent.lists.draws.entries).toStrictEqual(h.stored.game.draws);
-    expect(sent.lists.draws.entries).toHaveLength(DRAW_LIMIT);
+    expect(sent.lists.dealHistory.after).toBeNull();
+    expect(sent.lists.dealHistory.entries).toStrictEqual(
+      h.stored.game.dealHistory
+    );
+    expect(sent.lists.dealHistory.entries).toHaveLength(DEAL_HISTORY_LIMIT);
   });
 
   it("sends every kept draw when the last broadcast is ahead of the room", () => {
     const { h } = roundWhereHostMovesFirst();
-    const { drawSeq } = h.stored.game;
-    h.stored.broadcastSeqs = { draws: drawSeq + 5, log: h.stored.game.logSeq };
+    const { dealSeq } = h.stored.game;
+    h.stored.broadcastSeqs = {
+      dealHistory: dealSeq + 5,
+      log: h.stored.game.logSeq,
+    };
 
     const sent = broadcastOf(h.room.chat("ana-tab", "after a restore"));
 
-    expect(sent.lists.draws).toStrictEqual({
+    expect(sent.lists.dealHistory).toStrictEqual({
       after: null,
-      entries: h.stored.game.draws,
-      seq: drawSeq,
+      entries: h.stored.game.dealHistory,
+      seq: dealSeq,
     });
   });
 
@@ -1049,15 +1067,17 @@ describe("sending draws", () => {
 
     const snapshot = h.room.snapshot();
 
-    expect(snapshot.lists.draws.after).toBeNull();
-    expect(snapshot.lists.draws.entries).toStrictEqual(h.stored.game.draws);
+    expect(snapshot.lists.dealHistory.after).toBeNull();
+    expect(snapshot.lists.dealHistory.entries).toStrictEqual(
+      h.stored.game.dealHistory
+    );
     expect(h.stored).toStrictEqual(stored);
   });
 
   it("remembers which draws it broadcast across hibernation", () => {
     const { h } = roundWhereHostMovesFirst();
     broadcastOf(h.room.chat("ana-tab", "one"));
-    const before = h.stored.game.drawSeq;
+    const before = h.stored.game.dealSeq;
     const saved = structuredClone(h.stored);
 
     const woken = createRoom(
@@ -1066,10 +1086,14 @@ describe("sending draws", () => {
       { newId: () => "x", now: () => START, random }
     );
 
-    saved.game.drawSeq = before + 1;
-    saved.game.draws = [...saved.game.draws, drawn(before + 1, 7001)];
+    saved.game.drawSeq += 1;
+    saved.game.dealSeq = before + 1;
+    saved.game.dealHistory = [
+      ...saved.game.dealHistory,
+      drawn(before + 1, 7001),
+    ];
 
-    expect(broadcastOf(woken.reconcile()).lists.draws).toStrictEqual({
+    expect(broadcastOf(woken.reconcile()).lists.dealHistory).toStrictEqual({
       after: before,
       entries: [drawn(before + 1, 7001)],
       seq: before + 1,

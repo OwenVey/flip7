@@ -1,6 +1,6 @@
 import { isActionCard } from "../game/cards";
 import type { Card } from "../game/cards";
-import type { DrawEvent, HeldCard, Player } from "../game/engine";
+import type { DealEvent, DrawEvent, HeldCard, Player } from "../game/engine";
 import { roundStarted } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 
@@ -53,12 +53,14 @@ const locate = (room: RoomView, cardId: number) => {
   return held ? ({ kind: "held", playerId: held.ownerId } as const) : null;
 };
 
-const newDraws = (previous: RoomView, current: RoomView) => {
-  const since = current.drawSeq >= previous.drawSeq ? previous.drawSeq : 0;
+const newDealEvents = (previous: RoomView, current: RoomView) => {
+  const since = previous.dealSeq;
+  const events = current.dealHistory.filter((event) => event.seq > since);
 
-  const draws = current.draws.filter((draw) => draw.seq > since);
-
-  return draws.length === current.drawSeq - since ? draws : null;
+  return events.length === current.dealSeq - since &&
+    events.every((event, index) => event.seq === since + index + 1)
+    ? events
+    : null;
 };
 
 const handOf = (table: Table, playerId: string) => {
@@ -161,16 +163,30 @@ const releaseHeld = (
   table: Table,
   steps: DealStep[],
   current: RoomView,
-  upcoming: DrawEvent[]
+  upcoming: DealEvent[]
 ) => {
+  if (table.held.length === 0) {
+    return;
+  }
+
   const [next] = upcoming;
 
+  const nextByCard = new Map(
+    upcoming.toReversed().map(({ card, type }) => [card.id, type])
+  );
+
   for (const entry of table.held) {
+    if (nextByCard.get(entry.card.id) === "heldAction") {
+      continue;
+    }
+
     const spot = locate(current, entry.card.id);
     const stays = spot?.kind === "held" && spot.playerId === entry.ownerId;
 
     const stillFlipping =
-      next?.flip !== null && next?.playerId === entry.ownerId;
+      next?.type === "draw" &&
+      next.flip !== null &&
+      next.playerId === entry.ownerId;
 
     if (!stays && !stillFlipping) {
       record(table, steps, {
@@ -178,10 +194,29 @@ const releaseHeld = (
         flip: null,
         from: "held",
         partnerId: null,
-        to: spot ?? leavingSpot(entry.card, entry.ownerId, upcoming),
+        to: spot ?? { kind: "discard", playerId: entry.ownerId },
       });
     }
   }
+};
+
+const heldActionStep = (
+  event: Extract<DealEvent, { type: "heldAction" }>,
+  choiceId: number | undefined
+) => {
+  let kind: "discard" | "hand" | "played" = "discard";
+
+  if (event.outcome === "played") {
+    kind = event.card.kind === "freeze" ? "hand" : "played";
+  }
+
+  return {
+    card: event.card,
+    flip: null,
+    from: event.card.id === choiceId ? "choice" : "held",
+    partnerId: null,
+    to: { kind, playerId: event.targetId },
+  } satisfies DealStep;
 };
 
 const resolvedChoice = (
@@ -222,9 +257,9 @@ const resolvedChoice = (
  * Returns no steps when the update can't be replayed card by card.
  */
 export const planDeal = (previous: RoomView, current: RoomView) => {
-  const draws = newDraws(previous, current);
+  const events = newDealEvents(previous, current);
 
-  if (current.phase === "lobby" || draws === null) {
+  if (current.phase === "lobby" || events === null) {
     return [];
   }
 
@@ -240,18 +275,36 @@ export const planDeal = (previous: RoomView, current: RoomView) => {
   };
 
   const steps: DealStep[] = [];
+  const draws = events.filter((event) => event.type === "draw");
+  let choiceId = newRound ? undefined : previous.choice?.card.id;
 
-  if (!newRound) {
+  const nextForChoice = events.find((event) => event.card.id === choiceId);
+
+  if (!newRound && nextForChoice?.type !== "heldAction") {
     resolvedChoice(table, steps, previous, current, draws);
+    choiceId = undefined;
   }
 
-  for (const [index, draw] of draws.entries()) {
-    releaseHeld(table, steps, current, draws.slice(index));
-    record(
-      table,
-      steps,
-      drawStep(table, current, draw, draws.slice(index + 1))
-    );
+  let drawsSeen = 0;
+
+  for (const [index, event] of events.entries()) {
+    releaseHeld(table, steps, current, events.slice(index));
+
+    if (event.type === "heldAction") {
+      const step = heldActionStep(event, choiceId);
+      record(table, steps, step);
+
+      if (step.from === "choice") {
+        choiceId = undefined;
+      }
+    } else {
+      drawsSeen += 1;
+      record(
+        table,
+        steps,
+        drawStep(table, current, event, draws.slice(drawsSeen))
+      );
+    }
   }
 
   releaseHeld(table, steps, current, []);

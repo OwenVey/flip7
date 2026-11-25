@@ -149,6 +149,59 @@ describe(planDeal, () => {
     ]);
   });
 
+  it("shows each held Flip Three at its assigned seat before its draws", () => {
+    const state = setup(["a", "b", "c"], [num(5), num(3), num(8)]);
+    const first = flipThree();
+    const second = flipThree();
+    const forB = [num(4), num(6), num(10)];
+    const forC = [num(7), num(9), num(12)];
+    rig(state, [flipThree(), first, second, num(2), ...forB, ...forC]);
+    hit(state, "a", random);
+    choose(state, "a", "b", random);
+    choose(state, "b", "b", random);
+    const before = view(state);
+    choose(state, "b", "c", random);
+    const after = view(state);
+
+    expect(planDeal(before, after)).toMatchObject([
+      { card: first, from: "held", to: { kind: "played", playerId: "b" } },
+      ...forB.map((card) => ({ card, to: { kind: "hand", playerId: "b" } })),
+      { card: second, from: "choice", to: { kind: "played", playerId: "c" } },
+      ...forC.map((card) => ({ card, to: { kind: "hand", playerId: "c" } })),
+    ]);
+    expect(
+      planDeal(before, {
+        ...after,
+        dealHistory: after.dealHistory.filter(
+          (event) => event.seq !== before.dealSeq + 1
+        ),
+      })
+    ).toStrictEqual([]);
+  });
+
+  it("shows a queued Flip Three discarded after Freeze without a draw", () => {
+    const state = setup(["a", "b", "c"], [num(5), num(3), num(8)]);
+    const heldFreeze = freeze();
+    const heldFlip = flipThree();
+    rig(state, [flipThree(), num(1), heldFreeze, heldFlip, num(11)]);
+    hit(state, "a", random);
+    choose(state, "a", "c", random);
+    choose(state, "c", "b", random);
+    const before = view(state);
+    choose(state, "c", "b", random);
+    const after = view(state);
+
+    expect(after.drawSeq).toBe(before.drawSeq);
+    expect(planDeal(before, after)).toMatchObject([
+      { card: heldFreeze, from: "held", to: { kind: "hand", playerId: "b" } },
+      {
+        card: heldFlip,
+        from: "choice",
+        to: { kind: "discard", playerId: "b" },
+      },
+    ]);
+  });
+
   it("discards held cards when a Flip Three ends in a bust", () => {
     const state = setup(["a", "b"], [num(5), num(3)]);
     rig(state, [flipThree(), freeze(), num(3), num(9)]);
@@ -181,13 +234,15 @@ describe(planDeal, () => {
     ).toHaveLength(3);
   });
 
-  it("shows the result at once for rooms saved without a draw record", () => {
+  it("shows the result at once when the deal history is incomplete", () => {
     const state = setup(["a", "b"], [num(5), num(3)]);
     const before = view(state);
     rig(state, [num(7)]);
     hit(state, "a", random);
 
-    expect(planDeal(before, { ...view(state), draws: [] })).toStrictEqual([]);
+    expect(planDeal(before, { ...view(state), dealHistory: [] })).toStrictEqual(
+      []
+    );
   });
 });
 

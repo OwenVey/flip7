@@ -2,8 +2,8 @@ import * as v from "valibot";
 
 import { projectActionCards } from "./action-card-resolution";
 import { isAvatar } from "./avatars";
-import { DRAW_LIMIT, LOG_LIMIT } from "./engine";
-import type { DrawEvent, GameState, HeldCard, LogEntry } from "./engine";
+import { DEAL_HISTORY_LIMIT, LOG_LIMIT } from "./engine";
+import type { DealEvent, GameState, HeldCard, LogEntry } from "./engine";
 import { MAX_SPECTATORS } from "./moves";
 import { applyListUpdate, listUpdateSince } from "./sequenced-list";
 import type { ListSpec, ListUpdate, ReceivedList } from "./sequenced-list";
@@ -56,6 +56,8 @@ export const cleanName = (raw: string) =>
 export interface RoomView extends Pick<
   GameState,
   | "choice"
+  | "dealHistory"
+  | "dealSeq"
   | "drawSeq"
   | "hostId"
   | "log"
@@ -70,7 +72,6 @@ export interface RoomView extends Pick<
   dealerId: string | null;
   deckCount: number;
   discardCount: number;
-  draws: DrawEvent[];
   /** Flip Threes still under way, waiting on a choice. */
   flips: { targetId: string; remaining: number }[];
   held: HeldCard[];
@@ -86,7 +87,7 @@ export const roundStarted = (previous: RoomView, current: RoomView) =>
 
 /** The parts of the room view that are sent as new entries rather than in full. */
 export interface RoomLists {
-  draws: DrawEvent[];
+  dealHistory: DealEvent[];
   log: LogEntry[];
 }
 
@@ -95,7 +96,7 @@ export type RoomListName = keyof RoomLists;
 type ListEntry<K extends RoomListName> = RoomLists[K][number];
 
 const ROOM_LISTS = {
-  draws: { limit: DRAW_LIMIT, seqOf: (draw) => draw.seq },
+  dealHistory: { limit: DEAL_HISTORY_LIMIT, seqOf: (event) => event.seq },
   log: { limit: LOG_LIMIT, seqOf: (entry) => entry.id },
 } satisfies { [K in RoomListName]: ListSpec<ListEntry<K>> };
 
@@ -113,7 +114,7 @@ export type ReceivedLists = {
   [K in RoomListName]: ReceivedList<ListEntry<K>> | null;
 };
 
-export const NO_LISTS: ReceivedLists = { draws: null, log: null };
+export const NO_LISTS: ReceivedLists = { dealHistory: null, log: null };
 
 const SpectatorCountSchema = v.pipe(
   v.number(),
@@ -145,6 +146,49 @@ const ListUpdateSchema = v.looseObject({
 });
 
 const nonNegativeInteger = v.pipe(v.number(), v.integer(), v.minValue(0));
+
+const cardFields = { id: nonNegativeInteger };
+
+const HeldActionCardSchema = v.object({
+  ...cardFields,
+  kind: v.picklist(["freeze", "flipThree"]),
+});
+
+const CardSchema = v.union([
+  HeldActionCardSchema,
+  v.object({ ...cardFields, kind: v.picklist(["double", "secondChance"]) }),
+  v.object({
+    ...cardFields,
+    kind: v.picklist(["number", "modifier"]),
+    value: nonNegativeInteger,
+  }),
+]);
+
+const DealHistoryUpdateSchema = v.object({
+  ...ListUpdateSchema.entries,
+  entries: v.array(
+    v.variant("type", [
+      v.object({
+        card: CardSchema,
+        flip: v.nullable(
+          v.object({ index: nonNegativeInteger, total: nonNegativeInteger })
+        ),
+        hit: v.optional(v.literal(true)),
+        outcome: v.picklist(["kept", "bust", "saved", "held", "action"]),
+        playerId: v.string(),
+        seq: nonNegativeInteger,
+        type: v.literal("draw"),
+      }),
+      v.object({
+        card: HeldActionCardSchema,
+        outcome: v.picklist(["played", "discarded"]),
+        seq: nonNegativeInteger,
+        targetId: v.string(),
+        type: v.literal("heldAction"),
+      }),
+    ])
+  ),
+});
 
 const LATEST_DATE_MS = 8_640_000_000_000_000;
 
@@ -197,9 +241,14 @@ const LogUpdateSchema = v.object({
 });
 
 const StateMessageSchema = v.looseObject({
-  lists: v.looseObject({ draws: ListUpdateSchema, log: LogUpdateSchema }),
+  lists: v.looseObject({
+    dealHistory: DealHistoryUpdateSchema,
+    log: LogUpdateSchema,
+  }),
   room: v.looseObject({
     code: v.string(),
+    dealSeq: nonNegativeInteger,
+    drawSeq: nonNegativeInteger,
     hostId: v.nullable(v.string()),
     phase: v.picklist(["lobby", "playing", "roundOver", "gameOver"]),
     players: v.array(
@@ -279,7 +328,8 @@ export const toRoomView = (
         : (state.players[state.dealerIndex]?.id ?? null),
     deckCount: state.deck.length,
     discardCount: state.discard.length,
-    draws: state.draws,
+    dealHistory: state.dealHistory,
+    dealSeq: state.dealSeq,
     drawSeq: state.drawSeq,
     flips,
     held,
@@ -300,7 +350,7 @@ export const toRoomView = (
 /** The lists' sequence numbers now, to remember what a broadcast sent. */
 export const listSeqsOf = (state: GameState) => {
   const seqs: ListSeqs = {
-    draws: state.drawSeq,
+    dealHistory: state.dealSeq,
     log: state.logSeq,
   };
 
@@ -314,14 +364,14 @@ export const toStateMessage = (
   since: Partial<ListSeqs> = {},
   spectatorCount = 0
 ) => {
-  const { draws, log, ...room } = toRoomView(code, state, spectatorCount);
+  const { dealHistory, log, ...room } = toRoomView(code, state, spectatorCount);
 
   const message: ServerMessage = {
     lists: {
-      draws: listUpdateSince(
-        { clearedAt: 0, entries: draws, seq: state.drawSeq },
-        since.draws,
-        ROOM_LISTS.draws
+      dealHistory: listUpdateSince(
+        { clearedAt: 0, entries: dealHistory, seq: state.dealSeq },
+        since.dealHistory,
+        ROOM_LISTS.dealHistory
       ),
       log: listUpdateSince(
         { clearedAt: state.logClearedAt, entries: log, seq: state.logSeq },
@@ -347,16 +397,16 @@ export const receiveState = (
 ) => {
   const gaps: RoomListName[] = [];
 
-  const draws = applyListUpdate(
-    received.draws,
-    message.lists.draws,
-    ROOM_LISTS.draws
+  const history = applyListUpdate(
+    received.dealHistory,
+    message.lists.dealHistory,
+    ROOM_LISTS.dealHistory
   );
 
   const log = applyListUpdate(received.log, message.lists.log, ROOM_LISTS.log);
 
-  if (!draws) {
-    gaps.push("draws");
+  if (!history) {
+    gaps.push("dealHistory");
   }
 
   if (!log) {
@@ -364,13 +414,13 @@ export const receiveState = (
   }
 
   const lists: ReceivedLists = {
-    draws: draws ?? received.draws,
+    dealHistory: history ?? received.dealHistory,
     log: log ?? received.log,
   };
 
   const room: RoomView = {
     ...message.room,
-    draws: lists.draws?.entries ?? [],
+    dealHistory: lists.dealHistory?.entries ?? [],
     log: lists.log?.entries ?? [],
   };
 

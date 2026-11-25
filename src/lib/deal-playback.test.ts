@@ -6,7 +6,7 @@ import {
   addPlayer,
   choose,
   createGame,
-  DRAW_LIMIT,
+  DEAL_HISTORY_LIMIT,
   hit,
   nextRound,
   stay,
@@ -16,6 +16,7 @@ import type { GameState } from "../game/engine";
 import {
   listSeqsOf,
   NO_LISTS,
+  parseServerMessage,
   receiveState,
   toRoomView,
   toStateMessage,
@@ -653,7 +654,7 @@ describe(createDealPlayback, () => {
     table.show(view(game));
     game.deck = [number];
     hit(game, "a", random);
-    const afterHit = { ...view(game), draws: [] };
+    const afterHit = { ...view(game), dealHistory: [] };
     table.show(afterHit);
 
     expect(table.shown).toMatchObject({
@@ -676,8 +677,8 @@ describe(createDealPlayback, () => {
 
     const flip: RoomView = {
       ...afterHit,
-      draws: afterHit.draws.map((draw) =>
-        draw.card.id === number.id
+      dealHistory: afterHit.dealHistory.map((draw) =>
+        draw.type === "draw" && draw.card.id === number.id
           ? { ...draw, flip: { index: 1, total: 3 } }
           : draw
       ),
@@ -739,7 +740,12 @@ const browserCopy = () => {
 
   return {
     receive: (message: StateMessage) => {
-      const overTheWire = structuredClone(message);
+      const overTheWire = parseServerMessage(JSON.stringify(message));
+
+      if (overTheWire?.type !== "state") {
+        throw new Error("Could not read the Room update");
+      }
+
       const received = receiveState(lists, overTheWire);
       ({ lists } = received);
 
@@ -753,7 +759,7 @@ const browserCopy = () => {
   };
 };
 
-describe("deal playback from draws sent as new entries", () => {
+describe("Deal playback from history sent as new entries", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -762,7 +768,7 @@ describe("deal playback from draws sent as new entries", () => {
     vi.useRealTimers();
   });
 
-  it("plays the same deals as full draws across a reconnect, new rounds and a new game", async () => {
+  it("plays the same deals as full history across a reconnect, new rounds and a new game", async () => {
     const game = createGame();
     addPlayer(game, "a", "Ada", 1);
     addPlayer(game, "b", "Ben", 1);
@@ -827,13 +833,13 @@ describe("deal playback from draws sent as new entries", () => {
 
     expect({
       games: game.games,
-      manyDeals: full.flights.length > DRAW_LIMIT,
-      pastDrawLimit: game.drawSeq > DRAW_LIMIT,
+      manyDeals: full.flights.length > DEAL_HISTORY_LIMIT,
+      pastHistoryLimit: game.dealSeq > DEAL_HISTORY_LIMIT,
       rounds: seen.size >= 4,
     }).toStrictEqual({
       games: 2,
       manyDeals: true,
-      pastDrawLimit: true,
+      pastHistoryLimit: true,
       rounds: true,
     });
     expect({
