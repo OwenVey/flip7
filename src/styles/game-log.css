@@ -456,7 +456,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) 3.5ch;
     column-gap: 0.375rem;
-    align-items: baseline;
+    align-items: center;
 
     & > time {
       text-align: end;
@@ -473,11 +473,11 @@
     display: grid;
     grid-template-columns: 0.875rem minmax(0, 1fr);
     column-gap: 0.375rem;
+    align-items: center;
   }
 
   & .log-event-icon {
     grid-area: 1 / 1;
-    margin-block-start: 0.125rem;
   }
 
   & .log-event-text {
@@ -544,17 +544,21 @@
   }
 
   & .log-card {
-    display: inline-block;
-    min-inline-size: 1.25rem;
-    padding-inline: 0.25rem;
+    position: relative;
+    inset-block-start: -1px;
+    display: inline-grid;
+    place-items: center;
+    inline-size: 1rem;
+    aspect-ratio: 5 / 7;
     border: 1px solid var(--chip-color);
-    border-radius: 0.25rem;
+    border-radius: 0.125rem;
     background: var(--paper-light);
     color: color-mix(in oklab, var(--chip-color) 60%, var(--ink));
     font-family: var(--font-numeral);
     font-weight: 900;
-    line-height: var(--leading-tight);
-    text-align: center;
+    line-height: var(--leading-none);
+    vertical-align: middle;
+    white-space: nowrap;
   }
 
   & .log-points {
