@@ -39,6 +39,31 @@ export interface ChatLogReads {
   visible: () => LogEntry[];
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Compares fields of events already parsed at the wire.
+const sameValue: (a: unknown, b: unknown) => boolean = (a, b) => {
+  if (a === b) {
+    return true;
+  }
+
+  if (
+    !(a instanceof Object) ||
+    !(b instanceof Object) ||
+    Array.isArray(a) !== Array.isArray(b)
+  ) {
+    return false;
+  }
+
+  const fields = new Map(Object.entries(b));
+  const entries = Object.entries(a);
+
+  return (
+    entries.length === fields.size &&
+    entries.every(
+      ([key, value]) => fields.has(key) && sameValue(value, fields.get(key))
+    )
+  );
+};
+
 const sameContent = (a: LogEntry, b: LogEntry) => {
   if (isChat(a) || isChat(b)) {
     return (
@@ -46,7 +71,7 @@ const sameContent = (a: LogEntry, b: LogEntry) => {
     );
   }
 
-  return JSON.stringify(a.event) === JSON.stringify(b.event);
+  return sameValue(a.event, b.event);
 };
 
 const sameEntry = (a: LogEntry, b: LogEntry | undefined) =>
