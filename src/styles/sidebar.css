@@ -347,18 +347,19 @@
   .table-body > .seats {
     align-content: start;
     align-self: stretch;
-    overflow: auto;
+    /* Keep wide turn-ring animations from making the panel grid scroll sideways. */
+    overflow-x: hidden;
+    overflow-y: auto;
     overscroll-behavior: contain;
     /*
      * Room for seat shadows and turn rings, which a scroll viewport clips. The
-     * viewport reaches the page's edge and bottom, the gap before the sidebar,
-     * and most of the gap below the action bar, so the clip lands where the
-     * felt ends or a shadow has faded.
+     * top stays just below the action bar's turn ring, while the sides and
+     * bottom reach the page's edges and the sidebar gap.
      */
-    margin: -1rem;
-    padding: 1rem;
+    margin: -0.625rem -1rem -1rem;
+    padding: 0.625rem 1rem 1rem;
     /* Revealing a seat stops where the seats rest, not flush with the clip. */
-    scroll-padding-block: 1rem;
+    scroll-padding-block: 0.625rem 1rem;
 
     /* Nothing covers the top of this viewport, unlike the page's sticky action bar on narrow screens. */
     & .seat {
@@ -378,7 +379,10 @@
 
     & .leaderboard-panel {
       grid-template-rows: auto minmax(0, 1fr);
-      max-block-size: min(calc((100cqh - 1rem) * 0.47), calc(100cqh - 15rem));
+      max-block-size: min(
+        calc((100cqh - 1rem) * 0.47),
+        max(6rem, calc(100cqh - 15rem))
+      );
     }
 
     & .leaderboard {
