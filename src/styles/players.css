@@ -3,6 +3,11 @@
   margin: 2rem auto;
 }
 
+/* The seated players' names break anywhere, so a long one wraps inside the card. */
+.join-seated {
+  overflow-wrap: anywhere;
+}
+
 .lobby {
   display: grid;
   gap: 1.25rem;

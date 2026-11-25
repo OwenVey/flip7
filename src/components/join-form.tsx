@@ -101,7 +101,7 @@ export default function JoinForm(props: {
   return (
     <Frame embedded={props.embedded === true}>
       <Show when={props.room?.players.length}>
-        <p class="muted">
+        <p class="muted join-seated">
           At the table:{" "}
           <For each={props.room?.players ?? []} keyed={(player) => player.id}>
             {(player, index) => (

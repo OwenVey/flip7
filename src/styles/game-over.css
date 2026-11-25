@@ -227,9 +227,11 @@
     white-space: nowrap;
   }
 
+  /* The host's name breaks anywhere, so a long one wraps inside the card. */
   & > p {
     grid-column: 1 / -1;
     margin: 0;
+    overflow-wrap: anywhere;
   }
 }
 

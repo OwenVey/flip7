@@ -648,7 +648,9 @@ export const ChatLog = (
 
   return (
     <SpotlightContext value={spotlight}>
-      <section class={props.inSheet === true ? "stack" : "panel log"}>
+      <section
+        class={["chat-log", props.inSheet === true ? "stack" : "panel log"]}
+      >
         <Show when={props.inSheet !== true}>
           <h2>
             {CHAT_AND_GAME_LOG_TITLE}
