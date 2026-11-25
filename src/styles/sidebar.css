@@ -338,13 +338,26 @@
 
 /* The sidebar runs to 1rem above the bottom edge. Scores take what they need, up to their cap, and the log fills the rest. */
 @media (--lg) and (not (--short)) {
+  .table {
+    flex: 1;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    min-block-size: 0;
+  }
+
+  .table-body > .seats {
+    align-content: start;
+    align-self: stretch;
+    overflow: auto;
+    overscroll-behavior: contain;
+    /* Keep seat shadows and focus rings inside the scroll viewport. */
+    margin: -0.5rem;
+    padding: 0.5rem;
+  }
+
   .table-sidebar {
-    --sidebar-height: calc(100dvh - 9rem);
-    position: sticky;
-    inset-block-start: 0.5rem;
+    container-type: size;
     grid-template-rows: auto minmax(0, 1fr);
-    block-size: var(--sidebar-height);
-    align-self: start;
+    align-self: stretch;
 
     & > .panel {
       gap: 0.625rem;
@@ -353,10 +366,7 @@
 
     & .leaderboard-panel {
       grid-template-rows: auto minmax(0, 1fr);
-      max-block-size: min(
-        calc((var(--sidebar-height) - 1rem) * 0.47),
-        calc(var(--sidebar-height) - 15rem)
-      );
+      max-block-size: min(calc((100cqh - 1rem) * 0.47), calc(100cqh - 15rem));
     }
 
     & .leaderboard {
