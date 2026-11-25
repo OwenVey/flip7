@@ -228,10 +228,6 @@
     }
   }
 
-  &[data-size="compact"] {
-    --button-height: 0;
-  }
-
   &:where([data-size="sm"]) {
     --button-height: var(--control-height-sm);
     padding-inline: 0.75rem;
