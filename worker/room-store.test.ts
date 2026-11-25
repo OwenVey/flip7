@@ -1,14 +1,14 @@
 // oxlint-disable landmines-structure/colocated-tests -- This tests the Worker store; src/game only supplies the room fixture.
 import { describe, expect, it } from "vitest";
 
+import { addPlayer, startGame } from "../src/game/engine";
 import { newStoredRoom } from "../src/game/room";
-import type { StoredRoom } from "../src/game/room";
 import { createRoomStore } from "./room-store";
 import type { RoomStorage } from "./room-store";
 
 const NOW = 1_000_000;
 
-const fakeStorage = (initial: { room?: StoredRoom; alarm?: number } = {}) => {
+const fakeStorage = (initial: { room?: unknown; alarm?: number } = {}) => {
   const writes: string[] = [];
 
   let room =
@@ -80,6 +80,39 @@ const loadedStore = async (room = newStoredRoom("ABCDE", NOW)) => {
 };
 
 describe(createRoomStore, () => {
+  it("treats a room with invalid deal history as missing", async () => {
+    const room = newStoredRoom("ABCDE", NOW);
+
+    const fake = fakeStorage({
+      room: { ...room, game: { ...room.game, dealHistory: null } },
+      alarm: NOW + 500,
+    });
+
+    const store = createRoomStore(fake.storage);
+
+    await expect(store.load()).resolves.toBeNull();
+    expect(fake.takeWrites()).toStrictEqual([]);
+
+    await store.save(room, NOW + 500);
+
+    await expect(createRoomStore(fake.storage).load()).resolves.toStrictEqual(
+      room
+    );
+  });
+
+  it("restores an in-progress room with deal history and structured log entries", async () => {
+    const room = newStoredRoom("ABCDE", NOW);
+    addPlayer(room.game, "host", "Host", 1);
+    addPlayer(room.game, "guest", "Guest", 2);
+    startGame(room.game, "host", () => 0.5);
+
+    const { storage } = fakeStorage({ room });
+
+    expect(room.game.dealHistory.length).toBeGreaterThan(0);
+    expect(room.game.log.length).toBeGreaterThan(0);
+    await expect(createRoomStore(storage).load()).resolves.toStrictEqual(room);
+  });
+
   it("writes nothing when the room and alarm haven't changed", async () => {
     const { room, store, takeWrites } = await loadedStore();
 
