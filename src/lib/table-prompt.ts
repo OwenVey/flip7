@@ -8,8 +8,9 @@ import type { RoomView } from "../game/protocol";
 import { stepPlayerId } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
 import { pointsOf } from "./deal-playback";
-import type { DealPlaybackView, PlaybackMoment } from "./deal-playback";
+import type { DealPlaybackView } from "./deal-playback";
 import { hostName } from "./host";
+import type { PlaybackMoment } from "./playback-moments";
 import { nameOf } from "./player-name";
 import { rankPlayers } from "./standings";
 
@@ -177,17 +178,13 @@ const gameOverPrompt = (room: RoomView, moves: AvailableMoves) =>
   }) satisfies Prompt;
 
 const roundOverPrompt = (room: RoomView, moves: AvailableMoves) => {
-  const over = room.log.findLast(
-    (entry) =>
-      !isChat(entry) &&
-      entry.round === room.round &&
-      entry.event.type === "roundOver"
-  );
+  const over = room.log
+    .flatMap((entry) =>
+      isChat(entry) || entry.round !== room.round ? [] : [entry.event]
+    )
+    .findLast((event) => event.type === "roundOver");
 
-  const tiedAt =
-    over && !isChat(over) && over.event.type === "roundOver"
-      ? over.event.tiedAt
-      : null;
+  const tiedAt = over?.tiedAt ?? null;
 
   return {
     controls: moves.host.nextRound

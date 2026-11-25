@@ -230,8 +230,8 @@ export default function Table(
                       actionsDisabled={props.actionsDisabled}
                       removeDisabled={props.offline}
                       roundPoints={pointsOf(props.roundPoints, id)}
-                      dealing={props.dealing}
-                      dealMoment={props.dealMoment}
+                      dealing={props.dealing === true}
+                      dealMoment={props.dealMoment ?? null}
                       dealStep={props.dealStep}
                       moves={moves()}
                       onPick={chooseTarget}

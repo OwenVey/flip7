@@ -959,6 +959,59 @@ describe(createDealPlayback, () => {
     });
   });
 
+  it("stops holding settle beats once Room updates pile up behind them", async () => {
+    const game = gameAtFirstTurn();
+    addPlayer(game, "c", "Cat", 1);
+    addPlayer(game, "d", "Dev", 1);
+    game.phase = "roundOver";
+    game.round = 0;
+    game.dealerIndex = 2;
+    game.deck = [
+      { id: 1004, kind: "number", value: 6 },
+      { id: 1003, kind: "number", value: 4 },
+      { id: 1002, kind: "number", value: 3 },
+      { id: 1001, kind: "number", value: 5 },
+    ];
+    nextRound(game, "a", random);
+
+    const table = playback(true, "d");
+    table.show(view(game));
+
+    stay(game, "a", random);
+    table.show(view(game));
+    stay(game, "b", random);
+    table.show(view(game));
+    stay(game, "c", random);
+    table.show(view(game));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect({
+      cues: table.cues,
+      moment: table.shown.moment,
+    }).toStrictEqual({
+      cues: ["bank", "bank"],
+      moment: { kind: "stay", playerId: "b", points: 3 },
+    });
+
+    await vi.advanceTimersByTimeAsync(460);
+    expect(table.shown.moment).toStrictEqual({
+      kind: "stay",
+      playerId: "c",
+      points: 4,
+    });
+
+    await vi.advanceTimersByTimeAsync(460);
+    expect({
+      cues: table.cues,
+      moment: table.shown.moment,
+      myMove: table.shown.myMove,
+    }).toStrictEqual({
+      cues: ["bank", "bank", "bank", "turn"],
+      moment: null,
+      myMove: true,
+    });
+  });
+
   it("holds a Second Chance duplicate, plays secondChance on discard, and keeps it in Flip Three", async () => {
     const game = gameAtFirstTurn();
     const [player] = game.players;
@@ -1133,7 +1186,7 @@ describe(createDealPlayback, () => {
     expect(table.flights).toHaveLength(2);
   });
 
-  it("settles a mid-batch Freeze before discarding a queued Flip Three", async () => {
+  it("settles a mid-batch Freeze, then discards a queued Flip Three without holding it", async () => {
     const game = gameAtFirstTurn();
     addPlayer(game, "c", "Cat", 1);
     game.phase = "roundOver";
@@ -1185,7 +1238,7 @@ describe(createDealPlayback, () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(table.flights).toHaveLength(2);
 
-    await vi.advanceTimersByTimeAsync(580);
+    await vi.advanceTimersByTimeAsync(280);
     expect({ cues: table.cues, lands: table.lands }).toStrictEqual({
       cues: ["reveal", "freeze", "reveal"],
       lands: [heldFreeze.id, heldFlip.id],

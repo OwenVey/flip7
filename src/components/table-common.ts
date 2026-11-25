@@ -1,6 +1,7 @@
 import type { RoomView } from "../game/protocol";
 import type { DealStep } from "../lib/deal-plan";
-import type { DealPlaybackView, PlaybackMoment } from "../lib/deal-playback";
+import type { DealPlaybackView } from "../lib/deal-playback";
+import type { PlaybackMoment } from "../lib/playback-moments";
 import type { RoomConnection } from "../lib/room-connection";
 
 export const SCORES_TITLE = "Scores";

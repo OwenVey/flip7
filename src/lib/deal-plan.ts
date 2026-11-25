@@ -379,19 +379,23 @@ const complete = (
   frame.held = frame.held.filter((entry) => entry.card.id !== step.card.id);
 };
 
-const settleStep = (seats: Map<string, Seat>, step: DealStep) => {
+const settledStatus = (step: DealStep) => {
   if (step.to.kind === "bust") {
-    const seat = seats.get(step.to.playerId);
+    return "busted";
+  }
 
-    if (seat) {
-      seat.player = { ...seat.player, status: "busted" };
-    }
-  } else if (step.to.kind === "hand" && step.card.kind === "freeze") {
-    const seat = seats.get(step.to.playerId);
+  return step.to.kind === "hand" && step.card.kind === "freeze"
+    ? "frozen"
+    : null;
+};
 
-    if (seat) {
-      seat.player = { ...seat.player, status: "frozen" };
-    }
+const settleStep = (seats: Map<string, Seat>, step: DealStep) => {
+  const status = settledStatus(step);
+  const playerId = stepPlayerId(step);
+  const seat = playerId === null ? undefined : seats.get(playerId);
+
+  if (status !== null && seat) {
+    seat.player = { ...seat.player, status };
   }
 };
 

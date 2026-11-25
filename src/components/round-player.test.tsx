@@ -13,7 +13,7 @@ import { calculateRoundScore } from "../game/cards";
 import { availableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { pointsOf, roundPointsFor } from "../lib/deal-playback";
-import type { PlaybackMoment } from "../lib/deal-playback";
+import type { PlaybackMoment } from "../lib/playback-moments";
 import type { RoomConnection } from "../lib/room-connection";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
@@ -36,6 +36,8 @@ const Seat = (props: {
       itemAt(props.room.players, props.seat).id
     )}
     moves={availableMoves(props.room, props.playerId)}
+    dealing={false}
+    dealMoment={null}
     onPick={vi.fn<(targetId: string) => void>()}
     onRemove={vi.fn<(playerId: string) => void>()}
   />
@@ -526,7 +528,7 @@ describe("<RoundPlayer />", () => {
     ).toBeEnabled();
   });
 
-  it("suppresses turn rings, target highlights, winner badges, and confetti while settling", () => {
+  it("suppresses turn rings, winner badges, and confetti while settling", () => {
     const [dealing, setDealing] = createSignal(true);
 
     const [moment, setMoment] = createSignal<PlaybackMoment | null>({

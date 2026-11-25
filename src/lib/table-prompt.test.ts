@@ -5,7 +5,7 @@ import type { Player } from "../game/engine";
 import type { RoomView } from "../game/protocol";
 import { room } from "../test/room-view";
 import type { DealStep } from "./deal-plan";
-import type { PlaybackMoment } from "./deal-playback";
+import type { PlaybackMoment } from "./playback-moments";
 import { samePrompt, tablePrompt } from "./table-prompt";
 import type { PromptPlayback } from "./table-prompt";
 
