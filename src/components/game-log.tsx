@@ -519,6 +519,7 @@ const LogRound = (props: {
               <h3>
                 <CollapsibleTrigger
                   class="log-round-toggle"
+                  data-size="compact"
                   data-variant="disclosure"
                 >
                   <ChevronRight aria-hidden="true" size={12} />
@@ -601,7 +602,6 @@ export const ChatLog = (
   const scroll = createScrollAreaController();
 
   const [followsEnd, setFollowsEnd] = createSignal(true);
-  let viewport: HTMLElement | undefined;
 
   const stayAboveUnfoldedRound = () => {
     if (!scroll.isSticking()) {
@@ -610,10 +610,7 @@ export const ChatLog = (
 
     setFollowsEnd(false);
     requestAnimationFrame(() => {
-      if (
-        viewport !== undefined &&
-        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 1
-      ) {
+      if (scroll.isAtEnd()) {
         setFollowsEnd(true);
       }
     });
@@ -732,9 +729,6 @@ export const ChatLog = (
             return (
               <>
                 <ScrollAreaViewport
-                  ref={(element) => {
-                    viewport = element;
-                  }}
                   class="log-scroll"
                   role="log"
                   aria-label={CHAT_AND_GAME_LOG_TITLE}

@@ -396,11 +396,10 @@
     display: inline-flex;
     gap: 0.25rem;
     align-items: center;
-    /* Sit at the heading's height like an unfolded round, and keep a larger target. */
-    min-height: 0;
     letter-spacing: var(--tracking-wider);
     text-transform: inherit;
 
+    /* Extend the tap target beyond the compact heading. */
     &::after {
       content: "";
       position: absolute;

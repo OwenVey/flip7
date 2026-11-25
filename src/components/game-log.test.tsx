@@ -258,7 +258,7 @@ describe("<GameLog />", () => {
     expect(toggle).toHaveAttribute("aria-controls", panel?.id);
   });
 
-  it("stays on an unfolded round instead of following the end", () => {
+  it("stays on an unfolded round instead of following the end", async () => {
     vi.useFakeTimers({
       toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
     });
@@ -273,16 +273,36 @@ describe("<GameLog />", () => {
 
       expect(area).toHaveAttribute("data-sticking");
 
+      const toggle = screen.getByRole("button", { name: "Round 1" });
       Object.defineProperties(viewport, {
         clientHeight: { value: 200 },
-        scrollHeight: { value: 500 },
+        scrollHeight: {
+          get: () =>
+            toggle.getAttribute("aria-expanded") === "true" ? 700 : 500,
+        },
       });
-      fireEvent.click(screen.getByRole("button", { name: "Round 1" }));
-      flush();
+      viewport.scrollTop = 300;
+      fireEvent.scroll(viewport);
       vi.advanceTimersToNextFrame();
       flush();
 
+      fireEvent.click(toggle);
+      flush();
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      fireEvent.scroll(viewport);
+      vi.advanceTimersToNextFrame();
+      flush();
+
+      expect(viewport.scrollTop).toBe(300);
       expect(area).not.toHaveAttribute("data-sticking");
+
+      viewport.scrollTop = 500;
+      fireEvent.scroll(viewport);
+      vi.advanceTimersToNextFrame();
+      await Promise.resolve();
+      flush();
+
+      expect(area).toHaveAttribute("data-sticking");
     } finally {
       cleanup();
       vi.useRealTimers();
