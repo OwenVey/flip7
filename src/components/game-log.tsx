@@ -43,6 +43,7 @@ import {
 import { CHAT_MAX_LENGTH } from "../game/engine";
 import type { LogEntry } from "../game/engine";
 import {
+  continuesChat,
   countChatsAfter,
   eventDetails,
   groupLog,
@@ -179,7 +180,17 @@ const GameEvent = (props: {
         <Icon class="log-event-icon" aria-hidden="true" size={13} />
         <span class="log-event-text">
           <span class="log-outcome">{copy().outcome}</span>
-          <Show when={copy().detail}>{(detail) => <> · {detail()}</>}</Show>
+          <For each={copy().details}>
+            {(detail) => (
+              <>
+                {" "}
+                <span class="log-detail">
+                  {"·\u00A0"}
+                  {detail}
+                </span>
+              </>
+            )}
+          </For>
         </span>
       </span>
       <Show when={minute() === null}>
@@ -189,13 +200,50 @@ const GameEvent = (props: {
   );
 };
 
+const ChatMessage = (props: {
+  author: NonNullable<LogEntry["from"]>;
+  entry: LogEntry;
+  continuation: boolean;
+  now: () => number;
+}) => (
+  <>
+    <Show when={!props.continuation}>
+      <div class="log-message-header">
+        <span class="log-author-line">
+          <PlayerAvatar player={props.author} size="sm" />
+          <strong class="log-author">{props.author.name}</strong>
+        </span>
+        <LogTime at={props.entry.at} now={props.now} />
+      </div>
+    </Show>
+    <span>
+      <Show when={props.continuation}>
+        <span class="sr-only">{props.author.name}: </span>
+      </Show>
+      {props.entry.text}
+    </span>
+    <Show when={props.continuation}>
+      <LogTime at={props.entry.at} now={props.now} />
+    </Show>
+  </>
+);
+
 const ChatForm = (props: { onSend: (text: string) => boolean }) => {
   const [text, setText] = createSignal("");
+  const [failed, setFailed] = createSignal(false);
+  const message = createMemo(() => text().trim());
 
   const submit = () => {
-    const message = text().trim();
+    const draft = message();
 
-    if (message !== "" && props.onSend(message)) {
+    if (draft === "") {
+      return;
+    }
+
+    const sent = props.onSend(draft);
+    setFailed(!sent);
+
+    if (sent) {
       setText("");
     }
   };
@@ -231,11 +279,16 @@ const ChatForm = (props: { onSend: (text: string) => boolean }) => {
             data-size="sm"
             data-variant="solid"
             data-icon=""
+            disabled={message() === ""}
+            focusableWhenDisabled
           />
         )}
       >
         <Send size={16} aria-hidden="true" />
       </Tooltip>
+      <output class="chat-send-status form-error">
+        {failed() ? "Message not sent. Try again when reconnected." : ""}
+      </output>
     </form>
   );
 };
@@ -304,7 +357,7 @@ export default function GameLog(props: {
       <Show when={props.inSheet !== true}>
         <h2>
           {CHAT_AND_GAME_LOG_TITLE}
-          <Show when={unreadChats() > 0}>
+          <Show when={filter() !== "Game" && unreadChats() > 0}>
             <span class="log-unread" aria-hidden="true">
               {unreadChats()}
             </span>
@@ -342,13 +395,7 @@ export default function GameLog(props: {
               }
             >
               {option}
-              <Show
-                when={
-                  props.inSheet === true &&
-                  option === "Chat" &&
-                  hiddenChats() > 0
-                }
-              >
+              <Show when={option === "Chat" && hiddenChats() > 0}>
                 <span class="log-unread" aria-hidden="true">
                   {hiddenChats()}
                 </span>
@@ -403,47 +450,52 @@ export default function GameLog(props: {
                               each={group().entries}
                               keyed={(entry) => entry.id}
                             >
-                              {(entry, index) => (
-                                <li
-                                  data-cue={entry().cue}
-                                  data-kind={entry().from ? "chat" : "game"}
-                                  data-own={
-                                    entry().from?.id === props.playerId
-                                      ? ""
-                                      : undefined
-                                  }
-                                >
-                                  <Show
-                                    when={entry().from}
-                                    fallback={
-                                      <GameEvent
-                                        entry={entry()}
-                                        hasRoundHeading={group().heading !== ""}
-                                        previous={group().entries[index() - 1]}
-                                        now={now}
-                                      />
+                              {(entry, index) => {
+                                const previous = () =>
+                                  group().entries[index() - 1];
+
+                                const continuation = createMemo(() =>
+                                  continuesChat(entry(), previous())
+                                );
+
+                                return (
+                                  <li
+                                    data-continuation={
+                                      continuation() ? "" : undefined
+                                    }
+                                    data-cue={entry().cue}
+                                    data-kind={entry().from ? "chat" : "game"}
+                                    data-own={
+                                      entry().from?.id === props.playerId
+                                        ? ""
+                                        : undefined
                                     }
                                   >
-                                    {(author) => (
-                                      <>
-                                        <div class="log-message-header">
-                                          <span class="log-author-line">
-                                            <PlayerAvatar
-                                              player={author()}
-                                              size="sm"
-                                            />
-                                            <strong class="log-author">
-                                              {author().name}
-                                            </strong>
-                                          </span>
-                                          <LogTime at={entry().at} now={now} />
-                                        </div>
-                                        {entry().text}
-                                      </>
-                                    )}
-                                  </Show>
-                                </li>
-                              )}
+                                    <Show
+                                      when={entry().from}
+                                      fallback={
+                                        <GameEvent
+                                          entry={entry()}
+                                          hasRoundHeading={
+                                            group().heading !== ""
+                                          }
+                                          previous={previous()}
+                                          now={now}
+                                        />
+                                      }
+                                    >
+                                      {(author) => (
+                                        <ChatMessage
+                                          author={author()}
+                                          entry={entry()}
+                                          continuation={continuation()}
+                                          now={now}
+                                        />
+                                      )}
+                                    </Show>
+                                  </li>
+                                );
+                              }}
                             </For>
                           </ol>
                         </div>

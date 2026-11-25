@@ -500,15 +500,8 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       }
     },
 
-    chat: (text: string) => {
-      if (!state.online || !state.ready || !raw({ text, type: "chat" })) {
-        notify(TRY_AGAIN);
-
-        return false;
-      }
-
-      return true;
-    },
+    chat: (text: string) =>
+      state.online && state.ready && raw({ text, type: "chat" }),
 
     closed: (code: number, retryCount: number) => {
       if (stopped) {

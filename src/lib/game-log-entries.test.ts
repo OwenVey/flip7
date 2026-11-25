@@ -7,6 +7,7 @@ import {
   backToLobby,
   chat,
   choose,
+  configure,
   createGame,
   hit,
   nextRound,
@@ -99,6 +100,14 @@ const fromEnd =
     log.at(-offset);
 
 const scenarios = {
+  lockRoom: () => {
+    const state = createGame();
+    addPlayer(state, "a", NAMES.a, 1);
+    configure(state, "a", { locked: true });
+    configure(state, "a", { locked: false });
+
+    return state.log;
+  },
   assign: () => {
     const state = deal(["a", "b", "c"], [num(5), num(3), num(8)]);
     rig(state, [flipThree(), freeze(), flipThree(), num(2)]);
@@ -276,16 +285,20 @@ const messageFrom = (
   return entry;
 };
 
-const event = (outcome: string, detail: string | undefined, icon?: string) => ({
+const event = (
+  outcome: string,
+  details: string[] | undefined,
+  icon?: string
+) => ({
   announcement: false,
-  detail,
+  details: details ?? [],
   icon,
   outcome,
 });
 
 const announcement = (outcome: string, icon?: string) => ({
   announcement: true,
-  detail: undefined,
+  details: [],
   icon,
   outcome,
 });
@@ -302,9 +315,21 @@ const unchangedMessages = [
 
 describe("the engine's messages in the Chat & Log", () => {
   it.each([
-    ["stayPoints", cuedEntry("bank"), event("Ada stayed", "+10 pts", "coins")],
-    ["stayOnePoint", cuedEntry("bank"), event("Ada stayed", "+1 pts", "coins")],
-    ["bust", cuedEntry("bust"), event("Ada busted", "duplicate 5", "circle-x")],
+    [
+      "stayPoints",
+      cuedEntry("bank"),
+      event("Ada stayed", ["+10 pts"], "coins"),
+    ],
+    [
+      "stayOnePoint",
+      cuedEntry("bank"),
+      event("Ada stayed", ["+1 pts"], "coins"),
+    ],
+    [
+      "bust",
+      cuedEntry("bust"),
+      event("Ada busted", ["duplicate 5"], "circle-x"),
+    ],
     [
       "flipSeven",
       cuedEntry("flipSeven"),
@@ -313,17 +338,17 @@ describe("the engine's messages in the Chat & Log", () => {
     [
       "freezeSelf",
       cuedEntry("freeze"),
-      event("Ada froze themselves", "+5 pts", "snowflake"),
+      event("Ada froze themselves", ["+5 pts"], "snowflake"),
     ],
     [
       "freezeOther",
       cuedEntry("freeze"),
-      event("Bo was frozen", "+3 pts · by Ada", "snowflake"),
+      event("Bo was frozen", ["+3 pts", "by Ada"], "snowflake"),
     ],
     [
       "secondChanceSave",
       cuedEntry("special"),
-      event("Ada used Second Chance", "duplicate 5", "heart"),
+      event("Ada used Second Chance", ["duplicate 5"], "heart"),
     ],
     [
       "secondChanceSave",
@@ -333,22 +358,22 @@ describe("the engine's messages in the Chat & Log", () => {
     [
       "flipThreeOnOther",
       cuedEntry("special", 0),
-      event("Bo must flip three", "from Ada", "playing-cards-fan"),
+      event("Bo must flip three", ["from Ada"], "playing-cards-fan"),
     ],
     [
       "assign",
       cuedEntry("special", 1),
-      event("Bo assigned Freeze", "to themselves", "arrow-right"),
+      event("Bo assigned Freeze", ["to themselves"], "arrow-right"),
     ],
     [
       "assign",
       cuedEntry("special", 2),
-      event("Bo assigned Flip Three", "to Cy", "arrow-right"),
+      event("Bo assigned Flip Three", ["to Cy"], "arrow-right"),
     ],
     [
       "giveSecondChance",
       cuedEntry("special"),
-      event("Cy got Second Chance", "from Ada", "heart"),
+      event("Cy got Second Chance", ["from Ada"], "heart"),
     ],
     [
       "reshuffle",
@@ -372,6 +397,18 @@ describe("the engine's messages in the Chat & Log", () => {
       );
     }
   );
+
+  it("shows short lock and unlock events with matching icons", () => {
+    expect(
+      scenarios
+        .lockRoom()
+        .slice(-2)
+        .map((entry) => eventDetails(entry, true))
+    ).toStrictEqual([
+      event("Room locked.", undefined, "lock"),
+      event("Room unlocked.", undefined, "lock-open"),
+    ]);
+  });
 
   it.each([
     ["roundOver", fromEnd(), "Round 1 is over."],

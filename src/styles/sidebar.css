@@ -367,8 +367,8 @@
     & .leaderboard-body:not([data-at-y-start]) thead th::after {
       position: absolute;
       inset: 100% 0 auto;
-      height: 1.125rem;
-      background: linear-gradient(var(--scroll-fade-stops));
+      height: var(--scroll-fade-depth);
+      background: var(--scroll-start-fade);
       pointer-events: none;
       content: "";
     }

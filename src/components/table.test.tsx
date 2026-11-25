@@ -697,7 +697,9 @@ describe("<Table />", () => {
       return {
         announcement: row.querySelector("[data-announcement]") !== null,
         at: time?.getAttribute("datetime"),
-        text: row.textContent?.replace(time?.textContent ?? "", ""),
+        text: row.textContent
+          ?.replace(time?.textContent ?? "", "")
+          .replaceAll("\u00A0", " "),
       };
     });
 
@@ -861,7 +863,7 @@ describe("<Table />", () => {
       hiddenMessage: log.queryByText("gl"),
       unread: unread.textContent,
     }).toStrictEqual({
-      chatFilter: "Chat",
+      chatFilter: "Chat1",
       hiddenMessage: null,
       unread: "1 unread message",
     });

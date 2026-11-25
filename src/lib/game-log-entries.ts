@@ -4,6 +4,11 @@ export const SECOND_MS = 1000;
 export const MINUTE_MS = 60 * SECOND_MS;
 export const HOUR_MS = 60 * MINUTE_MS;
 
+export const continuesChat = (entry: LogEntry, previous?: LogEntry) =>
+  entry.from !== undefined &&
+  previous?.from?.id === entry.from.id &&
+  entry.at - previous.at < MINUTE_MS;
+
 export const countChatsAfter = (
   log: LogEntry[],
   playerId: string | null,
@@ -85,21 +90,21 @@ const cueIcons = {
   special: "playing-cards",
 } satisfies Record<Cue, EventIconKey>;
 
-type EventRule = [RegExp, string, string?, EventIconKey?];
+type EventRule = [RegExp, string, (readonly string[])?, EventIconKey?];
 
 export const eventCopy = {
   bank: [
     [
       /^(?<player>.+) stayed and banked (?<points>\d+) points?\.$/u,
       "$<player> stayed",
-      "+$<points> pts",
+      ["+$<points> pts"],
     ],
   ],
   bust: [
     [
       /^(?<player>.+) was dealt a duplicate (?<card>\d+) and busted\.$/u,
       "$<player> busted",
-      "duplicate $<card>",
+      ["duplicate $<card>"],
     ],
   ],
   flipSeven: [
@@ -109,37 +114,37 @@ export const eventCopy = {
     [
       /^(?<player>.+) played Freeze on themselves and banked (?<points>\d+) points?\.$/u,
       "$<player> froze themselves",
-      "+$<points> pts",
+      ["+$<points> pts"],
     ],
     [
       /^(?<player>.+) played Freeze on (?<target>.+), who banked (?<points>\d+) points?\.$/u,
       "$<target> was frozen",
-      "+$<points> pts · by $<player>",
+      ["+$<points> pts", "by $<player>"],
     ],
   ],
   special: [
     [
       /^(?<player>.+) discarded Second Chance and a duplicate (?<card>\d+)\.$/u,
       "$<player> used Second Chance",
-      "duplicate $<card>",
+      ["duplicate $<card>"],
       "heart",
     ],
     [
       /^(?<player>.+) played Flip Three on (?<target>.+)\.$/u,
       "$<target> must flip three",
-      "from $<player>",
+      ["from $<player>"],
       "playing-cards-fan",
     ],
     [
       /^(?<player>.+) assigned (?<card>Flip Three|Freeze) to (?<target>.+)\.$/u,
       "$<player> assigned $<card>",
-      "to $<target>",
+      ["to $<target>"],
       "arrow-right",
     ],
     [
       /^(?<player>.+) gave a Second Chance to (?<target>.+)\.$/u,
       "$<target> got Second Chance",
-      "from $<player>",
+      ["from $<player>"],
       "heart",
     ],
     [/^.+ must flip three cards\.$/u, "$&", undefined, "playing-cards-fan"],
@@ -156,8 +161,8 @@ const deckReshuffled = "The discard pile was shuffled into a new deck.";
 
 const systemIcons = new Map<string, EventIconKey>([
   [deckReshuffled, "shuffle"],
-  ["The host locked the room.", "lock"],
-  ["The host unlocked the room.", "lock-open"],
+  ["Room locked.", "lock"],
+  ["Room unlocked.", "lock-open"],
 ]);
 
 export const roundAnnouncement =
@@ -175,7 +180,7 @@ export const systemCopy = new Map([
 
 interface LogEventCopy {
   announcement: boolean;
-  detail: string | undefined;
+  details: string[];
   icon: EventIconKey | undefined;
   outcome: string;
 }
@@ -186,7 +191,7 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
   if (hasRoundHeading && entry.text.startsWith(roundPrefix)) {
     return {
       announcement: true,
-      detail: undefined,
+      details: [],
       icon: "playing-cards",
       outcome: entry.text.slice(roundPrefix.length),
     } satisfies LogEventCopy;
@@ -197,14 +202,11 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
 
   const cueIcon = entry.cue === undefined ? undefined : cueIcons[entry.cue];
 
-  for (const [pattern, outcome, detail, icon] of rules) {
+  for (const [pattern, outcome, details = [], icon] of rules) {
     if (pattern.test(entry.text)) {
       return {
         announcement: false,
-        detail:
-          detail === undefined
-            ? undefined
-            : entry.text.replace(pattern, detail),
+        details: details.map((detail) => entry.text.replace(pattern, detail)),
         icon: icon ?? cueIcon,
         outcome: entry.text.replace(pattern, outcome),
       } satisfies LogEventCopy;
@@ -220,7 +222,7 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
   return {
     announcement:
       systemText !== undefined || roundAnnouncement.test(entry.text),
-    detail: undefined,
+    details: [],
     icon,
     outcome: systemText ?? entry.text,
   } satisfies LogEventCopy;
@@ -230,7 +232,8 @@ type EventDetails = ReturnType<typeof eventDetails>;
 
 export const sameDetails = (a: EventDetails, b: EventDetails) =>
   a.announcement === b.announcement &&
-  a.detail === b.detail &&
+  a.details.length === b.details.length &&
+  a.details.every((detail, index) => detail === b.details[index]) &&
   a.icon === b.icon &&
   a.outcome === b.outcome;
 
