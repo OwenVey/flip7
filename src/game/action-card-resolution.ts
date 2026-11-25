@@ -1,7 +1,5 @@
-import { cardLabel } from "./cards";
 import type { ActionCard, Card } from "./cards";
-import { logCopy } from "./log-copy";
-import type { LogCopy } from "./log-copy";
+import type { GameEvent, LogPlayer } from "./game-events";
 
 export const FLIP_THREE_COUNT = 3;
 
@@ -70,11 +68,12 @@ interface ResolutionState extends ActionCardState {
   players: readonly (CardOwner & { status: string })[];
 }
 
-/** Logs a line, with the players it names. */
-type Say = (text: string | LogCopy, said?: { cue?: "special" }) => void;
+/** Records a game event in the log. */
+type Say = (event: GameEvent) => void;
 
 interface ResolutionEffects {
-  apply: (owner: CardOwner, card: ActionCard, targetId: string) => void;
+  /** `owner` is null when the player who played the card has left. */
+  apply: (owner: LogPlayer | null, card: ActionCard, targetId: string) => void;
   draw: () => Card | undefined;
   flip: (playerId: string, card: Card, flip: FlipDraw) => void;
   resolveHeld: (resolution: HeldActionResolution) => void;
@@ -83,6 +82,9 @@ interface ResolutionEffects {
 
 const findPlayer = (state: ResolutionState, playerId: string) =>
   state.players.find((player) => player.id === playerId);
+
+const logPlayer = (player: CardOwner | undefined) =>
+  player === undefined ? null : { id: player.id, name: player.name };
 
 const discardAssignment = (
   state: ResolutionState,
@@ -159,9 +161,6 @@ export const offerActionCardChoice = (
   return null;
 };
 
-const cardNames = (cards: ActionCard[]) =>
-  cards.map((card) => cardLabel(card)).join(" and ");
-
 const finishFlipThree = (
   state: ResolutionState,
   sequence: FlipThreeSequence,
@@ -175,9 +174,10 @@ const finishFlipThree = (
 
   if (target?.status !== "active") {
     state.discard.push(...sequence.deferred);
-    say(
-      `${cardNames(sequence.deferred)} set aside during the Flip Three ${sequence.deferred.length === 1 ? "was" : "were"} discarded.`
-    );
+    say({
+      cards: sequence.deferred.map((card) => card.kind),
+      type: "heldActionsDiscarded",
+    });
 
     return;
   }
@@ -204,14 +204,12 @@ const assignDeferred = (
   }
 
   assignment.assigned.push({ card, ownerId: assignment.chooserId, targetId });
-  say(
-    targetId === assignment.chooserId
-      ? logCopy`${chooser ?? "Someone"} assigned ${cardLabel(card)} to themselves.`
-      : logCopy`${chooser ?? "Someone"} assigned ${cardLabel(card)} to ${target ?? "someone"}.`,
-    {
-      cue: "special",
-    }
-  );
+  say({
+    by: logPlayer(chooser),
+    card: card.kind,
+    target: logPlayer(target),
+    type: "actionAssigned",
+  });
 };
 
 const stepAssignment = (state: ResolutionState, say: Say) => {
@@ -312,18 +310,16 @@ const stepActionQueue = (
 
   if (target?.status !== "active") {
     state.discard.push(queued.card);
-    effects.say(
-      logCopy`${cardLabel(queued.card)} for ${target ?? "a player who left"} was discarded, since they're out of the round.`
-    );
+    effects.say({
+      card: queued.card.kind,
+      target: logPlayer(target),
+      type: "actionDiscarded",
+    });
 
     return true;
   }
 
-  effects.apply(
-    owner ?? { id: queued.ownerId, name: "Someone" },
-    queued.card,
-    target.id
-  );
+  effects.apply(logPlayer(owner), queued.card, target.id);
 
   return true;
 };

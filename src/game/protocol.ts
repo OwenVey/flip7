@@ -2,6 +2,7 @@ import * as v from "valibot";
 
 import { projectActionCards } from "./action-card-resolution";
 import { isAvatar } from "./avatars";
+import { HIGHEST_NUMBER } from "./cards";
 import { DEAL_HISTORY_LIMIT, LOG_LIMIT } from "./engine";
 import type { DealEvent, GameState, HeldCard, LogEntry } from "./engine";
 import { MAX_SPECTATORS } from "./moves";
@@ -197,43 +198,126 @@ const logPlayerFields = {
   name: v.pipe(v.string(), v.nonEmpty(), v.maxLength(NAME_MAX_LENGTH)),
 };
 
-const LogEntrySchema = v.pipe(
+const LogPlayerSchema = v.object(logPlayerFields);
+
+const OptionalLogPlayerSchema = v.nullable(LogPlayerSchema);
+
+const LoggedScoresSchema = v.array(
+  v.object({ ...logPlayerFields, points: nonNegativeInteger })
+);
+
+const HeldActionKindSchema = v.picklist(["freeze", "flipThree"]);
+
+const NumberCardValueSchema = v.pipe(
+  nonNegativeInteger,
+  v.maxValue(HIGHEST_NUMBER)
+);
+
+const OfflineMoverSchema = v.variant("kind", [
+  v.object({ host: LogPlayerSchema, kind: v.literal("host") }),
+  v.object({ kind: v.literal("game") }),
+]);
+
+const MoverSchema = v.variant("kind", [
+  v.object({ kind: v.literal("player") }),
+  ...OfflineMoverSchema.options,
+]);
+
+const eventOf = <const T extends string, const E extends v.ObjectEntries>(
+  type: T,
+  entries: E
+) => v.object({ ...entries, type: v.literal(type) });
+
+const GameEventSchema = v.variant("type", [
+  eventOf("joined", {
+    player: LogPlayerSchema,
+    waitsFor: v.nullable(v.picklist(["round", "game"])),
+  }),
+  eventOf("botAdded", { player: LogPlayerSchema }),
+  eventOf("evicted", {
+    how: v.picklist(["kicked", "left", "leftToWatch"]),
+    player: LogPlayerSchema,
+  }),
+  eventOf("hostChanged", { player: LogPlayerSchema }),
+  eventOf("targetScoreSet", { targetScore: v.picklist(TARGET_SCORES) }),
+  eventOf("botSpeedSet", { botSpeed: v.picklist(BOT_SPEEDS) }),
+  eventOf("lockSet", { locked: v.boolean() }),
+  eventOf("gameAbandoned", {}),
+  eventOf("roundStarted", { dealer: OptionalLogPlayerSchema }),
+  eventOf("deckReshuffled", {}),
+  eventOf("outOfCards", {}),
+  eventOf("stayed", {
+    by: MoverSchema,
+    player: LogPlayerSchema,
+    points: nonNegativeInteger,
+  }),
+  eventOf("movedForOffline", {
+    by: OfflineMoverSchema,
+    move: v.picklist(["hit", "choose"]),
+    player: LogPlayerSchema,
+  }),
+  eventOf("busted", { card: NumberCardValueSchema, player: LogPlayerSchema }),
+  eventOf("flipSeven", { player: LogPlayerSchema }),
+  eventOf("secondChanceKept", { player: LogPlayerSchema }),
+  eventOf("secondChanceUsed", {
+    card: NumberCardValueSchema,
+    player: LogPlayerSchema,
+  }),
+  eventOf("secondChanceGiven", {
+    by: OptionalLogPlayerSchema,
+    target: LogPlayerSchema,
+  }),
+  eventOf("secondChanceDiscarded", { player: LogPlayerSchema }),
+  eventOf("frozen", {
+    by: OptionalLogPlayerSchema,
+    points: nonNegativeInteger,
+    target: LogPlayerSchema,
+  }),
+  eventOf("flipThreeStarted", {
+    by: OptionalLogPlayerSchema,
+    target: LogPlayerSchema,
+  }),
+  eventOf("actionAssigned", {
+    by: OptionalLogPlayerSchema,
+    card: HeldActionKindSchema,
+    target: OptionalLogPlayerSchema,
+  }),
+  eventOf("heldActionsDiscarded", {
+    cards: v.pipe(v.array(HeldActionKindSchema), v.nonEmpty()),
+  }),
+  eventOf("actionDiscarded", {
+    card: HeldActionKindSchema,
+    target: OptionalLogPlayerSchema,
+  }),
+  eventOf("roundOver", {
+    scores: LoggedScoresSchema,
+    tiedAt: v.nullable(nonNegativeInteger),
+  }),
+  eventOf("gameWon", {
+    player: LogPlayerSchema,
+    points: nonNegativeInteger,
+    scores: LoggedScoresSchema,
+  }),
+]);
+
+const logEntryFields = {
+  at: v.pipe(nonNegativeInteger, v.maxValue(LATEST_DATE_MS)),
+  game: nonNegativeInteger,
+  id: nonNegativeInteger,
+  round: nonNegativeInteger,
+};
+
+const LogEntrySchema: v.GenericSchema<unknown, LogEntry> = v.union([
   v.object({
-    about: v.array(
-      v.object({ ...logPlayerFields, offset: nonNegativeInteger })
-    ),
-    at: v.pipe(nonNegativeInteger, v.maxValue(LATEST_DATE_MS)),
-    cue: v.optional(
-      v.picklist(["bank", "bust", "flipSeven", "freeze", "join", "special"])
-    ),
-    from: v.optional(
-      v.object({
-        ...logPlayerFields,
-        avatar: v.nullable(v.custom<number>(isAvatar)),
-      })
-    ),
-    game: nonNegativeInteger,
-    id: nonNegativeInteger,
-    round: nonNegativeInteger,
-    scores: v.optional(
-      v.array(v.object({ ...logPlayerFields, points: nonNegativeInteger }))
-    ),
+    ...logEntryFields,
+    from: v.object({
+      ...logPlayerFields,
+      avatar: v.nullable(v.custom<number>(isAvatar)),
+    }),
     text: v.string(),
   }),
-  v.check(({ about, text }) => {
-    let end = 0;
-
-    for (const { name, offset } of about) {
-      if (offset < end || !text.startsWith(name, offset)) {
-        return false;
-      }
-
-      end = offset + name.length;
-    }
-
-    return true;
-  })
-);
+  v.object({ ...logEntryFields, event: GameEventSchema }),
+]);
 
 const LogUpdateSchema = v.object({
   ...ListUpdateSchema.entries,

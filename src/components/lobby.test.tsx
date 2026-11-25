@@ -190,13 +190,16 @@ describe("<Lobby />", () => {
     state.phase = "gameOver";
     state.round = 1;
     state.log.push({
-      about: [],
       at: Date.now(),
+      event: {
+        player: { id: "p0", name: "Host" },
+        points: 202,
+        scores: [{ id: "p0", name: "Host", points: 21 }],
+        type: "gameWon",
+      },
       game: 1,
       id: state.logSeq + 1,
       round: 1,
-      scores: [{ id: "p0", name: "Host", points: 21 }],
-      text: "Host wins with 202 points!",
     });
     backToLobby(state, "p0");
 

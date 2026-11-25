@@ -17,6 +17,10 @@ import { chatControls } from "../test/chat";
 import { LOGGED_AT, room } from "../test/room-view";
 import { agent, Table } from "../test/table";
 
+const outcome = (text: string) => (_: string, element: Element | null) =>
+  element?.classList.contains("log-outcome") === true &&
+  element.textContent === text;
+
 const withBot = (overrides: Partial<RoomView> = {}) => {
   const view = room(overrides);
   const [ana, ben] = view.players;
@@ -44,7 +48,6 @@ const spectator = () => ({
 });
 
 const benChat = (id: number, text: string) => ({
-  about: [],
   at: LOGGED_AT,
   from: { avatar: 1, id: "b", name: "Ben" },
   game: 1,
@@ -580,15 +583,13 @@ describe("<Table />", () => {
         room={room({
           log: [
             {
-              about: [],
               at: LOGGED_AT,
               game: 1,
               id: 1,
               round: 1,
-              text: "Round 1 begins. Ben deals.",
+              event: { dealer: { id: "b", name: "Ben" }, type: "roundStarted" },
             },
             {
-              about: [],
               at: LOGGED_AT,
               from: { avatar: 1, id: "b", name: "Ben" },
               game: 1,
@@ -606,7 +607,9 @@ describe("<Table />", () => {
     ));
 
     const log = screen.getByRole("log", { name: "Chat & Log" });
-    expect(within(log).getByText("Ben")).toBeTruthy();
+    expect(
+      within(log).getByText("Ben", { selector: ".log-author" })
+    ).toBeTruthy();
     expect(within(log).getByText("gl")).toBeTruthy();
 
     const result = await agent.act({
@@ -627,60 +630,70 @@ describe("<Table />", () => {
         room={room({
           log: [
             {
-              about: [],
               at,
               game: 1,
               id: 2,
               round: 1,
-              text: "Round 1 begins. Ben deals.",
+              event: { dealer: { id: "b", name: "Ben" }, type: "roundStarted" },
             },
             {
-              about: [],
               at,
-              cue: "bust",
               game: 1,
               id: 3,
               round: 1,
-              text: "Ben was dealt a duplicate 6 and busted.",
+              event: {
+                card: 6,
+                player: { id: "b", name: "Ben" },
+                type: "busted",
+              },
             },
             {
-              about: [],
               at: at + 1000,
-              cue: "bank",
               game: 1,
               id: 4,
               round: 1,
-              text: "Ana stayed and banked 44 points.",
+              event: {
+                by: { kind: "player" },
+                player: { id: "a", name: "Ana" },
+                points: 44,
+                type: "stayed",
+              },
             },
             {
-              about: [],
               at: at + 2000,
-              cue: "freeze",
               game: 1,
               id: 5,
               round: 2,
-              text: "Ben played Freeze on Ana, who banked 26 points.",
+              event: {
+                by: { id: "b", name: "Ben" },
+                points: 26,
+                target: { id: "a", name: "Ana" },
+                type: "frozen",
+              },
             },
             {
-              about: [],
               at: at + 3000,
-              cue: "special",
               game: 1,
               id: 6,
               round: 2,
-              text: "Ben assigned Flip Three to Ana.",
+              event: {
+                by: { id: "b", name: "Ben" },
+                card: "flipThree",
+                target: { id: "a", name: "Ana" },
+                type: "actionAssigned",
+              },
             },
             {
-              about: [],
               at: at + 4000,
-              cue: "special",
               game: 1,
               id: 7,
               round: 2,
-              text: "Ben is holding a Second Chance.",
+              event: {
+                player: { id: "b", name: "Ben" },
+                type: "secondChanceKept",
+              },
             },
             {
-              about: [],
               at: at + 60_000,
               from: { avatar: 1, id: "b", name: "Ben" },
               game: 1,
@@ -689,7 +702,6 @@ describe("<Table />", () => {
               text: "Good round",
             },
             {
-              about: [],
               at: at + 61_000,
               from: { avatar: 1, id: "a", name: "Ana" },
               game: 1,
@@ -698,28 +710,30 @@ describe("<Table />", () => {
               text: "Thanks!",
             },
             {
-              about: [],
               at: at + 62_000,
               game: 1,
               id: 10,
               round: 2,
-              text: "Round 2 is over.",
+              event: { scores: [], tiedAt: null, type: "roundOver" },
             },
             {
-              about: [],
               at: at + 62_000,
               game: 1,
               id: 11,
               round: 2,
-              text: "The discard pile was shuffled into a new deck.",
+              event: { type: "deckReshuffled" },
             },
             {
-              about: [],
               at: at + 62_000,
               game: 1,
               id: 12,
               round: 2,
-              text: "Ben wins with 202 points!",
+              event: {
+                player: { id: "b", name: "Ben" },
+                points: 202,
+                scores: [],
+                type: "gameWon",
+              },
             },
           ],
         })}
@@ -731,6 +745,8 @@ describe("<Table />", () => {
     ));
 
     const log = within(screen.getByRole("log", { name: "Chat & Log" }));
+    fireEvent.click(log.getByRole("button", { name: "Round 2" }));
+    flush();
 
     const rows = log.getAllByRole("listitem").map((row) => {
       const time = within(row).queryByRole("time");
@@ -797,15 +813,16 @@ describe("<Table />", () => {
           room={room({
             log: [
               {
-                about: [],
                 at,
                 game: 1,
                 id: 1,
                 round: 1,
-                text: "Round 1 begins. Ben deals.",
+                event: {
+                  dealer: { id: "b", name: "Ben" },
+                  type: "roundStarted",
+                },
               },
               {
-                about: [],
                 at,
                 from: { avatar: 1, id: "b", name: "Ben" },
                 game: 1,
@@ -881,7 +898,6 @@ describe("<Table />", () => {
         log: [
           ...view().log,
           {
-            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "b", name: "Ben" },
             game: 1,
@@ -890,7 +906,6 @@ describe("<Table />", () => {
             text: "gl",
           },
           {
-            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "a", name: "Ana" },
             game: 1,
@@ -924,7 +939,7 @@ describe("<Table />", () => {
       filters.getByRole("radio", { name: "Chat", checked: true })
     ).toBeVisible();
     expect({
-      gameEvent: log.queryByText("Ben deals."),
+      gameEvent: log.queryByText(outcome("Ben deals.")),
       unread: unread.textContent,
     }).toStrictEqual({
       gameEvent: null,
@@ -933,7 +948,7 @@ describe("<Table />", () => {
 
     filters.getByRole("radio", { name: "All" }).click();
     flush();
-    expect(log.getByText("Ben deals.")).toBeVisible();
+    expect(log.getByText(outcome("Ben deals."))).toBeVisible();
   });
 
   it("keeps the scroll position and counts new entries until jumping to latest", async () => {
@@ -988,23 +1003,25 @@ describe("<Table />", () => {
         log: [
           ...view().log,
           {
-            about: [],
             at: LOGGED_AT,
             game: 1,
             id: 2,
             round: 1,
-            text: "Ben stayed.",
+            event: {
+              by: { kind: "player" },
+              player: { id: "b", name: "Ben" },
+              points: 0,
+              type: "stayed",
+            },
           },
           {
-            about: [],
             at: LOGGED_AT,
             game: 1,
             id: 3,
             round: 1,
-            text: "Round 2 begins.",
+            event: { dealer: { id: "a", name: "Ana" }, type: "roundStarted" },
           },
           {
-            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "b", name: "Ben" },
             game: 1,
@@ -1013,7 +1030,6 @@ describe("<Table />", () => {
             text: "Good luck!",
           },
           {
-            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "a", name: "Ana" },
             game: 1,
@@ -1054,7 +1070,6 @@ describe("<Table />", () => {
         log: [
           ...view().log,
           {
-            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "b", name: "Ben" },
             game: 1,
@@ -1245,15 +1260,13 @@ describe("<Table />", () => {
       room({
         log: [
           {
-            about: [],
             at: LOGGED_AT,
             game: 1,
             id: 1,
             round: 1,
-            text: "Round 1 begins. Ben deals.",
+            event: { dealer: { id: "b", name: "Ben" }, type: "roundStarted" },
           },
           {
-            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "b", name: "Ben" },
             game: 1,
@@ -1262,7 +1275,6 @@ describe("<Table />", () => {
             text: "gl",
           },
           {
-            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "a", name: "Ana" },
             game: 1,
@@ -1510,28 +1522,29 @@ describe("<Table />", () => {
         room={room({
           log: [
             {
-              about: [],
               at: LOGGED_AT,
               game: 1,
               id: 1,
               round: 1,
-              text: "Round 1 begins. Ben deals.",
+              event: { dealer: { id: "b", name: "Ben" }, type: "roundStarted" },
             },
             {
-              about: [],
               at: LOGGED_AT,
               game: 1,
               id: 2,
               round: 0,
-              text: "Cal joined.",
+              event: {
+                player: { id: "c", name: "Cal" },
+                type: "joined",
+                waitsFor: null,
+              },
             },
             {
-              about: [],
               at: LOGGED_AT,
               game: 2,
               id: 3,
               round: 1,
-              text: "Round 1 begins. Ana deals.",
+              event: { dealer: { id: "a", name: "Ana" }, type: "roundStarted" },
             },
           ],
         })}

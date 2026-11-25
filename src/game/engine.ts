@@ -23,8 +23,7 @@ import {
   countUniqueNumberCards,
 } from "./cards";
 import type { ActionCard, Card, NumberCard, Random, RoundScore } from "./cards";
-import { logCopy } from "./log-copy";
-import type { LogCopy, LogPlayer } from "./log-copy";
+import type { GameEvent, LogPlayer, Mover, OfflineMover } from "./game-events";
 import { MAX_PLAYERS, MIN_PLAYERS, rejectMove, waitingOn } from "./moves";
 import type { Move } from "./moves";
 import { nameKey, sameName } from "./names";
@@ -37,7 +36,7 @@ export { FLIP_THREE_COUNT } from "./action-card-resolution";
 
 export type { ActionCardChoice, HeldCard } from "./action-card-resolution";
 
-export type { LogPlayer } from "./log-copy";
+export type { GameEvent, LogPlayer } from "./game-events";
 
 /** The most log entries a room keeps. The log starts over each game, so this only guards against runaway chat. */
 export const LOG_LIMIT = 1000;
@@ -96,40 +95,29 @@ type UnsequencedDealEvent =
 
 export type DealEvent = UnsequencedDealEvent & { seq: number };
 
-export type GameCue =
-  | "bank"
-  | "bust"
-  | "freeze"
-  | "join"
-  | "special"
-  | "flipSeven";
-
-/** What one player scored in a round, as the entry that ends the round records it. */
-export interface LoggedScore extends LogPlayer {
-  points: number;
-}
-
-export interface LogEntry extends LogCopy {
+export interface LogEntryBase {
   /** Epoch milliseconds. */
   at: number;
-  cue?: GameCue;
-  /** Set on chat messages: who sent it, with their name and avatar at the time. */
-  from?: { id: string; name: string; avatar: number | null };
   /** Which game in this room, counting from 1; 0 before the first game starts. */
   game: number;
   id: number;
   round: number;
-  /** Set on the entry that ends a round: what each player in the round scored. */
-  scores?: LoggedScore[];
 }
 
-/** Log text the Chat & Log recognizes to show its own icon or wording. */
-export const LOG_TEXT = {
-  deckReshuffled: "The discard pile was shuffled into a new deck.",
-  outOfCards: "No cards are left to draw, so the round ends.",
-  roomLocked: "Room locked.",
-  roomUnlocked: "Room unlocked.",
-} as const;
+/** A chat message, with its sender's name and avatar at the time. */
+export interface ChatEntry extends LogEntryBase {
+  from: { id: string; name: string; avatar: number | null };
+  text: string;
+}
+
+/** Something that happened in the game. */
+export interface EventEntry extends LogEntryBase {
+  event: GameEvent;
+}
+
+export type LogEntry = ChatEntry | EventEntry;
+
+export const isChat = (entry: LogEntry) => "from" in entry;
 
 export interface GameState extends ActionCardState {
   phase: Phase;
@@ -210,7 +198,7 @@ export const createGame = () => {
 
 const record = (
   state: GameState,
-  entry: Pick<LogEntry, "about" | "cue" | "from" | "scores" | "text">
+  entry: Pick<ChatEntry, "from" | "text"> | Pick<EventEntry, "event">
 ) => {
   state.logSeq += 1;
   state.log.push({
@@ -226,27 +214,14 @@ const record = (
   }
 };
 
-const pointsLabel = (points: number) =>
-  points === 1 ? "1 point" : `${points} points`;
-
-/** A game event's cue and, for a settlement, its round scores. */
-export interface Said {
-  cue?: GameCue | undefined;
-  scores?: LoggedScore[];
-}
-
-export const say = (
-  state: GameState,
-  copy: string | LogCopy,
-  { cue, scores }: Said = {}
-) => {
-  record(state, {
-    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- System messages have no mentions.
-    ...(typeof copy === "string" ? { about: [], text: copy } : copy),
-    ...(cue && { cue }),
-    ...(scores && { scores }),
-  });
+/** Records a game event in the log. */
+export const say = (state: GameState, event: GameEvent) => {
+  record(state, { event });
 };
+
+/** A player as the log names them now. */
+export const named = ({ id, name }: LogPlayer) =>
+  ({ id, name }) satisfies LogPlayer;
 
 export const findPlayer = (state: GameState, id: string) =>
   state.players.find((player) => player.id === id);
@@ -270,7 +245,6 @@ export const chat = (state: GameState, playerId: string, raw: string) => {
   }
 
   record(state, {
-    about: [],
     from: { avatar: player.avatar, id: player.id, name: player.name },
     text,
   });
@@ -314,7 +288,7 @@ const draw = (state: GameState, random: Random) => {
   if (state.deck.length === 0 && state.discard.length > 0) {
     state.deck = shuffle(state.discard, random);
     state.discard = [];
-    say(state, LOG_TEXT.deckReshuffled);
+    say(state, { type: "deckReshuffled" });
   }
 
   const card = state.deck.pop();
@@ -323,7 +297,7 @@ const draw = (state: GameState, random: Random) => {
     state.drawSeq += 1;
   } else if (!state.outOfCards) {
     state.outOfCards = true;
-    say(state, LOG_TEXT.outOfCards);
+    say(state, { type: "outOfCards" });
   }
 
   return card;
@@ -343,9 +317,7 @@ const placeNumberCard = (
 
     if (countUniqueNumberCards(player.hand) >= FLIP_SEVEN_COUNT) {
       player.status = "flipSeven";
-      say(state, logCopy`${player} earned the Flip 7 bonus!`, {
-        cue: "flipSeven",
-      });
+      say(state, { player: named(player), type: "flipSeven" });
     }
 
     return;
@@ -356,74 +328,57 @@ const placeNumberCard = (
   if (chance) {
     removeCard(player, chance);
     state.discard.push(chance, card);
-    say(
-      state,
-      logCopy`${player} discarded Second Chance and a duplicate ${card.value}.`,
-      { cue: "special" }
-    );
+    say(state, {
+      card: card.value,
+      player: named(player),
+      type: "secondChanceUsed",
+    });
 
     return;
   }
 
   player.status = "busted";
   player.bustCard = card;
-  say(
-    state,
-    logCopy`${player} was dealt a duplicate ${card.value} and busted.`,
-    {
-      cue: "bust",
-    }
-  );
+  say(state, { card: card.value, player: named(player), type: "busted" });
 };
 
 const applyAction = (
   state: GameState,
-  owner: Pick<Player, "id" | "name">,
+  owner: LogPlayer | null,
   card: ActionCard,
   targetId: string
 ) => {
   const target = getPlayer(state, targetId);
+  const by = owner && named(owner);
 
   if (card.kind === "freeze") {
     target.hand.push(card);
     target.status = "frozen";
-    const banked = pointsLabel(calculateRoundScore(target.hand).total);
-    say(
-      state,
-      target.id === owner.id
-        ? logCopy`${owner} played Freeze on themselves and banked ${banked}.`
-        : logCopy`${owner} played Freeze on ${target}, who banked ${banked}.`,
-      { cue: "freeze" }
-    );
+    say(state, {
+      by,
+      points: calculateRoundScore(target.hand).total,
+      target: named(target),
+      type: "frozen",
+    });
 
     return;
   }
 
   if (card.kind === "flipThree") {
     startFlipThree(state, target.id, card);
-    say(
-      state,
-      target.id === owner.id
-        ? logCopy`${owner} must flip three cards.`
-        : logCopy`${owner} played Flip Three on ${target}.`,
-      { cue: "special" }
-    );
+    say(state, { by, target: named(target), type: "flipThreeStarted" });
 
     return;
   }
 
   target.hand.push(card);
-  say(state, logCopy`${owner} gave a Second Chance to ${target}.`, {
-    cue: "special",
-  });
+  say(state, { by, target: named(target), type: "secondChanceGiven" });
 };
 
 const startAction = (state: GameState, owner: Player, card: ActionCard) => {
   if (card.kind === "secondChance" && !hasSecondChance(owner)) {
     owner.hand.push(card);
-    say(state, logCopy`${owner} is holding a Second Chance.`, {
-      cue: "special",
-    });
+    say(state, { player: named(owner), type: "secondChanceKept" });
 
     return;
   }
@@ -440,7 +395,7 @@ const startAction = (state: GameState, owner: Player, card: ActionCard) => {
   }
 
   if (card.kind === "secondChance" && options.length === 0) {
-    say(state, logCopy`${owner} discarded an extra Second Chance.`);
+    say(state, { player: named(owner), type: "secondChanceDiscarded" });
   }
 
   const targetId = offerActionCardChoice(state, owner.id, card, options);
@@ -572,21 +527,22 @@ const finishRound = (state: GameState) => {
   if (best >= targetScore && leaders.length === 1 && winner !== undefined) {
     state.phase = "gameOver";
     state.winnerIds = [winner.id];
-    say(state, logCopy`${winner} wins with ${best} points!`, {
+    say(state, {
+      player: named(winner),
+      points: best,
       scores,
+      type: "gameWon",
     });
 
     return;
   }
 
   state.phase = "roundOver";
-  say(
-    state,
-    best >= targetScore
-      ? `Round ${state.round} is over. Tied at ${best}, so play continues.`
-      : `Round ${state.round} is over.`,
-    { scores }
-  );
+  say(state, {
+    scores,
+    tiedAt: best >= targetScore ? best : null,
+    type: "roundOver",
+  });
 };
 
 const stepDeal = (state: GameState, random: Random) => {
@@ -620,11 +576,7 @@ const stepDeal = (state: GameState, random: Random) => {
 
 const advance = (state: GameState, random: Random) => {
   const effects = {
-    apply: (
-      owner: Pick<Player, "id" | "name">,
-      card: ActionCard,
-      targetId: string
-    ) => {
+    apply: (owner: LogPlayer | null, card: ActionCard, targetId: string) => {
       applyAction(state, owner, card, targetId);
     },
     draw: () => draw(state, random),
@@ -634,8 +586,8 @@ const advance = (state: GameState, random: Random) => {
     resolveHeld: (resolution: HeldActionResolution) => {
       recordDeal(state, { ...resolution, type: "heldAction" });
     },
-    say: (text: string | LogCopy, said?: Said) => {
-      say(state, text, said);
+    say: (event: GameEvent) => {
+      say(state, event);
     },
   };
 
@@ -700,10 +652,10 @@ const startRound = (state: GameState, random: Random) => {
         ?.id ?? ""
   );
   const dealer = state.players[state.dealerIndex];
-  say(
-    state,
-    logCopy`Round ${state.round} begins. ${dealer ?? "Someone"} deals.`
-  );
+  say(state, {
+    dealer: dealer === undefined ? null : named(dealer),
+    type: "roundStarted",
+  });
   advance(state, random);
 };
 
@@ -742,13 +694,11 @@ export const addPlayer = (
   state.hostId ??= id;
 
   const next = state.phase === "gameOver" ? "game" : "round";
-  say(
-    state,
-    state.phase === "lobby"
-      ? logCopy`${{ id, name }} joined.`
-      : logCopy`${{ id, name }} joined and will play in the next ${next}.`,
-    { cue: "join" }
-  );
+  say(state, {
+    player: { id, name },
+    type: "joined",
+    waitsFor: state.phase === "lobby" ? null : next,
+  });
 };
 
 const BOT_NAMES = [
@@ -812,9 +762,7 @@ export const addBot = (
     score: 0,
     status: "out",
   });
-  say(state, logCopy`The host added ${{ id, name }}, a bot.`, {
-    cue: "join",
-  });
+  say(state, { player: { id, name }, type: "botAdded" });
 
   return name;
 };
@@ -825,20 +773,15 @@ const announceSettings = (
   after: RoomSettings
 ) => {
   if (after.targetScore !== before.targetScore) {
-    say(state, `The host set the winning score to ${after.targetScore}.`);
+    say(state, { targetScore: after.targetScore, type: "targetScoreSet" });
   }
 
   if (after.botSpeed !== before.botSpeed) {
-    say(
-      state,
-      after.botSpeed === "fast"
-        ? "The host sped up the bots."
-        : "The host set the bots back to normal speed."
-    );
+    say(state, { botSpeed: after.botSpeed, type: "botSpeedSet" });
   }
 
   if (after.locked !== before.locked) {
-    say(state, after.locked ? LOG_TEXT.roomLocked : LOG_TEXT.roomUnlocked);
+    say(state, { locked: after.locked, type: "lockSet" });
   }
 };
 
@@ -929,11 +872,14 @@ const stayAndBankPoints = (
   state: GameState,
   player: Player,
   random: Random,
-  describe = (banked: string) => logCopy`${player} stayed and banked ${banked}.`
+  by: Mover
 ) => {
   player.status = "stayed";
-  say(state, describe(pointsLabel(calculateRoundScore(player.hand).total)), {
-    cue: "bank",
+  say(state, {
+    by,
+    player: named(player),
+    points: calculateRoundScore(player.hand).total,
+    type: "stayed",
   });
   endTurn(state, player);
   advance(state, random);
@@ -942,7 +888,7 @@ const stayAndBankPoints = (
 export const stay = (state: GameState, playerId: string, random: Random) => {
   assertMove(state, playerId, { type: "stay" });
   const player = getPlayer(state, playerId);
-  stayAndBankPoints(state, player, random);
+  stayAndBankPoints(state, player, random, { kind: "player" });
 };
 
 export const choose = (
@@ -957,8 +903,8 @@ export const choose = (
     return;
   }
 
-  const card = chooseActionCard(state, targetId, (text, said) => {
-    say(state, text, said);
+  const card = chooseActionCard(state, targetId, (event) => {
+    say(state, event);
   });
 
   if (card) {
@@ -1024,7 +970,7 @@ export const removePlayer = (
 
     clearRoundTable(state, "out");
 
-    say(state, "Not enough players left, so the game ended.");
+    say(state, { type: "gameAbandoned" });
 
     return;
   }
@@ -1036,7 +982,7 @@ const evict = (
   state: GameState,
   playerId: string,
   random: Random,
-  describe: (player: LogPlayer) => LogCopy
+  how: Extract<GameEvent, { type: "evicted" }>["how"]
 ) => {
   const player = findPlayer(state, playerId);
 
@@ -1045,7 +991,7 @@ const evict = (
   }
 
   removePlayer(state, playerId, random);
-  say(state, describe(player));
+  say(state, { how, player: named(player), type: "evicted" });
 };
 
 /** The host removes another player from the room. */
@@ -1056,17 +1002,12 @@ export const kick = (
   random: Random
 ) => {
   assertMove(state, hostId, { playerId, type: "kick" });
-  evict(
-    state,
-    playerId,
-    random,
-    (player) => logCopy`${player} was removed by the host.`
-  );
+  evict(state, playerId, random, "kicked");
 };
 
 /** A player removes themselves from the room. */
 export const leave = (state: GameState, playerId: string, random: Random) => {
-  evict(state, playerId, random, (player) => logCopy`${player} left.`);
+  evict(state, playerId, random, "left");
 };
 
 /** A player gives up their seat to keep watching the room. */
@@ -1075,7 +1016,7 @@ export const leaveToWatch = (
   playerId: string,
   random: Random
 ) => {
-  evict(state, playerId, random, (player) => logCopy`${player} left to watch.`);
+  evict(state, playerId, random, "leftToWatch");
 };
 
 export const backToLobby = (state: GameState, playerId: string) => {
@@ -1102,9 +1043,18 @@ export const transferHost = (state: GameState) => {
   }
 
   state.hostId = next.id;
-  say(state, logCopy`${next} is now the host.`);
+  say(state, { player: named(next), type: "hostChanged" });
 
   return true;
+};
+
+const sayMovedFor = (
+  state: GameState,
+  player: Player,
+  move: "hit" | "choose",
+  by: OfflineMover
+) => {
+  say(state, { by, move, player: named(player), type: "movedForOffline" });
 };
 
 /**
@@ -1132,29 +1082,20 @@ export const playForAbsent = (state: GameState, random: Random) => {
       return false;
     }
 
-    say(state, logCopy`${player} is offline, so the game played their card.`);
+    sayMovedFor(state, player, "choose", { kind: "game" });
     choose(state, player.id, target, random);
 
     return true;
   }
 
   if (!waiting.canStay) {
-    say(
-      state,
-      logCopy`${player} is offline and has no cards, so the game hit for them.`
-    );
+    sayMovedFor(state, player, "hit", { kind: "game" });
     hit(state, player.id, random);
 
     return true;
   }
 
-  stayAndBankPoints(
-    state,
-    player,
-    random,
-    (banked) =>
-      logCopy`${player} is offline, so the game stayed for them and banked ${banked}.`
-  );
+  stayAndBankPoints(state, player, random, { kind: "game" });
 
   return true;
 };
@@ -1212,28 +1153,27 @@ export const playFor = (
   random: Random
 ) => {
   assertMove(state, hostId, { ...move, forId: playerId });
-  const host = getPlayer(state, hostId);
+
+  const hostMove = {
+    host: named(getPlayer(state, hostId)),
+    kind: "host",
+  } satisfies OfflineMover;
+
   const player = getPlayer(state, playerId);
 
   if (move.type === "choose") {
-    say(state, logCopy`${host} chose for ${player}, who is offline.`);
+    sayMovedFor(state, player, "choose", hostMove);
     choose(state, player.id, move.targetId, random);
 
     return;
   }
 
   if (move.type === "hit") {
-    say(state, logCopy`${host} hit for ${player}, who is offline.`);
+    sayMovedFor(state, player, "hit", hostMove);
     hit(state, player.id, random);
 
     return;
   }
 
-  stayAndBankPoints(
-    state,
-    player,
-    random,
-    (banked) =>
-      logCopy`${host} stayed for ${player}, who is offline, and banked ${banked}.`
-  );
+  stayAndBankPoints(state, player, random, hostMove);
 };

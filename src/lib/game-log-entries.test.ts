@@ -2,41 +2,32 @@ import { describe, expect, it } from "vitest";
 
 import type { Card } from "../game/cards";
 import {
-  addBot,
   addPlayer,
   backToLobby,
   chat,
-  choose,
-  configure,
   createGame,
-  hit,
+  isChat,
   nextRound,
-  playFor,
-  playForAbsent,
   startGame,
   stay,
 } from "../game/engine";
-import type { GameCue, GameState, LogEntry } from "../game/engine";
-import { logCopy } from "../game/log-copy";
+import type { ChatEntry, EventEntry, GameState } from "../game/engine";
+import type { GameEvent } from "../game/game-events";
 import { DEFAULT_SETTINGS } from "../game/settings";
-import type { EventDetail } from "./game-log-entries";
+import type { EventCopy, EventDetail, NamePart } from "./game-log-entries";
 import {
   countChatsAfter,
+  detailText,
   eventCopy,
-  eventDetails,
-  eventDetailsWithMentions,
   groupLog,
   HOUR_MS,
   involves,
-  nameParts,
-  shownTimes,
   MINUTE_MS,
-  roundAnnouncement,
+  partsText,
   SECOND_MS,
-  systemCopy,
+  shownTimes,
   timeFormats,
   timeLabel,
-  winnerAnnouncement,
 } from "./game-log-entries";
 
 const random = () => 0.5;
@@ -52,13 +43,7 @@ const cardId = () => {
 const num = (value: number) =>
   ({ id: cardId(), kind: "number", value }) satisfies Card;
 
-const freeze = () => ({ id: cardId(), kind: "freeze" }) satisfies Card;
-const flipThree = () => ({ id: cardId(), kind: "flipThree" }) satisfies Card;
-
-const secondChance = () =>
-  ({ id: cardId(), kind: "secondChance" }) satisfies Card;
-
-const NAMES = { a: "Ada", b: "Bo", c: "Cy" };
+const NAMES = { a: "Ada", b: "Bo" };
 
 type PlayerId = keyof typeof NAMES;
 
@@ -95,217 +80,35 @@ const deal = (playerIds: PlayerId[], opening: Card[]) => {
   return state;
 };
 
-const cuedEntry =
-  (cue: GameCue, nth = -1) =>
-  (log: LogEntry[]) =>
-    log.filter((entry) => entry.cue === cue).at(nth);
+const ada = { id: "a", name: "Ada" };
+const bo = { id: "b", name: "Bo" };
+const cy = { id: "c", name: "Cy" };
 
-const fromEnd =
-  (offset = 1) =>
-  (log: LogEntry[]) =>
-    log.at(-offset);
+let logId = 0;
 
-const scenarios = {
-  lockRoom: () => {
-    const state = createGame();
-    addPlayer(state, "a", NAMES.a, 1);
-    configure(state, "a", { locked: true });
-    configure(state, "a", { locked: false });
+const readParts = (parts: readonly NamePart[]) =>
+  parts
+    .map((part) => ("text" in part ? part.text : `[${part.player.name}]`))
+    .join("");
 
-    return state.log;
-  },
-  assign: () => {
-    const state = deal(["a", "b", "c"], [num(5), num(3), num(8)]);
-    rig(state, [flipThree(), freeze(), flipThree(), num(2)]);
-    hit(state, "a", random);
-    choose(state, "a", "b", random);
-    choose(state, "b", "b", random);
-    choose(state, "b", "c", random);
+const shownDetail = (detail: EventDetail) =>
+  detail.kind === "text" ? readParts(detail.parts) : detailText(detail);
 
-    return state.log;
-  },
-  botAdded: () => {
-    const state = createGame();
-    addPlayer(state, "a", NAMES.a, 1);
-    addBot(state, "a", "bot", random);
+const read = (copy: EventCopy) => ({
+  announcement: copy.announcement,
+  details: copy.details.map(shownDetail),
+  icon: copy.icon,
+  outcome: readParts(copy.outcome),
+});
 
-    return state.log;
-  },
-  bust: () => {
-    const state = deal(["a", "b"], [num(5), num(3)]);
-    rig(state, [num(5)]);
-    hit(state, "a", random);
+const copyOf = (event: GameEvent, round = 1) =>
+  read(eventCopy({ at: 0, event, game: 1, id: 1, round }, true));
 
-    return state.log;
-  },
-  flipSeven: () => {
-    const state = deal(["a", "b"], [num(1), num(12)]);
-    playerById(state, "a").hand.push(num(2), num(3), num(4), num(5), num(6));
-    rig(state, [num(7)]);
-    hit(state, "a", random);
-
-    return state.log;
-  },
-  flipThreeOnOther: () => {
-    const state = deal(["a", "b"], [num(5), num(3)]);
-    rig(state, [flipThree(), num(1), num(2), num(4)]);
-    hit(state, "a", random);
-    choose(state, "a", "b", random);
-
-    return state.log;
-  },
-  flipThreeOnSelf: () => {
-    const state = deal(["a", "b"], [num(5), num(3)]);
-    rig(state, [flipThree(), num(1), num(2), num(4)]);
-    hit(state, "a", random);
-    choose(state, "a", "a", random);
-
-    return state.log;
-  },
-  freezeOther: () => {
-    const state = deal(["a", "b"], [num(5), num(3)]);
-    rig(state, [freeze()]);
-    hit(state, "a", random);
-    choose(state, "a", "b", random);
-
-    return state.log;
-  },
-  freezeSelf: () => {
-    const state = deal(["a", "b"], [num(5), num(3)]);
-    rig(state, [freeze()]);
-    hit(state, "a", random);
-    choose(state, "a", "a", random);
-
-    return state.log;
-  },
-  giveSecondChance: () => {
-    const state = deal(["a", "b", "c"], [secondChance(), num(3), num(4)]);
-    rig(state, [secondChance()]);
-    hit(state, "a", random);
-    choose(state, "a", "c", random);
-
-    return state.log;
-  },
-  joinLobby: () => {
-    const state = createGame();
-    addPlayer(state, "a", NAMES.a, 1);
-
-    return state.log;
-  },
-  joinMidRound: () => {
-    const state = deal(["a", "b"], [num(5), num(3)]);
-    addPlayer(state, "c", NAMES.c, 1);
-
-    return state.log;
-  },
-  offlineStayByGame: () => {
-    const state = deal(["a", "b"], [num(5), num(3)]);
-    playerById(state, "a").connected = false;
-    playForAbsent(state, random);
-
-    return state.log;
-  },
-  offlineStayByHost: () => {
-    const state = deal(["a", "b"], [num(5), num(3)]);
-    stay(state, "a", random);
-    playerById(state, "b").connected = false;
-    playFor(state, "a", "b", { type: "stay" }, random);
-
-    return state.log;
-  },
-  outOfCards: () => {
-    const state = deal(["a", "b"], [num(5), num(3)]);
-    rig(state, []);
-    state.discard = [];
-    hit(state, "a", random);
-
-    return state.log;
-  },
-  reshuffle: () => {
-    const state = deal(["a", "b"], [num(5), num(3)]);
-    rig(state, []);
-    state.discard = [num(9)];
-    hit(state, "a", random);
-
-    return state.log;
-  },
-  roundOver: () => {
-    const state = deal(["a", "b"], [num(5), num(3)]);
-    stay(state, "a", random);
-    stay(state, "b", random);
-
-    return state.log;
-  },
-  secondChanceSave: () => {
-    const state = deal(["a", "b"], [num(5), num(3)]);
-    rig(state, [secondChance(), num(5)]);
-    hit(state, "a", random);
-    stay(state, "b", random);
-    hit(state, "a", random);
-
-    return state.log;
-  },
-  stayOnePoint: () => {
-    const state = deal(["a", "b"], [num(1), num(3)]);
-    stay(state, "a", random);
-
-    return state.log;
-  },
-  stayPoints: () => {
-    const state = deal(["a", "b"], [num(10), num(3)]);
-    stay(state, "a", random);
-
-    return state.log;
-  },
-  tied: () => {
-    const state = deal(["a", "b"], [num(10), num(10)]);
-    playerById(state, "a").score = DEFAULT_SETTINGS.targetScore;
-    playerById(state, "b").score = DEFAULT_SETTINGS.targetScore;
-    stay(state, "a", random);
-    stay(state, "b", random);
-
-    return state.log;
-  },
-  winner: () => {
-    const state = deal(["a", "b"], [num(10), num(3)]);
-    playerById(state, "a").score = DEFAULT_SETTINGS.targetScore - 5;
-    stay(state, "a", random);
-    stay(state, "b", random);
-
-    return state.log;
-  },
-} satisfies Record<string, () => LogEntry[]>;
-
-type Scenario = keyof typeof scenarios;
-
-const messageFrom = (
-  scenario: Scenario,
-  pick: (log: LogEntry[]) => LogEntry | undefined
-) => {
-  const entry = pick(scenarios[scenario]());
-
-  if (entry === undefined) {
-    throw new Error(`${scenario} logged no matching entry`);
-  }
-
-  return entry;
-};
-
-const pts = (points: number) => ({ kind: "points", points }) as const;
-
-const dupe = (number: number) =>
-  ({ kind: "card", label: "duplicate", number }) as const;
-
-const words = (text: string) => ({ kind: "text", text }) as const;
-
-const event = (
-  outcome: string,
-  players: string[],
-  details: EventDetail[] | undefined,
-  icon?: string
-) => ({
-  copy: { announcement: false, details: details ?? [], icon, outcome },
-  players,
+const happening = (outcome: string, icon?: string, details: string[] = []) => ({
+  announcement: false,
+  details,
+  icon,
+  outcome,
 });
 
 const announcement = (outcome: string, icon?: string) => ({
@@ -315,237 +118,317 @@ const announcement = (outcome: string, icon?: string) => ({
   outcome,
 });
 
-const unchangedMessages = [
-  ["flipThreeOnSelf", cuedEntry("special", 0), "playing-cards-fan"],
-  ["joinLobby", cuedEntry("join"), "user-plus"],
-  ["joinMidRound", cuedEntry("join"), "user-plus"],
-  ["botAdded", cuedEntry("join"), "user-plus"],
-  ["winner", fromEnd(), "trophy"],
-] as const;
-
-describe("the engine's messages in the Chat & Log", () => {
+describe(eventCopy, () => {
   it.each([
     [
-      "stayPoints",
-      cuedEntry("bank"),
-      event("Ada stayed", ["Ada"], [pts(10)], "coins"),
+      "a Stay",
+      { by: { kind: "player" }, player: ada, points: 10, type: "stayed" },
+      happening("[Ada] stayed", "coins", ["+10 pts"]),
     ],
     [
-      "stayOnePoint",
-      cuedEntry("bank"),
-      event("Ada stayed", ["Ada"], [pts(1)], "coins"),
+      "a one-point Stay",
+      { by: { kind: "player" }, player: ada, points: 1, type: "stayed" },
+      happening("[Ada] stayed", "coins", ["+1 pt"]),
     ],
     [
-      "offlineStayByGame",
-      cuedEntry("bank"),
-      event(
-        "The game stayed for Ada",
-        ["Ada"],
-        [pts(5), words("Ada is offline")],
-        "coins"
-      ),
-    ],
-    [
-      "offlineStayByHost",
-      cuedEntry("bank"),
-      event(
-        "Ada stayed for Bo",
-        ["Ada", "Bo"],
-        [pts(3), words("Bo is offline")],
-        "coins"
-      ),
-    ],
-    [
-      "bust",
-      cuedEntry("bust"),
-      event("Ada busted", ["Ada"], [dupe(5)], "circle-x"),
-    ],
-    [
-      "flipSeven",
-      cuedEntry("flipSeven"),
-      event("Ada flipped 7!", ["Ada"], undefined, "flame"),
-    ],
-    [
-      "freezeSelf",
-      cuedEntry("freeze"),
-      event("Ada froze themselves", ["Ada"], [pts(5)], "snowflake"),
-    ],
-    [
-      "freezeOther",
-      cuedEntry("freeze"),
-      event(
-        "Bo was frozen",
-        ["Ada", "Bo"],
-        [pts(3), words("by Ada")],
-        "snowflake"
-      ),
-    ],
-    [
-      "secondChanceSave",
-      cuedEntry("special"),
-      event("Ada used Second Chance", ["Ada"], [dupe(5)], "heart"),
-    ],
-    [
-      "secondChanceSave",
-      cuedEntry("special", 0),
-      event("Ada got a Second Chance", ["Ada"], undefined, "heart"),
-    ],
-    [
-      "flipThreeOnOther",
-      cuedEntry("special", 0),
-      event(
-        "Bo must flip three",
-        ["Ada", "Bo"],
-        [words("from Ada")],
-        "playing-cards-fan"
-      ),
-    ],
-    [
-      "assign",
-      cuedEntry("special", 1),
-      event(
-        "Bo assigned Freeze",
-        ["Bo"],
-        [words("to themselves")],
-        "arrow-right"
-      ),
-    ],
-    [
-      "assign",
-      cuedEntry("special", 2),
-      event(
-        "Bo assigned Flip Three",
-        ["Bo", "Cy"],
-        [words("to Cy")],
-        "arrow-right"
-      ),
-    ],
-    [
-      "giveSecondChance",
-      cuedEntry("special"),
-      event(
-        "Cy got Second Chance",
-        ["Ada", "Cy"],
-        [words("from Ada")],
-        "heart"
-      ),
-    ],
-    [
-      "reshuffle",
-      fromEnd(),
+      "the host staying for an offline player",
       {
-        copy: announcement("Deck rebuilt from the discard pile.", "shuffle"),
-        players: [],
+        by: { host: ada, kind: "host" },
+        player: bo,
+        points: 3,
+        type: "stayed",
       },
+      happening("[Ada] stayed for [Bo]", "coins", [
+        "+3 pts",
+        "[Bo] is offline",
+      ]),
     ],
     [
-      "outOfCards",
-      fromEnd(2),
-      { copy: announcement("Deck empty · round ended."), players: [] },
+      "the game staying for an offline player",
+      { by: { kind: "game" }, player: ada, points: 5, type: "stayed" },
+      happening("The game stayed for [Ada]", "coins", [
+        "+5 pts",
+        "[Ada] is offline",
+      ]),
     ],
-  ] as const)("shortens %s", (scenario, pick, expected) => {
-    const entry = messageFrom(scenario, pick);
-
-    expect({
-      copy: eventDetails(entry, true),
-      players: entry.about.map((player) => player.name),
-    }).toStrictEqual(expected);
-  });
-
-  it.each(unchangedMessages)(
-    "shows %s as the engine wrote it",
-    (scenario, pick, icon) => {
-      const entry = messageFrom(scenario, pick);
-
-      expect(eventDetails(entry, true)).toMatchObject({
-        details: [],
-        icon,
-        outcome: entry.text,
-      });
+    [
+      "a bust",
+      { card: 5, player: ada, type: "busted" },
+      happening("[Ada] busted", "circle-x", ["duplicate 5"]),
+    ],
+    [
+      "a Flip 7",
+      { player: ada, type: "flipSeven" },
+      happening("[Ada] flipped 7!", "flame"),
+    ],
+    [
+      "a Freeze on yourself",
+      { by: ada, points: 5, target: ada, type: "frozen" },
+      happening("[Ada] froze themselves", "snowflake", ["+5 pts"]),
+    ],
+    [
+      "a Freeze on someone else",
+      { by: ada, points: 3, target: bo, type: "frozen" },
+      happening("[Bo] was frozen", "snowflake", ["+3 pts", "by [Ada]"]),
+    ],
+    [
+      "a Freeze from a player who left",
+      { by: null, points: 3, target: bo, type: "frozen" },
+      happening("[Bo] was frozen", "snowflake", ["+3 pts", "by Someone"]),
+    ],
+    [
+      "a Flip Three on yourself",
+      { by: ada, target: ada, type: "flipThreeStarted" },
+      happening("[Ada] must flip three cards.", "playing-cards-fan"),
+    ],
+    [
+      "a Flip Three on someone else",
+      { by: ada, target: bo, type: "flipThreeStarted" },
+      happening("[Bo] must flip three", "playing-cards-fan", ["from [Ada]"]),
+    ],
+    [
+      "a Second Chance kept",
+      { player: ada, type: "secondChanceKept" },
+      happening("[Ada] got a Second Chance", "heart"),
+    ],
+    [
+      "a Second Chance used",
+      { card: 5, player: ada, type: "secondChanceUsed" },
+      happening("[Ada] used Second Chance", "heart", ["duplicate 5"]),
+    ],
+    [
+      "a Second Chance given",
+      { by: ada, target: cy, type: "secondChanceGiven" },
+      happening("[Cy] got Second Chance", "heart", ["from [Ada]"]),
+    ],
+    [
+      "an extra Second Chance",
+      { player: ada, type: "secondChanceDiscarded" },
+      happening("[Ada] discarded an extra Second Chance."),
+    ],
+    [
+      "a held card assigned to yourself",
+      { by: bo, card: "freeze", target: bo, type: "actionAssigned" },
+      happening("[Bo] assigned Freeze", "arrow-right", ["to themselves"]),
+    ],
+    [
+      "a held card assigned to someone else",
+      { by: bo, card: "flipThree", target: cy, type: "actionAssigned" },
+      happening("[Bo] assigned Flip Three", "arrow-right", ["to [Cy]"]),
+    ],
+    [
+      "held cards discarded",
+      { cards: ["freeze", "flipThree"], type: "heldActionsDiscarded" },
+      happening(
+        "Freeze and Flip Three set aside during the Flip Three were discarded."
+      ),
+    ],
+    [
+      "a held card discarded",
+      { cards: ["freeze"], type: "heldActionsDiscarded" },
+      happening("Freeze set aside during the Flip Three was discarded."),
+    ],
+    [
+      "a card for a player who left",
+      { card: "freeze", target: null, type: "actionDiscarded" },
+      happening(
+        "Freeze for a player who left was discarded, since they're out of the round."
+      ),
+    ],
+    [
+      "a card for a player out of the round",
+      { card: "flipThree", target: bo, type: "actionDiscarded" },
+      happening(
+        "Flip Three for [Bo] was discarded, since they're out of the round."
+      ),
+    ],
+    [
+      "the game hitting for an offline player",
+      {
+        by: { kind: "game" },
+        move: "hit",
+        player: ada,
+        type: "movedForOffline",
+      },
+      happening("[Ada] is offline and has no cards, so the game hit for them."),
+    ],
+    [
+      "the game playing an offline player's card",
+      {
+        by: { kind: "game" },
+        move: "choose",
+        player: ada,
+        type: "movedForOffline",
+      },
+      happening("[Ada] is offline, so the game played their card."),
+    ],
+    [
+      "the host hitting for an offline player",
+      {
+        by: { host: ada, kind: "host" },
+        move: "hit",
+        player: bo,
+        type: "movedForOffline",
+      },
+      happening("[Ada] hit for [Bo], who is offline."),
+    ],
+    [
+      "the host choosing for an offline player",
+      {
+        by: { host: ada, kind: "host" },
+        move: "choose",
+        player: bo,
+        type: "movedForOffline",
+      },
+      happening("[Ada] chose for [Bo], who is offline."),
+    ],
+    [
+      "a join",
+      { player: ada, type: "joined", waitsFor: null },
+      happening("[Ada] joined.", "user-plus"),
+    ],
+    [
+      "a join mid-game",
+      { player: cy, type: "joined", waitsFor: "round" },
+      happening("[Cy] joined and will play in the next round.", "user-plus"),
+    ],
+    [
+      "a bot",
+      { player: { id: "bot", name: "Ember" }, type: "botAdded" },
+      happening("The host added [Ember], a bot.", "user-plus"),
+    ],
+    [
+      "a kick",
+      { how: "kicked", player: bo, type: "evicted" },
+      happening("[Bo] was removed by the host."),
+    ],
+    [
+      "a leave",
+      { how: "left", player: bo, type: "evicted" },
+      happening("[Bo] left."),
+    ],
+    [
+      "leaving to watch",
+      { how: "leftToWatch", player: bo, type: "evicted" },
+      happening("[Bo] left to watch."),
+    ],
+    [
+      "a new host",
+      { player: bo, type: "hostChanged" },
+      happening("[Bo] is now the host."),
+    ],
+    [
+      "a winning score",
+      { targetScore: 300, type: "targetScoreSet" },
+      happening("The host set the winning score to 300."),
+    ],
+    [
+      "fast bots",
+      { botSpeed: "fast", type: "botSpeedSet" },
+      happening("The host sped up the bots."),
+    ],
+    [
+      "normal bots",
+      { botSpeed: "normal", type: "botSpeedSet" },
+      happening("The host set the bots back to normal speed."),
+    ],
+    [
+      "a lock",
+      { locked: true, type: "lockSet" },
+      happening("Room locked.", "lock"),
+    ],
+    [
+      "an unlock",
+      { locked: false, type: "lockSet" },
+      happening("Room unlocked.", "lock-open"),
+    ],
+    [
+      "a game without enough players",
+      { type: "gameAbandoned" },
+      happening("Not enough players left, so the game ended."),
+    ],
+    [
+      "a reshuffle",
+      { type: "deckReshuffled" },
+      announcement("Deck rebuilt from the discard pile.", "shuffle"),
+    ],
+    [
+      "an empty deck",
+      { type: "outOfCards" },
+      announcement("Deck empty · round ended."),
+    ],
+    [
+      "a round's end",
+      { scores: [], tiedAt: null, type: "roundOver" },
+      announcement("Round 1 is over."),
+    ],
+    [
+      "a tie at the winning score",
+      { scores: [], tiedAt: 210, type: "roundOver" },
+      announcement("Round 1 is over. Tied at 210, so play continues."),
+    ],
+    [
+      "a win",
+      { player: ada, points: 210, scores: [], type: "gameWon" },
+      happening("[Ada] wins with 210 points!", "trophy"),
+    ],
+  ] satisfies [string, GameEvent, ReturnType<typeof happening>][])(
+    "words %s",
+    (_, happened, expected) => {
+      expect(copyOf(happened)).toStrictEqual(expected);
     }
   );
 
-  it("shows short lock and unlock events with matching icons", () => {
+  it("drops the round from a round's first event under its heading", () => {
+    const entry = {
+      at: 0,
+      event: { dealer: bo, type: "roundStarted" },
+      game: 1,
+      id: 1,
+      round: 2,
+    } satisfies EventEntry;
+
+    expect(read(eventCopy(entry, true))).toStrictEqual(
+      announcement("[Bo] deals.", "playing-cards")
+    );
+    expect(read(eventCopy(entry, false))).toStrictEqual(
+      announcement("Round 2 begins. [Bo] deals.")
+    );
     expect(
-      scenarios
-        .lockRoom()
-        .slice(-2)
-        .map((entry) => eventDetails(entry, true))
-    ).toStrictEqual([
-      event("Room locked.", [], undefined, "lock").copy,
-      event("Room unlocked.", [], undefined, "lock-open").copy,
-    ]);
-  });
-
-  it.each([
-    ["roundOver", fromEnd(), "Round 1 is over."],
-    ["tied", fromEnd(), "Round 1 is over. Tied at 210, so play continues."],
-  ] as const)("announces %s as the engine wrote it", (scenario, pick, text) => {
-    const entry = messageFrom(scenario, pick);
-
-    expect(entry.text).toBe(text);
-    expect(eventDetails(entry, true)).toStrictEqual(announcement(text));
-  });
-
-  it("drops the round from a round's first message under its heading", () => {
-    const [begins] = scenarios.roundOver();
-
-    if (begins === undefined) {
-      throw new Error("The round logged nothing");
-    }
-
-    expect(eventDetails(begins, true)).toStrictEqual(
-      announcement("Bo deals.", "playing-cards")
-    );
-    expect(eventDetails(begins, false)).toStrictEqual(
-      announcement(begins.text)
-    );
-  });
-});
-
-describe("the Chat & Log's patterns", () => {
-  const engineLog = Object.values(scenarios).flatMap((run) => run());
-
-  const rules = Object.entries(eventCopy).flatMap(([cue, cueRules]) =>
-    cueRules.map(([pattern]) => ({ cue, pattern }))
-  );
-
-  it.each(rules)(
-    "$cue: $pattern matches something the engine says",
-    ({ cue, pattern }) => {
-      expect(
-        engineLog.some((entry) => entry.cue === cue && pattern.test(entry.text))
-      ).toBeTruthy();
-    }
-  );
-
-  it.each([...systemCopy.keys()])("%s is something the engine says", (text) => {
-    expect(engineLog.map((entry) => entry.text)).toContain(text);
-  });
-
-  it.each([
-    ["round", roundAnnouncement],
-    ["winner", winnerAnnouncement],
-  ])("the %s announcement matches something the engine says", (_, pattern) => {
-    expect(engineLog.some((entry) => pattern.test(entry.text))).toBeTruthy();
-  });
-
-  it("accounts for every cued message in the scenarios", () => {
-    const unchanged = new Set(
-      unchangedMessages.map(
-        ([scenario, pick]) => messageFrom(scenario, pick).text
+      read(
+        eventCopy(
+          { ...entry, event: { dealer: null, type: "roundStarted" } },
+          true
+        )
       )
+    ).toStrictEqual(announcement("Someone deals.", "playing-cards"));
+  });
+
+  it("names each player as the player, even when a name is ordinary words", () => {
+    const short = { id: "x", name: "a" };
+
+    expect(
+      copyOf({ by: short, points: 3, target: bo, type: "frozen" })
+    ).toStrictEqual(
+      happening("[Bo] was frozen", "snowflake", ["+3 pts", "by [a]"])
+    );
+  });
+
+  it("keeps the name a player had when the event happened", () => {
+    const copy = eventCopy(
+      logEntry({
+        by: { kind: "player" },
+        player: { id: "a", name: "Old name" },
+        points: 2,
+        type: "stayed",
+      }),
+      true
     );
 
-    const unmatched = engineLog.filter(
-      (entry) =>
-        entry.cue !== undefined &&
-        !unchanged.has(entry.text) &&
-        (entry.cue === "join" ||
-          !eventCopy[entry.cue].some(([pattern]) => pattern.test(entry.text)))
-    );
-
-    expect(unmatched.map((entry) => entry.text)).toStrictEqual([]);
+    expect(copy.outcome).toStrictEqual([
+      { player: { id: "a", name: "Old name" } },
+      { text: " stayed" },
+    ]);
   });
 });
 
@@ -602,7 +485,13 @@ describe(groupLog, () => {
       groups.map(({ entries, id }) => entries[0]?.id === id)
     ).toStrictEqual([true, true]);
     expect(
-      groups.map(({ entries }) => eventDetails(entries[0], true).outcome)
+      groups.map(({ entries }) => {
+        const [first] = entries;
+
+        return first === undefined || isChat(first)
+          ? undefined
+          : partsText(eventCopy(first, true).outcome);
+      })
     ).toStrictEqual(["Bo deals.", "Ada deals."]);
   });
 
@@ -688,69 +577,28 @@ describe(timeLabel, () => {
   );
 });
 
-let logId = 0;
-
-const logEntry = (text: string, extra: Partial<LogEntry> = {}) => {
+const logEntry = (event: GameEvent, at = 0) => {
   logId += 1;
 
-  const entry: LogEntry = {
-    about: [],
-    at: 0,
+  return { at, event, game: 1, id: logId, round: 1 } satisfies EventEntry;
+};
+
+const said = (name: string, text: string, at = 0) => {
+  logId += 1;
+
+  return {
+    at,
+    from: { avatar: null, id: name, name },
     game: 1,
     id: logId,
     round: 1,
     text,
-    ...extra,
-  };
-
-  return entry;
+  } satisfies ChatEntry;
 };
-
-const said = (name: string, text: string, at = 0) =>
-  logEntry(text, { at, from: { avatar: null, id: name, name } });
-
-const ada = { id: "a", name: "Ada" };
-const bo = { id: "b", name: "Bo" };
-const cy = { id: "c", name: "Cy" };
-
-describe(nameParts, () => {
-  it("keeps short names out of ordinary words after formatting a Freeze", () => {
-    const player = { id: "x", name: "a" };
-
-    const entry = logEntry("", {
-      ...logCopy`${player} played Freeze on ${bo}, who banked 3 points.`,
-      cue: "freeze",
-    });
-
-    const copy = eventDetailsWithMentions(entry, true);
-
-    expect(nameParts(copy.outcome, entry.about)).toStrictEqual([
-      { player: entry.about[1] },
-      { text: " was frozen" },
-    ]);
-    const [, detail] = copy.details;
-
-    const text = detail?.kind === "text" ? detail.text : "";
-    expect(nameParts(text, entry.about)).toStrictEqual([
-      { text: "by " },
-      { player: entry.about[0] },
-    ]);
-  });
-
-  it("keeps ordinary text whole even when it contains a player's name", () => {
-    expect(nameParts("from Ada", [ada])).toStrictEqual([{ text: "from Ada" }]);
-  });
-});
 
 describe(involves, () => {
   it("finds every player an event names, by ID", () => {
-    const frozen = logEntry("Ada played Freeze on Bo, who banked 3 points.", {
-      about: [
-        { ...ada, offset: 0 },
-        { ...bo, offset: "Ada played Freeze on ".length },
-      ],
-      cue: "freeze",
-    });
+    const frozen = logEntry({ by: ada, points: 3, target: bo, type: "frozen" });
 
     expect(involves(frozen, bo.id)).toBeTruthy();
     expect(involves(frozen, ada.id)).toBeTruthy();
@@ -761,9 +609,11 @@ describe(involves, () => {
     const alex = { id: "x", name: "Alex" };
     const alexander = { id: "y", name: "Alexander" };
 
-    const stayed = logEntry("Alexander stayed and banked 4 points.", {
-      about: [{ ...alexander, offset: 0 }],
-      cue: "bank",
+    const stayed = logEntry({
+      by: { kind: "player" },
+      player: alexander,
+      points: 4,
+      type: "stayed",
     });
 
     expect(involves(stayed, alexander.id)).toBeTruthy();
@@ -778,19 +628,22 @@ describe(involves, () => {
 
 describe(shownTimes, () => {
   it("shows a time once per minute of game events and once per chat run", () => {
-    const entries = [
-      logEntry("first", { at: 0 }),
-      logEntry("same minute", { at: 30 * SECOND_MS }),
-      logEntry("a minute on", { at: MINUTE_MS }),
-      said("Ada", "hi", MINUTE_MS + SECOND_MS),
-      said("Ada", "again", MINUTE_MS + 2 * SECOND_MS),
-      logEntry("after a chat", { at: MINUTE_MS + 3 * SECOND_MS }),
-    ];
+    const first = logEntry({ type: "deckReshuffled" }, 0);
+    const sameMinute = logEntry({ type: "deckReshuffled" }, 30 * SECOND_MS);
+    const minuteOn = logEntry({ type: "deckReshuffled" }, MINUTE_MS);
+    const hi = said("Ada", "hi", MINUTE_MS + SECOND_MS);
+    const again = said("Ada", "again", MINUTE_MS + 2 * SECOND_MS);
 
+    const afterChat = logEntry(
+      { type: "deckReshuffled" },
+      MINUTE_MS + 3 * SECOND_MS
+    );
+
+    const entries = [first, sameMinute, minuteOn, hi, again, afterChat];
     const shown = shownTimes(entries);
 
     expect(
-      entries.flatMap((entry) => (shown.has(entry.id) ? [entry.text] : []))
-    ).toStrictEqual(["first", "a minute on", "hi", "after a chat"]);
+      entries.flatMap((entry) => (shown.has(entry.id) ? [entry.id] : []))
+    ).toStrictEqual([first.id, minuteOn.id, hi.id, afterChat.id]);
   });
 });

@@ -3,7 +3,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { parseClientMessage } from "../game/client-message";
-import { DEAL_HISTORY_LIMIT } from "../game/engine";
+import { DEAL_HISTORY_LIMIT, isChat } from "../game/engine";
+import type { LogEntry } from "../game/engine";
 import {
   ROOM_REMOVED_CLOSE_CODE,
   TYPING_SEND_MS,
@@ -19,6 +20,9 @@ import type {
 } from "../game/room";
 import { createRoomClient } from "./room-client";
 import type { RoomClientDeps } from "./room-client";
+
+const chatText = (entry: LogEntry | undefined) =>
+  entry !== undefined && isChat(entry) ? entry.text : undefined;
 
 const START = 1_000_000;
 const REPLY_TIMEOUT_MS = 6000;
@@ -492,7 +496,7 @@ describe("the log through the room client", () => {
 
     expect(logIds(ben)).toStrictEqual(serverLogIds(net));
     expect(ben.client.state.room?.log.slice(0, -1)).toStrictEqual(before);
-    expect(ben.client.state.room?.log.at(-1)?.text).toBe("hi Ben");
+    expect(chatText(ben.client.state.room?.log.at(-1))).toBe("hi Ben");
     expect(net.syncs).toStrictEqual([]);
   });
 
@@ -524,7 +528,7 @@ describe("the log through the room client", () => {
       expect(logIds(player)).toStrictEqual(serverLogIds(net));
       expect(
         player.client.state.room?.log.some(
-          (entry) => entry.text === "lobby chat"
+          (entry) => isChat(entry) && entry.text === "lobby chat"
         )
       ).toBeFalsy();
     }
@@ -545,7 +549,7 @@ describe("the log through the room client", () => {
 
     await expect(sent).resolves.toBeTruthy();
     expect(logIds(ana)).toStrictEqual(serverLogIds(net));
-    expect(ana.client.state.room?.log.at(-1)?.text).toBe("you there?");
+    expect(chatText(ana.client.state.room?.log.at(-1))).toBe("you there?");
     expect(net.syncs).toStrictEqual([]);
   });
 
@@ -593,7 +597,9 @@ describe("the log through the room client", () => {
       ana.link?.toServer.filter((frame) => frame.includes("sync"))
     ).toHaveLength(1);
     expect(
-      ana.client.state.room?.log.some((entry) => entry.text === "two")
+      ana.client.state.room?.log.some(
+        (entry) => isChat(entry) && entry.text === "two"
+      )
     ).toBeFalsy();
 
     net.flush();
@@ -966,7 +972,10 @@ describe("watching a room", () => {
     host.client.chat("Good luck");
     net.flush();
     const live = guest.client.state.room;
-    expect({ phase: live?.phase, chat: live?.log.at(-1)?.text }).toStrictEqual({
+    expect({
+      phase: live?.phase,
+      chat: chatText(live?.log.at(-1)),
+    }).toStrictEqual({
       chat: "Good luck",
       phase: "playing",
     });
