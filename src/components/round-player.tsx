@@ -1,4 +1,3 @@
-import Crown from "@lucide/solid/icons/crown";
 import PlayingCards from "@lucide/solid/icons/playing-cards";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import Trophy from "@lucide/solid/icons/trophy";
@@ -194,14 +193,6 @@ const RoundPlayer = (props: RoundPlayerProps) => {
   const scorePercent = (score: number) =>
     `${Math.min(100, (score / props.room.settings.targetScore) * 100)}%`;
 
-  const decisionLabel = () => {
-    if (props.room.choice) {
-      return "Choosing…";
-    }
-
-    return isMe() ? "Your turn" : "Thinking…";
-  };
-
   return (
     <article
       class="seat"
@@ -240,34 +231,34 @@ const RoundPlayer = (props: RoundPlayerProps) => {
       </Show>
       <header class="seat-header">
         <div class="seat-name">
-          <PlayerAvatar player={props.player} />
-          <strong>{props.player.name}</strong>
-          <Show when={isMe()}>
-            <span class="badge">You</span>
-          </Show>
-          <Show when={props.player.bot}>
-            <span class="badge" data-tone="bot">
-              Bot
-            </span>
-          </Show>
-          <Show when={isDealer()}>
-            <Tooltip
-              content="Dealer"
-              type="label"
-              trigger={(hint) => <span {...hint} class="dealer-chip" />}
-            >
-              <PlayingCards size={14} strokeWidth={2.25} aria-hidden="true" />
-            </Tooltip>
-          </Show>
-          <Show when={isHost()}>
-            <Tooltip
-              content="Host"
-              type="label"
-              trigger={(hint) => <span {...hint} class="host-chip" />}
-            >
-              <Crown size={12} strokeWidth={2.25} aria-hidden="true" />
-            </Tooltip>
-          </Show>
+          <span class="seat-avatar">
+            <PlayerAvatar player={props.player} />
+            <Show when={isMe()}>
+              <span class="avatar-tag">You</span>
+            </Show>
+            <Show when={props.player.bot}>
+              <span class="avatar-tag" data-tone="bot">
+                Bot
+              </span>
+            </Show>
+            <Show when={isHost()}>
+              <Tooltip
+                content="Host"
+                type="label"
+                trigger={(hint) => <span {...hint} class="host-chip" />}
+              >
+                <svg
+                  viewBox="0 0 24 18"
+                  width="30"
+                  height="22"
+                  aria-hidden="true"
+                >
+                  <path d="M2.5 5.5 7.5 10 12 2.5l4.5 7.5 5-4.5-2 10h-15z" />
+                </svg>
+              </Tooltip>
+            </Show>
+          </span>
+          <strong title={props.player.name}>{props.player.name}</strong>
           <Show when={isWinner()}>
             <span class="badge" data-tone="winner">
               <Trophy size={12} aria-hidden="true" />
@@ -288,9 +279,9 @@ const RoundPlayer = (props: RoundPlayerProps) => {
               />
             )}
           </Show>
-          <Show when={hasDecision()}>
+          <Show when={hasDecision() && !isMe()}>
             <span class="badge" data-tone="turn">
-              {decisionLabel()}
+              {props.room.choice ? "Choosing…" : "Thinking…"}
             </span>
           </Show>
           <Show when={props.player.status !== "active"}>
@@ -342,6 +333,15 @@ const RoundPlayer = (props: RoundPlayerProps) => {
             {(card) => <PlayingCard card={card()} bust />}
           </Show>
         </ul>
+        <Show when={isDealer()}>
+          <Tooltip
+            content="Dealer"
+            type="label"
+            trigger={(hint) => <span {...hint} class="dealer-chip" />}
+          >
+            <PlayingCards size={14} strokeWidth={2.25} aria-hidden="true" />
+          </Tooltip>
+        </Show>
         <Show when={STAMPED_STATUSES.has(props.player.status)}>
           <span class="hand-stamp" aria-hidden="true">
             <span>{STATUS_LABELS[props.player.status]}</span>

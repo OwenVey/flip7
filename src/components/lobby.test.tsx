@@ -62,6 +62,25 @@ const spectator = () => ({
 describe("<Lobby />", () => {
   afterEach(cleanup);
 
+  it("keeps the full player name available in the roster", () => {
+    const name = "MW".repeat(10);
+    const state = createGame();
+    addPlayer(state, "p0", name, 1);
+
+    render(() => (
+      <Lobby
+        chat={chatControls()}
+        typing={[]}
+        room={toRoomView("ABCDE", state)}
+        playerId="p0"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+
+    const roster = screen.getByRole("list", { name: "Players" });
+    expect(within(roster).getByText(name)).toHaveAttribute("title", name);
+  });
+
   it("keeps the host's Add bot button mounted and focusable once the room fills", () => {
     const send = vi.fn<RoomConnection["send"]>();
     const [room, setRoom] = createSignal<RoomView>(roomOf(MAX_PLAYERS - 1));

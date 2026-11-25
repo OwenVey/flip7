@@ -444,8 +444,14 @@
   visibility: hidden;
 }
 
-/* Mini cards keep to the right, even when they wrap below a crowded header. */
+/*
+ * Mini cards keep to the right, and the name truncates to make room for them.
+ * Only when the name is down to its minimum do they wrap onto a second row.
+ */
 .seat-header > .seat-extras {
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   margin-inline-start: auto;
 }
 

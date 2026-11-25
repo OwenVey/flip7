@@ -74,8 +74,6 @@ describe("<RoundPlayer />", () => {
     render(() => <Seat seat={0} room={room()} playerId="a" />);
 
     const seat = screen.getByRole("article", { name: "Ana, 40 points" });
-    expect(within(seat).getByText("Your turn")).toBeVisible();
-
     const meter = within(seat).getByRole("meter", { name: "Total score" });
     expect(within(meter).getByText("40 / 200")).toBeVisible();
     expect(
@@ -89,6 +87,31 @@ describe("<RoundPlayer />", () => {
       "aria-valuetext",
       "40 of 200 points, 7 this round"
     );
+  });
+
+  it("keeps the local player's header metadata empty when their move starts", () => {
+    const [view, setView] = createSignal(room({ turnId: "b" }));
+
+    render(() => (
+      <>
+        <Seat seat={0} room={view()} playerId="a" />
+        <Seat seat={1} room={view()} playerId="a" />
+      </>
+    ));
+
+    const mine = screen.getByRole("article", { name: "Ana, 40 points" });
+    const other = screen.getByRole("article", { name: "Ben, 12 points" });
+    const meta = mine.querySelector(".seat-meta");
+
+    expect(meta?.children).toHaveLength(0);
+    expect(within(other).getByText("Thinking…")).toBeVisible();
+
+    setView(room());
+    flush();
+
+    expect(mine).toHaveAttribute("data-turn");
+    expect(meta?.children).toHaveLength(0);
+    expect(within(other).queryByText("Thinking…")).toBeNull();
   });
 
   it("keeps only Number cards on the mat and sets the rest beside it in arrival order", () => {
@@ -429,7 +452,7 @@ describe("<RoundPlayer />", () => {
       />
     ));
     const seat = screen.getByRole("article", { name: "Ana, 40 points" });
-    expect(within(seat).getByText("Choosing…")).toBeVisible();
+    expect(seat).toHaveAttribute("data-turn");
     screen.getByRole("button", { name: "Freeze Ben" }).click();
     flush();
     expect(send).toHaveBeenCalledWith({ targetId: "b", type: "choose" });

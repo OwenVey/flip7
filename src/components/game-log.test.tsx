@@ -602,25 +602,34 @@ describe("<GameLog />", () => {
     }).toStrictEqual({ highlighting: null, spotlit: [] });
   });
 
-  it("highlights a player's lines when their chat name is tapped", () => {
+  it("highlights a player's lines by their full name even when it is long", () => {
+    const longName = { ...ben, name: "MW".repeat(10) };
+
+    const log: ChatEntry[] = [
+      { ...fields(1, Date.now()), from: longName, text: "ouch" },
+    ];
+
     render(() => (
-      <GameLog log={twoRounds()} playerId="a" players={players} typing={[]} />
+      <GameLog log={log} playerId="a" players={[ana, longName]} typing={[]} />
     ));
     fireEvent.click(screen.getByRole("radio", { name: "Chat" }));
     flush();
 
-    const author = screen.getByRole("button", { name: "Ben" });
+    const author = screen.getByRole("button", { name: longName.name });
+    expect(author).toHaveAttribute("title", longName.name);
     fireEvent.click(author);
     flush();
 
+    const highlighting = screen.getByText("Highlighting");
+    expect(highlighting).toHaveAttribute("title", longName.name);
     expect({
-      highlighting: screen.getByText("Highlighting").textContent,
+      highlighting: highlighting.textContent,
       pressed: author.getAttribute("aria-pressed"),
       spotlit: rowTexts("spotlit"),
     }).toStrictEqual({
-      highlighting: "Highlighting Ben",
+      highlighting: `Highlighting ${longName.name}`,
       pressed: "true",
-      spotlit: ["Benouch"],
+      spotlit: [`${longName.name}ouch`],
     });
   });
 
