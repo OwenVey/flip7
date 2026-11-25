@@ -217,7 +217,7 @@ describe("<GameLog />", () => {
     }).toStrictEqual({ disabled: "true", feedback: "", sent: ["Good game!"] });
   });
 
-  it("folds a finished round into a summary that keeps its chat", () => {
+  it("folds a finished round down to its chat", () => {
     render(() => (
       <GameLog log={twoRounds()} playerId="a" players={players} typing={[]} />
     ));
@@ -227,13 +227,11 @@ describe("<GameLog />", () => {
     const folding = () => ({
       expanded: toggle.getAttribute("aria-expanded"),
       rows: rowTexts(),
-      summary: document.querySelector(".log-round-summary")?.textContent,
     });
 
     expect(folding()).toStrictEqual({
       expanded: "false",
       rows: ["Benouch", "Ana deals.", "Ben stayed +30 points"],
-      summary: "Ana +12 · 1 bust",
     });
     expect(screen.queryByRole("button", { name: "Round 2" })).toBeNull();
 
@@ -250,7 +248,6 @@ describe("<GameLog />", () => {
         "Ana deals.",
         "Ben stayed +30 points",
       ],
-      summary: undefined,
     });
 
     const panel = toggle
@@ -288,7 +285,6 @@ describe("<GameLog />", () => {
     const toggle = screen.getByRole("button", { name: "Round 2" });
 
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByText("Ben +30")).toBeVisible();
   });
 
   it("keeps a chat run split by an event even when the event is hidden", () => {

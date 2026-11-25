@@ -69,7 +69,6 @@ import {
   sameDetails,
   SECOND_MS,
   shownTimes,
-  summarizeRound,
   timeLabel,
 } from "../lib/game-log-entries";
 import type {
@@ -440,22 +439,6 @@ const LogRound = (props: {
       (entry) => entry.id === props.newFrom && entry.from === undefined
     );
 
-  const summary = createMemo(() => {
-    if (!props.collapsible) {
-      return "";
-    }
-
-    const parts = summarizeRound(props.group.entries);
-
-    const events = props.group.entries.filter(
-      (entry) => entry.from === undefined
-    ).length;
-
-    return parts.length > 0
-      ? parts.join(" · ")
-      : `${events} ${events === 1 ? "event" : "events"}`;
-  });
-
   const rows = () => (
     <For each={shown()} keyed={(entry) => entry.id}>
       {(entry, index) => {
@@ -546,9 +529,6 @@ const LogRound = (props: {
                   {heading()}
                 </CollapsibleTrigger>
               </h3>
-              <Show when={collapsed()}>
-                <span class="log-round-summary">{summary()}</span>
-              </Show>
             </Show>
             <ClockMinute
               at={oldGameMinute(props.group.entries[0], props.now)}

@@ -415,13 +415,6 @@
     padding-block-end: 0;
   }
 
-  & .log-round-summary {
-    flex: 1;
-    min-inline-size: 0;
-    color: var(--ink-soft);
-    font-size: var(--text-xs);
-  }
-
   & h3 {
     margin: 0;
     color: var(--accent);

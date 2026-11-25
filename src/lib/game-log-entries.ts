@@ -365,43 +365,6 @@ export const nameParts = (text: string, players: readonly LogPlayer[]) => {
   return parts;
 };
 
-const countLabel = (count: number, one: string, many: string) =>
-  `${count} ${count === 1 ? one : many}`;
-
-/** A finished round in a few words: the round's top score, then the Flip 7s and busts. */
-export const summarizeRound = (entries: readonly LogEntry[]) => {
-  let best: { name: string; points: number } | undefined;
-  let busts = 0;
-  const flipSevens: string[] = [];
-
-  for (const entry of entries) {
-    if (entry.cue === "bust") {
-      busts += 1;
-    }
-
-    const [player] = entry.about;
-
-    if (entry.cue === "flipSeven" && player !== undefined) {
-      flipSevens.push(player.name);
-    }
-
-    for (const score of entry.scores ?? []) {
-      if (
-        score.points > 0 &&
-        (best === undefined || score.points > best.points)
-      ) {
-        best = score;
-      }
-    }
-  }
-
-  return [
-    ...(best ? [`${best.name} +${best.points}`] : []),
-    ...flipSevens.map((name) => `${name} flipped 7`),
-    ...(busts > 0 ? [countLabel(busts, "bust", "busts")] : []),
-  ];
-};
-
 /**
  * The entries that show their time. A chat run shows it once in its header;
  * game events show it when a minute has passed since the last time shown, or

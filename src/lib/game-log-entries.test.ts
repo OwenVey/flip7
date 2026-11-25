@@ -16,7 +16,7 @@ import {
   startGame,
   stay,
 } from "../game/engine";
-import type { GameCue, GameState, LogEntry, LogPlayer } from "../game/engine";
+import type { GameCue, GameState, LogEntry } from "../game/engine";
 import { logCopy } from "../game/log-copy";
 import { DEFAULT_SETTINGS } from "../game/settings";
 import type { EventDetail } from "./game-log-entries";
@@ -30,7 +30,6 @@ import {
   involves,
   nameParts,
   shownTimes,
-  summarizeRound,
   MINUTE_MS,
   roundAnnouncement,
   SECOND_MS,
@@ -774,69 +773,6 @@ describe(involves, () => {
   it("counts a chat as its sender's", () => {
     expect(involves(said("Ada", "hi Bo"), "Ada")).toBeTruthy();
     expect(involves(said("Ada", "hi Bo"), "Bo")).toBeFalsy();
-  });
-});
-
-const roundOver = (scores: [LogPlayer, number][]) =>
-  logEntry("Round 1 is over.", {
-    scores: scores.map(([player, points]) => ({ ...player, points })),
-  });
-
-describe(summarizeRound, () => {
-  it("names the round's top score, then Flip 7s and busts", () => {
-    expect(
-      summarizeRound([
-        logEntry("Bo was dealt a duplicate 5 and busted.", {
-          about: [{ ...bo, offset: 0 }],
-          cue: "bust",
-        }),
-        said("Bo", "ugh"),
-        logEntry("Cy earned the Flip 7 bonus!", {
-          about: [{ ...cy, offset: 0 }],
-          cue: "flipSeven",
-        }),
-        logEntry("Ada was dealt a duplicate 9 and busted.", {
-          about: [{ ...ada, offset: 0 }],
-          cue: "bust",
-        }),
-        roundOver([
-          [ada, 0],
-          [bo, 0],
-          [cy, 40],
-        ]),
-      ])
-    ).toStrictEqual(["Cy +40", "Cy flipped 7", "2 busts"]);
-  });
-
-  it("credits a Flip 7 player's score, which no bank line shows", () => {
-    expect(
-      summarizeRound([
-        logEntry("Bo stayed and banked 8 points.", {
-          about: [{ ...bo, offset: 0 }],
-          cue: "bank",
-        }),
-        logEntry("Ada earned the Flip 7 bonus!", {
-          about: [{ ...ada, offset: 0 }],
-          cue: "flipSeven",
-        }),
-        roundOver([
-          [ada, 23],
-          [bo, 8],
-        ]),
-      ])
-    ).toStrictEqual(["Ada +23", "Ada flipped 7"]);
-  });
-
-  it("sums up a round the engine played to a Flip 7", () => {
-    expect(summarizeRound(scenarios.flipSeven())).toStrictEqual([
-      expect.stringMatching(/^Ada \+\d+$/u),
-      "Ada flipped 7",
-    ]);
-  });
-
-  it("says nothing for a round without scores", () => {
-    expect(summarizeRound([logEntry("Round 1 is over.")])).toStrictEqual([]);
-    expect(summarizeRound([roundOver([[ada, 0]])])).toStrictEqual([]);
   });
 });
 
