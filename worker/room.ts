@@ -90,6 +90,10 @@ export class GameRoom extends Server<Env> {
     );
     void ctx.blockConcurrencyWhile(async () => {
       this.stored = await this.store.load();
+
+      if (!this.stored) {
+        this.closeRoomConnections();
+      }
     });
   }
 
@@ -211,10 +215,14 @@ export class GameRoom extends Server<Env> {
     deliver(outcome, this.transport(frameOf, outcome.expired, sender));
 
     if (outcome.expired) {
-      for (const connection of this.getConnections()) {
-        if (connection.readyState === WebSocket.OPEN) {
-          connection.close(ROOM_MISSING_CLOSE_CODE, "Room closed");
-        }
+      this.closeRoomConnections();
+    }
+  }
+
+  private closeRoomConnections() {
+    for (const connection of this.getConnections()) {
+      if (connection.readyState === WebSocket.OPEN) {
+        connection.close(ROOM_MISSING_CLOSE_CODE, "Room closed");
       }
     }
   }

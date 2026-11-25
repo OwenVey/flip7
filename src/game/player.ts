@@ -1,12 +1,15 @@
 import type { Card, RoundScore } from "./cards";
 
-export type RoundStatus =
-  | "out"
-  | "active"
-  | "stayed"
-  | "frozen"
-  | "busted"
-  | "flipSeven";
+export const ROUND_STATUSES = [
+  "out",
+  "active",
+  "stayed",
+  "frozen",
+  "busted",
+  "flipSeven",
+] as const;
+
+export type RoundStatus = (typeof ROUND_STATUSES)[number];
 
 export interface Player {
   id: string;

@@ -1,12 +1,16 @@
 import { isDeepStrictEqual } from "node:util";
 
+import { getDotPath, safeParse } from "valibot";
+
 import type { StoredRoom } from "../src/game/room";
+import { StoredRoomSchema } from "./stored-room-schema";
 
 const ROOM_KEY = "room";
 
 /** The part of Durable Object storage the room uses. */
 export interface RoomStorage {
-  get: (key: string) => Promise<StoredRoom | undefined>;
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- Storage values are untrusted until load parses them.
+  get: (key: string) => Promise<unknown>;
   put: (key: string, value: StoredRoom) => Promise<void>;
   deleteAll: () => Promise<void>;
   getAlarm: () => Promise<number | null>;
@@ -24,15 +28,45 @@ export const createRoomStore = (storage: RoomStorage) => {
 
   return {
     async load() {
-      const [room, alarm] = await Promise.all([
+      const [record, alarm] = await Promise.all([
         storage.get(ROOM_KEY),
         storage.getAlarm(),
       ]);
 
-      savedSnapshot = room ? structuredClone(room) : null;
       pendingAlarm = alarm;
 
-      return room ?? null;
+      const result = safeParse(StoredRoomSchema, record, { abortEarly: true });
+
+      if (!result.success) {
+        if (record !== undefined) {
+          const [issue] = result.issues;
+
+          const [root, child] = issue.path ?? [];
+          const recordKey = root?.key;
+
+          const field =
+            child && (recordKey === "tokens" || recordKey === "lastRequests")
+              ? `${recordKey}.*`
+              : getDotPath(issue);
+
+          console.warn({
+            event: "stored_room_rejected",
+            field: field ?? "room",
+            validation: issue.type,
+          });
+
+          await storage.deleteAll();
+          pendingAlarm = null;
+        }
+
+        savedSnapshot = null;
+
+        return null;
+      }
+
+      savedSnapshot = structuredClone(result.output);
+
+      return result.output;
     },
 
     async refreshAlarm() {

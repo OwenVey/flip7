@@ -149,41 +149,59 @@ const cardFields = { id: nonNegativeInteger };
 
 const HeldActionKindSchema = v.picklist(HELD_ACTION_KINDS);
 
-const HeldActionCardSchema = v.object({
+export const HeldActionCardSchema = v.object({
   ...cardFields,
   kind: HeldActionKindSchema,
 });
 
-const CardSchema = v.union([
+const SecondChanceCardSchema = v.object({
+  ...cardFields,
+  kind: v.literal("secondChance"),
+});
+
+export const ActionCardSchema = v.union([
   HeldActionCardSchema,
-  v.object({ ...cardFields, kind: v.picklist(["double", "secondChance"]) }),
+  SecondChanceCardSchema,
+]);
+
+export const CardSchema = v.union([
+  ActionCardSchema,
+  v.object({ ...cardFields, kind: v.literal("double") }),
   v.object({
     ...cardFields,
-    kind: v.picklist(["number", "modifier"]),
+    kind: v.literal("number"),
+    value: nonNegativeInteger,
+  }),
+  v.object({
+    ...cardFields,
+    kind: v.literal("modifier"),
     value: nonNegativeInteger,
   }),
 ]);
 
-const DealEventSchema: v.GenericSchema<unknown, DealEvent> = v.variant("type", [
-  v.object({
-    card: CardSchema,
-    flip: v.nullable(
-      v.object({ index: nonNegativeInteger, total: nonNegativeInteger })
-    ),
-    hit: v.optional(v.literal(true)),
-    outcome: v.picklist(DRAW_OUTCOMES),
-    playerId: v.string(),
-    seq: nonNegativeInteger,
-    type: v.literal("draw"),
-  }),
-  v.object({
-    card: HeldActionCardSchema,
-    outcome: v.picklist(["played", "discarded"]),
-    seq: nonNegativeInteger,
-    targetId: v.string(),
-    type: v.literal("heldAction"),
-  }),
-]);
+export const DealEventSchema: v.GenericSchema<unknown, DealEvent> = v.variant(
+  "type",
+  [
+    v.object({
+      card: CardSchema,
+      flip: v.nullable(
+        v.object({ index: nonNegativeInteger, total: nonNegativeInteger })
+      ),
+      hit: v.optional(v.literal(true)),
+      outcome: v.picklist(DRAW_OUTCOMES),
+      playerId: v.string(),
+      seq: nonNegativeInteger,
+      type: v.literal("draw"),
+    }),
+    v.object({
+      card: HeldActionCardSchema,
+      outcome: v.picklist(["played", "discarded"]),
+      seq: nonNegativeInteger,
+      targetId: v.string(),
+      type: v.literal("heldAction"),
+    }),
+  ]
+);
 
 const DealHistoryUpdateSchema = v.object({
   ...ListUpdateSchema.entries,
@@ -304,7 +322,7 @@ const logEntryFields = {
   round: nonNegativeInteger,
 };
 
-const LogEntrySchema: v.GenericSchema<unknown, LogEntry> = v.union([
+export const LogEntrySchema: v.GenericSchema<unknown, LogEntry> = v.union([
   v.object({
     ...logEntryFields,
     from: v.object({
