@@ -258,6 +258,37 @@ describe("<GameLog />", () => {
     expect(toggle).toHaveAttribute("aria-controls", panel?.id);
   });
 
+  it("stays on an unfolded round instead of following the end", () => {
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
+    });
+
+    try {
+      render(() => (
+        <GameLog log={twoRounds()} playerId="a" players={players} typing={[]} />
+      ));
+
+      const viewport = screen.getByRole("log");
+      const area = viewport.closest('[data-slot="scroll-area"]');
+
+      expect(area).toHaveAttribute("data-sticking");
+
+      Object.defineProperties(viewport, {
+        clientHeight: { value: 200 },
+        scrollHeight: { value: 500 },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Round 1" }));
+      flush();
+      vi.advanceTimersToNextFrame();
+      flush();
+
+      expect(area).not.toHaveAttribute("data-sticking");
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
   it("makes the last round foldable as soon as it finishes", () => {
     const [log, setLog] = createSignal(twoRounds());
 

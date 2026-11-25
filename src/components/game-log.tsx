@@ -399,6 +399,7 @@ const LogRound = (props: {
   playerId: string | null;
   newFrom: number | undefined;
   now: number;
+  onUnfold: () => void;
 }) => {
   const spotlight = useContext(SpotlightContext);
   const [open, setOpen] = createSignal(false);
@@ -499,6 +500,10 @@ const LogRound = (props: {
       class="log-group"
       open={!collapsed()}
       onOpenChange={(next) => {
+        if (next) {
+          props.onUnfold();
+        }
+
         setOpen(next);
       }}
     >
@@ -595,6 +600,25 @@ export const ChatLog = (
 
   const scroll = createScrollAreaController();
 
+  const [followsEnd, setFollowsEnd] = createSignal(true);
+  let viewport: HTMLElement | undefined;
+
+  const stayAboveUnfoldedRound = () => {
+    if (!scroll.isSticking()) {
+      return;
+    }
+
+    setFollowsEnd(false);
+    requestAnimationFrame(() => {
+      if (
+        viewport !== undefined &&
+        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 1
+      ) {
+        setFollowsEnd(true);
+      }
+    });
+  };
+
   const [spotlit, setSpotlit] = createSignal<LogPlayer | null>(null);
 
   const spotlitIds = createProjection<Partial<Record<string, true>>>(() => {
@@ -655,6 +679,7 @@ export const ChatLog = (
             const option = LOG_FILTERS.find((candidate) => candidate === next);
 
             if (option !== undefined) {
+              setFollowsEnd(true);
               scroll.scrollToEnd({ behavior: "instant" });
               props.reads.setFilter(option);
             }
@@ -684,10 +709,19 @@ export const ChatLog = (
         <ScrollArea
           class="log-body scroll-fades"
           type="auto"
-          stickToEnd
+          stickToEnd={followsEnd()}
           controller={scroll}
         >
           {(state) => {
+            createEffect(
+              () => state.atEnd,
+              (atEnd) => {
+                if (atEnd) {
+                  setFollowsEnd(true);
+                }
+              }
+            );
+
             createEffect(
               () => ({ atEnd: state.atEnd, following: state.sticking }),
               (position) => {
@@ -698,6 +732,9 @@ export const ChatLog = (
             return (
               <>
                 <ScrollAreaViewport
+                  ref={(element) => {
+                    viewport = element;
+                  }}
                   class="log-scroll"
                   role="log"
                   aria-label={CHAT_AND_GAME_LOG_TITLE}
@@ -726,6 +763,7 @@ export const ChatLog = (
                             playerId={props.reads.playerId()}
                             newFrom={props.reads.newFrom()}
                             now={now()}
+                            onUnfold={stayAboveUnfoldedRound}
                           />
                         )}
                       </For>
