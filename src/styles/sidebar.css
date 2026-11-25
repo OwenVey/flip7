@@ -38,7 +38,7 @@
     background: var(--gold-soft);
 
     & > :first-child {
-      box-shadow: inset 4px 0 0 var(--gold);
+      box-shadow: inset 6px 0 0 var(--gold);
     }
   }
 
