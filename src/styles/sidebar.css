@@ -33,7 +33,7 @@
     }
   }
 
-  /* Your own row, tinted like your seat and marked with a gold bar framed in the row rule color so it stays distinct on medal rows. */
+  /* Your own row, tinted like your seat and enclosed in the row rule color with a framed gold bar on the left so it stays distinct on medal rows. */
   & tr[data-me] {
     background: var(--gold-soft);
 
@@ -42,6 +42,10 @@
         inset 1px 0 0 var(--gold-deep),
         inset 5px 0 0 var(--gold),
         inset 6px 0 0 var(--gold-deep);
+    }
+
+    & > :last-child {
+      box-shadow: inset -1px 0 0 var(--gold-deep);
     }
   }
 
