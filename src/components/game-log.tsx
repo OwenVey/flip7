@@ -38,8 +38,10 @@ import {
   SegmentedControlItem,
 } from "@ui-sdk/solid/segmented-control";
 import {
+  createContext,
   createEffect,
   createMemo,
+  createProjection,
   createSignal,
   createUniqueId,
   For,
@@ -47,6 +49,7 @@ import {
   Show,
   Switch,
   untrack,
+  useContext,
 } from "solid-js";
 
 import { CHAT_MAX_LENGTH } from "../game/engine";
@@ -58,6 +61,7 @@ import {
   eventDetailsWithMentions,
   groupLog,
   HOUR_MS,
+  involvedIds,
   involves,
   localTime,
   MINUTE_MS,
@@ -157,20 +161,35 @@ const ClockMinute = (props: { at: number | null; class?: string }) => {
 };
 
 interface Spotlight {
-  player: LogPlayer | null;
+  has: (playerId: string) => boolean;
   toggle: (player: LogPlayer) => void;
 }
+
+const SpotlightContext = createContext<Spotlight>();
+
+const PlayerName = (props: { player: LogPlayer; class?: string }) => {
+  const spotlight = useContext(SpotlightContext);
+
+  return (
+    <button
+      type="button"
+      class={["log-name", props.class]}
+      aria-pressed={spotlight.has(props.player.id) ? "true" : "false"}
+      onClick={() => {
+        spotlight.toggle(props.player);
+      }}
+    >
+      {props.player.name}
+    </button>
+  );
+};
 
 const samePart = (a: NamePart, b: NamePart) =>
   "text" in a
     ? "text" in b && a.text === b.text
     : "player" in b && a.player.id === b.player.id;
 
-const Named = (props: {
-  text: string;
-  players: readonly LogPlayer[];
-  spotlight: Spotlight;
-}) => {
+const Named = (props: { text: string; players: readonly LogPlayer[] }) => {
   const parts = createMemo(() => nameParts(props.text, props.players), {
     equals: (a, b) =>
       a.length === b.length &&
@@ -184,22 +203,7 @@ const Named = (props: {
   return (
     <For each={parts()}>
       {(part) =>
-        "text" in part ? (
-          part.text
-        ) : (
-          <button
-            type="button"
-            class="log-name"
-            aria-pressed={
-              props.spotlight.player?.id === part.player.id ? "true" : "false"
-            }
-            onClick={() => {
-              props.spotlight.toggle(part.player);
-            }}
-          >
-            {part.player.name}
-          </button>
-        )
+        "text" in part ? part.text : <PlayerName player={part.player} />
       }
     </For>
   );
@@ -208,16 +212,9 @@ const Named = (props: {
 const Detail = (props: {
   detail: EventDetail;
   players: readonly LogPlayer[];
-  spotlight: Spotlight;
 }) => (
   <Switch
-    fallback={
-      <Named
-        text={detailText(props.detail)}
-        players={props.players}
-        spotlight={props.spotlight}
-      />
-    }
+    fallback={<Named text={detailText(props.detail)} players={props.players} />}
   >
     <Match when={props.detail.kind === "card" ? props.detail : undefined}>
       {(card) => (
@@ -251,7 +248,6 @@ const GameEvent = (props: {
   previous: LogEntry | undefined;
   showTime: boolean;
   now: number;
-  spotlight: Spotlight;
 }) => {
   const copy = createMemo(
     () => eventDetailsWithMentions(props.entry, props.hasRoundHeading),
@@ -291,11 +287,7 @@ const GameEvent = (props: {
         <Icon class="log-event-icon" aria-hidden="true" size={13} />
         <span class="log-event-text">
           <span class="log-outcome">
-            <Named
-              text={copy().outcome}
-              players={props.entry.about}
-              spotlight={props.spotlight}
-            />
+            <Named text={copy().outcome} players={props.entry.about} />
           </span>
           <For each={copy().details} keyed={(detail) => detailText(detail)}>
             {(detail) => (
@@ -303,11 +295,7 @@ const GameEvent = (props: {
                 {" "}
                 <span class="log-detail">
                   <Show when={detail().kind !== "points"}>{"·\u00A0"}</Show>
-                  <Detail
-                    detail={detail()}
-                    players={props.entry.about}
-                    spotlight={props.spotlight}
-                  />
+                  <Detail detail={detail()} players={props.entry.about} />
                 </span>
               </>
             )}
@@ -326,25 +314,13 @@ const ChatMessage = (props: {
   entry: LogEntry;
   continuation: boolean;
   now: number;
-  spotlight: Spotlight;
 }) => (
   <>
     <Show when={!props.continuation}>
       <div class="log-message-header">
         <span class="log-author-line">
           <PlayerAvatar player={props.author} size="sm" />
-          <button
-            type="button"
-            class="log-name log-author"
-            aria-pressed={
-              props.spotlight.player?.id === props.author.id ? "true" : "false"
-            }
-            onClick={() => {
-              props.spotlight.toggle(props.author);
-            }}
-          >
-            {props.author.name}
-          </button>
+          <PlayerName player={props.author} class="log-author" />
         </span>
         <LogTime at={props.entry.at} now={props.now} />
       </div>
@@ -443,9 +419,9 @@ const LogRound = (props: {
   collapsible: boolean;
   playerId: string | null;
   newFrom: number | undefined;
-  spotlight: Spotlight;
   now: number;
 }) => {
+  const spotlight = useContext(SpotlightContext);
   const [open, setOpen] = createSignal(false);
   const collapsed = () => props.collapsible && !open();
 
@@ -497,11 +473,9 @@ const LogRound = (props: {
           );
         });
 
-        const spotlit = createMemo(() => {
-          const { player } = props.spotlight;
-
-          return player !== null && involves(entry(), player.id);
-        });
+        const spotlit = createMemo(() =>
+          involvedIds(entry()).some((id) => spotlight.has(id))
+        );
 
         return (
           <>
@@ -527,7 +501,6 @@ const LogRound = (props: {
                     previous={previous()}
                     showTime={times().has(entry().id)}
                     now={props.now}
-                    spotlight={props.spotlight}
                   />
                 }
               >
@@ -537,7 +510,6 @@ const LogRound = (props: {
                     entry={entry()}
                     continuation={continuation()}
                     now={props.now}
-                    spotlight={props.spotlight}
                   />
                 )}
               </Show>
@@ -704,29 +676,25 @@ export default function GameLog(props: {
     }
   );
 
-  let latestWhileFollowing: number | undefined;
-
   createEffect(
     () => ({ id: latestId(), isFollowing: following() }),
-    ({ id, isFollowing }) => {
-      if (
-        isFollowing &&
-        latestWhileFollowing !== undefined &&
-        id !== latestWhileFollowing
-      ) {
+    ({ id, isFollowing }, previous) => {
+      if (isFollowing && previous?.isFollowing === true && id !== previous.id) {
         setNewFrom(undefined);
       }
-
-      latestWhileFollowing = isFollowing ? id : undefined;
     }
   );
 
   const [spotlit, setSpotlit] = createSignal<LogPlayer | null>(null);
 
+  const spotlitIds = createProjection<Record<string, true>>(() => {
+    const id = spotlit()?.id;
+
+    return id === undefined ? {} : { [id]: true };
+  }, {});
+
   const spotlight: Spotlight = {
-    get player() {
-      return spotlit();
-    },
+    has: (playerId) => spotlitIds[playerId],
     toggle: (player) => {
       setSpotlit((current) => (current?.id === player.id ? null : player));
     },
@@ -747,160 +715,161 @@ export default function GameLog(props: {
   );
 
   return (
-    <section class={props.inSheet === true ? "stack" : "panel log"}>
-      <Show when={props.inSheet !== true}>
-        <h2>
-          {CHAT_AND_GAME_LOG_TITLE}
-          <Show when={filter() !== "Game" && unreadChats() > 0}>
-            <span class="log-unread" aria-hidden="true">
-              {unreadChats()}
-            </span>
-          </Show>
-        </h2>
-        <output class="sr-only" aria-label="Unread chat messages">
-          <Show when={unreadChats() > 0}>
-            {unreadChats()} unread{" "}
-            {unreadChats() === 1 ? "message" : "messages"}
-          </Show>
-        </output>
-      </Show>
-      <SegmentedControl
-        class="log-filters"
-        aria-label="Filter activity"
-        value={filter()}
-        onValueChange={(next) => {
-          const option = FILTERS.find((candidate) => candidate === next);
-
-          if (option !== undefined) {
-            scroll.scrollToEnd({ behavior: "instant" });
-            setNewFrom(undefined);
-            setFilter(option);
-          }
-        }}
-      >
-        <SegmentedControlIndicator />
-        <For each={FILTERS}>
-          {(option) => (
-            <SegmentedControlItem
-              value={option}
-              aria-label={
-                option === "Chat" && filterChats() > 0
-                  ? `Chat, ${filterChats()} unread`
-                  : undefined
-              }
-            >
-              {option}
-              <Show when={option === "Chat" && filterChats() > 0}>
-                <span class="log-unread" aria-hidden="true">
-                  {filterChats()}
-                </span>
-              </Show>
-            </SegmentedControlItem>
-          )}
-        </For>
-      </SegmentedControl>
-      <ScrollArea
-        class="log-body scroll-fades"
-        type="auto"
-        stickToEnd
-        controller={scroll}
-      >
-        {(state) => {
-          createEffect(
-            () => state.sticking,
-            (sticking) => {
-              setFollowing(sticking);
-            }
-          );
-
-          return (
-            <>
-              <ScrollAreaViewport
-                class="log-scroll"
-                role="log"
-                aria-label={CHAT_AND_GAME_LOG_TITLE}
-              >
-                <ScrollAreaContent class="log-entries">
-                  <Show
-                    when={groups().length > 0}
-                    fallback={
-                      <p class="log-empty">{EMPTY_MESSAGE[filter()]}</p>
-                    }
-                  >
-                    <For each={groups()} keyed={(group) => group.id}>
-                      {(group) => (
-                        <LogRound
-                          group={group()}
-                          continuations={continuations()}
-                          collapsible={
-                            filter() !== "Chat" &&
-                            group().entries.some(
-                              (entry) => entry.scores !== undefined
-                            )
-                          }
-                          playerId={props.playerId}
-                          newFrom={newFrom()}
-                          spotlight={spotlight}
-                          now={now()}
-                        />
-                      )}
-                    </For>
-                  </Show>
-                </ScrollAreaContent>
-              </ScrollAreaViewport>
-              <ScrollAreaScrollbar>
-                <ScrollAreaThumb />
-              </ScrollAreaScrollbar>
-              <div class="log-jump">
-                <ScrollAreaScrollToEnd
-                  render={(jump) => (
-                    <Button {...jump} data-size="sm" data-variant="solid" />
-                  )}
-                >
-                  <ArrowDown aria-hidden="true" />
-                  Jump to latest
-                  <Show when={newEntries() > 0}> · {newEntries()} new</Show>
-                </ScrollAreaScrollToEnd>
-              </div>
-            </>
-          );
-        }}
-      </ScrollArea>
-      <div class="log-compose">
-        <Show when={spotlit()}>
-          {(player) => (
-            <p class="log-spotlight">
-              <span>
-                Highlighting <strong>{player().name}</strong>
+    <SpotlightContext value={spotlight}>
+      <section class={props.inSheet === true ? "stack" : "panel log"}>
+        <Show when={props.inSheet !== true}>
+          <h2>
+            {CHAT_AND_GAME_LOG_TITLE}
+            <Show when={filter() !== "Game" && unreadChats() > 0}>
+              <span class="log-unread" aria-hidden="true">
+                {unreadChats()}
               </span>
-              <Button
-                data-size="sm"
-                onClick={() => {
-                  setSpotlit(null);
-                }}
-              >
-                Clear
-              </Button>
-            </p>
-          )}
+            </Show>
+          </h2>
+          <output class="sr-only" aria-label="Unread chat messages">
+            <Show when={unreadChats() > 0}>
+              {unreadChats()} unread{" "}
+              {unreadChats() === 1 ? "message" : "messages"}
+            </Show>
+          </output>
         </Show>
-        <p class="log-typing" hidden={typingNames().length === 0}>
-          {typingLabel(typingNames())}
-        </p>
-        <Show
-          when={props.chat}
-          fallback={<p class="muted chat-hint">Join as a player to chat.</p>}
+        <SegmentedControl
+          class="log-filters"
+          aria-label="Filter activity"
+          value={filter()}
+          onValueChange={(next) => {
+            const option = FILTERS.find((candidate) => candidate === next);
+
+            if (option !== undefined) {
+              scroll.scrollToEnd({ behavior: "instant" });
+              setNewFrom(undefined);
+              setFilter(option);
+            }
+          }}
         >
-          {(chat) => (
-            <ChatForm
-              chat={chat()}
-              onSent={() => {
-                setNewFrom(undefined);
-              }}
-            />
-          )}
-        </Show>
-      </div>
-    </section>
+          <SegmentedControlIndicator />
+          <For each={FILTERS}>
+            {(option) => (
+              <SegmentedControlItem
+                value={option}
+                aria-label={
+                  option === "Chat" && filterChats() > 0
+                    ? `Chat, ${filterChats()} unread`
+                    : undefined
+                }
+              >
+                {option}
+                <Show when={option === "Chat" && filterChats() > 0}>
+                  <span class="log-unread" aria-hidden="true">
+                    {filterChats()}
+                  </span>
+                </Show>
+              </SegmentedControlItem>
+            )}
+          </For>
+        </SegmentedControl>
+        <ScrollArea
+          class="log-body scroll-fades"
+          type="auto"
+          stickToEnd
+          controller={scroll}
+        >
+          {(state) => {
+            createEffect(
+              () => state.sticking,
+              (sticking) => {
+                setFollowing(sticking);
+              }
+            );
+
+            return (
+              <>
+                <ScrollAreaViewport
+                  class="log-scroll"
+                  role="log"
+                  aria-label={CHAT_AND_GAME_LOG_TITLE}
+                >
+                  <ScrollAreaContent class="log-entries">
+                    <Show
+                      when={groups().length > 0}
+                      fallback={
+                        <p class="log-empty">{EMPTY_MESSAGE[filter()]}</p>
+                      }
+                    >
+                      <For each={groups()} keyed={(group) => group.id}>
+                        {(group) => (
+                          <LogRound
+                            group={group()}
+                            continuations={continuations()}
+                            collapsible={
+                              filter() !== "Chat" &&
+                              group().entries.some(
+                                (entry) => entry.scores !== undefined
+                              )
+                            }
+                            playerId={props.playerId}
+                            newFrom={newFrom()}
+                            now={now()}
+                          />
+                        )}
+                      </For>
+                    </Show>
+                  </ScrollAreaContent>
+                </ScrollAreaViewport>
+                <ScrollAreaScrollbar>
+                  <ScrollAreaThumb />
+                </ScrollAreaScrollbar>
+                <div class="log-jump">
+                  <ScrollAreaScrollToEnd
+                    render={(jump) => (
+                      <Button {...jump} data-size="sm" data-variant="solid" />
+                    )}
+                  >
+                    <ArrowDown aria-hidden="true" />
+                    Jump to latest
+                    <Show when={newEntries() > 0}> · {newEntries()} new</Show>
+                  </ScrollAreaScrollToEnd>
+                </div>
+              </>
+            );
+          }}
+        </ScrollArea>
+        <div class="log-compose">
+          <Show when={spotlit()}>
+            {(player) => (
+              <p class="log-spotlight">
+                <span>
+                  Highlighting <strong>{player().name}</strong>
+                </span>
+                <Button
+                  data-size="sm"
+                  onClick={() => {
+                    setSpotlit(null);
+                  }}
+                >
+                  Clear
+                </Button>
+              </p>
+            )}
+          </Show>
+          <p class="log-typing" hidden={typingNames().length === 0}>
+            {typingLabel(typingNames())}
+          </p>
+          <Show
+            when={props.chat}
+            fallback={<p class="muted chat-hint">Join as a player to chat.</p>}
+          >
+            {(chat) => (
+              <ChatForm
+                chat={chat()}
+                onSent={() => {
+                  setNewFrom(undefined);
+                }}
+              />
+            )}
+          </Show>
+        </div>
+      </section>
+    </SpotlightContext>
   );
 }

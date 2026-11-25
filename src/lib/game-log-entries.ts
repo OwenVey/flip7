@@ -308,17 +308,21 @@ export const sameDetails = (a: EventDetails, b: EventDetails) =>
   a.icon === b.icon &&
   a.outcome === b.outcome;
 
-/** Whether an entry is about this player: a chat they sent, or an event that names them. */
+/** The players an entry is about: who sent a chat, or whom an event names. */
+export const involvedIds = (entry: LogEntry) => [
+  ...(entry.from === undefined ? [] : [entry.from.id]),
+  ...entry.about.map((player) => player.id),
+];
+
+/** Whether an entry is about this player. */
 export const involves = (entry: LogEntry, playerId: string) =>
-  entry.from?.id === playerId ||
-  entry.about.some((player) => player.id === playerId);
+  involvedIds(entry).includes(playerId);
 
 export type NamePart = { text: string } | { player: LogPlayer };
 
 const mentionToken = /\uE000(?<index>\d+)\uE000/gu;
 
 /** Keeps name positions through copy rules that can move mentions into a detail. */
-
 export const eventDetailsWithMentions = (
   entry: LogEntry,
   hasRoundHeading: boolean

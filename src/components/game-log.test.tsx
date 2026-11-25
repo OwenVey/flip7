@@ -506,10 +506,27 @@ describe("<GameLog />", () => {
       "Ben stayed +30 points",
     ]);
 
+    const [anaName] = screen.getAllByRole("button", { name: "Ana" });
+    fireEvent.click(anaName);
+    flush();
+
+    expect({
+      ana: anaName.getAttribute("aria-pressed"),
+      ben: benName.getAttribute("aria-pressed"),
+      spotlit: rowTexts("spotlit"),
+    }).toStrictEqual({
+      ana: "true",
+      ben: "false",
+      spotlit: ["Ana stayed +12 points", "Ana deals."],
+    });
+
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
     flush();
 
-    expect(screen.queryByText("Highlighting")).toBeNull();
+    expect({
+      highlighting: screen.queryByText("Highlighting"),
+      spotlit: rowTexts("spotlit"),
+    }).toStrictEqual({ highlighting: null, spotlit: [] });
   });
 
   it("highlights a player's lines when their chat name is tapped", () => {
