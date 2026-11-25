@@ -97,11 +97,13 @@ export interface RoomDeps {
 /**
  * Something the transport must do, in order: reply to the sender, broadcast
  * the live table to admitted connections and the join preview to visitors,
- * or close a connection. Live broadcasts carry new list entries only.
+ * relay a passing message to every other admitted connection, or close a
+ * connection. Live broadcasts carry new list entries only.
  */
 export type RoomEffect =
   | { type: "reply"; message: ServerMessage }
   | { type: "broadcast"; message: ServerMessage; preview: PreviewMessage }
+  | { type: "relay"; message: ServerMessage; except: string }
   | { type: "close"; connectionId: string; code: number; reason: string };
 
 type PlannedEffect =
@@ -123,6 +125,7 @@ export interface RoomOutcome {
 export interface RoomTransport {
   reply: (message: ServerMessage) => void;
   broadcast: (message: ServerMessage, preview: PreviewMessage) => void;
+  relay: (message: ServerMessage, except: string) => void;
   close: (connectionId: string, code: number, reason: string) => void;
 }
 
@@ -137,6 +140,11 @@ export const deliver = (outcome: RoomOutcome, transport: RoomTransport) => {
 
       case "broadcast": {
         transport.broadcast(effect.message, effect.preview);
+        break;
+      }
+
+      case "relay": {
+        transport.relay(effect.message, effect.except);
         break;
       }
 
@@ -538,6 +546,22 @@ export const createRoom = (
 
           return [BROADCAST];
         })
+      );
+    },
+
+    typing: (connectionId: string) => {
+      const playerId = seatOf(connectionId)?.playerId;
+
+      return finish(
+        playerId !== undefined && findPlayer(game, playerId)
+          ? [
+              {
+                except: connectionId,
+                message: { playerId, type: "typing" },
+                type: "relay",
+              },
+            ]
+          : []
       );
     },
 

@@ -39,6 +39,9 @@ export default function Table(
     DealProps &
     RoundPointsByPlayer & {
       chat: RoomConnection["chat"];
+      /** Other players typing a chat message, by player ID. */
+      typing?: readonly string[];
+      onTyping?: () => void;
       /**
        * The room as last confirmed, ahead of deal playback. Settings read it so
        * a change shows as soon as the room accepts it, not after the deal.
@@ -141,6 +144,9 @@ export default function Table(
               log={props.room.log}
               playerId={props.playerId}
               onChat={props.playerId === null ? undefined : props.chat}
+              players={props.room.players}
+              typing={props.typing}
+              onTyping={props.playerId === null ? undefined : props.onTyping}
             />
             <InviteButton brief collapsible />
             <Show when={moves().host.configure}>
@@ -235,6 +241,9 @@ export default function Table(
               log={props.room.log}
               playerId={props.playerId}
               onChat={props.playerId === null ? undefined : props.chat}
+              players={props.room.players}
+              typing={props.typing}
+              onTyping={props.playerId === null ? undefined : props.onTyping}
             />
           </div>
         </div>

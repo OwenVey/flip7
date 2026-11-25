@@ -311,6 +311,52 @@
   }
 }
 
+.log-spotlight {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0.25rem 0.25rem 0.25rem 0.75rem;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-md);
+  background: var(--gold-soft);
+  color: var(--ink);
+  font-size: var(--text-xs);
+}
+
+/* Highlighting a player dims every other line, so theirs stand out. */
+:is(.log, .stack):has(.log-spotlight)
+  .log-group
+  li:not([data-spotlit], .log-new) {
+  opacity: 0.4;
+}
+
+.log-compose {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.log-typing {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-style: italic;
+}
+
+.chat-count {
+  grid-column: 1;
+  justify-self: end;
+  color: var(--ink-soft);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+
+  &[data-full] {
+    color: var(--danger);
+    font-weight: 600;
+  }
+}
+
 .chat-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -339,6 +385,39 @@
     justify-content: space-between;
     padding-block: 0.375rem 0.125rem;
     border-block-start: 1px solid var(--gold-deep);
+  }
+
+  & .log-round-toggle {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: var(--tracking-wider);
+    text-transform: inherit;
+    cursor: pointer;
+
+    & svg {
+      transition: rotate var(--duration-fast) ease-out;
+    }
+
+    &[aria-expanded="true"] svg {
+      rotate: 90deg;
+    }
+
+    &:hover {
+      color: var(--ink);
+    }
+  }
+
+  & .log-round-summary {
+    flex: 1;
+    min-inline-size: 0;
+    color: var(--ink-soft);
+    font-size: var(--text-xs);
   }
 
   & h3 {
@@ -409,6 +488,88 @@
 
   & .log-event-text {
     grid-column: 2;
+  }
+
+  & li[data-mine] {
+    margin-inline: -0.375rem;
+    padding-inline: 0.375rem;
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklab, var(--gold) 22%, transparent);
+  }
+
+  & li:not(.log-new) {
+    transition: opacity var(--duration-fast) ease-out;
+  }
+
+  & .log-new {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0;
+    color: var(--danger);
+    font-size: var(--text-2xs);
+    font-weight: 800;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+
+    &::before,
+    &::after {
+      flex: 1;
+      block-size: 1px;
+      background: currentcolor;
+      content: "";
+    }
+  }
+
+  & .log-name {
+    padding: 0;
+    border: 0;
+    border-radius: 0.125rem;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline dotted
+      color-mix(in oklab, currentcolor 40%, transparent);
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration-color: currentcolor;
+    }
+
+    &[aria-pressed="true"] {
+      background: var(--gold);
+      box-shadow: 0 0 0 0.125rem var(--gold);
+      color: var(--ink);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ui-ring-border);
+      outline-offset: 1px;
+    }
+  }
+
+  & .log-card {
+    display: inline-block;
+    min-inline-size: 1.25rem;
+    padding-inline: 0.25rem;
+    border: 1px solid var(--chip-color);
+    border-radius: 0.25rem;
+    background: var(--paper-light);
+    color: color-mix(in oklab, var(--chip-color) 60%, var(--ink));
+    font-family: var(--font-numeral);
+    font-weight: 900;
+    line-height: var(--leading-tight);
+    text-align: center;
+  }
+
+  & .log-points {
+    padding-inline: 0.25rem;
+    border-radius: var(--radius-full);
+    background: color-mix(in oklab, var(--success) 14%, transparent);
+    color: var(--success);
+    font-family: var(--font-numeral);
+    font-weight: 900;
   }
 
   & .log-detail {

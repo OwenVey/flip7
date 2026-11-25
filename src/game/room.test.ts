@@ -327,6 +327,24 @@ describe("commands", () => {
       { message: "Join the room first.", type: "error" },
     ]);
   });
+
+  it("relays a seated player's typing to everyone else without changing the room", () => {
+    const h = harness();
+    const ana = joinAs(h, "ana-tab", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+    h.connect("lurker");
+    const before = structuredClone(h.stored);
+
+    expect(h.room.typing("ana-tab").effects).toStrictEqual([
+      {
+        except: "ana-tab",
+        message: { playerId: ana.playerId, type: "typing" },
+        type: "relay",
+      },
+    ]);
+    expect(h.room.typing("lurker").effects).toStrictEqual([]);
+    expect(h.stored).toStrictEqual(before);
+  });
 });
 
 describe("evicting a player", () => {

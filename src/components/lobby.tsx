@@ -75,6 +75,9 @@ export default function Lobby(props: {
   playerId: string | null;
   send: RoomConnection["send"];
   chat: RoomConnection["chat"];
+  /** Other players typing a chat message, by player ID. */
+  typing?: readonly string[];
+  onTyping?: () => void;
   actionsDisabled?: boolean;
   /** A Spectator's Join and Leave, shown where a player's Leave goes. */
   spectator?: Spectator;
@@ -126,6 +129,9 @@ export default function Lobby(props: {
             log={props.room.log}
             playerId={props.playerId}
             onChat={props.playerId === null ? undefined : props.chat}
+            players={props.room.players}
+            typing={props.typing}
+            onTyping={props.playerId === null ? undefined : props.onTyping}
           />
           <Show
             when={props.playerId !== null}
@@ -305,6 +311,9 @@ export default function Lobby(props: {
           log={props.room.log}
           playerId={props.playerId}
           onChat={props.playerId === null ? undefined : props.chat}
+          players={props.room.players}
+          typing={props.typing}
+          onTyping={props.playerId === null ? undefined : props.onTyping}
         />
       </div>
     </div>

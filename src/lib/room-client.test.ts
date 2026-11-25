@@ -8,7 +8,11 @@ import { ROOM_REMOVED_CLOSE_CODE } from "../game/protocol";
 import type { ServerMessage } from "../game/protocol";
 import { createRoom, deliver, newStoredRoom } from "../game/room";
 import type { Admission, RoomOutcome, Seats } from "../game/room";
-import { createRoomClient } from "./room-client";
+import {
+  createRoomClient,
+  TYPING_SEND_MS,
+  TYPING_SHOWN_MS,
+} from "./room-client";
 import type { RoomClientDeps } from "./room-client";
 
 const START = 1_000_000;
@@ -82,6 +86,17 @@ const network = () => {
         connections.delete(connectionId);
         links.get(connectionId)?.toClient.push({ closeCode: code });
       },
+      relay: (message, except) => {
+        for (const link of links.values()) {
+          if (
+            link.open &&
+            link.id !== except &&
+            connections.get(link.id)?.admission
+          ) {
+            link.toClient.push(message);
+          }
+        }
+      },
       reply: (message) => {
         sender?.toClient.push(message);
       },
@@ -102,6 +117,8 @@ const network = () => {
       );
     } else if (message.type === "chat") {
       carryOut(room.chat(link.id, message.text), link);
+    } else if (message.type === "typing") {
+      carryOut(room.typing(link.id), link);
     } else if (message.type === "sync") {
       syncs.push(link.id);
       link.toClient.push(room.viewFor(link.id));
@@ -350,6 +367,68 @@ const logIds = (player: TestPlayer) =>
 
 const serverLogIds = (net: ReturnType<typeof network>) =>
   net.stored.game.log.map((entry) => entry.id);
+
+describe("typing through the room client", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows a player typing to everyone else until they send", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+
+    ana.client.typing();
+    net.flush();
+
+    expect(ben.client.state.typing).toStrictEqual([ana.client.state.playerId]);
+    expect(ana.client.state.typing).toStrictEqual([]);
+
+    ana.client.chat("hi");
+    net.flush();
+
+    expect(ben.client.state.typing).toStrictEqual([]);
+  });
+
+  it("stops showing a player typing when they go quiet", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+
+    ana.client.typing();
+    net.flush();
+    vi.advanceTimersByTime(TYPING_SHOWN_MS);
+
+    expect(ben.client.state.typing).toStrictEqual([]);
+  });
+
+  it("sends typing at most once every few seconds, and again after a send", () => {
+    const net = network();
+    const ana = net.join("Ana");
+
+    const sent = () =>
+      ana.link?.toServer.filter((frame) => frame.includes('"typing"')).length;
+
+    ana.client.typing();
+    ana.client.typing();
+
+    expect(sent()).toBe(1);
+
+    vi.advanceTimersByTime(TYPING_SEND_MS);
+    ana.client.typing();
+
+    expect(sent()).toBe(2);
+
+    ana.client.chat("hi");
+    ana.client.typing();
+
+    expect(sent()).toBe(3);
+  });
+});
 
 describe("the log through the room client", () => {
   beforeEach(() => {

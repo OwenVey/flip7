@@ -245,6 +245,8 @@ export const createRoomConnection = (code: string) => {
     savedName,
     send: client.send,
     status: createMemo(() => state().status),
+    typing: createMemo(() => state().typing),
+    sendTyping: client.typing,
     stopWatching: client.stopWatching,
     syncId: createMemo(() => state().syncId),
     watch: client.watch,

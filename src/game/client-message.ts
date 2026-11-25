@@ -52,6 +52,7 @@ const ClientMessageSchema = v.variant("type", [
     text: v.pipe(v.string(), v.maxLength(2000)),
     type: v.literal("chat"),
   }),
+  v.object({ type: v.literal("typing") }),
   v.object({ type: v.literal("sync") }),
   v.object({ type: v.literal("watch") }),
   v.object({ type: v.literal("watchInstead") }),
@@ -63,7 +64,14 @@ export type ClientMessage = v.InferOutput<typeof ClientMessageSchema>;
 export type GameCommand = Exclude<
   ClientMessage,
   {
-    type: "chat" | "join" | "stopWatching" | "sync" | "watch" | "watchInstead";
+    type:
+      | "chat"
+      | "join"
+      | "stopWatching"
+      | "sync"
+      | "typing"
+      | "watch"
+      | "watchInstead";
   }
 >;
 

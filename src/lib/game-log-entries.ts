@@ -1,4 +1,5 @@
 import type { LogEntry } from "../game/engine";
+import { sameName } from "../game/names";
 
 export const SECOND_MS = 1000;
 export const MINUTE_MS = 60 * SECOND_MS;
@@ -90,21 +91,32 @@ const cueIcons = {
   special: "playing-cards",
 } satisfies Record<Cue, EventIconKey>;
 
-type EventRule = [RegExp, string, (readonly string[])?, EventIconKey?];
+/** A detail template: plain text, a number card with a label, or banked points. */
+type DetailSpec =
+  | { text: string }
+  | { card: string; label: string }
+  | { points: string };
+
+type EventRule = [RegExp, string, (readonly DetailSpec[])?, EventIconKey?];
+
+export type EventDetail =
+  | { kind: "text"; text: string }
+  | { kind: "card"; label: string; number: number }
+  | { kind: "points"; points: number };
 
 export const eventCopy = {
   bank: [
     [
       /^(?<player>.+) stayed and banked (?<points>\d+) points?\.$/u,
       "$<player> stayed",
-      ["+$<points> pts"],
+      [{ points: "$<points>" }],
     ],
   ],
   bust: [
     [
       /^(?<player>.+) was dealt a duplicate (?<card>\d+) and busted\.$/u,
       "$<player> busted",
-      ["duplicate $<card>"],
+      [{ card: "$<card>", label: "duplicate" }],
     ],
   ],
   flipSeven: [
@@ -114,40 +126,45 @@ export const eventCopy = {
     [
       /^(?<player>.+) played Freeze on themselves and banked (?<points>\d+) points?\.$/u,
       "$<player> froze themselves",
-      ["+$<points> pts"],
+      [{ points: "$<points>" }],
     ],
     [
       /^(?<player>.+) played Freeze on (?<target>.+), who banked (?<points>\d+) points?\.$/u,
       "$<target> was frozen",
-      ["+$<points> pts", "by $<player>"],
+      [{ points: "$<points>" }, { text: "by $<player>" }],
     ],
   ],
   special: [
     [
       /^(?<player>.+) discarded Second Chance and a duplicate (?<card>\d+)\.$/u,
       "$<player> used Second Chance",
-      ["duplicate $<card>"],
+      [{ card: "$<card>", label: "duplicate" }],
       "heart",
     ],
     [
       /^(?<player>.+) played Flip Three on (?<target>.+)\.$/u,
       "$<target> must flip three",
-      ["from $<player>"],
+      [{ text: "from $<player>" }],
       "playing-cards-fan",
     ],
     [
       /^(?<player>.+) assigned (?<card>Flip Three|Freeze) to (?<target>.+)\.$/u,
       "$<player> assigned $<card>",
-      ["to $<target>"],
+      [{ text: "to $<target>" }],
       "arrow-right",
     ],
     [
       /^(?<player>.+) gave a Second Chance to (?<target>.+)\.$/u,
       "$<target> got Second Chance",
-      ["from $<player>"],
+      [{ text: "from $<player>" }],
       "heart",
     ],
-    [/^.+ must flip three cards\.$/u, "$&", undefined, "playing-cards-fan"],
+    [
+      /^(?<player>.+) must flip three cards\.$/u,
+      "$&",
+      undefined,
+      "playing-cards-fan",
+    ],
     [
       /^(?<player>.+) is holding a Second Chance\.$/u,
       "$<player> got a Second Chance",
@@ -156,6 +173,56 @@ export const eventCopy = {
     ],
   ],
 } satisfies Partial<Record<Cue, EventRule[]>>;
+
+const fillDetail = (text: string, pattern: RegExp, spec: DetailSpec) => {
+  const fill = (template: string) => text.replace(pattern, template);
+
+  if ("points" in spec) {
+    return {
+      kind: "points",
+      points: Number(fill(spec.points)),
+    } satisfies EventDetail;
+  }
+
+  if ("card" in spec) {
+    return {
+      kind: "card",
+      label: spec.label,
+      number: Number(fill(spec.card)),
+    } satisfies EventDetail;
+  }
+
+  return { kind: "text", text: fill(spec.text) } satisfies EventDetail;
+};
+
+/** A detail as plain words, for a summary or a screen reader. */
+export const detailText = (detail: EventDetail) => {
+  switch (detail.kind) {
+    case "card": {
+      return `${detail.label} ${detail.number}`;
+    }
+
+    case "points": {
+      return `+${detail.points} ${detail.points === 1 ? "pt" : "pts"}`;
+    }
+
+    case "text": {
+      return detail.text;
+    }
+
+    default: {
+      return detail satisfies never;
+    }
+  }
+};
+
+const SELF = "themselves";
+
+const namedPlayers = (match: RegExpExecArray) =>
+  [match.groups?.player, match.groups?.target].filter(
+    (name, index, names): name is string =>
+      name !== undefined && name !== SELF && names.indexOf(name) === index
+  );
 
 const deckReshuffled = "The discard pile was shuffled into a new deck.";
 
@@ -180,9 +247,10 @@ export const systemCopy = new Map([
 
 interface LogEventCopy {
   announcement: boolean;
-  details: string[];
+  details: EventDetail[];
   icon: EventIconKey | undefined;
   outcome: string;
+  players: string[];
 }
 
 export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
@@ -194,6 +262,7 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
       details: [],
       icon: "playing-cards",
       outcome: entry.text.slice(roundPrefix.length),
+      players: [],
     } satisfies LogEventCopy;
   }
 
@@ -203,12 +272,17 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
   const cueIcon = entry.cue === undefined ? undefined : cueIcons[entry.cue];
 
   for (const [pattern, outcome, details = [], icon] of rules) {
-    if (pattern.test(entry.text)) {
+    const match = pattern.exec(entry.text);
+
+    if (match) {
       return {
         announcement: false,
-        details: details.map((detail) => entry.text.replace(pattern, detail)),
+        details: details.map((detail) =>
+          fillDetail(entry.text, pattern, detail)
+        ),
         icon: icon ?? cueIcon,
         outcome: entry.text.replace(pattern, outcome),
+        players: namedPlayers(match),
       } satisfies LogEventCopy;
     }
   }
@@ -225,17 +299,139 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
     details: [],
     icon,
     outcome: systemText ?? entry.text,
+    players: [],
   } satisfies LogEventCopy;
 };
 
 type EventDetails = ReturnType<typeof eventDetails>;
 
+const sameList = <T>(a: T[], b: T[], same: (x: T, y: T) => boolean) =>
+  a.length === b.length && a.every((item, index) => same(item, b[index]));
+
 export const sameDetails = (a: EventDetails, b: EventDetails) =>
   a.announcement === b.announcement &&
-  a.details.length === b.details.length &&
-  a.details.every((detail, index) => detail === b.details[index]) &&
+  sameList(a.details, b.details, (x, y) => detailText(x) === detailText(y)) &&
+  sameList(a.players, b.players, (x, y) => x === y) &&
   a.icon === b.icon &&
   a.outcome === b.outcome;
+
+/** Whether an entry is about this player: a chat they sent, or an event that names them. */
+export const involves = (entry: LogEntry, name: string) => {
+  if (entry.from !== undefined) {
+    return sameName(entry.from.name, name);
+  }
+
+  return eventDetails(entry, false).players.some((player) =>
+    sameName(player, name)
+  );
+};
+
+export type NamePart = { text: string } | { name: string };
+
+/** Splits text around the given player names, so each name can be shown on its own. */
+export const nameParts = (text: string, names: readonly string[]) => {
+  const parts: NamePart[] = [];
+  const longestFirst = [...names].toSorted((a, b) => b.length - a.length);
+  let rest = text;
+
+  while (rest !== "") {
+    let next: { at: number; name: string } | undefined;
+
+    for (const name of longestFirst) {
+      const at = rest.indexOf(name);
+
+      if (at !== -1 && (next === undefined || at < next.at)) {
+        next = { at, name };
+      }
+    }
+
+    if (next === undefined) {
+      parts.push({ text: rest });
+      break;
+    }
+
+    if (next.at > 0) {
+      parts.push({ text: rest.slice(0, next.at) });
+    }
+
+    parts.push({ name: next.name });
+    rest = rest.slice(next.at + next.name.length);
+  }
+
+  return parts;
+};
+
+const countLabel = (count: number, one: string, many: string) =>
+  `${count} ${count === 1 ? one : many}`;
+
+/** A finished round in a few words: the biggest bank, then the busts and Flip 7s. */
+export const summarizeRound = (entries: readonly LogEntry[]) => {
+  let best: { name: string; points: number } | undefined;
+  let busts = 0;
+  const flipSevens: string[] = [];
+
+  for (const entry of entries) {
+    if (entry.from !== undefined) {
+      continue;
+    }
+
+    const copy = eventDetails(entry, false);
+
+    const subject = copy.players.find((name) => copy.outcome.startsWith(name));
+
+    if (entry.cue === "bust") {
+      busts += 1;
+    }
+
+    if (entry.cue === "flipSeven" && subject !== undefined) {
+      flipSevens.push(subject);
+    }
+
+    for (const detail of copy.details) {
+      if (
+        detail.kind === "points" &&
+        subject !== undefined &&
+        (best === undefined || detail.points > best.points)
+      ) {
+        best = { name: subject, points: detail.points };
+      }
+    }
+  }
+
+  return [
+    ...(best ? [`${best.name} +${best.points}`] : []),
+    ...flipSevens.map((name) => `${name} flipped 7`),
+    ...(busts > 0 ? [countLabel(busts, "bust", "busts")] : []),
+  ];
+};
+
+/**
+ * The entries that show their time. A chat run shows it once in its header;
+ * game events show it when a minute has passed since the last time shown, or
+ * after a chat.
+ */
+export const shownTimes = (entries: readonly LogEntry[]) => {
+  const shown = new Set<number>();
+  let lastShown: number | undefined;
+  let previous: LogEntry | undefined;
+
+  for (const entry of entries) {
+    if (entry.from !== undefined) {
+      if (!continuesChat(entry, previous)) {
+        shown.add(entry.id);
+      }
+
+      lastShown = undefined;
+    } else if (lastShown === undefined || entry.at - lastShown >= MINUTE_MS) {
+      shown.add(entry.id);
+      lastShown = entry.at;
+    }
+
+    previous = entry;
+  }
+
+  return shown;
+};
 
 export const timeFormats = (locale?: string) =>
   ({

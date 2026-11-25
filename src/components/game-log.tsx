@@ -1,5 +1,6 @@
 import ArrowDown from "@lucide/solid/icons/arrow-down";
 import ArrowRight from "@lucide/solid/icons/arrow-right";
+import ChevronRight from "@lucide/solid/icons/chevron-right";
 import CircleX from "@lucide/solid/icons/circle-x";
 import Coins from "@lucide/solid/icons/coins";
 import Flame from "@lucide/solid/icons/flame";
@@ -35,26 +36,39 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  createUniqueId,
   For,
+  Match,
   Show,
+  Switch,
   untrack,
 } from "solid-js";
 
 import { CHAT_MAX_LENGTH } from "../game/engine";
 import type { LogEntry } from "../game/engine";
+import { sameName } from "../game/names";
 import {
   continuesChat,
   countChatsAfter,
+  detailText,
   eventDetails,
   groupLog,
   HOUR_MS,
+  involves,
   localTime,
   MINUTE_MS,
+  nameParts,
   sameDetails,
   SECOND_MS,
+  shownTimes,
+  summarizeRound,
   timeLabel,
 } from "../lib/game-log-entries";
-import type { EventIconKey } from "../lib/game-log-entries";
+import type {
+  EventDetail,
+  EventIconKey,
+  LogGroup,
+} from "../lib/game-log-entries";
 import PlayerAvatar from "./player-avatar";
 import Tooltip from "./tooltip";
 
@@ -136,11 +150,88 @@ const ClockMinute = (props: { at: number | null; class?: string }) => {
   );
 };
 
+interface Spotlight {
+  name: string | null;
+  toggle: (name: string) => void;
+}
+
+const Named = (props: {
+  text: string;
+  names: readonly string[];
+  spotlight: Spotlight;
+}) => (
+  <For each={nameParts(props.text, props.names)}>
+    {(part) =>
+      "text" in part ? (
+        part.text
+      ) : (
+        <button
+          type="button"
+          class="log-name"
+          aria-pressed={
+            props.spotlight.name !== null &&
+            sameName(props.spotlight.name, part.name)
+              ? "true"
+              : "false"
+          }
+          onClick={() => {
+            props.spotlight.toggle(part.name);
+          }}
+        >
+          {part.name}
+        </button>
+      )
+    }
+  </For>
+);
+
+const Detail = (props: {
+  detail: EventDetail;
+  names: readonly string[];
+  spotlight: Spotlight;
+}) => (
+  <Switch
+    fallback={
+      <Named
+        text={detailText(props.detail)}
+        names={props.names}
+        spotlight={props.spotlight}
+      />
+    }
+  >
+    <Match when={props.detail.kind === "card" ? props.detail : undefined}>
+      {(card) => (
+        <>
+          {card().label}{" "}
+          <span
+            class="log-card"
+            style={{ "--chip-color": `var(--number-${card().number})` }}
+          >
+            {card().number}
+          </span>
+        </>
+      )}
+    </Match>
+    <Match when={props.detail.kind === "points" ? props.detail : undefined}>
+      {(points) => (
+        <span class="log-points">
+          +{points().points}
+          <span class="sr-only">
+            {points().points === 1 ? " point" : " points"}
+          </span>
+        </span>
+      )}
+    </Match>
+  </Switch>
+);
+
 const GameEvent = (props: {
   entry: LogEntry;
   hasRoundHeading: boolean;
   previous: LogEntry | undefined;
+  showTime: boolean;
   now: () => number;
+  spotlight: Spotlight;
 }) => {
   const copy = createMemo(
     () => eventDetails(props.entry, props.hasRoundHeading),
@@ -179,21 +270,31 @@ const GameEvent = (props: {
       >
         <Icon class="log-event-icon" aria-hidden="true" size={13} />
         <span class="log-event-text">
-          <span class="log-outcome">{copy().outcome}</span>
-          <For each={copy().details}>
+          <span class="log-outcome">
+            <Named
+              text={copy().outcome}
+              names={copy().players}
+              spotlight={props.spotlight}
+            />
+          </span>
+          <For each={copy().details} keyed={(detail) => detailText(detail)}>
             {(detail) => (
               <>
                 {" "}
                 <span class="log-detail">
-                  {"·\u00A0"}
-                  {detail}
+                  <Show when={detail().kind !== "points"}>{"·\u00A0"}</Show>
+                  <Detail
+                    detail={detail()}
+                    names={copy().players}
+                    spotlight={props.spotlight}
+                  />
                 </span>
               </>
             )}
           </For>
         </span>
       </span>
-      <Show when={minute() === null}>
+      <Show when={minute() === null && props.showTime}>
         <LogTime at={props.entry.at} now={props.now} />
       </Show>
     </>
@@ -222,16 +323,19 @@ const ChatMessage = (props: {
       </Show>
       {props.entry.text}
     </span>
-    <Show when={props.continuation}>
-      <LogTime at={props.entry.at} now={props.now} />
-    </Show>
   </>
 );
 
-const ChatForm = (props: { onSend: (text: string) => boolean }) => {
+const CHAT_COUNT_FROM = CHAT_MAX_LENGTH - 40;
+
+const ChatForm = (props: {
+  onSend: (text: string) => boolean;
+  onTyping: (() => void) | undefined;
+}) => {
   const [text, setText] = createSignal("");
   const [failed, setFailed] = createSignal(false);
   const message = createMemo(() => text().trim());
+  const countId = createUniqueId();
 
   const submit = () => {
     const draft = message();
@@ -263,8 +367,13 @@ const ChatForm = (props: { onSend: (text: string) => boolean }) => {
         value={text()}
         onValueChange={(value) => {
           setText(value);
+
+          if (value.trim() !== "") {
+            props.onTyping?.();
+          }
         }}
         maxlength={CHAT_MAX_LENGTH}
+        aria-describedby={countId}
         autocomplete="off"
         enterkeyhint="send"
       />
@@ -286,6 +395,14 @@ const ChatForm = (props: { onSend: (text: string) => boolean }) => {
       >
         <Send size={16} aria-hidden="true" />
       </Tooltip>
+      <span
+        id={countId}
+        class="chat-count"
+        hidden={text().length < CHAT_COUNT_FROM}
+        data-full={text().length >= CHAT_MAX_LENGTH ? "" : undefined}
+      >
+        {text().length}/{CHAT_MAX_LENGTH}
+      </span>
       <output class="chat-send-status form-error">
         {failed() ? "Message not sent. Try again when reconnected." : ""}
       </output>
@@ -293,11 +410,174 @@ const ChatForm = (props: { onSend: (text: string) => boolean }) => {
   );
 };
 
+const roundKey = (entry: LogEntry | undefined) =>
+  entry === undefined ? "" : `${entry.game}:${entry.round}`;
+
+const LogRound = (props: {
+  group: LogGroup;
+  collapsible: boolean;
+  playerId: string | null;
+  myName: string | null;
+  newFrom: number | undefined;
+  spotlight: Spotlight;
+  now: () => number;
+}) => {
+  const [open, setOpen] = createSignal(false);
+  const collapsed = () => props.collapsible && !open();
+
+  const shown = createMemo(() =>
+    collapsed()
+      ? props.group.entries.filter((entry) => entry.from !== undefined)
+      : props.group.entries
+  );
+
+  const times = createMemo(() => shownTimes(shown()));
+
+  const summary = createMemo(() => {
+    if (!props.collapsible) {
+      return "";
+    }
+
+    const parts = summarizeRound(props.group.entries);
+
+    const events = props.group.entries.filter(
+      (entry) => entry.from === undefined
+    ).length;
+
+    return parts.length > 0
+      ? parts.join(" · ")
+      : `${events} ${events === 1 ? "event" : "events"}`;
+  });
+
+  return (
+    <div class="log-group">
+      <Show when={props.group.heading}>
+        {(heading) => (
+          <div class="log-round-heading">
+            <Show when={props.collapsible} fallback={<h3>{heading()}</h3>}>
+              <h3>
+                <button
+                  type="button"
+                  class="log-round-toggle"
+                  aria-expanded={open() ? "true" : "false"}
+                  onClick={() => {
+                    setOpen((previous) => !previous);
+                  }}
+                >
+                  <ChevronRight aria-hidden="true" size={12} />
+                  {heading()}
+                </button>
+              </h3>
+              <Show when={collapsed()}>
+                <span class="log-round-summary">{summary()}</span>
+              </Show>
+            </Show>
+            <ClockMinute
+              at={oldGameMinute(props.group.entries[0], props.now)}
+            />
+          </div>
+        )}
+      </Show>
+      <Show when={shown().length > 0}>
+        <ol>
+          <For each={shown()} keyed={(entry) => entry.id}>
+            {(entry, index) => {
+              const previous = () => shown()[index() - 1];
+
+              const continuation = createMemo(() =>
+                continuesChat(entry(), previous())
+              );
+
+              const mine = createMemo(() => {
+                const name = props.myName;
+
+                return (
+                  name !== null &&
+                  entry().from === undefined &&
+                  involves(entry(), name)
+                );
+              });
+
+              const spotlit = createMemo(() => {
+                const { name } = props.spotlight;
+
+                return name !== null && involves(entry(), name);
+              });
+
+              return (
+                <>
+                  <Show when={entry().id === props.newFrom}>
+                    <li class="log-new">
+                      <span>New</span>
+                    </li>
+                  </Show>
+                  <li
+                    data-continuation={continuation() ? "" : undefined}
+                    data-cue={entry().cue}
+                    data-kind={entry().from ? "chat" : "game"}
+                    data-mine={mine() ? "" : undefined}
+                    data-own={
+                      entry().from?.id === props.playerId ? "" : undefined
+                    }
+                    data-spotlit={spotlit() ? "" : undefined}
+                  >
+                    <Show
+                      when={entry().from}
+                      fallback={
+                        <GameEvent
+                          entry={entry()}
+                          hasRoundHeading={props.group.heading !== ""}
+                          previous={previous()}
+                          showTime={times().has(entry().id)}
+                          now={props.now}
+                          spotlight={props.spotlight}
+                        />
+                      }
+                    >
+                      {(author) => (
+                        <ChatMessage
+                          author={author()}
+                          entry={entry()}
+                          continuation={continuation()}
+                          now={props.now}
+                        />
+                      )}
+                    </Show>
+                  </li>
+                </>
+              );
+            }}
+          </For>
+        </ol>
+      </Show>
+    </div>
+  );
+};
+
+const typingLabel = (names: readonly string[]) => {
+  const [first, second] = names;
+
+  if (first === undefined) {
+    return "";
+  }
+
+  if (names.length === 1) {
+    return `${first} is typing…`;
+  }
+
+  return names.length === 2 && second !== undefined
+    ? `${first} and ${second} are typing…`
+    : "Several people are typing…";
+};
+
 export default function GameLog(props: {
   log: LogEntry[];
   playerId: string | null;
   onChat?: ((text: string) => boolean) | undefined;
   inSheet?: boolean;
+  players?: readonly { id: string; name: string }[];
+  typing?: readonly string[];
+  onTyping?: (() => void) | undefined;
 }) {
   const [filter, setFilter] = createSignal<LogFilter>("All");
   const now = createPolled(Date.now, SECOND_MS);
@@ -352,6 +632,67 @@ export default function GameLog(props: {
     }
   );
 
+  const [newFrom, setNewFrom] = createSignal<number | undefined>();
+
+  const firstUnseen = createMemo(() =>
+    following() ? undefined : visible().find((entry) => entry.id > seenId())?.id
+  );
+
+  createEffect(
+    () => firstUnseen(),
+    (id) => {
+      if (id !== undefined) {
+        setNewFrom(id);
+      }
+    }
+  );
+
+  let latestWhileFollowing: number | undefined;
+
+  createEffect(
+    () => ({ id: latestId(), isFollowing: following() }),
+    ({ id, isFollowing }) => {
+      if (
+        isFollowing &&
+        latestWhileFollowing !== undefined &&
+        id !== latestWhileFollowing
+      ) {
+        setNewFrom(undefined);
+      }
+
+      latestWhileFollowing = isFollowing ? id : undefined;
+    }
+  );
+
+  const [spotlit, setSpotlit] = createSignal<string | null>(null);
+
+  const spotlight: Spotlight = {
+    get name() {
+      return spotlit();
+    },
+    toggle: (name) => {
+      setSpotlit((current) =>
+        current !== null && sameName(current, name) ? null : name
+      );
+    },
+  };
+
+  const myName = createMemo(
+    () =>
+      props.players?.find((player) => player.id === props.playerId)?.name ??
+      null
+  );
+
+  const currentRound = createMemo(() => roundKey(props.log.at(-1)));
+
+  const typingNames = createMemo(() =>
+    (props.typing ?? []).flatMap((id) => {
+      const name = props.players?.find((player) => player.id === id)?.name;
+
+      return name === undefined ? [] : [name];
+    })
+  );
+
   return (
     <section class={props.inSheet === true ? "stack" : "panel log"}>
       <Show when={props.inSheet !== true}>
@@ -379,6 +720,7 @@ export default function GameLog(props: {
 
           if (option !== undefined) {
             scroll.scrollToEnd({ behavior: "instant" });
+            setNewFrom(undefined);
             setFilter(option);
           }
         }}
@@ -434,71 +776,19 @@ export default function GameLog(props: {
                   >
                     <For each={groups()} keyed={(group) => group.id}>
                       {(group) => (
-                        <div class="log-group">
-                          <Show when={group().heading}>
-                            {(heading) => (
-                              <div class="log-round-heading">
-                                <h3>{heading()}</h3>
-                                <ClockMinute
-                                  at={oldGameMinute(group().entries[0], now)}
-                                />
-                              </div>
-                            )}
-                          </Show>
-                          <ol>
-                            <For
-                              each={group().entries}
-                              keyed={(entry) => entry.id}
-                            >
-                              {(entry, index) => {
-                                const previous = () =>
-                                  group().entries[index() - 1];
-
-                                const continuation = createMemo(() =>
-                                  continuesChat(entry(), previous())
-                                );
-
-                                return (
-                                  <li
-                                    data-continuation={
-                                      continuation() ? "" : undefined
-                                    }
-                                    data-cue={entry().cue}
-                                    data-kind={entry().from ? "chat" : "game"}
-                                    data-own={
-                                      entry().from?.id === props.playerId
-                                        ? ""
-                                        : undefined
-                                    }
-                                  >
-                                    <Show
-                                      when={entry().from}
-                                      fallback={
-                                        <GameEvent
-                                          entry={entry()}
-                                          hasRoundHeading={
-                                            group().heading !== ""
-                                          }
-                                          previous={previous()}
-                                          now={now}
-                                        />
-                                      }
-                                    >
-                                      {(author) => (
-                                        <ChatMessage
-                                          author={author()}
-                                          entry={entry()}
-                                          continuation={continuation()}
-                                          now={now}
-                                        />
-                                      )}
-                                    </Show>
-                                  </li>
-                                );
-                              }}
-                            </For>
-                          </ol>
-                        </div>
+                        <LogRound
+                          group={group()}
+                          collapsible={
+                            filter() !== "Chat" &&
+                            (group().entries[0]?.round ?? 0) > 0 &&
+                            roundKey(group().entries[0]) !== currentRound()
+                          }
+                          playerId={props.playerId}
+                          myName={myName()}
+                          newFrom={newFrom()}
+                          spotlight={spotlight}
+                          now={now}
+                        />
                       )}
                     </For>
                   </Show>
@@ -522,12 +812,47 @@ export default function GameLog(props: {
           );
         }}
       </ScrollArea>
-      <Show
-        when={props.onChat}
-        fallback={<p class="muted chat-hint">Join as a player to chat.</p>}
-      >
-        {(onChat) => <ChatForm onSend={(message) => onChat()(message)} />}
-      </Show>
+      <div class="log-compose">
+        <Show when={spotlit()}>
+          {(name) => (
+            <p class="log-spotlight">
+              <span>
+                Highlighting <strong>{name()}</strong>
+              </span>
+              <Button
+                data-size="sm"
+                onClick={() => {
+                  setSpotlit(null);
+                }}
+              >
+                Clear
+              </Button>
+            </p>
+          )}
+        </Show>
+        <p class="log-typing" hidden={typingNames().length === 0}>
+          {typingLabel(typingNames())}
+        </p>
+        <Show
+          when={props.onChat}
+          fallback={<p class="muted chat-hint">Join as a player to chat.</p>}
+        >
+          {(onChat) => (
+            <ChatForm
+              onSend={(message) => {
+                const sent = onChat()(message);
+
+                if (sent) {
+                  setNewFrom(undefined);
+                }
+
+                return sent;
+              }}
+              onTyping={props.onTyping}
+            />
+          )}
+        </Show>
+      </div>
     </section>
   );
 }

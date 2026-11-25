@@ -18,12 +18,17 @@ import {
 } from "../game/engine";
 import type { GameCue, GameState, LogEntry } from "../game/engine";
 import { DEFAULT_SETTINGS } from "../game/settings";
+import type { EventDetail } from "./game-log-entries";
 import {
   countChatsAfter,
   eventCopy,
   eventDetails,
   groupLog,
   HOUR_MS,
+  involves,
+  nameParts,
+  shownTimes,
+  summarizeRound,
   MINUTE_MS,
   roundAnnouncement,
   SECOND_MS,
@@ -285,15 +290,24 @@ const messageFrom = (
   return entry;
 };
 
+const pts = (points: number) => ({ kind: "points", points }) as const;
+
+const dupe = (number: number) =>
+  ({ kind: "card", label: "duplicate", number }) as const;
+
+const words = (text: string) => ({ kind: "text", text }) as const;
+
 const event = (
   outcome: string,
-  details: string[] | undefined,
+  players: string[],
+  details: EventDetail[] | undefined,
   icon?: string
 ) => ({
   announcement: false,
   details: details ?? [],
   icon,
   outcome,
+  players,
 });
 
 const announcement = (outcome: string, icon?: string) => ({
@@ -301,6 +315,7 @@ const announcement = (outcome: string, icon?: string) => ({
   details: [],
   icon,
   outcome,
+  players: [],
 });
 
 const unchangedMessages = [
@@ -318,62 +333,87 @@ describe("the engine's messages in the Chat & Log", () => {
     [
       "stayPoints",
       cuedEntry("bank"),
-      event("Ada stayed", ["+10 pts"], "coins"),
+      event("Ada stayed", ["Ada"], [pts(10)], "coins"),
     ],
     [
       "stayOnePoint",
       cuedEntry("bank"),
-      event("Ada stayed", ["+1 pts"], "coins"),
+      event("Ada stayed", ["Ada"], [pts(1)], "coins"),
     ],
     [
       "bust",
       cuedEntry("bust"),
-      event("Ada busted", ["duplicate 5"], "circle-x"),
+      event("Ada busted", ["Ada"], [dupe(5)], "circle-x"),
     ],
     [
       "flipSeven",
       cuedEntry("flipSeven"),
-      event("Ada flipped 7!", undefined, "flame"),
+      event("Ada flipped 7!", ["Ada"], undefined, "flame"),
     ],
     [
       "freezeSelf",
       cuedEntry("freeze"),
-      event("Ada froze themselves", ["+5 pts"], "snowflake"),
+      event("Ada froze themselves", ["Ada"], [pts(5)], "snowflake"),
     ],
     [
       "freezeOther",
       cuedEntry("freeze"),
-      event("Bo was frozen", ["+3 pts", "by Ada"], "snowflake"),
+      event(
+        "Bo was frozen",
+        ["Ada", "Bo"],
+        [pts(3), words("by Ada")],
+        "snowflake"
+      ),
     ],
     [
       "secondChanceSave",
       cuedEntry("special"),
-      event("Ada used Second Chance", ["duplicate 5"], "heart"),
+      event("Ada used Second Chance", ["Ada"], [dupe(5)], "heart"),
     ],
     [
       "secondChanceSave",
       cuedEntry("special", 0),
-      event("Ada got a Second Chance", undefined, "heart"),
+      event("Ada got a Second Chance", ["Ada"], undefined, "heart"),
     ],
     [
       "flipThreeOnOther",
       cuedEntry("special", 0),
-      event("Bo must flip three", ["from Ada"], "playing-cards-fan"),
+      event(
+        "Bo must flip three",
+        ["Ada", "Bo"],
+        [words("from Ada")],
+        "playing-cards-fan"
+      ),
     ],
     [
       "assign",
       cuedEntry("special", 1),
-      event("Bo assigned Freeze", ["to themselves"], "arrow-right"),
+      event(
+        "Bo assigned Freeze",
+        ["Bo"],
+        [words("to themselves")],
+        "arrow-right"
+      ),
     ],
     [
       "assign",
       cuedEntry("special", 2),
-      event("Bo assigned Flip Three", ["to Cy"], "arrow-right"),
+      event(
+        "Bo assigned Flip Three",
+        ["Bo", "Cy"],
+        [words("to Cy")],
+        "arrow-right"
+      ),
     ],
     [
       "giveSecondChance",
       cuedEntry("special"),
-      event("Cy got Second Chance", ["from Ada"], "heart"),
+      event(
+        "Cy got Second Chance",
+        ["Ada", "Cy"],
+        [words("from Ada")],
+        "heart"
+      ),
     ],
     [
       "reshuffle",
@@ -392,9 +432,11 @@ describe("the engine's messages in the Chat & Log", () => {
     (scenario, pick, icon) => {
       const entry = messageFrom(scenario, pick);
 
-      expect(eventDetails(entry, true)).toStrictEqual(
-        event(entry.text, undefined, icon)
-      );
+      expect(eventDetails(entry, true)).toMatchObject({
+        details: [],
+        icon,
+        outcome: entry.text,
+      });
     }
   );
 
@@ -405,8 +447,8 @@ describe("the engine's messages in the Chat & Log", () => {
         .slice(-2)
         .map((entry) => eventDetails(entry, true))
     ).toStrictEqual([
-      event("Room locked.", undefined, "lock"),
-      event("Room unlocked.", undefined, "lock-open"),
+      event("Room locked.", [], undefined, "lock"),
+      event("Room unlocked.", [], undefined, "lock-open"),
     ]);
   });
 
@@ -619,4 +661,96 @@ describe(timeLabel, () => {
       expect(formats.exact.format(at)).toMatch(/^\d{1,2}:\d{2}:\d{2}\s[AP]M$/u);
     }
   );
+});
+
+let logId = 0;
+
+const logEntry = (text: string, extra: Partial<LogEntry> = {}) => {
+  logId += 1;
+
+  return {
+    at: 0,
+    game: 1,
+    id: logId,
+    round: 1,
+    text,
+    ...extra,
+  } satisfies LogEntry;
+};
+
+const said = (name: string, text: string, at = 0) =>
+  logEntry(text, { at, from: { avatar: null, id: name, name } });
+
+describe(nameParts, () => {
+  it("splits out each name, longest first where names overlap", () => {
+    expect(nameParts("Ash froze Ashley", ["Ash", "Ashley"])).toStrictEqual([
+      { name: "Ash" },
+      { text: " froze " },
+      { name: "Ashley" },
+    ]);
+  });
+
+  it("keeps text without names whole", () => {
+    expect(nameParts("Room locked.", ["Ada"])).toStrictEqual([
+      { text: "Room locked." },
+    ]);
+    expect(nameParts("from Ada", [])).toStrictEqual([{ text: "from Ada" }]);
+  });
+});
+
+describe(involves, () => {
+  it("finds a player named anywhere in an event, ignoring case", () => {
+    const frozen = logEntry("Ada played Freeze on Bo, who banked 3 points.", {
+      cue: "freeze",
+    });
+
+    expect(involves(frozen, "bo")).toBeTruthy();
+    expect(involves(frozen, "Ada")).toBeTruthy();
+    expect(involves(frozen, "Cy")).toBeFalsy();
+  });
+
+  it("counts a chat as its sender's", () => {
+    expect(involves(said("Ada", "hi Bo"), "Ada")).toBeTruthy();
+    expect(involves(said("Ada", "hi Bo"), "Bo")).toBeFalsy();
+  });
+});
+
+describe(summarizeRound, () => {
+  it("names the biggest bank, then Flip 7s and busts", () => {
+    expect(
+      summarizeRound([
+        logEntry("Ada stayed and banked 12 points.", { cue: "bank" }),
+        logEntry("Bo was dealt a duplicate 5 and busted.", { cue: "bust" }),
+        said("Bo", "ugh"),
+        logEntry("Cy earned the Flip 7 bonus!", { cue: "flipSeven" }),
+        logEntry("Ada played Freeze on Cy, who banked 40 points.", {
+          cue: "freeze",
+        }),
+        logEntry("Ada was dealt a duplicate 9 and busted.", { cue: "bust" }),
+      ])
+    ).toStrictEqual(["Cy +40", "Cy flipped 7", "2 busts"]);
+  });
+
+  it("says nothing for a round without scores", () => {
+    expect(summarizeRound([logEntry("Round 1 is over.")])).toStrictEqual([]);
+  });
+});
+
+describe(shownTimes, () => {
+  it("shows a time once per minute of game events and once per chat run", () => {
+    const entries = [
+      logEntry("first", { at: 0 }),
+      logEntry("same minute", { at: 30 * SECOND_MS }),
+      logEntry("a minute on", { at: MINUTE_MS }),
+      said("Ada", "hi", MINUTE_MS + SECOND_MS),
+      said("Ada", "again", MINUTE_MS + 2 * SECOND_MS),
+      logEntry("after a chat", { at: MINUTE_MS + 3 * SECOND_MS }),
+    ];
+
+    const shown = shownTimes(entries);
+
+    expect(
+      entries.flatMap((entry) => (shown.has(entry.id) ? [entry.text] : []))
+    ).toStrictEqual(["first", "a minute on", "hi", "after a chat"]);
+  });
 });

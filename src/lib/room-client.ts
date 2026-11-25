@@ -46,6 +46,8 @@ export interface RoomClientState {
   online: boolean;
   notice: Notice | null;
   canAct: boolean;
+  /** Other players typing a chat message right now, by player ID. */
+  typing: string[];
 }
 
 /**
@@ -89,6 +91,12 @@ const RESYNC_TIMEOUT_MS = 10_000;
 const FAILURES_BEFORE_RECHECK = 3;
 const TRY_AGAIN = "Reconnecting. Try again in a moment.";
 
+/** How long a player shows as typing after their last typing message. */
+export const TYPING_SHOWN_MS = 5000;
+
+/** The least time between this player's typing messages. */
+export const TYPING_SEND_MS = 3000;
+
 const shouldRecheck = (retryCount: number) =>
   retryCount === 1 ||
   (retryCount > 0 && retryCount % FAILURES_BEFORE_RECHECK === 0);
@@ -117,6 +125,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     sending: false,
     status: "connecting",
     syncId: 0,
+    typing: [],
     watchError: "",
     watchPending: false,
     watching: false,
@@ -135,6 +144,8 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   const roomCommands = new Map<string, PendingReply>();
   let stopped = false;
   let wasVisible = false;
+  const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  let typingSentAt: number | null = null;
 
   const update = (patch: Partial<Omit<RoomClientState, "canAct">>) => {
     const next = { ...state, ...patch };
@@ -179,6 +190,38 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     }
   };
 
+  const stopTyping = (playerId: string) => {
+    clearTimeout(typingTimers.get(playerId));
+
+    if (typingTimers.delete(playerId)) {
+      update({ typing: state.typing.filter((id) => id !== playerId) });
+    }
+  };
+
+  const clearTyping = () => {
+    for (const playerId of typingTimers.keys()) {
+      stopTyping(playerId);
+    }
+  };
+
+  const showTyping = (playerId: string) => {
+    if (playerId === seatedPlayerId) {
+      return;
+    }
+
+    clearTimeout(typingTimers.get(playerId));
+    typingTimers.set(
+      playerId,
+      setTimeout(() => {
+        stopTyping(playerId);
+      }, TYPING_SHOWN_MS)
+    );
+
+    if (!state.typing.includes(playerId)) {
+      update({ typing: [...state.typing, playerId] });
+    }
+  };
+
   const finishJoin = (error = "") => {
     clearTimeout(joinTimeout);
     joinTimeout = undefined;
@@ -193,6 +236,8 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     seatedPlayerId = null;
     lastRequestId = undefined;
     awaitingWelcome = false;
+    typingSentAt = null;
+    clearTyping();
 
     if (state.joining) {
       finishJoin("Connection lost while joining. Try again when reconnected.");
@@ -265,6 +310,12 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     // WARNING: deal playback reads the cards dealt since the shown room from draws, so keep showing that room until they arrive.
     if (received.gaps.includes("draws")) {
       return;
+    }
+
+    for (const entry of message.lists.log.entries) {
+      if (entry.from !== undefined) {
+        stopTyping(entry.from.id);
+      }
     }
 
     const firstSync = !synced;
@@ -349,6 +400,12 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
       case "state": {
         receiveRoomState(message);
+
+        return;
+      }
+
+      case "typing": {
+        showTyping(message.playerId);
 
         return;
       }
@@ -500,8 +557,31 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       }
     },
 
-    chat: (text: string) =>
-      state.online && state.ready && raw({ text, type: "chat" }),
+    chat: (text: string) => {
+      const sent = state.online && state.ready && raw({ text, type: "chat" });
+
+      if (sent) {
+        typingSentAt = null;
+      }
+
+      return sent;
+    },
+
+    typing: () => {
+      const now = Date.now();
+
+      if (
+        !state.online ||
+        !state.ready ||
+        (typingSentAt !== null && now - typingSentAt < TYPING_SEND_MS)
+      ) {
+        return;
+      }
+
+      if (raw({ type: "typing" })) {
+        typingSentAt = now;
+      }
+    },
 
     closed: (code: number, retryCount: number) => {
       if (stopped) {

@@ -154,6 +154,8 @@ export class GameRoom extends Server<Env> {
       );
     } else if (message.type === "chat") {
       await this.carryOut(room.chat(ws.id, message.text), ws);
+    } else if (message.type === "typing") {
+      await this.carryOut(room.typing(ws.id), ws);
     } else if (message.type === "sync") {
       send(ws, room.viewFor(ws.id));
     } else if (message.type === "watch") {
@@ -212,6 +214,13 @@ export class GameRoom extends Server<Env> {
 
         for (const connection of this.getConnections<Admission>()) {
           sendFrame(connection, frameOf(connection.state ? message : preview));
+        }
+      },
+      relay: (message, except) => {
+        for (const connection of this.getConnections<Admission>()) {
+          if (connection.state && connection.id !== except) {
+            sendFrame(connection, frameOf(message));
+          }
         }
       },
       close: (connectionId, code, reason) => {

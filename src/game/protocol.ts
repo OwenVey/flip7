@@ -195,6 +195,7 @@ export type ServerMessage =
   | { requestId: string; type: "accepted" }
   | { message: string; requestId: string; type: "rejected" }
   | { lists: RoomListUpdates; room: SentRoomView; type: "state" }
+  | { playerId: string; type: "typing" }
   | { message: string; type: "error" };
 
 export const toRoomView = (
@@ -336,6 +337,10 @@ export const parseServerMessage = (raw: string) => {
 
       case "watchError": {
         return v.is(v.string(), message.message) ? message : null;
+      }
+
+      case "typing": {
+        return v.is(v.string(), message.playerId) ? message : null;
       }
 
       case "accepted":

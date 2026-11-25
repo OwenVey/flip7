@@ -690,6 +690,8 @@ describe("<Table />", () => {
     ));
 
     const log = within(screen.getByRole("log", { name: "Chat & Log" }));
+    fireEvent.click(log.getByRole("button", { name: "Round 1" }));
+    flush();
 
     const rows = log.getAllByRole("listitem").map((row) => {
       const time = within(row).queryByRole("time");
@@ -731,8 +733,8 @@ describe("<Table />", () => {
     expect(rows.slice(0, 6).map((row) => row.text)).toStrictEqual([
       "Ben deals.",
       "Ben busted · duplicate 6",
-      "Ana stayed · +44 pts",
-      "Ana was frozen · +26 pts · by Ben",
+      "Ana stayed +44 points",
+      "Ana was frozen +26 points · by Ben",
       "Ben assigned Flip Three · to Ana",
       "Ben got a Second Chance",
     ]);

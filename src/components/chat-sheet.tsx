@@ -22,13 +22,17 @@ const SNAP_POINTS: SnapPoint[] = [HALF, "content"];
 
 /**
  * Chat & Log as a drawer from the header, with an unread count, for screens
- * without room for the log beside the page. At half height the table above
- * stays usable, so players can chat while they watch.
+ * without room for the log beside the page. It opens full height; dragged
+ * down to half, the table above stays usable, so players can chat while they
+ * watch.
  */
 export default function ChatSheet(props: {
   log: LogEntry[];
   playerId: string | null;
   onChat?: ((text: string) => boolean) | undefined;
+  players?: readonly { id: string; name: string }[];
+  typing?: readonly string[];
+  onTyping?: (() => void) | undefined;
   /** Set with `onOpenChange` when the page also needs to close the sheet. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -58,6 +62,7 @@ export default function ChatSheet(props: {
         props.onOpenChange?.(next);
       }}
       snapPoints={SNAP_POINTS}
+      defaultSnapPoint="content"
       modalAbove={HALF}
     >
       <Tooltip
@@ -116,6 +121,9 @@ export default function ChatSheet(props: {
             log={props.log}
             playerId={props.playerId}
             onChat={props.onChat}
+            players={props.players}
+            typing={props.typing}
+            onTyping={props.onTyping}
           />
         </div>
       </DrawerContent>
