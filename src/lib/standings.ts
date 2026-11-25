@@ -1,11 +1,5 @@
 import type { Player } from "../game/engine";
 
-export interface Standing {
-  index: number;
-  player: Player;
-  rank: number;
-}
-
 /** Highest total first. Tied totals share a rank, and the next rank skips past them. */
 export const rankPlayers = (players: readonly Player[]) => {
   const sorted = players.toSorted((a, b) => b.score - a.score);
@@ -16,8 +10,6 @@ export const rankPlayers = (players: readonly Player[]) => {
       rank = index + 1;
     }
 
-    const standing: Standing = { index, player, rank };
-
-    return standing;
+    return { index, player, rank };
   });
 };

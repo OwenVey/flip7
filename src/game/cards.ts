@@ -17,11 +17,14 @@ export type Card = NumberCard | ScoreModifierCard | ActionCard;
 
 export type CardKind = Card["kind"];
 
-type CardSpec = Card extends infer C
-  ? C extends Card
-    ? Omit<C, "id">
-    : never
-  : never;
+/** The action cards a Flip Three can set aside. */
+export const HELD_ACTION_KINDS = ["freeze", "flipThree"] as const;
+
+export type HeldActionKind = (typeof HELD_ACTION_KINDS)[number];
+
+type WithoutId<C> = C extends Card ? Omit<C, "id"> : never;
+
+type CardSpec = WithoutId<Card>;
 
 export const HIGHEST_NUMBER = 12;
 export const ADDITIVE_MODIFIER_VALUES = [2, 4, 6, 8, 10] as const;
@@ -59,12 +62,20 @@ export const buildDeck = () => {
 
 export type Random = () => number;
 
-export const shuffle = <T>(items: readonly T[], random: Random) => {
-  const result = [...items];
+export const shuffle = (cards: readonly Card[], random: Random) => {
+  const result = [...cards];
 
   for (let i = result.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
+    const current = result[i];
+    const picked = result[j];
+
+    if (current === undefined || picked === undefined) {
+      throw new Error("Cannot shuffle a missing card.");
+    }
+
+    result[i] = picked;
+    result[j] = current;
   }
 
   return result;
@@ -81,18 +92,6 @@ export const isScoreModifierCard = (card: Card): card is ScoreModifierCard =>
 export const countUniqueNumberCards = (cards: readonly Card[]) =>
   new Set(cards.flatMap((card) => (card.kind === "number" ? [card.value] : [])))
     .size;
-
-/** How a player's round score adds up. */
-export interface RoundScore {
-  /** The sum of their Number cards, before ×2. */
-  numbers: number;
-  doubled: boolean;
-  /** The sum of their additive Score Modifier cards. */
-  modifiers: number;
-  /** Whether they earned the Flip 7 bonus. */
-  flipSeven: boolean;
-  total: number;
-}
 
 export const calculateRoundScore = (cards: readonly Card[]) => {
   let numberCardPoints = 0;
@@ -123,8 +122,15 @@ export const calculateRoundScore = (cards: readonly Card[]) => {
     modifiers: modifierPoints,
     numbers: numberCardPoints,
     total,
-  } satisfies RoundScore;
+  };
 };
+
+/**
+ * How a player's round score adds up. `numbers` is the Number subtotal before
+ * ×2, `modifiers` is the additive Score Modifier subtotal, and `flipSeven`
+ * indicates whether the player earned the Flip 7 bonus.
+ */
+export type RoundScore = ReturnType<typeof calculateRoundScore>;
 
 const KIND_LABELS = {
   modifier: "Score Modifier card",

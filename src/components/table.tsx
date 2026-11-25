@@ -220,18 +220,22 @@ export default function Table(
           <div class="seats">
             <For each={playerIds()}>
               {(id, index) => (
-                <RoundPlayer
-                  player={props.room.players[index()]}
-                  room={props.room}
-                  playerId={props.playerId}
-                  actionsDisabled={props.actionsDisabled}
-                  removeDisabled={props.offline}
-                  roundPoints={pointsOf(props.roundPoints, id)}
-                  dealStep={props.dealStep}
-                  moves={moves()}
-                  onPick={chooseTarget}
-                  onRemove={removePlayer}
-                />
+                <Show when={props.room.players[index()]}>
+                  {(player) => (
+                    <RoundPlayer
+                      player={player()}
+                      room={props.room}
+                      playerId={props.playerId}
+                      actionsDisabled={props.actionsDisabled}
+                      removeDisabled={props.offline}
+                      roundPoints={pointsOf(props.roundPoints, id)}
+                      dealStep={props.dealStep}
+                      moves={moves()}
+                      onPick={chooseTarget}
+                      onRemove={removePlayer}
+                    />
+                  )}
+                </Show>
               )}
             </For>
           </div>

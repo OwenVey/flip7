@@ -4,14 +4,17 @@ import type { GameEvent, GameEventType } from "../game/game-events";
 import { roundStarted } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 
+const GAME_CUE_PRIORITY = [
+  "flipSeven",
+  "bust",
+  "freeze",
+  "special",
+  "bank",
+  "join",
+] as const;
+
 /** A sound a game event plays, and the colour the Chat & Log gives it. */
-export type GameCue =
-  | "bank"
-  | "bust"
-  | "freeze"
-  | "join"
-  | "special"
-  | "flipSeven";
+export type GameCue = (typeof GAME_CUE_PRIORITY)[number];
 
 const EVENT_CUES = {
   actionAssigned: "special",
@@ -46,17 +49,8 @@ const EVENT_CUES = {
 export const eventCue = (event: GameEvent | undefined) =>
   event === undefined ? null : EVENT_CUES[event.type];
 
-const GAME_CUE_PRIORITY = [
-  "flipSeven",
-  "bust",
-  "freeze",
-  "special",
-  "bank",
-  "join",
-] as const satisfies readonly GameCue[];
-
 export type RoomCue =
-  | (typeof GAME_CUE_PRIORITY)[number]
+  | GameCue
   | "deal"
   | "message"
   | "reveal"

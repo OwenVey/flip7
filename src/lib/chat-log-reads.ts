@@ -26,19 +26,6 @@ interface ReadPositions {
   viewedId: number;
 }
 
-export interface ChatLogReads {
-  clearNewFrom: () => void;
-  filter: () => LogFilter;
-  log: ReadSource["log"];
-  newEntries: () => number;
-  newFrom: () => number | undefined;
-  playerId: ReadSource["playerId"];
-  setFilter: (next: LogFilter) => void;
-  setScrollPosition: (position: ScrollPosition) => void;
-  unreadChats: () => number;
-  visible: () => LogEntry[];
-}
-
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- Compares fields of events already parsed at the wire.
 const sameValue: (a: unknown, b: unknown) => boolean = (a, b) => {
   if (a === b) {
@@ -206,7 +193,7 @@ export const createChatLogReads = (source: ReadSource) => {
     }
   );
 
-  const reads: ChatLogReads = {
+  return {
     clearNewFrom: () => {
       setNewFrom(undefined);
     },
@@ -215,16 +202,16 @@ export const createChatLogReads = (source: ReadSource) => {
     newEntries,
     newFrom,
     playerId: source.playerId,
-    setFilter: (next) => {
+    setFilter: (next: LogFilter) => {
       setNewFrom(undefined);
       setFilterValue(next);
     },
-    setScrollPosition: (next) => {
+    setScrollPosition: (next: ScrollPosition) => {
       setScrollPosition(next);
     },
     unreadChats,
     visible,
   };
-
-  return reads;
 };
+
+export type ChatLogReads = ReturnType<typeof createChatLogReads>;

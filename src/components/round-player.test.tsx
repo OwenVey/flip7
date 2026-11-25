@@ -16,6 +16,7 @@ import { pointsOf, roundPointsFor } from "../lib/deal-playback";
 import type { RoomConnection } from "../lib/room-connection";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
+import { itemAt } from "../test/item-at";
 import { room } from "../test/room-view";
 import { agent, agentApproval, Table } from "../test/table";
 import RoundPlayer from "./round-player";
@@ -26,12 +27,12 @@ const Seat = (props: {
   seat: number;
 }) => (
   <RoundPlayer
-    player={props.room.players[props.seat]}
+    player={itemAt(props.room.players, props.seat)}
     room={props.room}
     playerId={props.playerId}
     roundPoints={pointsOf(
       roundPointsFor(props.room),
-      props.room.players[props.seat].id
+      itemAt(props.room.players, props.seat).id
     )}
     moves={availableMoves(props.room, props.playerId)}
     onPick={vi.fn<(targetId: string) => void>()}
@@ -49,7 +50,7 @@ describe("<RoundPlayer />", () => {
 
   it("labels bot seats beside the player name", () => {
     const view = room();
-    const [ana, ben] = view.players;
+    const [ana, ben] = [itemAt(view.players, 0), itemAt(view.players, 1)];
     view.players = [ana, { ...ben, avatar: null, bot: true, name: "Torch" }];
 
     render(() => (
@@ -89,7 +90,7 @@ describe("<RoundPlayer />", () => {
 
   it("keeps only Number cards on the mat and sets the rest beside it in arrival order", () => {
     const view = room();
-    const [ana, ben] = view.players;
+    const [ana, ben] = [itemAt(view.players, 0), itemAt(view.players, 1)];
     view.players = [
       {
         ...ana,

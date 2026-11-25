@@ -1,9 +1,10 @@
-import type { ActionCard, Card } from "./cards";
+import type { ActionCard, Card, HeldActionKind } from "./cards";
 import type { GameEvent, LogPlayer } from "./game-events";
+import type { RoundStatus } from "./player";
 
 export const FLIP_THREE_COUNT = 3;
 
-type HeldActionCard = Exclude<ActionCard, { kind: "secondChance" }>;
+type HeldActionCard = Extract<ActionCard, { kind: HeldActionKind }>;
 
 export interface ActionCardChoice {
   chooserId: string;
@@ -58,14 +59,9 @@ export interface FlipDraw {
   progress: { index: number; total: number };
 }
 
-interface CardOwner {
-  id: string;
-  name: string;
-}
-
 interface ResolutionState extends ActionCardState {
   discard: Card[];
-  players: readonly (CardOwner & { status: string })[];
+  players: readonly (LogPlayer & { status: RoundStatus })[];
 }
 
 /** Records a game event in the log. */
@@ -83,7 +79,7 @@ interface ResolutionEffects {
 const findPlayer = (state: ResolutionState, playerId: string) =>
   state.players.find((player) => player.id === playerId);
 
-const logPlayer = (player: CardOwner | undefined) =>
+const logPlayer = (player: LogPlayer | undefined) =>
   player === undefined ? null : { id: player.id, name: player.name };
 
 const discardAssignment = (

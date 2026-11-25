@@ -41,7 +41,7 @@ describe(RulesDialog, () => {
     "opens the rules as a $presentation and restores focus on close",
     async ({ mobile, presentation }) => {
       stubBrowser(mobile);
-      render(() => <RulesDialog targetScore={250} />);
+      render(() => <RulesDialog targetScore={300} />);
 
       const trigger = screen.getByRole("button", { name: "Rules" });
       expect(screen.queryByRole("dialog")).toBeNull();
@@ -58,7 +58,7 @@ describe(RulesDialog, () => {
       expect(dialog).toHaveAttribute("data-presentation", presentation);
       expect(
         screen.getByText(
-          /the sole leader wins if they have at least 250 points/u
+          /the sole leader wins if they have at least 300 points/u
         )
       ).toBeVisible();
       fireEvent.click(screen.getByRole("button", { name: "Close rules" }));

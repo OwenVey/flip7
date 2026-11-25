@@ -21,7 +21,7 @@ import {
   toRoomView,
   toStateMessage,
 } from "../game/protocol";
-import type { ListSeqs, RoomView, ServerMessage } from "../game/protocol";
+import type { ListSeqs, RoomView, StateMessage } from "../game/protocol";
 import type { DealStep } from "./deal-plan";
 import { createDealPlayback, initialDealPlayback } from "./deal-playback";
 import type { DealMotion } from "./deal-playback";
@@ -718,8 +718,6 @@ describe(createDealPlayback, () => {
     expect(table.cues).toStrictEqual(["turn"]);
   });
 });
-
-type StateMessage = Extract<ServerMessage, { type: "state" }>;
 
 const moveOn = (game: GameState) => {
   const hostId = game.hostId ?? "";

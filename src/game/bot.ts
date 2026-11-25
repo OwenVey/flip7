@@ -6,6 +6,7 @@ import {
 import type { Card } from "./cards";
 import type { ActionCardChoice, Player, RoundStatus } from "./engine";
 import { canStay } from "./moves";
+import type { PlayMove } from "./moves";
 
 /** Hit while the chance of busting on the next card is below this. */
 export const BOT_RISK = 0.3;
@@ -46,11 +47,6 @@ export interface BotView {
   players: readonly BotPlayer[];
   targetScore: number;
 }
-
-export type BotMove =
-  | { type: "hit" }
-  | { type: "stay" }
-  | { type: "choose"; targetId: string };
 
 const visibleCards = (view: BotView) =>
   view.players.flatMap((player) =>
@@ -118,8 +114,8 @@ const acceptedRisk = (view: BotView, bot: BotPlayer) => {
   return behind && leader >= BOT_LATE_GAME_SCORE ? BOT_CATCH_UP_RISK : BOT_RISK;
 };
 
-const HIT = { type: "hit" } satisfies BotMove;
-const STAY = { type: "stay" } satisfies BotMove;
+const HIT = { type: "hit" } satisfies PlayMove;
+const STAY = { type: "stay" } satisfies PlayMove;
 
 const decideTurn = (view: BotView, bot: BotPlayer) => {
   if (!canStay(bot)) {
@@ -189,7 +185,7 @@ const decideChoice = (
   );
 
   return target
-    ? ({ targetId: target.id, type: "choose" } satisfies BotMove)
+    ? ({ targetId: target.id, type: "choose" } satisfies PlayMove)
     : null;
 };
 

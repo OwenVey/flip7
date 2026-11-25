@@ -5,7 +5,7 @@ import { TooltipTrigger } from "@ui-sdk/solid/tooltip";
 import { Match, Show, Switch } from "solid-js";
 
 import { cardLabel, isActionCard, isScoreModifierCard } from "../game/cards";
-import type { Card } from "../game/cards";
+import type { Card, CardKind } from "../game/cards";
 import { useCardTooltips } from "./card-tooltips";
 
 const CARD_HINTS = {
@@ -24,7 +24,7 @@ const cardName = (card: Card, bust: boolean) => {
   return bust ? `${name}, busted` : name;
 };
 
-const ActionIcon = (props: { kind: Card["kind"] }) => (
+const ActionIcon = (props: { kind: CardKind }) => (
   <Switch>
     <Match when={props.kind === "freeze"}>
       <Snowflake class="card-icon" />

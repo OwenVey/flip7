@@ -597,14 +597,14 @@ export const ChatLog = (
 
   const [spotlit, setSpotlit] = createSignal<LogPlayer | null>(null);
 
-  const spotlitIds = createProjection<Record<string, true>>(() => {
+  const spotlitIds = createProjection<Partial<Record<string, true>>>(() => {
     const id = spotlit()?.id;
 
     return id === undefined ? {} : { [id]: true };
   }, {});
 
   const spotlight: Spotlight = {
-    has: (playerId) => spotlitIds[playerId],
+    has: (playerId) => spotlitIds[playerId] === true,
     toggle: (player) => {
       setSpotlit((current) => (current?.id === player.id ? null : player));
     },
