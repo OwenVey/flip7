@@ -353,20 +353,28 @@ describe("<Lobby />", () => {
     expect(screen.queryByText("Waiting for players…")).toBeNull();
   });
 
-  it("offers bot speed only once a bot is seated", () => {
+  it("keeps the host's Bot speed control mounted when the first bot joins", () => {
+    const [room, setRoom] = createSignal<RoomView>(roomOf(2));
+
     render(() => (
       <Lobby
         chat={() => true}
-        room={roomOf(2)}
+        room={room()}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
       />
     ));
 
-    expect(screen.queryByRole("radiogroup", { name: "Bot speed" })).toBeNull();
+    const botSpeed = screen.getByRole("radiogroup", { name: "Bot speed" });
     expect(
-      screen.getByRole("radiogroup", { name: "Winning score" })
-    ).toBeInTheDocument();
+      within(botSpeed).getByRole("radio", { name: "Normal" })
+    ).toBeChecked();
+
+    setRoom(roomWithBot());
+    flush();
+    expect(screen.getByRole("radiogroup", { name: "Bot speed" })).toBe(
+      botSpeed
+    );
   });
 
   it("shows the host a disabled Start game that says what it's waiting for", () => {
