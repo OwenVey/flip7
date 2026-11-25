@@ -349,9 +349,21 @@
     align-self: stretch;
     overflow: auto;
     overscroll-behavior: contain;
-    /* Keep seat shadows and focus rings inside the scroll viewport. */
-    margin: -0.5rem;
-    padding: 0.5rem;
+    /*
+     * Room for seat shadows and turn rings, which a scroll viewport clips. The
+     * viewport reaches the page's edge and bottom, the gap before the sidebar,
+     * and most of the gap below the action bar, so the clip lands where the
+     * felt ends or a shadow has faded.
+     */
+    margin: -1rem;
+    padding: 1rem;
+    /* Revealing a seat stops where the seats rest, not flush with the clip. */
+    scroll-padding-block: 1rem;
+
+    /* Nothing covers the top of this viewport, unlike the page's sticky action bar on narrow screens. */
+    & .seat {
+      scroll-margin-block-start: 0;
+    }
   }
 
   .table-sidebar {
