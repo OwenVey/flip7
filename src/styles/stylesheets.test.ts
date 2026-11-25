@@ -1,45 +1,43 @@
-// oxlint-disable-next-line landmines-style/no-comments -- Fontaine reads font files through Node, not jsdom.
+// oxlint-disable-next-line landmines-style/no-comments -- Fontless reads font files through Node, not jsdom.
 // @vitest-environment node
 
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { FontaineTransform } from "fontaine";
+import { fontless } from "fontless";
+import { resolveConfig } from "vite";
 import { describe, expect, it } from "vitest";
 
+import { fontlessOptions } from "../../fonts.config.ts";
+
+const root = path.resolve(import.meta.dirname, "../..");
 const appCss = path.resolve(import.meta.dirname, "../app.css");
 const stylesIndex = path.resolve(import.meta.dirname, "index.css");
+const tokensCss = path.resolve(import.meta.dirname, "tokens.css");
 
-const fontImports = [
-  '@import "@fontsource-variable/big-shoulders-display";',
-  '@import "@fontsource-variable/inter";',
-  '@import "@fontsource/bungee/400.css";',
-];
-
-const fontImportBlock = fontImports.join("\n");
-
-const fallbackFamilies = [
-  "Big Shoulders Display Variable fallback",
-  "Inter Variable fallback",
-  "Bungee fallback",
-];
-
-// WARNING: keep these options the same as the FontaineTransform in vite.config.ts.
-const fontaine = FontaineTransform.raw(
-  { fallbacks: {} },
-  { framework: "vite" }
-);
-
-const fontainePlugin = Array.isArray(fontaine) ? fontaine[0] : fontaine;
+const weightsSetPerFamily = {
+  "Big Shoulders Display Variable": [400, 900],
+  Bungee: [400],
+  "Inter Variable": [400, 600, 700, 800],
+};
 
 const transform = async (file: string) => {
-  const hook = fontainePlugin?.transform;
+  const config = await resolveConfig(
+    { configFile: false, root, plugins: [fontless(fontlessOptions)] },
+    "serve"
+  );
+
+  const plugin = config.plugins.find(
+    ({ name }) => name === "vite-plugin-fontless"
+  );
+
+  const hook = plugin?.transform;
 
   if (hook === undefined || !("handler" in hook)) {
-    throw new Error("Fontaine no longer exposes a transform handler.");
+    throw new Error("Fontless no longer exposes a transform handler.");
   }
 
-  // SAFETY: Fontaine's transform handler never reads its plugin context.
+  // SAFETY: when serving, Fontless's transform handler never reads its plugin context.
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Vite supplies the context in a real build.
   const context = {} as ThisParameterType<typeof hook.handler>;
 
@@ -53,7 +51,7 @@ const transform = async (file: string) => {
     return null;
   }
 
-  return result instanceof Object ? result.code : result;
+  return String(result instanceof Object ? result.code : result);
 };
 
 const statements = (css: string) =>
@@ -63,10 +61,20 @@ const statements = (css: string) =>
     .map((line) => line.trim())
     .filter((line) => line !== "");
 
+const faces = (css: string) =>
+  (css.match(/@font-face\s*\{[^}]*\}/gu) ?? []).map((face) => ({
+    family:
+      /font-family:\s*["']?(?<family>[^;"']+)/u
+        .exec(face)
+        ?.groups?.family?.replaceAll("\\", "") ?? "",
+    weight: Number(
+      /font-weight:\s*(?<weight>\d+);/u.exec(face)?.groups?.weight ?? 400
+    ),
+  }));
+
 describe("stylesheet entry points", () => {
-  it("keeps only the font imports and the ui-sdk layer in app.css", async () => {
+  it("keeps only the ui-sdk layer in app.css", async () => {
     expect(statements(await readFile(appCss, "utf-8"))).toStrictEqual([
-      ...fontImports,
       "@layer ui-sdk;",
     ]);
   });
@@ -81,27 +89,45 @@ describe("stylesheet entry points", () => {
     }
   });
 
-  it("puts Fontaine's fallback faces right after the font imports", async () => {
-    const code = (await transform(appCss)) ?? "";
+  it("adds no font faces among the style imports", async () => {
+    await expect(transform(stylesIndex)).resolves.toBeNull();
+  });
+});
 
-    expect(code.startsWith(fontImportBlock)).toBeTruthy();
+describe("font faces", () => {
+  it("serves each family from its @fontsource package", async () => {
+    const code = (await transform(tokensCss)) ?? "";
+    const families = new Set(faces(code).map(({ family }) => family));
 
-    const between = code.slice(
-      fontImportBlock.length,
-      code.indexOf("@layer ui-sdk;")
-    );
-
-    const faces = between.match(/@font-face\s*\{[^}]*\}/gu) ?? [];
-
-    expect(between.replaceAll(/@font-face\s*\{[^}]*\}/gu, "").trim()).toBe("");
     expect(
-      fallbackFamilies.map((family) =>
-        faces.some((face) => face.includes(`font-family: "${family}"`))
-      )
-    ).toStrictEqual(fallbackFamilies.map(() => true));
+      Object.keys(weightsSetPerFamily).filter((family) => families.has(family))
+    ).toStrictEqual(Object.keys(weightsSetPerFamily));
   });
 
-  it("adds no fallback faces among the style imports", async () => {
-    await expect(transform(stylesIndex)).resolves.toBeNull();
+  it("gives each family a fallback face for every weight it is set in", async () => {
+    const code = (await transform(tokensCss)) ?? "";
+
+    const fallbacks = faces(code).filter(({ family }) =>
+      family.endsWith(": Arial")
+    );
+
+    expect(
+      Object.fromEntries(
+        Object.keys(weightsSetPerFamily).map((family) => [
+          family,
+          fallbacks
+            .filter((face) => face.family === `${family} Fallback: Arial`)
+            .map(({ weight }) => weight),
+        ])
+      )
+    ).toStrictEqual(weightsSetPerFamily);
+  });
+
+  it("puts the fallbacks right after each family in the font stacks", async () => {
+    const code = (await transform(tokensCss)) ?? "";
+
+    for (const family of Object.keys(weightsSetPerFamily)) {
+      expect(code).toContain(`"${family}", "${family} Fallback: `);
+    }
   });
 });

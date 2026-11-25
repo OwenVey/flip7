@@ -1,13 +1,8 @@
-import bigShouldersUrl from "@fontsource-variable/big-shoulders-display/files/big-shoulders-display-latin-wght-normal.woff2?url";
-import interUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
-import bungeeUrl from "@fontsource/bungee/files/bungee-latin-400-normal.woff2?url";
 import { HydrationScript } from "@solidjs/web";
+import { preloads } from "fontless/runtime";
 import type { ParentProps } from "solid-js";
 
 import faviconUrl from "./assets/favicon.svg?url";
-
-// WARNING: these must be the same files the @font-face rules in app.css load, or they download twice.
-const preloadedFonts = [interUrl, bungeeUrl, bigShouldersUrl];
 
 export default function Document(props: ParentProps) {
   return (
@@ -24,13 +19,13 @@ export default function Document(props: ParentProps) {
         <link rel="icon" type="image/svg+xml" href={faviconUrl} />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/site.webmanifest" />
-        {preloadedFonts.map((href) => (
+        {preloads.map((attributes) => (
           <link
-            rel="preload"
-            href={href}
-            as="font"
+            rel={attributes.rel}
+            href={attributes.href}
+            as={attributes.as}
             type="font/woff2"
-            crossorigin=""
+            crossorigin={attributes.crossorigin}
           />
         ))}
         <title>Flip 7</title>

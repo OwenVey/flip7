@@ -91,14 +91,10 @@
 
   /* ── Type ──────────────────────────────────────────────────────────── */
 
-  --font-display:
-    "Bungee", "Bungee fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bungee", ui-sans-serif, system-ui, sans-serif;
   --font-numeral:
-    "Big Shoulders Display Variable", "Big Shoulders Display Variable fallback",
-    "Bungee", ui-sans-serif, sans-serif;
-  --font-body:
-    "Inter Variable", "Inter Variable fallback", ui-sans-serif, system-ui,
-    sans-serif;
+    "Big Shoulders Display Variable", "Bungee", ui-sans-serif, sans-serif;
+  --font-body: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
 
   /*
    * Text sizes for interface text. Display type (titles, the wordmark, card

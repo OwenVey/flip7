@@ -276,9 +276,9 @@ importers:
       filesystem-routing:
         specifier: 0.5.0
         version: 0.5.0(vite@8.3.8(@types/node@26.6.10)(yaml@2.9.1))
-      fontaine:
-        specifier: ^1.0.3
-        version: 1.0.3(postcss@8.5.33)(rolldown@1.2.19)(vite@8.3.8(@types/node@26.6.10)(yaml@2.9.1))
+      fontless:
+        specifier: ^1.4.0
+        version: 1.4.0(lightningcss@1.33.0)(postcss@8.5.33)(rolldown@1.2.19)(vite@8.3.8(@types/node@26.6.10)(yaml@2.9.1))
       jsdom:
         specifier: ^31.0.1
         version: 31.0.1
@@ -1950,6 +1950,9 @@ packages:
     resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
     engines: {node: '>=0.10.0'}
 
+  defu@6.1.7:
+    resolution: {integrity: sha512-7z22QmUWiQ/2d0KkdYmANbRUVABpZ9SNYyH5vx6PZ+nE5bcC0l7uFvEfHlyld/HcGBFTL536ClDt3DEcSlEJAQ==}
+
   dequal@2.0.3:
     resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
     engines: {node: '>=6'}
@@ -2029,6 +2032,9 @@ packages:
     resolution: {integrity: sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==}
     engines: {node: '>=12.0.0'}
 
+  exsolve@1.2.0:
+    resolution: {integrity: sha512-h1pQPR9XoeSMdntRNCjyTznaume4UpfXrULBnlkZ2CUM/G5eSa+pBByGldO5uR8dxbPC+OuJXsPPNf+JZ81ADg==}
+
   fast-glob@3.3.3:
     resolution: {integrity: sha512-7MptL8U0cqcFdzIzwOTHoilX9x5BrNqye7Z/LuC7kCMRio1EMSyqRK3BEAUD7sXRq4iT4AzTVuZdhgQ2TCvYLg==}
     engines: {node: '>=8.6.0'}
@@ -2076,8 +2082,11 @@ packages:
   find-workspaces@0.3.1:
     resolution: {integrity: sha512-UDkGILGJSA1LN5Aa7McxCid4sqW3/e+UYsVwyxki3dDT0F8+ym0rAfnCkEfkL0rO7M+8/mvkim4t/s3IPHmg+w==}
 
-  fontaine@1.0.3:
-    resolution: {integrity: sha512-mCeB9tcB2qeDJYVp/f55ZUQMOkOaZn4MFDlsCsy8Vggsju47egnH1+qzWwderp3BuX2EyezhdsjNX64df6M5mg==}
+  fnv1a-64@0.1.2:
+    resolution: {integrity: sha512-mJbcILTPybAR1jdOwt/lVv8N2cffeJFFP+gVbSAwLEx1ujXH27RpPd8Rokec/KX9c76UYIB6Co+H4lQzxPnJfA==}
+
+  fontaine@1.1.0:
+    resolution: {integrity: sha512-vWhmaCmsCCoH2SWh31uZWS8IL7/qa0+dPrEWiAiHz+0epqiB6jexNsiTqg/ehnuZcJncxKhaygZkVzfmzDYxZQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       postcss: ^8.4.31
@@ -2088,6 +2097,27 @@ packages:
   fontkitten@1.0.3:
     resolution: {integrity: sha512-Wp1zXWPVUPBmfoa3Cqc9ctaKuzKAV6uLstRqlR56kSjplf5uAce+qeyYym7F+PHbGTk+tCEdkCW6RD7DX/gBZw==}
     engines: {node: '>=20'}
+
+  fontless@1.4.0:
+    resolution: {integrity: sha512-bXc/xHgVQh085qwlgad6PUg7bC5UG4EVAoqIzzG6LHIDm7W3qRNmLGo+n35Y5rP3vo1rzBJlbH8d3IbDWARaqQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    peerDependencies:
+      devframe: ^1.2.0
+      jiti: ^2.6.1
+      lightningcss: ^1.33.0
+      subset-font: ^2.5.0
+      vite: '*'
+    peerDependenciesMeta:
+      devframe:
+        optional: true
+      jiti:
+        optional: true
+      lightningcss:
+        optional: true
+      subset-font:
+        optional: true
+      vite:
+        optional: true
 
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
@@ -2737,6 +2767,9 @@ packages:
   unicorn-magic@0.3.0:
     resolution: {integrity: sha512-+QBBXBCvifc56fsbuxZQ6Sic3wqqc3WWaqxs58gvJrcOuN83HGTCwz3oS5phzU9LthRNE9VrJCFCLUgHeeFnfA==}
     engines: {node: '>=18'}
+
+  unifont@1.0.3:
+    resolution: {integrity: sha512-XGnEwj5sWdCbiBX01mWLSBncS0yMRjnLygau3IfdOlfjMacNIQvTGW4VH7pWBq+gGWArfSef/CensMLjMmIr/A==}
 
   unplugin@3.7.0:
     resolution: {integrity: sha512-GrM2uq3DQo3hvLU2FjeYhooJ8BY9N6j1Fbzgx7Pta3VVJevsD3VP4dPjZkZOS0mLvN8w9zzr9OlP+31bSMyuLw==}
@@ -4100,6 +4133,8 @@ snapshots:
 
   deepmerge@4.3.1: {}
 
+  defu@6.1.7: {}
+
   dequal@2.0.3: {}
 
   detect-libc@2.1.2: {}
@@ -4171,6 +4206,8 @@ snapshots:
 
   expect-type@1.4.0: {}
 
+  exsolve@1.2.0: {}
+
   fast-glob@3.3.3:
     dependencies:
       '@nodelib/fs.stat': 2.0.5
@@ -4222,10 +4259,13 @@ snapshots:
       pkg-types: 1.3.1
       yaml: 2.9.1
 
-  fontaine@1.0.3(postcss@8.5.33)(rolldown@1.2.19)(vite@8.3.8(@types/node@26.6.10)(yaml@2.9.1)):
+  fnv1a-64@0.1.2: {}
+
+  fontaine@1.1.0(postcss@8.5.33)(rolldown@1.2.19)(vite@8.3.8(@types/node@26.6.10)(yaml@2.9.1)):
     dependencies:
       '@capsizecss/unpack': 4.0.1
       css-tree: 3.2.1
+      fontkitten: 1.0.3
       magic-string: 1.4.5
       unplugin: 3.7.0(rolldown@1.2.19)(vite@8.3.8(@types/node@26.6.10)(yaml@2.9.1))
     optionalDependencies:
@@ -4245,6 +4285,29 @@ snapshots:
   fontkitten@1.0.3:
     dependencies:
       tiny-inflate: 1.0.3
+
+  fontless@1.4.0(lightningcss@1.33.0)(postcss@8.5.33)(rolldown@1.2.19)(vite@8.3.8(@types/node@26.6.10)(yaml@2.9.1)):
+    dependencies:
+      css-tree: 3.2.1
+      defu: 6.1.7
+      exsolve: 1.2.0
+      fontaine: 1.1.0(postcss@8.5.33)(rolldown@1.2.19)(vite@8.3.8(@types/node@26.6.10)(yaml@2.9.1))
+      magic-string: 1.4.5
+      unifont: 1.0.3
+    optionalDependencies:
+      lightningcss: 1.33.0
+      vite: 8.3.8(@types/node@26.6.10)(yaml@2.9.1)
+    transitivePeerDependencies:
+      - '@farmfe/core'
+      - '@rsbuild/core'
+      - '@rspack/core'
+      - bun-types-no-globals
+      - esbuild
+      - postcss
+      - rolldown
+      - rollup
+      - unloader
+      - webpack
 
   fsevents@2.3.3:
     optional: true
@@ -4961,6 +5024,13 @@ snapshots:
       pathe: 2.0.3
 
   unicorn-magic@0.3.0: {}
+
+  unifont@1.0.3:
+    dependencies:
+      css-tree: 3.2.1
+      fnv1a-64: 0.1.2
+      std-env: 4.3.0
+      undici: 8.13.1
 
   unplugin@3.7.0(rolldown@1.2.19)(vite@8.3.8(@types/node@26.6.10)(yaml@2.9.1)):
     dependencies:
