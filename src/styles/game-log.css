@@ -107,16 +107,55 @@
     }
   }
 
-  &:not([data-horizontal], .leaderboard-body, [data-at-y-start])::before,
-  &:not([data-horizontal], [data-at-y-end], .log-body[data-sticking])::after,
-  &[data-horizontal]:not([data-at-x-start])::before,
-  &[data-horizontal]:not([data-at-x-end])::after,
-  &.leaderboard-body:not([data-at-y-start]) thead th::after {
-    opacity: 1;
+  /* Each fade's strength follows the scroll offset, so it grows in over the first rem of scrolling and is gone at the edge. */
+  @supports (animation-timeline: scroll()) and (timeline-scope: --scroll-fade) {
+    timeline-scope: --scroll-fade;
 
-    /* Animate entry. Reaching an edge clears its fade in the same frame. */
-    @media (prefers-reduced-motion: no-preference) {
-      transition: opacity var(--duration-base) ease-out;
+    & > [data-slot="scroll-area-viewport"] {
+      scroll-timeline: --scroll-fade block;
+    }
+
+    &[data-horizontal] > [data-slot="scroll-area-viewport"] {
+      scroll-timeline: --scroll-fade inline;
+    }
+
+    &::before,
+    &::after,
+    &.leaderboard-body thead th::after {
+      /* Longhands, because Lightning CSS folds a timeline into the shorthand, which browsers reject. */
+      animation-name: scroll-fade-in;
+      animation-fill-mode: both;
+      animation-timing-function: linear;
+      animation-timeline: --scroll-fade;
+      animation-range: 0 var(--scroll-fade-depth);
+    }
+
+    &::after {
+      animation-name: scroll-fade-out;
+      animation-range: calc(100% - var(--scroll-fade-depth)) 100%;
+    }
+
+    /* Following new messages, or jumping to them, clears the bottom fade at once. */
+    &.leaderboard-body::before,
+    &.log-body[data-sticking]::after {
+      animation-name: none;
+    }
+  }
+
+  @supports not (
+    (animation-timeline: scroll()) and (timeline-scope: --scroll-fade)
+  ) {
+    &:not([data-horizontal], .leaderboard-body, [data-at-y-start])::before,
+    &:not([data-horizontal], [data-at-y-end], .log-body[data-sticking])::after,
+    &[data-horizontal]:not([data-at-x-start])::before,
+    &[data-horizontal]:not([data-at-x-end])::after,
+    &.leaderboard-body:not([data-at-y-start]) thead th::after {
+      opacity: 1;
+
+      /* Animate entry. Reaching an edge clears its fade in the same frame. */
+      @media (prefers-reduced-motion: no-preference) {
+        transition: opacity var(--duration-base) ease-out;
+      }
     }
   }
 
@@ -168,6 +207,26 @@
         }
       }
     }
+  }
+}
+
+@keyframes scroll-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scroll-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
   }
 }
 
