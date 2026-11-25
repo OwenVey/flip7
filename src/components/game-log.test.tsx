@@ -7,6 +7,7 @@ import type { ChatEntry, EventEntry, LogEntry } from "../game/engine";
 import { createChatLogReads } from "../lib/chat-log-reads";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
+import { itemAt } from "../test/item-at";
 import GameLog, { ChatLog } from "./game-log";
 
 const entries = (count: number) =>
@@ -493,7 +494,7 @@ describe("<GameLog />", () => {
     fireEvent.click(screen.getByRole("button", { name: "Round 1" }));
     flush();
 
-    const [benName] = screen.getAllByRole("button", { name: "Ben" });
+    const benName = itemAt(screen.getAllByRole("button", { name: "Ben" }), 0);
     fireEvent.click(benName);
     flush();
 
@@ -507,7 +508,7 @@ describe("<GameLog />", () => {
       "Ben stayed +30 points",
     ]);
 
-    const [anaName] = screen.getAllByRole("button", { name: "Ana" });
+    const anaName = itemAt(screen.getAllByRole("button", { name: "Ana" }), 0);
     fireEvent.click(anaName);
     flush();
 

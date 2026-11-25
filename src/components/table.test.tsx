@@ -14,6 +14,7 @@ import { calculateRoundScore } from "../game/cards";
 import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
 import { chatControls } from "../test/chat";
+import { itemAt } from "../test/item-at";
 import { LOGGED_AT, room } from "../test/room-view";
 import { agent, Table } from "../test/table";
 
@@ -23,7 +24,7 @@ const outcome = (text: string) => (_: string, element: Element | null) =>
 
 const withBot = (overrides: Partial<RoomView> = {}) => {
   const view = room(overrides);
-  const [ana, ben] = view.players;
+  const [ana, ben] = [itemAt(view.players, 0), itemAt(view.players, 1)];
   view.players = [ana, { ...ben, avatar: null, bot: true, name: "Torch" }];
 
   return view;
@@ -356,7 +357,12 @@ describe("<Table />", () => {
 
     try {
       const initial = room();
-      const [ana, ben] = initial.players;
+
+      const [ana, ben] = [
+        itemAt(initial.players, 0),
+        itemAt(initial.players, 1),
+      ];
+
       const [view, setView] = createSignal(initial);
       render(() => (
         <Table
@@ -467,7 +473,7 @@ describe("<Table />", () => {
 
         const roundCell = scoreTable.getByRole("cell", { name: label });
 
-        return [Number(seatPoints), Number(roundCell.textContent)];
+        return [Number(seatPoints), Number(roundCell.textContent)] as const;
       };
 
       setPoints(7);

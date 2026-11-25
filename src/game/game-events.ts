@@ -1,3 +1,4 @@
+import type { HeldActionKind } from "./cards";
 import type { BotSpeed, TargetScore } from "./settings";
 
 /** A player as the log names them, with their name at the time. */
@@ -19,9 +20,6 @@ export type Mover =
 
 /** Who made a move for an offline player. */
 export type OfflineMover = Exclude<Mover, { kind: "player" }>;
-
-/** An action card that a Flip Three can set aside. */
-export type HeldActionKind = "freeze" | "flipThree";
 
 /**
  * Something that happened in the room, as the facts the engine knew when it

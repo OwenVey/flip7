@@ -17,11 +17,14 @@ export type Card = NumberCard | ScoreModifierCard | ActionCard;
 
 export type CardKind = Card["kind"];
 
-type CardSpec = Card extends infer C
-  ? C extends Card
-    ? Omit<C, "id">
-    : never
-  : never;
+/** The action cards a Flip Three can set aside. */
+export const HELD_ACTION_KINDS = ["freeze", "flipThree"] as const;
+
+export type HeldActionKind = (typeof HELD_ACTION_KINDS)[number];
+
+type WithoutId<C> = C extends Card ? Omit<C, "id"> : never;
+
+type CardSpec = WithoutId<Card>;
 
 export const HIGHEST_NUMBER = 12;
 export const ADDITIVE_MODIFIER_VALUES = [2, 4, 6, 8, 10] as const;
@@ -64,7 +67,8 @@ export const shuffle = <T>(items: readonly T[], random: Random) => {
 
   for (let i = result.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
+    const picked = result.splice(j, 1, ...result.slice(i, i + 1));
+    result.splice(i, 1, ...picked);
   }
 
   return result;

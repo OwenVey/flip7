@@ -16,11 +16,15 @@ export type MovesView = Pick<
   >[];
 };
 
+/** A move on a turn or an action card choice, made by the player, a bot, or the host for an offline player. */
+export type PlayMove =
+  | { type: "hit" }
+  | { type: "stay" }
+  | { type: "choose"; targetId: string };
+
 /** A command a player can send, with `forId` set when the host moves for an offline player. */
 export type Move =
-  | { type: "hit"; forId?: string }
-  | { type: "stay"; forId?: string }
-  | { type: "choose"; targetId: string; forId?: string }
+  | (PlayMove & { forId?: string })
   | { type: "start" }
   | { type: "nextRound" }
   | { type: "lobby" }
@@ -101,11 +105,7 @@ const rejectTurn = (view: MovesView, playerId: string) => {
   return null;
 };
 
-const rejectOwnMove = (
-  view: MovesView,
-  viewerId: string,
-  move: Extract<Move, { type: "choose" | "hit" | "stay" }>
-) => {
+const rejectOwnMove = (view: MovesView, viewerId: string, move: PlayMove) => {
   if (move.type === "choose") {
     const { choice } = view;
 
@@ -135,7 +135,7 @@ const rejectMoveFor = (
   view: MovesView,
   viewerId: string,
   forId: string,
-  move: Extract<Move, { type: "choose" | "hit" | "stay" }>
+  move: PlayMove
 ) => {
   if (view.hostId !== viewerId) {
     return "Only the host can do that.";
@@ -179,7 +179,7 @@ const rejectMoveFor = (
 const rejectHostMove = (
   view: MovesView,
   viewerId: string | null,
-  move: Exclude<Move, { type: "choose" | "hit" | "stay" }>
+  move: Exclude<Move, { type: PlayMove["type"] }>
 ) => {
   if (viewerId === null) {
     return "Join the room first.";

@@ -1,7 +1,8 @@
+import type { HeldActionKind } from "../game/cards";
 import { isChat } from "../game/engine";
 import type { EventEntry, LogEntry } from "../game/engine";
 import { eventPlayers } from "../game/game-events";
-import type { GameEvent, HeldActionKind, LogPlayer } from "../game/game-events";
+import type { GameEvent, LogPlayer } from "../game/game-events";
 
 export const SECOND_MS = 1000;
 export const MINUTE_MS = 60 * SECOND_MS;

@@ -13,6 +13,7 @@ import type {
   RoomPreview,
   RoomView,
   ServerMessage,
+  StateMessage,
 } from "../game/protocol";
 
 export type ConnectionStatus =
@@ -289,9 +290,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     );
   };
 
-  const receiveRoomState = (
-    message: Extract<ServerMessage, { type: "state" }>
-  ) => {
+  const receiveRoomState = (message: StateMessage) => {
     if (seatedPlayerId === null && !state.watching) {
       return;
     }

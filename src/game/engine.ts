@@ -25,7 +25,7 @@ import {
 import type { ActionCard, Card, NumberCard, Random, RoundScore } from "./cards";
 import type { GameEvent, LogPlayer, Mover, OfflineMover } from "./game-events";
 import { MAX_PLAYERS, MIN_PLAYERS, rejectMove, waitingOn } from "./moves";
-import type { Move } from "./moves";
+import type { Move, PlayMove } from "./moves";
 import { nameKey, sameName } from "./names";
 import { DEFAULT_SETTINGS } from "./settings";
 import type { RoomSettings } from "./settings";
@@ -46,7 +46,9 @@ export const DEAL_HISTORY_LIMIT = 40;
 export const CHAT_MAX_LENGTH = 200;
 const WHITESPACE = /\s+/gu;
 
-export type Phase = "lobby" | "playing" | "roundOver" | "gameOver";
+export const PHASES = ["lobby", "playing", "roundOver", "gameOver"] as const;
+
+export type Phase = (typeof PHASES)[number];
 
 export type RoundStatus =
   | "out"
@@ -76,7 +78,15 @@ export interface Player {
  * What became of a drawn card: kept in the hand, busted the player, cancelled
  * by Second Chance, held until a Flip Three ends, or played as an action.
  */
-export type DrawOutcome = "kept" | "bust" | "saved" | "held" | "action";
+export const DRAW_OUTCOMES = [
+  "kept",
+  "bust",
+  "saved",
+  "held",
+  "action",
+] as const;
+
+export type DrawOutcome = (typeof DRAW_OUTCOMES)[number];
 
 /** One card leaving the deck. These are sent in WebSocket state messages. */
 export interface DrawEvent {
@@ -106,7 +116,7 @@ export interface LogEntryBase {
 
 /** A chat message, with its sender's name and avatar at the time. */
 export interface ChatEntry extends LogEntryBase {
-  from: { id: string; name: string; avatar: number | null };
+  from: LogPlayer & Pick<Player, "avatar">;
   text: string;
 }
 
@@ -1135,11 +1145,6 @@ export const playForBot = (state: GameState, random: Random) => {
   return true;
 };
 
-export type MoveForOffline =
-  | { type: "hit" }
-  | { type: "stay" }
-  | { type: "choose"; targetId: string };
-
 /**
  * Lets the host make the move an offline player owes, so a table that can
  * still reach them (on a call, in the same room) needn't wait for the grace
@@ -1149,7 +1154,7 @@ export const playFor = (
   state: GameState,
   hostId: string,
   playerId: string,
-  move: MoveForOffline,
+  move: PlayMove,
   random: Random
 ) => {
   assertMove(state, hostId, { ...move, forId: playerId });

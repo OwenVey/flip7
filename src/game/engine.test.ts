@@ -933,7 +933,11 @@ describe("Flip Three", () => {
     stay(state, "a", random);
     const trigger = flipThree();
     const nested = flipThree();
-    const [one, two, four, six, ten] = [1, 2, 4, 6, 10].map(num);
+    const one = num(1);
+    const two = num(2);
+    const four = num(4);
+    const six = num(6);
+    const ten = num(10);
     const untouched = num(11);
     rig(state, [trigger, one, nested, two, four, six, ten, untouched]);
     const mark = state.discard.length;

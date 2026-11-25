@@ -16,7 +16,7 @@ import {
   ROOM_REMOVED_CLOSE_CODE,
   TYPING_RELAY_MS,
 } from "./protocol";
-import type { ServerMessage } from "./protocol";
+import type { ServerMessage, StateMessage } from "./protocol";
 import { createRoom, newStoredRoom } from "./room";
 import type { Admission, RoomOutcome, Seats } from "./room";
 import { ABSENT_GRACE_MS, HOST_GRACE_MS, IDLE_EXPIRY_MS } from "./timers";
@@ -118,8 +118,6 @@ const closes = (outcome: RoomOutcome) =>
 
 const broadcasts = (outcome: RoomOutcome) =>
   outcome.effects.some((effect) => effect.type === "broadcast");
-
-type StateMessage = Extract<ServerMessage, { type: "state" }>;
 
 const broadcastOf = (outcome: RoomOutcome) => {
   const found = outcome.effects.find((effect) => effect.type === "broadcast");

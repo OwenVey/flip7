@@ -7,6 +7,7 @@ import { calculateRoundScore } from "../game/cards";
 import type { RoomView } from "../game/protocol";
 import { roundPointsFor } from "../lib/deal-playback";
 import { captureScenario } from "../test/diagnostics";
+import { itemAt } from "../test/item-at";
 import { room } from "../test/room-view";
 import Leaderboard from "./leaderboard";
 
@@ -22,7 +23,8 @@ describe("<Leaderboard />", () => {
   afterEach(cleanup);
 
   it("ranks banked scores, shares tied ranks, and updates after scoring", async () => {
-    const [ana, ben] = room().players;
+    const { players } = room();
+    const [ana, ben] = [itemAt(players, 0), itemAt(players, 1)];
 
     const cara = { ...ben, hand: [], id: "c", name: "Cara" };
 
@@ -91,7 +93,8 @@ describe("<Leaderboard />", () => {
   });
 
   it("distinguishes points in play, banked points, and a bust", () => {
-    const [ana, ben] = room().players;
+    const { players } = room();
+    const [ana, ben] = [itemAt(players, 0), itemAt(players, 1)];
 
     render(() => (
       <Scores

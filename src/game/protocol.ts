@@ -2,8 +2,8 @@ import * as v from "valibot";
 
 import { projectActionCards } from "./action-card-resolution";
 import { isAvatar } from "./avatars";
-import { HIGHEST_NUMBER } from "./cards";
-import { DEAL_HISTORY_LIMIT, LOG_LIMIT } from "./engine";
+import { HELD_ACTION_KINDS, HIGHEST_NUMBER } from "./cards";
+import { DEAL_HISTORY_LIMIT, DRAW_OUTCOMES, LOG_LIMIT, PHASES } from "./engine";
 import type { DealEvent, GameState, HeldCard, LogEntry } from "./engine";
 import { MAX_SPECTATORS } from "./moves";
 import { applyListUpdate, listUpdateSince } from "./sequenced-list";
@@ -127,7 +127,7 @@ const SpectatorCountSchema = v.pipe(
 const RoomPreviewSchema = v.object({
   code: v.string(),
   locked: v.boolean(),
-  phase: v.picklist(["lobby", "playing", "roundOver", "gameOver"]),
+  phase: v.picklist(PHASES),
   players: v.array(
     v.object({
       avatar: v.nullable(v.number()),
@@ -150,9 +150,11 @@ const nonNegativeInteger = v.pipe(v.number(), v.integer(), v.minValue(0));
 
 const cardFields = { id: nonNegativeInteger };
 
+const HeldActionKindSchema = v.picklist(HELD_ACTION_KINDS);
+
 const HeldActionCardSchema = v.object({
   ...cardFields,
-  kind: v.picklist(["freeze", "flipThree"]),
+  kind: HeldActionKindSchema,
 });
 
 const CardSchema = v.union([
@@ -165,30 +167,30 @@ const CardSchema = v.union([
   }),
 ]);
 
+const DealEventSchema: v.GenericSchema<unknown, DealEvent> = v.variant("type", [
+  v.object({
+    card: CardSchema,
+    flip: v.nullable(
+      v.object({ index: nonNegativeInteger, total: nonNegativeInteger })
+    ),
+    hit: v.optional(v.literal(true)),
+    outcome: v.picklist(DRAW_OUTCOMES),
+    playerId: v.string(),
+    seq: nonNegativeInteger,
+    type: v.literal("draw"),
+  }),
+  v.object({
+    card: HeldActionCardSchema,
+    outcome: v.picklist(["played", "discarded"]),
+    seq: nonNegativeInteger,
+    targetId: v.string(),
+    type: v.literal("heldAction"),
+  }),
+]);
+
 const DealHistoryUpdateSchema = v.object({
   ...ListUpdateSchema.entries,
-  entries: v.array(
-    v.variant("type", [
-      v.object({
-        card: CardSchema,
-        flip: v.nullable(
-          v.object({ index: nonNegativeInteger, total: nonNegativeInteger })
-        ),
-        hit: v.optional(v.literal(true)),
-        outcome: v.picklist(["kept", "bust", "saved", "held", "action"]),
-        playerId: v.string(),
-        seq: nonNegativeInteger,
-        type: v.literal("draw"),
-      }),
-      v.object({
-        card: HeldActionCardSchema,
-        outcome: v.picklist(["played", "discarded"]),
-        seq: nonNegativeInteger,
-        targetId: v.string(),
-        type: v.literal("heldAction"),
-      }),
-    ])
-  ),
+  entries: v.array(DealEventSchema),
 });
 
 const LATEST_DATE_MS = 8_640_000_000_000_000;
@@ -205,8 +207,6 @@ const OptionalLogPlayerSchema = v.nullable(LogPlayerSchema);
 const LoggedScoresSchema = v.array(
   v.object({ ...logPlayerFields, points: nonNegativeInteger })
 );
-
-const HeldActionKindSchema = v.picklist(["freeze", "flipThree"]);
 
 const NumberCardValueSchema = v.pipe(
   nonNegativeInteger,
@@ -334,7 +334,7 @@ const StateMessageSchema = v.looseObject({
     dealSeq: nonNegativeInteger,
     drawSeq: nonNegativeInteger,
     hostId: v.nullable(v.string()),
-    phase: v.picklist(["lobby", "playing", "roundOver", "gameOver"]),
+    phase: v.picklist(PHASES),
     players: v.array(
       v.looseObject({
         bot: v.boolean(),
@@ -395,6 +395,8 @@ export type ServerMessage =
   | { lists: RoomListUpdates; room: SentRoomView; type: "state" }
   | { active: boolean; playerId: string; type: "typing" }
   | { message: string; type: "error" };
+
+export type StateMessage = Extract<ServerMessage, { type: "state" }>;
 
 export const toRoomView = (
   code: string,
@@ -477,7 +479,7 @@ export const toStateMessage = (
  */
 export const receiveState = (
   received: ReceivedLists,
-  message: Extract<ServerMessage, { type: "state" }>
+  message: StateMessage
 ) => {
   const gaps: RoomListName[] = [];
 

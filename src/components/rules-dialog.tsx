@@ -11,6 +11,7 @@ import type { ParentProps } from "solid-js";
 
 import { FLIP_SEVEN_BONUS } from "../game/cards";
 import type { Card } from "../game/cards";
+import type { TargetScore } from "../game/settings";
 import PlayingCard from "./playing-card";
 import ScrollFade from "./scroll-fade";
 import Tooltip from "./tooltip";
@@ -33,7 +34,7 @@ const CardRule = (props: ParentProps<{ cards?: Card[] }>) => (
 );
 
 export default function RulesDialog(props: {
-  targetScore: number;
+  targetScore: TargetScore;
   label?: string;
   size?: "sm";
 }) {

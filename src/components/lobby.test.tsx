@@ -21,6 +21,7 @@ import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
+import { itemAt } from "../test/item-at";
 import Lobby from "./lobby";
 
 const roomOf = (size: number) => {
@@ -99,7 +100,9 @@ describe("<Lobby />", () => {
         actionsDisabled={paused()}
       />
     ));
-    const [, bot] = screen.getAllByRole("button", { name: /^Remove/u });
+
+    const bot = itemAt(screen.getAllByRole("button", { name: /^Remove/u }), 1);
+
     expect(bot).toBeEnabled();
     expect(bot).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(bot);
@@ -346,7 +349,8 @@ describe("<Lobby />", () => {
         send={send}
       />
     ));
-    const [guest, bot] = screen.getAllByRole("button", { name: /^Remove/u });
+    const removes = screen.getAllByRole("button", { name: /^Remove/u });
+    const [guest, bot] = [itemAt(removes, 0), itemAt(removes, 1)];
 
     fireEvent.click(bot);
     fireEvent.click(guest);

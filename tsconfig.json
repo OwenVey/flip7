@@ -15,6 +15,11 @@
 
     // Type Checking & Safety
     "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "types": ["vite/client", "node"]
   },
