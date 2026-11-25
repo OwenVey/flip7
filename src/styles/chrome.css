@@ -190,6 +190,31 @@ main {
   }
 }
 
+/* Give the desktop table the space left by the nav and any connection banner. */
+@media (--lg) and (not (--short)) {
+  body:has(> .room-page > .table) {
+    display: flex;
+    flex-direction: column;
+    block-size: 100dvh;
+
+    & > .site-nav {
+      flex: none;
+    }
+  }
+
+  .room-page:has(> .table) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-block-size: 0;
+    padding-block-end: 1rem;
+
+    & > .connection-banner {
+      flex: none;
+    }
+  }
+}
+
 /* The table runs wider than other pages, so three or four seats fit across. The lobby matches it so the log stays put when the game starts. */
 .room-page:has(.table, .lobby-page) {
   width: min(90rem, 100%);

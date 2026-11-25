@@ -203,7 +203,8 @@
 
   /* Round and game over. */
   .leaderboard-round[data-scored] {
-    animation: rise-in 320ms ease-out calc(var(--row-index, 0) * 60ms + 150ms)
+    /* Moving the last cell can overflow the Scores viewport on reload. */
+    animation: fade-in 320ms ease-out calc(var(--row-index, 0) * 60ms + 150ms)
       both;
   }
 
