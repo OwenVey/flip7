@@ -336,42 +336,15 @@
   }
 }
 
-/* The sidebar runs to 1rem above the bottom edge. Scores take what they need, up to their cap, and the log fills the rest. */
+/* Keep the sidebar in view as the player panels scroll with the page. */
 @media (--lg) and (not (--short)) {
-  .table {
-    flex: 1;
-    grid-template-rows: auto auto minmax(0, 1fr);
-    min-block-size: 0;
-  }
-
-  .table-body > .seats {
-    align-content: start;
-    align-self: stretch;
-    /* Keep wide turn-ring animations from making the panel grid scroll sideways. */
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    /*
-     * Room for seat shadows and turn rings, which a scroll viewport clips. The
-     * top stays just below the action bar's turn ring, while the sides and
-     * bottom reach the page's edges and the sidebar gap.
-     */
-    margin: -0.625rem -1rem -1rem;
-    padding: 0.625rem 1rem 1rem;
-    /* Revealing a seat stops where the seats rest, not flush with the clip. */
-    scroll-padding-block: 0.625rem 1rem;
-
-    /* Nothing covers the top of this viewport, unlike the page's sticky action bar on narrow screens. */
-    & .seat {
-      scroll-margin-block-start: 0;
-    }
-  }
-
   .table-sidebar {
     display: flex;
     flex-direction: column;
-    align-self: stretch;
-    min-block-size: 0;
+    position: sticky;
+    inset-block-start: 0.5rem;
+    align-self: start;
+    block-size: calc(100dvh - 9rem);
 
     & > .panel {
       gap: 0.625rem;
