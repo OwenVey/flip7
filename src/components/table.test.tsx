@@ -720,8 +720,6 @@ describe("<Table />", () => {
     ));
 
     const log = within(screen.getByRole("log", { name: "Chat & Log" }));
-    fireEvent.click(log.getByRole("button", { name: "Round 1" }));
-    flush();
 
     const rows = log.getAllByRole("listitem").map((row) => {
       const time = within(row).queryByRole("time");

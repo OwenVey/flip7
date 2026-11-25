@@ -50,12 +50,12 @@ import {
 } from "solid-js";
 
 import { CHAT_MAX_LENGTH } from "../game/engine";
-import type { LogEntry, LogPlayer, Phase } from "../game/engine";
+import type { LogEntry, LogPlayer } from "../game/engine";
 import {
   continuesChat,
   countChatsAfter,
   detailText,
-  eventDetails,
+  eventDetailsWithMentions,
   groupLog,
   HOUR_MS,
   involves,
@@ -254,7 +254,7 @@ const GameEvent = (props: {
   spotlight: Spotlight;
 }) => {
   const copy = createMemo(
-    () => eventDetails(props.entry, props.hasRoundHeading),
+    () => eventDetailsWithMentions(props.entry, props.hasRoundHeading),
     { equals: sameDetails }
   );
 
@@ -425,9 +425,6 @@ const ChatForm = (props: { chat: ChatControls; onSent: () => void }) => {
   );
 };
 
-const roundKey = (entry: LogEntry | undefined) =>
-  entry === undefined ? "" : `${entry.game}:${entry.round}`;
-
 const LogRound = (props: {
   group: LogGroup;
   continuations: ReadonlySet<number>;
@@ -556,7 +553,10 @@ const LogRound = (props: {
           <div class="log-round-heading">
             <Show when={props.collapsible} fallback={<h3>{heading()}</h3>}>
               <h3>
-                <CollapsibleTrigger class="log-round-toggle">
+                <CollapsibleTrigger
+                  class="log-round-toggle"
+                  data-variant="disclosure"
+                >
                   <ChevronRight aria-hidden="true" size={12} />
                   {heading()}
                 </CollapsibleTrigger>
@@ -601,7 +601,6 @@ const typingLabel = (names: readonly string[]) => {
 
 export default function GameLog(props: {
   log: LogEntry[];
-  phase: Phase;
   playerId: string | null;
   /** Missing for a spectator, who can read the chat but not send to it. */
   chat?: ChatControls | undefined;
@@ -719,11 +718,6 @@ export default function GameLog(props: {
     },
   };
 
-  const currentRound = createMemo(() => roundKey(props.log.at(-1)));
-
-  const roundFinished = () =>
-    props.phase === "roundOver" || props.phase === "gameOver";
-
   const typingNames = createMemo(
     () => {
       const typing = new Set(props.typing);
@@ -826,9 +820,9 @@ export default function GameLog(props: {
                           continuations={continuations()}
                           collapsible={
                             filter() !== "Chat" &&
-                            (group().entries[0]?.round ?? 0) > 0 &&
-                            (roundFinished() ||
-                              roundKey(group().entries[0]) !== currentRound())
+                            group().entries.some(
+                              (entry) => entry.scores !== undefined
+                            )
                           }
                           playerId={props.playerId}
                           newFrom={newFrom()}

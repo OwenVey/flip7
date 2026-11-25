@@ -6,6 +6,7 @@ import {
   ROOM_MISSING_CLOSE_CODE,
   ROOM_REMOVED_CLOSE_CODE,
   TYPING_SEND_MS,
+  TYPING_SHOWN_MS,
 } from "../game/protocol";
 import type {
   ReceivedLists,
@@ -91,9 +92,6 @@ const REPLY_TIMEOUT_MS = 6000;
 const RESYNC_TIMEOUT_MS = 10_000;
 const FAILURES_BEFORE_RECHECK = 3;
 const TRY_AGAIN = "Reconnecting. Try again in a moment.";
-
-/** How long a player shows as typing after their last typing message. */
-export const TYPING_SHOWN_MS = 5000;
 
 const shouldRecheck = (retryCount: number) =>
   retryCount === 1 ||
@@ -310,12 +308,6 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     // WARNING: deal playback reads the cards dealt since the shown room from draws, so keep showing that room until they arrive.
     if (received.gaps.includes("draws")) {
       return;
-    }
-
-    for (const entry of message.lists.log.entries) {
-      if (entry.from !== undefined) {
-        stopTyping(entry.from.id);
-      }
     }
 
     const firstSync = !synced;
@@ -565,7 +557,6 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       const sent = state.online && state.ready && raw({ text, type: "chat" });
 
       if (sent) {
-        typingSentAt = null;
         typingShown = false;
       }
 

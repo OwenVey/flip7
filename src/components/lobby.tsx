@@ -127,7 +127,6 @@ export default function Lobby(props: {
           />
           <ChatSheet
             log={props.room.log}
-            phase={props.room.phase}
             playerId={props.playerId}
             chat={chat()}
             players={props.room.players}
@@ -309,7 +308,6 @@ export default function Lobby(props: {
 
         <GameLog
           log={props.room.log}
-          phase={props.room.phase}
           playerId={props.playerId}
           chat={chat()}
           players={props.room.players}

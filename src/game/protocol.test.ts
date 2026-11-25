@@ -98,6 +98,26 @@ describe(parseServerMessage, () => {
   });
 
   it.each([
+    { about: undefined },
+    { about: [{ id: "a", name: "", offset: 0 }] },
+    { about: [{ id: "a", name: "Ana", offset: 1 }] },
+    { scores: [{ id: "a", name: "Ana", points: "5" }] },
+  ])("rejects corrupt log data %j", (changes) => {
+    const message = state();
+    const { log } = message.lists;
+    const entries = log.entries.map((entry) => ({ ...entry, ...changes }));
+
+    expect(
+      parseServerMessage(
+        JSON.stringify({
+          ...message,
+          lists: { ...message.lists, log: { ...log, entries } },
+        })
+      )
+    ).toBeNull();
+  });
+
+  it.each([
     ["without lists", { ...state(), lists: undefined }],
     [
       "with a draws update missing its entries",

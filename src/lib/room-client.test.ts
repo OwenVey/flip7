@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { parseClientMessage } from "../game/client-message";
 import { DRAW_LIMIT } from "../game/engine";
-import { ROOM_REMOVED_CLOSE_CODE, TYPING_SEND_MS } from "../game/protocol";
+import {
+  ROOM_REMOVED_CLOSE_CODE,
+  TYPING_SEND_MS,
+  TYPING_SHOWN_MS,
+} from "../game/protocol";
 import type { ServerMessage } from "../game/protocol";
 import { createRoom, deliver, newStoredRoom } from "../game/room";
 import type {
@@ -13,7 +17,7 @@ import type {
   RoomTransport,
   Seats,
 } from "../game/room";
-import { createRoomClient, TYPING_SHOWN_MS } from "./room-client";
+import { createRoomClient } from "./room-client";
 import type { RoomClientDeps } from "./room-client";
 
 const START = 1_000_000;
@@ -439,7 +443,7 @@ describe("typing through the room client", () => {
     expect(ben.client.state.typing).toStrictEqual([]);
   });
 
-  it("sends typing at most once every few seconds, and again after a send", () => {
+  it("keeps the typing start cooldown across a chat send", () => {
     const net = network();
     const ana = net.join("Ana");
 
@@ -457,6 +461,11 @@ describe("typing through the room client", () => {
     expect(sent()).toBe(2);
 
     ana.client.chat("hi");
+    ana.client.typing(true);
+
+    expect(sent()).toBe(2);
+
+    vi.advanceTimersByTime(TYPING_SEND_MS);
     ana.client.typing(true);
 
     expect(sent()).toBe(3);

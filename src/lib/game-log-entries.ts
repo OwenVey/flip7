@@ -113,6 +113,16 @@ export const eventCopy = {
       "$<player> stayed",
       [{ points: "$<points>" }],
     ],
+    [
+      /^(?<host>.+) stayed for (?<player>.+), who is offline, and banked (?<points>\d+) points?\.$/u,
+      "$<host> stayed for $<player>",
+      [{ points: "$<points>" }, { text: "$<player> is offline" }],
+    ],
+    [
+      /^(?<player>.+) is offline, so the game stayed for them and banked (?<points>\d+) points?\.$/u,
+      "The game stayed for $<player>",
+      [{ points: "$<points>" }, { text: "$<player> is offline" }],
+    ],
   ],
   bust: [
     [
@@ -241,15 +251,19 @@ interface LogEventCopy {
   outcome: string;
 }
 
-export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
+export const eventDetails = (
+  entry: LogEntry,
+  hasRoundHeading: boolean,
+  text = entry.text
+) => {
   const roundPrefix = `Round ${entry.round} begins. `;
 
-  if (hasRoundHeading && entry.text.startsWith(roundPrefix)) {
+  if (hasRoundHeading && text.startsWith(roundPrefix)) {
     return {
       announcement: true,
       details: [],
       icon: "playing-cards",
-      outcome: entry.text.slice(roundPrefix.length),
+      outcome: text.slice(roundPrefix.length),
     } satisfies LogEventCopy;
   }
 
@@ -259,30 +273,27 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
   const cueIcon = entry.cue === undefined ? undefined : cueIcons[entry.cue];
 
   for (const [pattern, outcome, details = [], icon] of rules) {
-    if (pattern.test(entry.text)) {
+    if (pattern.test(text)) {
       return {
         announcement: false,
-        details: details.map((detail) =>
-          fillDetail(entry.text, pattern, detail)
-        ),
+        details: details.map((detail) => fillDetail(text, pattern, detail)),
         icon: icon ?? cueIcon,
-        outcome: entry.text.replace(pattern, outcome),
+        outcome: text.replace(pattern, outcome),
       } satisfies LogEventCopy;
     }
   }
 
-  const icon = winnerAnnouncement.test(entry.text)
+  const icon = winnerAnnouncement.test(text)
     ? "trophy"
-    : (systemIcons.get(entry.text) ?? cueIcon);
+    : (systemIcons.get(text) ?? cueIcon);
 
-  const systemText = systemCopy.get(entry.text);
+  const systemText = systemCopy.get(text);
 
   return {
-    announcement:
-      systemText !== undefined || roundAnnouncement.test(entry.text),
+    announcement: systemText !== undefined || roundAnnouncement.test(text),
     details: [],
     icon,
-    outcome: systemText ?? entry.text,
+    outcome: systemText ?? text,
   } satisfies LogEventCopy;
 };
 
@@ -304,38 +315,47 @@ export const involves = (entry: LogEntry, playerId: string) =>
 
 export type NamePart = { text: string } | { player: LogPlayer };
 
-/** Splits text around the given players' names, so each name can be shown on its own. */
+const mentionToken = /\uE000(?<index>\d+)\uE000/gu;
+
+/** Keeps name positions through copy rules that can move mentions into a detail. */
+
+export const eventDetailsWithMentions = (
+  entry: LogEntry,
+  hasRoundHeading: boolean
+) => {
+  let text = "";
+  let offset = 0;
+
+  for (const [index, mention] of entry.about.entries()) {
+    text += entry.text.slice(offset, mention.offset);
+    text += `\uE000${index}\uE000`;
+    offset = mention.offset + mention.name.length;
+  }
+
+  return eventDetails(entry, hasRoundHeading, text + entry.text.slice(offset));
+};
+
 export const nameParts = (text: string, players: readonly LogPlayer[]) => {
   const parts: NamePart[] = [];
+  let offset = 0;
 
-  const longestFirst = players.toSorted(
-    (a, b) => b.name.length - a.name.length
-  );
+  for (const match of text.matchAll(mentionToken)) {
+    const player = players[Number(match.groups?.index)];
 
-  let rest = text;
-
-  while (rest !== "") {
-    let next: { at: number; player: LogPlayer } | undefined;
-
-    for (const player of longestFirst) {
-      const at = rest.indexOf(player.name);
-
-      if (at !== -1 && (next === undefined || at < next.at)) {
-        next = { at, player };
-      }
+    if (player === undefined) {
+      continue;
     }
 
-    if (next === undefined) {
-      parts.push({ text: rest });
-      break;
+    if (match.index > offset) {
+      parts.push({ text: text.slice(offset, match.index) });
     }
 
-    if (next.at > 0) {
-      parts.push({ text: rest.slice(0, next.at) });
-    }
+    parts.push({ player });
+    offset = match.index + match[0].length;
+  }
 
-    parts.push({ player: next.player });
-    rest = rest.slice(next.at + next.player.name.length);
+  if (offset < text.length) {
+    parts.push({ text: text.slice(offset) });
   }
 
   return parts;

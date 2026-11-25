@@ -9,7 +9,13 @@ import {
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { addBot, addPlayer, createGame, MAX_PLAYERS } from "../game/engine";
+import {
+  addBot,
+  addPlayer,
+  backToLobby,
+  createGame,
+  MAX_PLAYERS,
+} from "../game/engine";
 import { toRoomView } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
@@ -176,6 +182,41 @@ describe("<Lobby />", () => {
 
     expectNoDiagnostics(artifact);
     expect(screen.getByText("Waiting for players…")).toBe(seat);
+  });
+
+  it("keeps the final round folded after the host returns to the lobby", () => {
+    const state = createGame();
+    addPlayer(state, "p0", "Host", 1);
+    state.phase = "gameOver";
+    state.round = 1;
+    state.log.push({
+      about: [],
+      at: Date.now(),
+      game: 1,
+      id: state.logSeq + 1,
+      round: 1,
+      scores: [{ id: "p0", name: "Host", points: 21 }],
+      text: "Host wins with 202 points!",
+    });
+    backToLobby(state, "p0");
+
+    render(() => (
+      <Lobby
+        chat={chatControls()}
+        typing={[]}
+        room={toRoomView("ABCDE", state)}
+        playerId="p0"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+
+    const log = within(screen.getByRole("log", { name: "Chat & Log" }));
+
+    expect(log.getByRole("button", { name: "Round 1" })).toHaveAttribute(
+      "aria-expanded",
+      "false"
+    );
+    expect(log.getByText("Host +21")).toBeVisible();
   });
 
   it("shows spectators the chat log and their actions, without Leave", () => {

@@ -17,12 +17,14 @@ import {
   stay,
 } from "../game/engine";
 import type { GameCue, GameState, LogEntry, LogPlayer } from "../game/engine";
+import { logCopy } from "../game/log-copy";
 import { DEFAULT_SETTINGS } from "../game/settings";
 import type { EventDetail } from "./game-log-entries";
 import {
   countChatsAfter,
   eventCopy,
   eventDetails,
+  eventDetailsWithMentions,
   groupLog,
   HOUR_MS,
   involves,
@@ -319,8 +321,6 @@ const unchangedMessages = [
   ["joinLobby", cuedEntry("join"), "user-plus"],
   ["joinMidRound", cuedEntry("join"), "user-plus"],
   ["botAdded", cuedEntry("join"), "user-plus"],
-  ["offlineStayByGame", cuedEntry("bank"), "coins"],
-  ["offlineStayByHost", cuedEntry("bank"), "coins"],
   ["winner", fromEnd(), "trophy"],
 ] as const;
 
@@ -335,6 +335,26 @@ describe("the engine's messages in the Chat & Log", () => {
       "stayOnePoint",
       cuedEntry("bank"),
       event("Ada stayed", ["Ada"], [pts(1)], "coins"),
+    ],
+    [
+      "offlineStayByGame",
+      cuedEntry("bank"),
+      event(
+        "The game stayed for Ada",
+        ["Ada"],
+        [pts(5), words("Ada is offline")],
+        "coins"
+      ),
+    ],
+    [
+      "offlineStayByHost",
+      cuedEntry("bank"),
+      event(
+        "Ada stayed for Bo",
+        ["Ada", "Bo"],
+        [pts(3), words("Bo is offline")],
+        "coins"
+      ),
     ],
     [
       "bust",
@@ -695,29 +715,41 @@ const bo = { id: "b", name: "Bo" };
 const cy = { id: "c", name: "Cy" };
 
 describe(nameParts, () => {
-  it("splits out each name, longest first where names overlap", () => {
-    const ash = { id: "x", name: "Ash" };
-    const ashley = { id: "y", name: "Ashley" };
+  it("keeps short names out of ordinary words after formatting a Freeze", () => {
+    const player = { id: "x", name: "a" };
 
-    expect(nameParts("Ash froze Ashley", [ash, ashley])).toStrictEqual([
-      { player: ash },
-      { text: " froze " },
-      { player: ashley },
+    const entry = logEntry("", {
+      ...logCopy`${player} played Freeze on ${bo}, who banked 3 points.`,
+      cue: "freeze",
+    });
+
+    const copy = eventDetailsWithMentions(entry, true);
+
+    expect(nameParts(copy.outcome, entry.about)).toStrictEqual([
+      { player: entry.about[1] },
+      { text: " was frozen" },
+    ]);
+    const [, detail] = copy.details;
+
+    const text = detail?.kind === "text" ? detail.text : "";
+    expect(nameParts(text, entry.about)).toStrictEqual([
+      { text: "by " },
+      { player: entry.about[0] },
     ]);
   });
 
-  it("keeps text without names whole", () => {
-    expect(nameParts("Room locked.", [ada])).toStrictEqual([
-      { text: "Room locked." },
-    ]);
-    expect(nameParts("from Ada", [])).toStrictEqual([{ text: "from Ada" }]);
+  it("keeps ordinary text whole even when it contains a player's name", () => {
+    expect(nameParts("from Ada", [ada])).toStrictEqual([{ text: "from Ada" }]);
   });
 });
 
 describe(involves, () => {
   it("finds every player an event names, by ID", () => {
     const frozen = logEntry("Ada played Freeze on Bo, who banked 3 points.", {
-      about: [ada, bo],
+      about: [
+        { ...ada, offset: 0 },
+        { ...bo, offset: "Ada played Freeze on ".length },
+      ],
       cue: "freeze",
     });
 
@@ -731,7 +763,7 @@ describe(involves, () => {
     const alexander = { id: "y", name: "Alexander" };
 
     const stayed = logEntry("Alexander stayed and banked 4 points.", {
-      about: [alexander],
+      about: [{ ...alexander, offset: 0 }],
       cue: "bank",
     });
 
@@ -755,16 +787,16 @@ describe(summarizeRound, () => {
     expect(
       summarizeRound([
         logEntry("Bo was dealt a duplicate 5 and busted.", {
-          about: [bo],
+          about: [{ ...bo, offset: 0 }],
           cue: "bust",
         }),
         said("Bo", "ugh"),
         logEntry("Cy earned the Flip 7 bonus!", {
-          about: [cy],
+          about: [{ ...cy, offset: 0 }],
           cue: "flipSeven",
         }),
         logEntry("Ada was dealt a duplicate 9 and busted.", {
-          about: [ada],
+          about: [{ ...ada, offset: 0 }],
           cue: "bust",
         }),
         roundOver([
@@ -780,11 +812,11 @@ describe(summarizeRound, () => {
     expect(
       summarizeRound([
         logEntry("Bo stayed and banked 8 points.", {
-          about: [bo],
+          about: [{ ...bo, offset: 0 }],
           cue: "bank",
         }),
         logEntry("Ada earned the Flip 7 bonus!", {
-          about: [ada],
+          about: [{ ...ada, offset: 0 }],
           cue: "flipSeven",
         }),
         roundOver([

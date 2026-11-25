@@ -10,7 +10,7 @@ import GameLog from "./game-log";
 
 const entries = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
-    about: [{ id: `p${index}`, name: `Player ${index}` }],
+    about: [{ id: `p${index}`, name: `Player ${index}`, offset: 0 }],
     at: 0,
     cue: "bank",
     game: 1,
@@ -31,13 +31,13 @@ const twoRounds = () => {
     "about" | "cue" | "from" | "round" | "scores" | "text"
   >[] = [
     {
-      about: [anaNamed],
+      about: [{ ...anaNamed, offset: 0 }],
       cue: "bank",
       round: 1,
       text: "Ana stayed and banked 12 points.",
     },
     {
-      about: [benNamed],
+      about: [{ ...benNamed, offset: 0 }],
       cue: "bust",
       round: 1,
       text: "Ben was dealt a duplicate 9 and busted.",
@@ -52,9 +52,13 @@ const twoRounds = () => {
       ],
       text: "Round 1 is over.",
     },
-    { about: [anaNamed], round: 2, text: "Round 2 begins. Ana deals." },
     {
-      about: [benNamed],
+      about: [{ ...anaNamed, offset: "Round 2 begins. ".length }],
+      round: 2,
+      text: "Round 2 begins. Ana deals.",
+    },
+    {
+      about: [{ ...benNamed, offset: 0 }],
       cue: "bank",
       round: 2,
       text: "Ben stayed and banked 30 points.",
@@ -104,13 +108,7 @@ describe("<GameLog />", () => {
 
   it("tells spectators why they can't chat", () => {
     render(() => (
-      <GameLog
-        phase="playing"
-        log={entries(1)}
-        playerId={null}
-        players={players}
-        typing={[]}
-      />
+      <GameLog log={entries(1)} playerId={null} players={players} typing={[]} />
     ));
 
     expect(screen.queryByRole("textbox", { name: "Chat message" })).toBeNull();
@@ -138,13 +136,7 @@ describe("<GameLog />", () => {
     }));
 
     render(() => (
-      <GameLog
-        phase="playing"
-        log={log}
-        playerId={own.id}
-        players={[own, guest]}
-        typing={[]}
-      />
+      <GameLog log={log} playerId={own.id} players={[own, guest]} typing={[]} />
     ));
 
     const bubbles = screen
@@ -171,7 +163,6 @@ describe("<GameLog />", () => {
     const sent: string[] = [];
     render(() => (
       <GameLog
-        phase="playing"
         log={[]}
         playerId="p0"
         players={players}
@@ -228,13 +219,7 @@ describe("<GameLog />", () => {
 
   it("folds a finished round into a summary that keeps its chat", () => {
     render(() => (
-      <GameLog
-        phase="playing"
-        log={twoRounds()}
-        playerId="a"
-        players={players}
-        typing={[]}
-      />
+      <GameLog log={twoRounds()} playerId="a" players={players} typing={[]} />
     ));
 
     const toggle = screen.getByRole("button", { name: "Round 1" });
@@ -277,45 +262,33 @@ describe("<GameLog />", () => {
   });
 
   it("makes the last round foldable as soon as it finishes", () => {
-    const [phase, setPhase] = createSignal<
-      "playing" | "roundOver" | "gameOver"
-    >("playing");
+    const [log, setLog] = createSignal(twoRounds());
 
-    const log = twoRounds();
-    log.push({
+    const settlement: LogEntry = {
       about: [],
       at: Date.now(),
       game: 1,
-      id: log.length + 1,
+      id: log().length + 1,
       round: 2,
       scores: [
         { ...anaNamed, points: 0 },
         { ...benNamed, points: 30 },
       ],
       text: "Round 2 is over.",
-    });
+    };
 
     render(() => (
-      <GameLog
-        phase={phase()}
-        log={log}
-        playerId="a"
-        players={players}
-        typing={[]}
-      />
+      <GameLog log={log()} playerId="a" players={players} typing={[]} />
     ));
 
     expect(screen.queryByRole("button", { name: "Round 2" })).toBeNull();
-    setPhase("roundOver");
+    setLog([...log(), settlement]);
     flush();
 
     const toggle = screen.getByRole("button", { name: "Round 2" });
 
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("Ben +30")).toBeVisible();
-    setPhase("gameOver");
-    flush();
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
   it("keeps a chat run split by an event even when the event is hidden", () => {
@@ -329,7 +302,15 @@ describe("<GameLog />", () => {
         round: 1,
         text: "First",
       },
-      { about: [], at: 2000, game: 1, id: 2, round: 1, text: "Room unlocked." },
+      {
+        about: [],
+        at: 2000,
+        game: 1,
+        id: 2,
+        round: 1,
+        scores: [],
+        text: "Round 1 is over.",
+      },
       {
         about: [],
         at: 3000,
@@ -342,13 +323,7 @@ describe("<GameLog />", () => {
     ];
 
     render(() => (
-      <GameLog
-        phase="roundOver"
-        log={log}
-        playerId="a"
-        players={players}
-        typing={[]}
-      />
+      <GameLog log={log} playerId="a" players={players} typing={[]} />
     ));
 
     expect(isContinuation("Second")).toBeFalsy();
@@ -375,13 +350,7 @@ describe("<GameLog />", () => {
       const [log, setLog] = createSignal<LogEntry[]>([entry]);
 
       render(() => (
-        <GameLog
-          phase="playing"
-          log={log()}
-          playerId="a"
-          players={players}
-          typing={[]}
-        />
+        <GameLog log={log()} playerId="a" players={players} typing={[]} />
       ));
       const viewport = screen.getByRole("log");
       Object.defineProperties(viewport, {
@@ -399,7 +368,12 @@ describe("<GameLog />", () => {
 
       setLog([
         entry,
-        { ...entry, id: 2, text: "Round 1 is over." },
+        {
+          ...entry,
+          id: 2,
+          scores: [{ ...benNamed, points: 8 }],
+          text: "Round 1 is over.",
+        },
         { ...entry, id: 3, round: 2, text: "Round 2 begins. Ana deals." },
       ]);
       flush();
@@ -428,13 +402,7 @@ describe("<GameLog />", () => {
       text: "gg",
     });
     render(() => (
-      <GameLog
-        phase="playing"
-        log={log}
-        playerId="a"
-        players={players}
-        typing={[]}
-      />
+      <GameLog log={log} playerId="a" players={players} typing={[]} />
     ));
 
     fireEvent.click(screen.getByRole("radio", { name: "Chat" }));
@@ -450,13 +418,7 @@ describe("<GameLog />", () => {
 
   it("tints your own events and shows cards and points as chips", () => {
     render(() => (
-      <GameLog
-        phase="playing"
-        log={twoRounds()}
-        playerId="b"
-        players={players}
-        typing={[]}
-      />
+      <GameLog log={twoRounds()} playerId="b" players={players} typing={[]} />
     ));
     fireEvent.click(screen.getByRole("button", { name: "Round 1" }));
     flush();
@@ -473,13 +435,7 @@ describe("<GameLog />", () => {
 
   it("highlights a player's lines when their name is tapped", () => {
     render(() => (
-      <GameLog
-        phase="playing"
-        log={twoRounds()}
-        playerId="a"
-        players={players}
-        typing={[]}
-      />
+      <GameLog log={twoRounds()} playerId="a" players={players} typing={[]} />
     ));
     fireEvent.click(screen.getByRole("button", { name: "Round 1" }));
     flush();
@@ -508,7 +464,6 @@ describe("<GameLog />", () => {
     const chat = chatControls();
     render(() => (
       <GameLog
-        phase="playing"
         log={[]}
         playerId="a"
         players={players}
@@ -541,7 +496,6 @@ describe("<GameLog />", () => {
 
     render(() => (
       <GameLog
-        phase="playing"
         log={log()}
         playerId="p0"
         players={players}

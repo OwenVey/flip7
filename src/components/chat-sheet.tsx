@@ -12,7 +12,7 @@ import {
 import type { SnapPoint } from "@ui-sdk/solid/drawer";
 import { createSignal, Show, untrack } from "solid-js";
 
-import type { LogEntry, LogPlayer, Phase } from "../game/engine";
+import type { LogEntry, LogPlayer } from "../game/engine";
 import { countChatsAfter } from "../lib/game-log-entries";
 import type { ChatControls } from "../lib/room-connection";
 import GameLog, { CHAT_AND_GAME_LOG_TITLE } from "./game-log";
@@ -29,7 +29,6 @@ const SNAP_POINTS: SnapPoint[] = [HALF, "content"];
  */
 export default function ChatSheet(props: {
   log: LogEntry[];
-  phase: Phase;
   playerId: string | null;
   /** Missing for a spectator, who can read the chat but not send to it. */
   chat?: ChatControls | undefined;
@@ -122,7 +121,6 @@ export default function ChatSheet(props: {
           <GameLog
             inSheet
             log={props.log}
-            phase={props.phase}
             playerId={props.playerId}
             chat={props.chat}
             players={props.players}

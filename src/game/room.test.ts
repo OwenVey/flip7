@@ -378,7 +378,29 @@ describe("commands", () => {
     expect(relayed(false, true, false, false)).toStrictEqual([true, false]);
   });
 
-  it("relays typing starts at most every few seconds, or again after a chat", () => {
+  it("keeps typing visible when one seat sends a chat and another is still typing", () => {
+    const h = harness();
+    const ana = joinAs(h, "ana-tab", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+    h.connect("ana-phone");
+    h.room.join("ana-phone", "", ana.token);
+
+    h.room.typing("ana-tab", true);
+    h.room.typing("ana-phone", true);
+
+    expect(
+      h.room.chat("ana-tab", "hi").effects.map((effect) => effect.type)
+    ).toStrictEqual(["broadcast"]);
+    expect(h.room.typing("ana-phone", false)).toStrictEqual([
+      {
+        except: ["ana-tab", "ana-phone"],
+        message: { active: false, playerId: ana.playerId, type: "typing" },
+        type: "relay",
+      },
+    ]);
+  });
+
+  it("keeps the typing relay cooldown across a chat send", () => {
     const { h, relayed } = typingRelays();
 
     expect(relayed(true, true)).toStrictEqual([true]);
@@ -387,6 +409,9 @@ describe("commands", () => {
     expect(relayed(true)).toStrictEqual([true]);
 
     h.room.chat("ana-tab", "hi");
+    expect(relayed(true)).toStrictEqual([]);
+
+    h.advance(TYPING_RELAY_MS);
     expect(relayed(true)).toStrictEqual([true]);
   });
 });

@@ -154,6 +154,20 @@
     box-shadow: 0 0 0 var(--button-ink);
   }
 
+  &[data-variant="disclosure"] {
+    padding-inline: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    color: inherit;
+    font: inherit;
+
+    &:active:not([data-disabled], [aria-disabled="true"]) {
+      transform: none;
+      box-shadow: none;
+    }
+  }
+
   /* A paper button whose red ink warns without competing with the main action. */
   &[data-tone="danger"]:not([data-variant]) {
     --button-ink: var(--danger-ink);

@@ -391,20 +391,11 @@
     display: inline-flex;
     gap: 0.25rem;
     align-items: center;
-    min-height: 0;
-    padding: 0;
-    border: 0;
-    background: none;
-    box-shadow: none;
-    color: inherit;
-    font: inherit;
     letter-spacing: var(--tracking-wider);
     text-transform: inherit;
-    cursor: pointer;
 
     &:active {
       transform: none;
-      box-shadow: none;
     }
 
     & svg {

@@ -142,7 +142,6 @@ export default function Table(
                 setLogOpen(open);
               }}
               log={props.room.log}
-              phase={props.room.phase}
               playerId={props.playerId}
               chat={chat()}
               players={props.room.players}
@@ -239,7 +238,6 @@ export default function Table(
             </section>
             <GameLog
               log={props.room.log}
-              phase={props.room.phase}
               playerId={props.playerId}
               chat={chat()}
               players={props.room.players}

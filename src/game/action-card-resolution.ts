@@ -1,5 +1,7 @@
 import { cardLabel } from "./cards";
 import type { ActionCard, Card } from "./cards";
+import { logCopy } from "./log-copy";
+import type { LogCopy } from "./log-copy";
 
 export const FLIP_THREE_COUNT = 3;
 
@@ -61,10 +63,7 @@ interface ResolutionState extends ActionCardState {
 }
 
 /** Logs a line, with the players it names. */
-type Say = (
-  text: string,
-  said?: { about?: readonly CardOwner[]; cue?: "special" }
-) => void;
+type Say = (text: string | LogCopy, said?: { cue?: "special" }) => void;
 
 interface ResolutionEffects {
   apply: (owner: CardOwner, card: ActionCard, targetId: string) => void;
@@ -198,10 +197,9 @@ const assignDeferred = (
   assignment.assigned.push({ card, ownerId: assignment.chooserId, targetId });
   say(
     targetId === assignment.chooserId
-      ? `${chooser?.name ?? "Someone"} assigned ${cardLabel(card)} to themselves.`
-      : `${chooser?.name ?? "Someone"} assigned ${cardLabel(card)} to ${target?.name ?? "someone"}.`,
+      ? logCopy`${chooser ?? "Someone"} assigned ${cardLabel(card)} to themselves.`
+      : logCopy`${chooser ?? "Someone"} assigned ${cardLabel(card)} to ${target ?? "someone"}.`,
     {
-      about: [chooser, target].filter((player) => player !== undefined),
       cue: "special",
     }
   );
@@ -301,8 +299,7 @@ const stepActionQueue = (
   if (target?.status !== "active") {
     state.discard.push(queued.card);
     effects.say(
-      `${cardLabel(queued.card)} for ${target?.name ?? "a player who left"} was discarded, since they're out of the round.`,
-      { about: target ? [target] : [] }
+      logCopy`${cardLabel(queued.card)} for ${target ?? "a player who left"} was discarded, since they're out of the round.`
     );
 
     return true;

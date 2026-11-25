@@ -30,6 +30,7 @@ import {
   ROOM_REMOVED_CLOSE_CODE,
   toRoomPreview,
   TYPING_RELAY_MS,
+  TYPING_SHOWN_MS,
   toStateMessage,
 } from "./protocol";
 import type { ListSeqs, PreviewMessage, ServerMessage } from "./protocol";
@@ -246,6 +247,58 @@ export const createRoom = (
     }
 
     return playerId;
+  };
+
+  const typing: (connectionId: string, active: boolean) => RoomEffect[] = (
+    connectionId,
+    active
+  ) => {
+    const sender = seatOf(connectionId);
+
+    if (!sender || !findPlayer(game, sender.playerId)) {
+      return [];
+    }
+
+    const now = deps.now();
+    const last = sender.typing;
+
+    if (
+      active
+        ? last !== null && now - last.at < TYPING_RELAY_MS
+        : last?.active !== true
+    ) {
+      return [];
+    }
+
+    seats.assign(connectionId, {
+      ...sender,
+      typing: { active, at: active ? now : (last?.at ?? now) },
+    });
+
+    const siblings = seatedConnections(sender.playerId);
+
+    if (
+      !active &&
+      siblings.some(({ id, admission }) => {
+        const other = playerSeat(admission)?.typing;
+
+        return (
+          id !== connectionId &&
+          other?.active === true &&
+          now - other.at < TYPING_SHOWN_MS
+        );
+      })
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        except: siblings.map(({ id }) => id),
+        message: { active, playerId: sender.playerId, type: "typing" },
+        type: "relay",
+      },
+    ];
   };
 
   const seat = (connectionId: string, playerId: string) => {
@@ -554,46 +607,12 @@ export const createRoom = (
         attempt(() => {
           chat(game, seatedPlayer(connectionId), text);
 
-          const sender = seatOf(connectionId);
-
-          if (sender) {
-            seats.assign(connectionId, { ...sender, typing: null });
-          }
-
-          return [BROADCAST];
+          return [BROADCAST, ...typing(connectionId, false)];
         })
       );
     },
 
-    typing: (connectionId: string, active: boolean) => {
-      const effects: RoomEffect[] = [];
-      const sender = seatOf(connectionId);
-
-      if (!sender || !findPlayer(game, sender.playerId)) {
-        return effects;
-      }
-
-      const now = deps.now();
-      const last = sender.typing;
-
-      const relayed = active
-        ? last === null || now - last.at >= TYPING_RELAY_MS
-        : last?.active === true;
-
-      if (relayed) {
-        seats.assign(connectionId, {
-          ...sender,
-          typing: { active, at: active || last === null ? now : last.at },
-        });
-        effects.push({
-          except: seatedConnections(sender.playerId).map(({ id }) => id),
-          message: { active, playerId: sender.playerId, type: "typing" },
-          type: "relay",
-        });
-      }
-
-      return effects;
-    },
+    typing,
 
     command: (connectionId: string, command: GameCommand) => {
       touch();
