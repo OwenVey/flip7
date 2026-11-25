@@ -10,12 +10,11 @@ import {
   DrawerTrigger,
 } from "@ui-sdk/solid/drawer";
 import type { SnapPoint } from "@ui-sdk/solid/drawer";
-import { createSignal, Show, untrack } from "solid-js";
+import { createSignal, Show } from "solid-js";
 
-import type { LogEntry, LogPlayer } from "../game/engine";
-import { countChatsAfter } from "../lib/game-log-entries";
-import type { ChatControls } from "../lib/room-connection";
-import GameLog, { CHAT_AND_GAME_LOG_TITLE } from "./game-log";
+import { createChatLogReads } from "../lib/chat-log-reads";
+import { CHAT_AND_GAME_LOG_TITLE, ChatLog } from "./game-log";
+import type { ChatLogProps } from "./game-log";
 import Tooltip from "./tooltip";
 
 const HALF = 0.5;
@@ -27,28 +26,24 @@ const SNAP_POINTS: SnapPoint[] = [HALF, "content"];
  * down to half, the table above stays usable, so players can chat while they
  * watch.
  */
-export default function ChatSheet(props: {
-  log: LogEntry[];
-  playerId: string | null;
-  /** Missing for a spectator, who can read the chat but not send to it. */
-  chat?: ChatControls | undefined;
-  players: readonly LogPlayer[];
-  /** Other players typing a chat message, by player ID. */
-  typing: readonly string[];
-  /** Set with `onOpenChange` when the page also needs to close the sheet. */
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}) {
+export default function ChatSheet(
+  props: ChatLogProps & {
+    /** Set with `onOpenChange` when the page also needs to close the sheet. */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+  }
+) {
   const [ownOpen, setOwnOpen] = createSignal(false);
   const open = () => props.open ?? ownOpen();
-  const latestLogId = () => props.log.at(-1)?.id ?? 0;
-  const [seenLogId, setSeenLogId] = createSignal(untrack(latestLogId));
 
-  const unreadChats = () =>
-    open() ? 0 : countChatsAfter(props.log, props.playerId, seenLogId());
+  const reads = createChatLogReads({
+    log: () => props.log,
+    playerId: () => props.playerId,
+    shown: open,
+  });
 
   const triggerLabel = () => {
-    const unread = unreadChats();
+    const unread = reads.unreadChats();
 
     return unread > 0
       ? `${CHAT_AND_GAME_LOG_TITLE}, ${unread} new ${unread === 1 ? "message" : "messages"}`
@@ -59,7 +54,6 @@ export default function ChatSheet(props: {
     <Drawer
       open={open()}
       onOpenChange={(next) => {
-        setSeenLogId(latestLogId());
         setOwnOpen(next);
         props.onOpenChange?.(next);
       }}
@@ -81,9 +75,9 @@ export default function ChatSheet(props: {
         )}
       >
         <MessageCircle size={16} aria-hidden="true" />
-        <Show when={unreadChats() > 0}>
+        <Show when={reads.unreadChats() > 0}>
           <span class="unread-count" aria-hidden="true">
-            {unreadChats()}
+            {reads.unreadChats()}
           </span>
         </Show>
         <span class="button-label" aria-hidden="true">
@@ -118,10 +112,9 @@ export default function ChatSheet(props: {
           class="chat-sheet-body"
           data-agent-hidden={open() ? undefined : ""}
         >
-          <GameLog
+          <ChatLog
+            reads={reads}
             inSheet
-            log={props.log}
-            playerId={props.playerId}
             chat={props.chat}
             players={props.players}
             typing={props.typing}

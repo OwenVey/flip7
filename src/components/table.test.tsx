@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
@@ -40,6 +41,16 @@ const spectator = () => ({
     unavailable: false,
   },
   onLeave: vi.fn<() => void>(),
+});
+
+const benChat = (id: number, text: string) => ({
+  about: [],
+  at: LOGGED_AT,
+  from: { avatar: 1, id: "b", name: "Ben" },
+  game: 1,
+  id,
+  round: 1,
+  text,
 });
 
 describe("<Table />", () => {
@@ -1279,6 +1290,163 @@ describe("<Table />", () => {
     flush();
     expect(screen.queryByRole("dialog", { name: "Chat & Log" })).toBeNull();
     expect(toggle).toHaveFocus();
+  });
+
+  it.each([
+    ["keeps previously visible chat read", false, "Chat & Log"],
+    [
+      "keeps chat arriving with round end unread",
+      true,
+      "Chat & Log, 1 new message",
+    ],
+  ])(
+    "%s when Scores replaces the open sheet",
+    async (_, arrivesAtRoundEnd, label) => {
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+      vi.stubGlobal("matchMedia", (query: string) => ({
+        matches: query.includes("width < 64rem"),
+      }));
+
+      try {
+        const [view, setView] = createSignal(room());
+
+        render(() => (
+          <Table
+            room={view()}
+            playerId="a"
+            send={vi.fn<RoomConnection["send"]>()}
+            chat={chatControls()}
+            typing={[]}
+          />
+        ));
+
+        const toggle = screen.getByRole("button", { name: "Chat & Log" });
+        toggle.click();
+        flush();
+        const sheet = await screen.findByRole("dialog", { name: "Chat & Log" });
+
+        setView(room({ log: [benChat(1, "gl")] }));
+        flush();
+        await within(sheet).findByText("gl");
+        await waitFor(() => {
+          expect(within(sheet).getByRole("log")).toHaveAttribute(
+            "data-at-y-end"
+          );
+        });
+
+        const chatted = room({
+          log: [benChat(1, "gl"), benChat(2, "nice hit")],
+        });
+
+        if (!arrivesAtRoundEnd) {
+          setView(chatted);
+          flush();
+          await within(sheet).findByText("nice hit");
+        }
+
+        setView({ ...chatted, phase: "roundOver" });
+        flush();
+
+        await screen.findByRole("dialog", { name: "Scores" });
+        expect(screen.queryByRole("dialog", { name: "Chat & Log" })).toBeNull();
+        expect(toggle).toHaveAccessibleName(label);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    }
+  );
+
+  it.each([9, 10])(
+    "counts replacement chat after restoring the log to entry %i",
+    (id) => {
+      const retained = benChat(id - 1, "retained");
+      const original = [retained, benChat(id, "original")];
+
+      if (id === 9) {
+        original.push(benChat(10, "lost in restore"));
+      }
+
+      const [view, setView] = createSignal(room({ log: original }));
+      render(() => (
+        <Table
+          room={view()}
+          playerId="a"
+          send={vi.fn<RoomConnection["send"]>()}
+          chat={chatControls()}
+          typing={[]}
+        />
+      ));
+
+      const toggle = screen.getByRole("button", { name: "Chat & Log" });
+      const restored = [{ ...retained }, benChat(id, "replacement")];
+      setView(room({ log: restored }));
+      flush();
+
+      expect(toggle).toHaveAccessibleName("Chat & Log, 1 new message");
+
+      setView(room({ log: [...restored, benChat(id + 1, "new chat")] }));
+      flush();
+
+      expect(toggle).toHaveAccessibleName("Chat & Log, 2 new messages");
+    }
+  );
+
+  it("keeps chat unread when the sheet closes during a jump to latest", async () => {
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
+    });
+
+    const [view, setView] = createSignal(
+      room({ log: [benChat(1, "first chat")] })
+    );
+
+    render(() => (
+      <Table
+        room={view()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={chatControls()}
+        typing={[]}
+      />
+    ));
+
+    const toggle = screen.getByRole("button", { name: "Chat & Log" });
+    toggle.click();
+    flush();
+
+    const sheet = await screen.findByRole("dialog", { name: "Chat & Log" });
+    const log = within(sheet).getByRole("log");
+    Object.defineProperties(log, {
+      clientHeight: { value: 200 },
+      scrollHeight: { value: 1000 },
+    });
+
+    log.scrollTop = 800;
+    fireEvent.scroll(log);
+    vi.advanceTimersToNextFrame();
+    log.scrollTop = 100;
+    fireEvent.scroll(log);
+    vi.advanceTimersToNextFrame();
+    await Promise.resolve();
+    flush();
+
+    setView(
+      room({ log: [benChat(1, "first chat"), benChat(2, "unread chat")] })
+    );
+    flush();
+    expect(toggle).toHaveAccessibleName("Chat & Log, 1 new message");
+
+    within(sheet)
+      .getByRole("button", { name: /Jump to latest/u })
+      .click();
+    flush();
+
+    expect(log).toHaveAttribute("data-sticking");
+    expect(log).not.toHaveAttribute("data-at-y-end");
+    within(sheet).getByRole("button", { name: "Close" }).click();
+    flush();
+
+    expect(toggle).toHaveAccessibleName("Chat & Log, 1 new message");
   });
 
   it("keeps the chat draft after dismissing the sheet with Escape", async () => {
