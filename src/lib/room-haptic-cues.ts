@@ -58,15 +58,19 @@ export const settledHaptic = (
       : null;
   }
 
-  const draws = current.draws.filter(
-    (draw) => draw.seq > previous.drawSeq && draw.playerId === playerId
+  const draws = current.dealHistory.flatMap((event) =>
+    event.type === "draw" &&
+    event.seq > previous.dealSeq &&
+    event.playerId === playerId
+      ? [event]
+      : []
   );
 
-  if (draws.some(({ outcome }) => outcome === "bust")) {
+  if (draws.some((event) => event.outcome === "bust")) {
     return "bust";
   }
 
-  if (draws.some(({ outcome }) => outcome === "saved")) {
+  if (draws.some((event) => event.outcome === "saved")) {
     return "saved";
   }
 

@@ -5,6 +5,8 @@ import type { LogCopy } from "./log-copy";
 
 export const FLIP_THREE_COUNT = 3;
 
+type HeldActionCard = Exclude<ActionCard, { kind: "secondChance" }>;
+
 export interface ActionCardChoice {
   chooserId: string;
   card: ActionCard;
@@ -21,13 +23,19 @@ interface FlipThreeSequence {
   card: ActionCard;
   targetId: string;
   remaining: number;
-  deferred: ActionCard[];
+  deferred: HeldActionCard[];
 }
 
 interface QueuedAction {
   ownerId: string;
-  card: ActionCard;
+  card: HeldActionCard;
   targetId: string;
+}
+
+export interface HeldActionResolution {
+  card: HeldActionCard;
+  targetId: string;
+  outcome: "played" | "discarded";
 }
 
 /**
@@ -36,7 +44,7 @@ interface QueuedAction {
  */
 interface DeferredAssignment {
   chooserId: string;
-  cards: ActionCard[];
+  cards: HeldActionCard[];
   assigned: QueuedAction[];
 }
 
@@ -69,6 +77,7 @@ interface ResolutionEffects {
   apply: (owner: CardOwner, card: ActionCard, targetId: string) => void;
   draw: () => Card | undefined;
   flip: (playerId: string, card: Card, flip: FlipDraw) => void;
+  resolveHeld: (resolution: HeldActionResolution) => void;
   say: Say;
 }
 
@@ -295,6 +304,11 @@ const stepActionQueue = (
   const owner = findPlayer(state, queued.ownerId);
 
   const target = findPlayer(state, queued.targetId);
+  effects.resolveHeld({
+    card: queued.card,
+    outcome: target?.status === "active" ? "played" : "discarded",
+    targetId: queued.targetId,
+  });
 
   if (target?.status !== "active") {
     state.discard.push(queued.card);

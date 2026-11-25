@@ -91,10 +91,37 @@ const state = () => toStateMessage("ABCDE", game, {}, 1);
 describe(parseServerMessage, () => {
   it("accepts a live room update the Worker sends", () => {
     expect(parseServerMessage(JSON.stringify(state()))).toMatchObject({
-      lists: { draws: { after: null }, log: { after: null } },
+      lists: { dealHistory: { after: null }, log: { after: null } },
       room: { players: [{ name: "Ana" }, { name: "Ben" }], spectatorCount: 1 },
       type: "state",
     });
+  });
+
+  it("rejects a held action resolution without a target", () => {
+    const message = state();
+
+    const dealHistory = {
+      after: null,
+      entries: [
+        {
+          card: { id: 80, kind: "freeze" },
+          outcome: "played",
+          seq: 1,
+          type: "heldAction",
+        },
+      ],
+      seq: 1,
+    };
+
+    expect(
+      parseServerMessage(
+        JSON.stringify({
+          ...message,
+          lists: { ...message.lists, dealHistory },
+          room: { ...message.room, dealSeq: 1 },
+        })
+      )
+    ).toBeNull();
   });
 
   it.each([
@@ -143,10 +170,10 @@ describe(parseServerMessage, () => {
   it.each([
     ["without lists", { ...state(), lists: undefined }],
     [
-      "with a draws update missing its entries",
+      "with a deal history update missing its entries",
       {
         ...state(),
-        lists: { ...state().lists, draws: { after: null, seq: 1 } },
+        lists: { ...state().lists, dealHistory: { after: null, seq: 1 } },
       },
     ],
     [

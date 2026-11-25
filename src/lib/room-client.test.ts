@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { parseClientMessage } from "../game/client-message";
-import { DRAW_LIMIT } from "../game/engine";
+import { DEAL_HISTORY_LIMIT } from "../game/engine";
 import {
   ROOM_REMOVED_CLOSE_CODE,
   TYPING_SEND_MS,
@@ -603,14 +603,16 @@ describe("the log through the room client", () => {
 
 type Network = ReturnType<typeof network>;
 
-const serverDraws = (net: Network) => ({
+const serverDealHistory = (net: Network) => ({
+  dealSeq: net.stored.game.dealSeq,
   drawSeq: net.stored.game.drawSeq,
-  draws: net.stored.game.draws,
+  dealHistory: net.stored.game.dealHistory,
 });
 
-const drawsOf = (player: TestPlayer) => ({
+const dealHistoryOf = (player: TestPlayer) => ({
+  dealSeq: player.client.state.room?.dealSeq,
   drawSeq: player.client.state.room?.drawSeq,
-  draws: player.client.state.room?.draws,
+  dealHistory: player.client.state.room?.dealHistory,
 });
 
 const sendNextMove = async (net: Network) => {
@@ -691,7 +693,7 @@ const missABroadcastWithDraws = async () => {
   return { ana, net, next, shown };
 };
 
-describe("draws through the room client", () => {
+describe("Deal playback history through the room client", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -700,25 +702,25 @@ describe("draws through the room client", () => {
     vi.useRealTimers();
   });
 
-  it("adds each broadcast's new draws to the draws it has", async () => {
+  it("appends each broadcast's Deal playback events in order", async () => {
     const net = network();
     const ana = net.join("Ana");
     const ben = net.join("Ben");
     await moveTableOn(net);
 
     for (let move = 0; move < 12; move += 1) {
-      const before = ben.client.state.room?.draws ?? [];
+      const before = ben.client.state.room?.dealHistory ?? [];
       await moveTableOn(net);
-      const after = ben.client.state.room?.draws ?? [];
+      const after = ben.client.state.room?.dealHistory ?? [];
       const kept = before.filter((draw) => after.includes(draw));
 
       expect({
-        ana: drawsOf(ana),
-        ben: drawsOf(ben),
+        ana: dealHistoryOf(ana),
+        ben: dealHistoryOf(ben),
         keptInOrder: after.slice(0, kept.length),
       }).toStrictEqual({
-        ana: serverDraws(net),
-        ben: serverDraws(net),
+        ana: serverDealHistory(net),
+        ben: serverDealHistory(net),
         keptInOrder: kept,
       });
     }
@@ -738,24 +740,24 @@ describe("draws through the room client", () => {
       if (
         game.games === 1 &&
         game.phase === "roundOver" &&
-        game.drawSeq > DRAW_LIMIT
+        game.dealSeq > DEAL_HISTORY_LIMIT
       ) {
         game.phase = "gameOver";
       }
 
       await moveTableOn(net);
 
-      expect([drawsOf(ana), drawsOf(ben)]).toStrictEqual([
-        serverDraws(net),
-        serverDraws(net),
+      expect([dealHistoryOf(ana), dealHistoryOf(ben)]).toStrictEqual([
+        serverDealHistory(net),
+        serverDealHistory(net),
       ]);
     }
 
     expect({
-      draws: ben.client.state.room?.draws.length,
+      dealHistory: ben.client.state.room?.dealHistory.length,
       games: game.games,
       syncs: net.syncs,
-    }).toStrictEqual({ draws: DRAW_LIMIT, games: 2, syncs: [] });
+    }).toStrictEqual({ dealHistory: DEAL_HISTORY_LIMIT, games: 2, syncs: [] });
   });
 
   it("catches up on draws made while reconnecting", async () => {
@@ -777,7 +779,7 @@ describe("draws through the room client", () => {
     net.connect(ana);
     net.flush();
 
-    expect(drawsOf(ana)).toStrictEqual(serverDraws(net));
+    expect(dealHistoryOf(ana)).toStrictEqual(serverDealHistory(net));
     expect(net.syncs).toStrictEqual([]);
   });
 
@@ -795,16 +797,16 @@ describe("draws through the room client", () => {
     net.flush();
     await expect(next).resolves.toBeTruthy();
 
-    expect({ ...drawsOf(ana), syncs: net.syncs }).toStrictEqual({
-      ...serverDraws(net),
+    expect({ ...dealHistoryOf(ana), syncs: net.syncs }).toStrictEqual({
+      ...serverDealHistory(net),
       syncs: [ana.link?.id],
     });
     expect(ana.client.state.room?.drawSeq).toBeGreaterThan(shown?.drawSeq ?? 0);
 
     await moveTableOn(net);
 
-    expect({ ...drawsOf(ana), syncs: net.syncs }).toStrictEqual({
-      ...serverDraws(net),
+    expect({ ...dealHistoryOf(ana), syncs: net.syncs }).toStrictEqual({
+      ...serverDealHistory(net),
       syncs: [ana.link?.id],
     });
   });
@@ -836,11 +838,11 @@ describe("a room that goes back to an older save", () => {
     net.flush();
 
     expect({
-      ...drawsOf(ana),
+      ...dealHistoryOf(ana),
       log: ana.client.state.room?.log,
       syncs: net.syncs,
     }).toStrictEqual({
-      ...serverDraws(net),
+      ...serverDealHistory(net),
       log: net.stored.game.log,
       syncs: [ana.link?.id, ben.link?.id],
     });

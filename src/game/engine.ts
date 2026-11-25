@@ -8,7 +8,11 @@ import {
   resetActionCards,
   startFlipThree,
 } from "./action-card-resolution";
-import type { ActionCardState, FlipDraw } from "./action-card-resolution";
+import type {
+  ActionCardState,
+  FlipDraw,
+  HeldActionResolution,
+} from "./action-card-resolution";
 import { decideBotMove } from "./bot";
 import {
   buildDeck,
@@ -38,8 +42,8 @@ export type { LogPlayer } from "./log-copy";
 /** The most log entries a room keeps. The log starts over each game, so this only guards against runaway chat. */
 export const LOG_LIMIT = 1000;
 
-/** The most recent draws a room keeps, enough for deal playback to replay one update card by card. */
-export const DRAW_LIMIT = 40;
+/** How many draws and held action resolutions each Room keeps for Deal playback. */
+export const DEAL_HISTORY_LIMIT = 40;
 export const CHAT_MAX_LENGTH = 200;
 const WHITESPACE = /\s+/gu;
 
@@ -77,7 +81,7 @@ export type DrawOutcome = "kept" | "bust" | "saved" | "held" | "action";
 
 /** One card leaving the deck. These are sent in WebSocket state messages. */
 export interface DrawEvent {
-  seq: number;
+  type: "draw";
   card: Card;
   playerId: string;
   /** Set when the card is one of the flips of a Flip Three. */
@@ -85,6 +89,12 @@ export interface DrawEvent {
   outcome: DrawOutcome;
   hit?: true;
 }
+
+type UnsequencedDealEvent =
+  | DrawEvent
+  | ({ type: "heldAction" } & HeldActionResolution);
+
+export type DealEvent = UnsequencedDealEvent & { seq: number };
 
 export type GameCue =
   | "bank"
@@ -144,10 +154,12 @@ export interface GameState extends ActionCardState {
   logSeq: number;
   /** `logSeq` when the log was last cleared. */
   logClearedAt: number;
-  /** The seq of the newest draw. Never reset, so draws keep unique seqs for the life of the room. */
+  /** Counts cards drawn for the life of the room. */
   drawSeq: number;
-  /** The most recent draws, oldest first. */
-  draws: DrawEvent[];
+  /** The newest Deal playback event's sequence, never reset. */
+  dealSeq: number;
+  /** Recent draws and held action resolutions in execution order. */
+  dealHistory: DealEvent[];
   /** Players who have taken Flip Three draws this round. They get Hit or Stay at their opening slot instead of a dealt card. */
   flipThreeTargetIds: string[];
   /** The current turn is an opening slot, so it doesn't move where play resumes. */
@@ -173,8 +185,9 @@ export const createGame = () => {
     dealerIndex: -1,
     deck: [],
     discard: [],
+    dealHistory: [],
+    dealSeq: 0,
     drawSeq: 0,
-    draws: [],
     evictedCards: [],
     flipThreeTargetIds: [],
     games: 0,
@@ -465,6 +478,14 @@ const placeDealtCard = (state: GameState, player: Player, card: Card) => {
   return "action" satisfies DrawOutcome;
 };
 
+const recordDeal = (state: GameState, event: UnsequencedDealEvent) => {
+  state.dealSeq += 1;
+  state.dealHistory = [
+    ...state.dealHistory,
+    { ...event, seq: state.dealSeq },
+  ].slice(-DEAL_HISTORY_LIMIT);
+};
+
 const resolveDealtCard = (
   state: GameState,
   player: Player,
@@ -480,15 +501,14 @@ const resolveDealtCard = (
     state.flipThreeTargetIds = [...state.flipThreeTargetIds, player.id];
   }
 
-  state.draws.push({
+  recordDeal(state, {
     card,
     flip: flip?.progress ?? null,
     ...(source === "hit" && { hit: true }),
     outcome,
     playerId: player.id,
-    seq: state.drawSeq,
+    type: "draw",
   });
-  state.draws = state.draws.slice(-DRAW_LIMIT);
 };
 
 const nextActiveAfter = (state: GameState, index: number) => {
@@ -610,6 +630,9 @@ const advance = (state: GameState, random: Random) => {
     draw: () => draw(state, random),
     flip: (playerId: string, card: Card, flip: FlipDraw) => {
       resolveDealtCard(state, getPlayer(state, playerId), card, flip);
+    },
+    resolveHeld: (resolution: HeldActionResolution) => {
+      recordDeal(state, { ...resolution, type: "heldAction" });
     },
     say: (text: string | LogCopy, said?: Said) => {
       say(state, text, said);

@@ -305,8 +305,8 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       askedForLists = raw({ type: "sync" });
     }
 
-    // WARNING: deal playback reads the cards dealt since the shown room from draws, so keep showing that room until they arrive.
-    if (received.gaps.includes("draws")) {
+    // WARNING: Deal playback needs the history since the shown room, so keep showing that room until the history arrives.
+    if (received.gaps.includes("dealHistory")) {
       return;
     }
 
