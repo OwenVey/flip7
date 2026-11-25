@@ -52,10 +52,10 @@
     },
     "chief-of-staff": {
       "source": "mattpocock/skills",
-      "commit": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
+      "commit": "6f7f7831a625f040a8e06a0e7954826b87ce775a",
       "sourceType": "github",
       "skillPath": "skills/in-progress/chief-of-staff/SKILL.md",
-      "computedHash": "dc3348d0f641956ea78dafa037aea745154c516a286ed4156b0c2ec0cbcf581b"
+      "computedHash": "a429ec90dfd59d2fc00d1d6ebae34a315068856b5b4b64a9e2f6a1c9c86e7e0f"
     },
     "choreograph": {
       "source": "emilkowalski/skills",
@@ -94,10 +94,10 @@
     },
     "domain-modeling": {
       "source": "mattpocock/skills",
-      "commit": "abeeaf95660ba9e8b7c753eb38f441ca707a8823",
+      "commit": "6f7f7831a625f040a8e06a0e7954826b87ce775a",
       "sourceType": "github",
       "skillPath": "skills/engineering/domain-modeling/SKILL.md",
-      "computedHash": "b78689833404148c769077355e12dbe5ad996a158a1e21e58ddf169e439d9d8c"
+      "computedHash": "7d4453f798d7785c945972abe0871493caf884fa3ee82725cc71e783de6176ea"
     },
     "emil-design-eng": {
       "source": "emilkowalski/skills",
@@ -339,10 +339,10 @@
     },
     "ui-sdk": {
       "source": "vercel-labs/ui",
-      "commit": "3647512865fe0242b749dd8981c51c75ad5f486b",
+      "commit": "d5c6249e1a0b1df47334d3012180bfba9b9374ec",
       "sourceType": "github",
       "skillPath": "packages/core/skills/ui-sdk/SKILL.md",
-      "computedHash": "9a60caf01da3d47beedf627bf1505d922dccc93b04f294c6aa64edf01c46b3ba"
+      "computedHash": "1af8b09475fd1c8784489c4c1099eb167e28297c344e1102fb017ca07ce74d00"
     },
     "ultracite": {
       "source": "haydenbleasel/ultracite",
