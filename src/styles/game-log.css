@@ -603,6 +603,11 @@
 
   & .log-event[data-announcement] .log-event-text {
     font-style: italic;
+
+    /* An italic name's last letter leans past its box, which hides overflow for the ellipsis, so the padding keeps the slant visible. */
+    & .log-name {
+      padding-inline-end: 0.125rem;
+    }
   }
 
   & :is(.log-event-icon, .log-outcome) {
