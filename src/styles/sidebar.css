@@ -364,7 +364,7 @@
       margin-block-start: 2rem;
     }
 
-    & .leaderboard-body:not([data-at-y-start]) thead th::after {
+    & .leaderboard-body thead th::after {
       position: absolute;
       inset: 100% 0 auto;
       height: var(--scroll-fade-depth);

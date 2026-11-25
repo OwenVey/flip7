@@ -43,18 +43,13 @@
     position: absolute;
     z-index: 2;
     pointer-events: none;
+    content: "";
   }
 
-  @media (prefers-reduced-motion: no-preference) {
-    &::before,
-    &::after,
-    &.leaderboard-body thead th::after {
-      transition: opacity var(--duration-fast) var(--ease-settle);
-
-      @starting-style {
-        opacity: 0;
-      }
-    }
+  &::before,
+  &::after,
+  &.leaderboard-body thead th::after {
+    opacity: 0;
   }
 
   &::before {
@@ -74,23 +69,17 @@
       height: min(var(--scroll-fade-depth), 28%);
     }
 
-    &:not(.leaderboard-body, [data-at-y-start])::before {
+    &::before {
       inset: 0 0 auto;
-      content: "";
     }
 
-    &:not([data-at-y-end])::after {
+    &::after {
       inset-inline: 0;
       inset-block-end: 0;
-      content: "";
     }
 
     &.log-body::after {
       inset-block-end: 1px;
-    }
-
-    &.log-body[data-sticking]::after {
-      content: none;
     }
   }
 
@@ -109,14 +98,25 @@
       width: min(1.5rem, 28%);
     }
 
-    &:not([data-at-x-start])::before {
+    &::before {
       inset-inline-start: 0;
-      content: "";
     }
 
-    &:not([data-at-x-end])::after {
+    &::after {
       inset-inline-end: 0;
-      content: "";
+    }
+  }
+
+  &:not([data-horizontal], .leaderboard-body, [data-at-y-start])::before,
+  &:not([data-horizontal], [data-at-y-end], .log-body[data-sticking])::after,
+  &[data-horizontal]:not([data-at-x-start])::before,
+  &[data-horizontal]:not([data-at-x-end])::after,
+  &.leaderboard-body:not([data-at-y-start]) thead th::after {
+    opacity: 1;
+
+    /* Animate entry. Reaching an edge clears its fade in the same frame. */
+    @media (prefers-reduced-motion: no-preference) {
+      transition: opacity var(--duration-base) ease-out;
     }
   }
 
