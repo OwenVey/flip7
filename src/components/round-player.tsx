@@ -254,16 +254,18 @@ const RoundPlayer = (props: RoundPlayerProps) => {
       </Show>
       <header class="seat-header">
         <div class="seat-name">
-          <PlayerAvatar player={props.player} />
+          <span class="seat-avatar">
+            <PlayerAvatar player={props.player} />
+            <Show when={isMe()}>
+              <span class="avatar-tag">You</span>
+            </Show>
+            <Show when={props.player.bot}>
+              <span class="avatar-tag" data-tone="bot">
+                Bot
+              </span>
+            </Show>
+          </span>
           <strong title={props.player.name}>{props.player.name}</strong>
-          <Show when={isMe()}>
-            <span class="badge">You</span>
-          </Show>
-          <Show when={props.player.bot}>
-            <span class="badge" data-tone="bot">
-              Bot
-            </span>
-          </Show>
           <Show when={isDealer()}>
             <Tooltip
               content="Dealer"
