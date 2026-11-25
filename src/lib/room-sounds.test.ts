@@ -1,7 +1,26 @@
+import { access } from "node:fs/promises";
+import path from "node:path";
+
 import { createRoot, flush } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createRoomSounds } from "./room-sounds";
+import { createRoomSounds, nextTake } from "./room-sounds";
+
+const CUES = [
+  "bank",
+  "bust",
+  "deal",
+  "error",
+  "flipSeven",
+  "freeze",
+  "join",
+  "message",
+  "reveal",
+  "round",
+  "special",
+  "turn",
+  "win",
+];
 
 const KEYS = [
   "flip7:sound-muted",
@@ -60,5 +79,40 @@ describe(createRoomSounds, () => {
     });
     first.dispose();
     second.dispose();
+  });
+});
+
+describe(nextTake, () => {
+  it("never repeats the take just played when there is another", () => {
+    const picks = [0, 0.6, 0.99].map((roll) => nextTake(3, 1, () => roll));
+
+    expect(picks).toStrictEqual([0, 2, 2]);
+  });
+
+  it("picks any take first, and the only take when there is one", () => {
+    expect([
+      nextTake(3, -1, () => 0),
+      nextTake(3, -1, () => 0.99),
+      nextTake(1, 0),
+    ]).toStrictEqual([0, 2, 0]);
+  });
+});
+
+describe("sound files", () => {
+  it("ships each cue and the button tap in both formats", async () => {
+    const folder = path.resolve(import.meta.dirname, "../../public/sounds");
+
+    const files = [...CUES, "tap"].flatMap((name) => [
+      `${name}.m4a`,
+      `${name}.opus`,
+    ]);
+
+    await expect(
+      Promise.all(
+        files.map(async (file) => {
+          await access(path.join(folder, file));
+        })
+      )
+    ).resolves.toBeDefined();
   });
 });

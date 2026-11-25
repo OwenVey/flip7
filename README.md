@@ -104,3 +104,5 @@ Report bugs and propose changes in [GitHub Issues](https://github.com/OwenVey/fl
 ## License
 
 Flip 7 is released under the [MIT License](LICENSE).
+
+The sound effects use recordings from Kenney (CC0) and Josh Comeau's Button Sounds (MIT). See [public/sounds/CREDITS.md](public/sounds/CREDITS.md).
