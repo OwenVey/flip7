@@ -19,7 +19,7 @@ const handCard = (root: Element, playerId: string, cardId: number | null) =>
   cardId === null
     ? null
     : root.querySelector(
-        `[data-seat="${playerId}"] :is(.hand, .seat-extras, .flip-run-card)${cardAt(cardId)}`
+        `[data-seat="${playerId}"] :is(.hand, .seat-extras, .flip-run-card, .modifier-flight-target) >${cardAt(cardId)}`
       );
 
 const destination = (root: Element, step: DealStep) => {
@@ -154,7 +154,11 @@ export const createDealMotion: (
 
     if (root && deck) {
       await sweepCards(
-        [...root.querySelectorAll(".seat .card")],
+        [
+          ...root.querySelectorAll(
+            ".seat :is(.hand, .seat-extras, .flip-run-card) > .card"
+          ),
+        ],
         deck.getBoundingClientRect(),
         signal
       );

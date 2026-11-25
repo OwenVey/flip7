@@ -71,8 +71,6 @@ describe("<RoundPlayer />", () => {
     render(() => <Seat seat={0} room={room()} playerId="a" />);
 
     const seat = screen.getByRole("article", { name: "Ana, 40 points" });
-    expect(within(seat).getByText("Your turn")).toBeVisible();
-
     const meter = within(seat).getByRole("meter", { name: "Total score" });
     expect(within(meter).getByText("40 / 200")).toBeVisible();
     expect(
@@ -86,6 +84,31 @@ describe("<RoundPlayer />", () => {
       "aria-valuetext",
       "40 of 200 points, 7 this round"
     );
+  });
+
+  it("keeps the local player's header metadata empty when their move starts", () => {
+    const [view, setView] = createSignal(room({ turnId: "b" }));
+
+    render(() => (
+      <>
+        <Seat seat={0} room={view()} playerId="a" />
+        <Seat seat={1} room={view()} playerId="a" />
+      </>
+    ));
+
+    const mine = screen.getByRole("article", { name: "Ana, 40 points" });
+    const other = screen.getByRole("article", { name: "Ben, 12 points" });
+    const meta = mine.querySelector(".seat-meta");
+
+    expect(meta?.children).toHaveLength(0);
+    expect(within(other).getByText("Thinking…")).toBeVisible();
+
+    setView(room());
+    flush();
+
+    expect(mine).toHaveAttribute("data-turn");
+    expect(meta?.children).toHaveLength(0);
+    expect(within(other).queryByText("Thinking…")).toBeNull();
   });
 
   it("keeps only Number cards on the mat and sets the rest beside it in arrival order", () => {
@@ -122,6 +145,57 @@ describe("<RoundPlayer />", () => {
         .getAllByRole("listitem")
         .map((card) => card.dataset.cardId)
     ).toStrictEqual(["90", "91"]);
+  });
+
+  it("groups Score Modifiers without hiding Second Chance", () => {
+    const view = room();
+    const name = "MW".repeat(10);
+    const [ana, ben] = [itemAt(view.players, 0), itemAt(view.players, 1)];
+
+    view.players = [
+      {
+        ...ana,
+        hand: [
+          { id: 90, kind: "modifier", value: 4 },
+          { id: 91, kind: "secondChance" },
+          { id: 92, kind: "double" },
+        ],
+        name,
+      },
+      ben,
+    ];
+
+    render(() => <Seat seat={0} room={view} playerId="a" />);
+
+    const extras = screen.getByRole("list", {
+      name: `${name}'s modifier and Second Chance cards`,
+    });
+
+    const trigger = within(extras).getByRole("button", {
+      name: `${name}: 2 Score Modifiers`,
+    });
+
+    expect(screen.getByText(name)).toHaveAttribute("title", name);
+    expect(within(extras).getByLabelText(/^Second Chance/u)).toBeVisible();
+    expect(
+      screen.queryByRole("dialog", { name: "Score Modifiers" })
+    ).toBeNull();
+
+    fireEvent.click(trigger);
+    flush();
+
+    const details = screen.getByRole("dialog", { name: "Score Modifiers" });
+
+    const cards = within(details).getByRole("list", {
+      name: "Score Modifier cards",
+    });
+
+    expect(
+      within(cards)
+        .getAllByRole("listitem")
+        .map((card) => card.dataset.cardId)
+    ).toStrictEqual(["90", "92"]);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
   });
 
   it("updates the score preview on a bust and when the round is scored", () => {
@@ -426,7 +500,7 @@ describe("<RoundPlayer />", () => {
       />
     ));
     const seat = screen.getByRole("article", { name: "Ana, 40 points" });
-    expect(within(seat).getByText("Choosing…")).toBeVisible();
+    expect(seat).toHaveAttribute("data-turn");
     screen.getByRole("button", { name: "Freeze Ben" }).click();
     flush();
     expect(send).toHaveBeenCalledWith({ targetId: "b", type: "choose" });

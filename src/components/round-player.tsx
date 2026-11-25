@@ -3,8 +3,15 @@ import PlayingCards from "@lucide/solid/icons/playing-cards";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import Trophy from "@lucide/solid/icons/trophy";
 import { Meter, MeterIndicator, MeterTrack } from "@ui-sdk/solid/meter";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@ui-sdk/solid/popover";
 import { createEffect, createMemo, For, Show } from "solid-js";
 
+import { isScoreModifierCard } from "../game/cards";
 import type { Card } from "../game/cards";
 import type { ActionCardChoice, Player, RoundStatus } from "../game/engine";
 import type { AvailableMoves } from "../game/moves";
@@ -101,6 +108,30 @@ const RoundPlayer = (props: RoundPlayerProps) => {
     { equals: sameCards }
   );
 
+  const modifiers = createMemo(() => extraCards().filter(isScoreModifierCard), {
+    equals: sameCards,
+  });
+
+  const groupModifiers = () => modifiers().length > 1;
+
+  const visibleExtras = createMemo(
+    () =>
+      groupModifiers()
+        ? extraCards().filter((card) => !isScoreModifierCard(card))
+        : extraCards(),
+    { equals: sameCards }
+  );
+
+  const incomingModifier = () => {
+    const step = props.dealStep;
+
+    return step?.to.kind === "hand" &&
+      step.to.playerId === props.player.id &&
+      isScoreModifierCard(step.card)
+      ? modifiers().find((card) => card.id === step.card.id)
+      : undefined;
+  };
+
   const bustCard = createMemo(() => props.player.bustCard, {
     equals: (a, b) => a?.id === b?.id,
   });
@@ -187,14 +218,6 @@ const RoundPlayer = (props: RoundPlayerProps) => {
   const scorePercent = (score: number) =>
     `${Math.min(100, (score / props.room.settings.targetScore) * 100)}%`;
 
-  const decisionLabel = () => {
-    if (props.room.choice) {
-      return "Choosing…";
-    }
-
-    return isMe() ? "Your turn" : "Thinking…";
-  };
-
   return (
     <article
       class="seat"
@@ -232,7 +255,7 @@ const RoundPlayer = (props: RoundPlayerProps) => {
       <header class="seat-header">
         <div class="seat-name">
           <PlayerAvatar player={props.player} />
-          <strong>{props.player.name}</strong>
+          <strong title={props.player.name}>{props.player.name}</strong>
           <Show when={isMe()}>
             <span class="badge">You</span>
           </Show>
@@ -279,9 +302,9 @@ const RoundPlayer = (props: RoundPlayerProps) => {
               />
             )}
           </Show>
-          <Show when={hasDecision()}>
+          <Show when={hasDecision() && !isMe()}>
             <span class="badge" data-tone="turn">
-              {decisionLabel()}
+              {props.room.choice ? "Choosing…" : "Thinking…"}
             </span>
           </Show>
           <Show when={props.player.status !== "active"}>
@@ -309,9 +332,42 @@ const RoundPlayer = (props: RoundPlayerProps) => {
           class="seat-extras"
           aria-label={`${props.player.name}'s modifier and Second Chance cards`}
         >
-          <For each={extraCards()} keyed={(card) => card.id}>
+          <For each={visibleExtras()} keyed={(card) => card.id}>
             {(card) => <PlayingCard card={card()} size="mini" />}
           </For>
+          <Show when={groupModifiers()}>
+            <li class="modifier-group">
+              <Show when={incomingModifier()}>
+                {(card) => (
+                  <ul class="modifier-flight-target" aria-hidden="true">
+                    <PlayingCard card={card()} size="mini" />
+                  </ul>
+                )}
+              </Show>
+              <Popover>
+                <PopoverTrigger
+                  class="modifier-trigger"
+                  data-size="sm"
+                  aria-label={`${props.player.name}: ${modifiers().length} Score Modifiers`}
+                >
+                  <PlayingCards size={14} aria-hidden="true" />
+                  {modifiers().length}
+                </PopoverTrigger>
+                <PopoverContent
+                  class="modifier-details"
+                  side="bottom"
+                  align="end"
+                >
+                  <PopoverTitle>Score Modifiers</PopoverTitle>
+                  <ul class="modifier-cards" aria-label="Score Modifier cards">
+                    <For each={modifiers()} keyed={(card) => card.id}>
+                      {(card) => <PlayingCard card={card()} size="mini" />}
+                    </For>
+                  </ul>
+                </PopoverContent>
+              </Popover>
+            </li>
+          </Show>
         </ul>
         <Show when={canKick()}>
           <RemovePlayer
