@@ -220,7 +220,7 @@ export class GameRoom extends Server<Env> {
   }
 
   private closeRoomConnections() {
-    for (const connection of this.ctx.getWebSockets()) {
+    for (const connection of this.getConnections()) {
       if (connection.readyState === WebSocket.OPEN) {
         connection.close(ROOM_MISSING_CLOSE_CODE, "Room closed");
       }

@@ -54,6 +54,9 @@ export const createRoomStore = (storage: RoomStorage) => {
             field: field ?? "room",
             validation: issue.type,
           });
+
+          await storage.deleteAll();
+          pendingAlarm = null;
         }
 
         savedSnapshot = null;

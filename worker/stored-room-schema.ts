@@ -3,6 +3,7 @@ import * as v from "valibot";
 import { isAvatar } from "../src/game/avatars";
 import { PHASES } from "../src/game/engine";
 import type { GameState } from "../src/game/engine";
+import { ROUND_STATUSES } from "../src/game/player";
 import {
   ActionCardSchema,
   CardSchema,
@@ -82,14 +83,7 @@ const GameStateSchema: v.GenericSchema<unknown, GameState> = v.object({
       ),
       name: v.string(),
       score: nonNegativeInteger,
-      status: v.picklist([
-        "out",
-        "active",
-        "stayed",
-        "frozen",
-        "busted",
-        "flipSeven",
-      ]),
+      status: v.picklist(ROUND_STATUSES),
     })
   ),
   round: nonNegativeInteger,

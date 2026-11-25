@@ -80,7 +80,7 @@ const loadedStore = async (room = newStoredRoom("ABCDE", NOW)) => {
 };
 
 describe(createRoomStore, () => {
-  it("treats a room with invalid deal history as missing", async () => {
+  it("deletes a room with invalid deal history and treats it as missing", async () => {
     using warn = vi.spyOn(console, "warn");
     const room = newStoredRoom("ABCDE", NOW);
 
@@ -97,7 +97,8 @@ describe(createRoomStore, () => {
       field: "game.dealHistory",
       validation: "array",
     });
-    expect(fake.takeWrites()).toStrictEqual([]);
+    expect(fake.takeWrites()).toStrictEqual(["deleteAll"]);
+    await expect(createRoomStore(fake.storage).load()).resolves.toBeNull();
 
     await store.save(room, NOW + 500);
 
