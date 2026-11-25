@@ -48,6 +48,7 @@
 
 /* Waiting messages where Start game will appear. */
 .lobby-status {
+  overflow-wrap: anywhere;
   color: var(--ink-soft);
   text-align: center;
 }

@@ -1,3 +1,8 @@
+/* The sheet's log isn't a panel and the compose area is its own grid, so both need a panel's shrinkable column for long names. */
+:is(.chat-log, .log-compose) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .log-filters [data-slot="segmented-control-item"] {
   display: inline-flex;
   gap: 0.25rem;

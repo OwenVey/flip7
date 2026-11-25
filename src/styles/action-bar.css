@@ -30,6 +30,8 @@
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
+  /* A long player name breaks inside the two clamped lines instead of running past the bar. */
+  overflow-wrap: anywhere;
   font-size: var(--text-xl);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -85,7 +87,6 @@
 .headline[data-winner-headline] {
   font-size: 1.625rem;
   line-height: var(--leading-none);
-  overflow-wrap: anywhere;
   text-shadow: 2px 2px 0 var(--gold);
 }
 

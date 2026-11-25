@@ -16,8 +16,10 @@
   gap: 1rem;
 }
 
+/* One shrinkable column, so a long player name truncates instead of widening the card. */
 .panel {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.875rem;
   align-content: start;
   padding: clamp(1rem, 3vw, 1.5rem);
