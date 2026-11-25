@@ -260,7 +260,9 @@ export default function Lobby(props: {
                   data-offline={player().connected ? undefined : ""}
                 >
                   <PlayerAvatar player={player()} />
-                  <span class="roster-name">{player().name}</span>
+                  <span class="roster-name" title={player().name}>
+                    {player().name}
+                  </span>
                   <Show when={player().id === props.playerId}>
                     <span class="badge">You</span>
                   </Show>

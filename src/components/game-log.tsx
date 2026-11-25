@@ -171,6 +171,7 @@ const PlayerName = (props: { player: LogPlayer; class?: string }) => {
     <button
       type="button"
       class={["log-name", props.class]}
+      title={props.player.name}
       aria-pressed={spotlight.has(props.player.id) ? "true" : "false"}
       onClick={() => {
         spotlight.toggle(props.player);
@@ -789,7 +790,7 @@ export const ChatLog = (
           <Show when={spotlit()}>
             {(player) => (
               <p class="log-spotlight">
-                <span>
+                <span title={player().name}>
                   Highlighting <strong>{player().name}</strong>
                 </span>
                 <Button
