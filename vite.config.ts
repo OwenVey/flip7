@@ -1,8 +1,10 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
 import solid from "@solidjs/vite-plugin";
 import { fileRoutes } from "filesystem-routing/vite";
-import { FontaineTransform } from "fontaine";
+import { fontless } from "fontless";
 import { defineConfig } from "vitest/config";
+
+import { fontlessOptions } from "./fonts.config.ts";
 
 export default defineConfig({
   plugins: [
@@ -15,7 +17,7 @@ export default defineConfig({
       diagnostics: true,
     }),
     fileRoutes({ types: true }),
-    FontaineTransform.vite({ fallbacks: {} }),
+    fontless(fontlessOptions),
   ],
   css: {
     transformer: "lightningcss",
