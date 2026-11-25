@@ -119,26 +119,30 @@
       scroll-timeline: --scroll-fade inline;
     }
 
-    &::before,
-    &::after,
-    &.leaderboard-body thead th::after {
-      /* Longhands, because Lightning CSS folds a timeline into the shorthand, which browsers reject. */
-      animation-name: scroll-fade-in;
-      animation-fill-mode: both;
-      animation-timing-function: linear;
-      animation-timeline: --scroll-fade;
-      animation-range: 0 var(--scroll-fade-depth);
-    }
+    /* Only while the axis overflows: Chromium keeps a timeline's last progress once the content stops overflowing, as when a round collapses, so a fade would linger with nothing to scroll. */
+    &:not([data-horizontal])[data-overflow-y],
+    &[data-horizontal][data-overflow-x] {
+      &::before,
+      &::after,
+      &.leaderboard-body thead th::after {
+        /* Longhands, because Lightning CSS folds a timeline into the shorthand, which browsers reject. */
+        animation-name: scroll-fade-in;
+        animation-fill-mode: both;
+        animation-timing-function: linear;
+        animation-timeline: --scroll-fade;
+        animation-range: 0 var(--scroll-fade-depth);
+      }
 
-    &::after {
-      animation-name: scroll-fade-out;
-      animation-range: calc(100% - var(--scroll-fade-depth)) 100%;
-    }
+      &::after {
+        animation-name: scroll-fade-out;
+        animation-range: calc(100% - var(--scroll-fade-depth)) 100%;
+      }
 
-    /* Following new messages, or jumping to them, clears the bottom fade at once. */
-    &.leaderboard-body::before,
-    &.log-body[data-sticking]::after {
-      animation-name: none;
+      /* Following new messages, or jumping to them, clears the bottom fade at once. */
+      &.leaderboard-body::before,
+      &.log-body[data-sticking]::after {
+        animation-name: none;
+      }
     }
   }
 
