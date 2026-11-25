@@ -8,12 +8,16 @@ const GAME_CUE_PRIORITY = [
   "flipSeven",
   "bust",
   "freeze",
+  "secondChance",
+  "flipThree",
   "special",
   "bank",
+  "shuffle",
   "join",
+  "leave",
 ] as const;
 
-/** A sound a game event plays, and the colour the Chat & Log gives it. */
+/** A game event category that the Chat & Log uses for colour. */
 export type GameCue = (typeof GAME_CUE_PRIORITY)[number];
 
 const EVENT_CUES = {
@@ -22,10 +26,10 @@ const EVENT_CUES = {
   botAdded: "join",
   botSpeedSet: null,
   busted: "bust",
-  deckReshuffled: null,
-  evicted: null,
+  deckReshuffled: "shuffle",
+  evicted: "leave",
   flipSeven: "flipSeven",
-  flipThreeStarted: "special",
+  flipThreeStarted: "flipThree",
   frozen: "freeze",
   gameAbandoned: null,
   gameWon: null,
@@ -40,18 +44,19 @@ const EVENT_CUES = {
   secondChanceDiscarded: null,
   secondChanceGiven: "special",
   secondChanceKept: "special",
-  secondChanceUsed: "special",
+  secondChanceUsed: "secondChance",
   stayed: "bank",
   targetScoreSet: null,
 } as const satisfies Record<GameEventType, GameCue | null>;
 
-/** The cue a game event plays, if any. */
+/** The category of a game event, if any. */
 export const eventCue = (event: GameEvent | undefined) =>
   event === undefined ? null : EVENT_CUES[event.type];
 
 export type RoomCue =
-  | GameCue
+  | Exclude<GameCue, "special">
   | "deal"
+  | "lose"
   | "message"
   | "reveal"
   | "round"
@@ -61,21 +66,51 @@ export type RoomCue =
 const isChatFromOthers = (entry: LogEntry, playerId: string | null) =>
   isChat(entry) && entry.from.id !== playerId;
 
+export const newLogEntries = (previous: RoomView, current: RoomView) => {
+  const lastId = previous.log.at(-1)?.id ?? 0;
+
+  return current.log.filter((entry) => entry.id > lastId);
+};
+
+export const gameOverCue = (
+  previous: RoomView,
+  current: RoomView,
+  playerId: string | null
+) => {
+  if (current.phase !== "gameOver" || previous.phase === "gameOver") {
+    return null;
+  }
+
+  const seated = current.players.some(({ id }) => id === playerId);
+
+  return seated && playerId !== null && !current.winnerIds.includes(playerId)
+    ? ("lose" as const)
+    : ("win" as const);
+};
+
+export const chatCue = (events: readonly LogEntry[], playerId: string | null) =>
+  events.some((entry) => isChatFromOthers(entry, playerId))
+    ? ("message" as const)
+    : null;
+
 const tableCue = (
   previous: RoomView,
   current: RoomView,
-  events: LogEntry[]
+  events: LogEntry[],
+  playerId: string | null
 ) => {
   const gameCue = GAME_CUE_PRIORITY.find((cue) =>
     events.some((entry) => !isChat(entry) && eventCue(entry.event) === cue)
   );
 
-  if (current.phase === "gameOver" && previous.phase !== "gameOver") {
-    return "win";
+  const finale = gameOverCue(previous, current, playerId);
+
+  if (finale) {
+    return finale;
   }
 
   if (gameCue) {
-    return gameCue;
+    return gameCue === "special" ? "reveal" : gameCue;
   }
 
   if (current.phase === "roundOver" && previous.phase !== "roundOver") {
@@ -98,17 +133,18 @@ export const roomCues = (
   current: RoomView,
   playerId: string | null
 ) => {
-  const lastId = previous.log.at(-1)?.id ?? 0;
-  const events = current.log.filter((entry) => entry.id > lastId);
+  const events = newLogEntries(previous, current);
   const cues: RoomCue[] = [];
-  const cue = tableCue(previous, current, events);
+  const cue = tableCue(previous, current, events, playerId);
 
   if (cue) {
     cues.push(cue);
   }
 
-  if (events.some((entry) => isChatFromOthers(entry, playerId))) {
-    cues.push("message");
+  const chat = chatCue(events, playerId);
+
+  if (chat) {
+    cues.push(chat);
   }
 
   return cues;

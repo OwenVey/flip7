@@ -1,7 +1,7 @@
 import { createRoot, flush } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createRoomSounds } from "./room-sounds";
+import { createRoomSounds, pickVariant } from "./room-sounds";
 
 const KEYS = [
   "flip7:sound-muted",
@@ -60,5 +60,29 @@ describe(createRoomSounds, () => {
     });
     first.dispose();
     second.dispose();
+  });
+});
+
+describe(pickVariant, () => {
+  it("never repeats the recording played last", () => {
+    const draws = [0, 0.3, 0.6, 0.99];
+
+    expect(
+      [0, 1, 2, 3].flatMap((last) =>
+        draws.map((draw) => pickVariant(4, last, () => draw) === last)
+      )
+    ).not.toContain(true);
+  });
+
+  it("can reach every other recording and handles a single one", () => {
+    const reached = new Set(
+      [0, 0.4, 0.8].map((draw) => pickVariant(4, 2, () => draw))
+    );
+
+    expect({
+      first: pickVariant(4, undefined, () => 0.99),
+      reached: [...reached].toSorted((a, b) => a - b),
+      single: pickVariant(1, 0, () => 0.5),
+    }).toStrictEqual({ first: 3, reached: [0, 1, 3], single: 0 });
   });
 });

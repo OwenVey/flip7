@@ -1,13 +1,28 @@
 /* oxlint-disable eslint/no-await-in-loop, react-doctor/async-await-in-loop -- Card flights and Room updates must play in order. */
 
 import { calculateRoundScore, isActionCard } from "../game/cards";
+import { isChat } from "../game/engine";
 import type { Player } from "../game/engine";
-import { waitingOn } from "../game/moves";
+import type { GameEvent } from "../game/game-events";
+import { availableMoves, waitingOn } from "../game/moves";
 import { roundStarted } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 import { dealFrame, planDeal } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
-import { roomCues } from "./room-cues";
+import {
+  bustSettle,
+  cueAlreadyPlayed,
+  freezeSettle,
+  SAVE_SETTLE_MS,
+  trackTransition,
+  trailingSettle,
+} from "./playback-moments";
+import type {
+  MomentSettle,
+  PlaybackMoment,
+  TransitionTracker,
+} from "./playback-moments";
+import { chatCue, gameOverCue, newLogEntries, roomCues } from "./room-cues";
 import type { RoomCue } from "./room-cues";
 import {
   flipThreeHaptic,
@@ -25,11 +40,18 @@ interface QueuedRoom {
 const FLIGHT_MS = 280;
 const HURRIED_FLIGHT_MS = 140;
 const BULK_DEAL_MIN_CARDS = 5;
+const BULK_SETTLE_MS = 140;
 const PAUSE_MS = 40;
-const FLIP_PAUSE_MS = 100;
-const FLIP_LEAD_IN_MS = 150;
+const FLIP_PAUSE_MS = 220;
+const FLIP_START_PAUSE_MS = 200;
+const FLIP_LEAD_IN_MS = 220;
+const SAVE_HOLD_MS = 320;
+const DISCARD_HOLD_MS = 300;
+const CHOICE_SHOW_MS = 380;
 const DISCARD_MS = 240;
 const HURRIED_DISCARD_MS = 160;
+
+const SETTLE_BACKLOG = 2;
 
 export interface DealMotion {
   allowed: () => boolean;
@@ -42,7 +64,7 @@ export interface DealMotion {
     discardDuration: number,
     signal: AbortSignal
   ) => Promise<void>;
-  reshuffle: () => void;
+  reshuffle: (signal: AbortSignal) => Promise<void>;
   sweep: (signal: AbortSignal) => Promise<void>;
 }
 
@@ -57,6 +79,7 @@ interface PlaybackInput {
 interface Frame {
   dealing: boolean;
   incomingCardId: number | null;
+  moment: PlaybackMoment | null;
   room: RoomView | null;
   step: DealStep | null;
 }
@@ -70,6 +93,7 @@ export interface DealPlaybackView extends Omit<Frame, "incomingCardId"> {
 const emptyFrame: Frame = {
   dealing: false,
   incomingCardId: null,
+  moment: null,
   room: null,
   step: null,
 };
@@ -149,33 +173,116 @@ const reshuffled = (previous: RoomView, current: RoomView) =>
   current.deckCount > previous.deckCount &&
   current.discardCount < previous.discardCount;
 
+const didReshuffle = (
+  previous: RoomView,
+  current: RoomView,
+  events: readonly GameEvent[]
+) =>
+  events.some((event) => event.type === "deckReshuffled") ||
+  reshuffled(previous, current);
+
+const isOtherChoice = (
+  animate: boolean,
+  current: RoomView,
+  steps: DealStep[],
+  viewerId: string | null
+) =>
+  animate &&
+  current.choice !== null &&
+  steps.some((step) => step.to.kind === "choice") &&
+  availableMoves(current, viewerId).choice === null;
+
+const needsLeadIn = (
+  step: DealStep,
+  previousStep: DealStep | undefined,
+  isBehind: boolean
+) => step.flip?.index === 1 && !isBehind && previousStep?.to.kind !== "played";
+
+const isMidBatchOutcome = (step: DealStep, index: number, total: number) =>
+  index < total - 1 &&
+  (step.to.kind === "bust" ||
+    (step.to.kind === "hand" && step.card.kind === "freeze"));
+
+const isBulkDeal = (steps: DealStep[], newRound: boolean) =>
+  newRound && steps.filter(isDeckToHand).length >= BULK_DEAL_MIN_CARDS;
+
+interface Transition {
+  current: RoomView;
+  item: QueuedRoom;
+  previous: RoomView;
+  signal: AbortSignal;
+  steps: DealStep[];
+  tracker: TransitionTracker;
+}
+
+interface StepContext extends Transition {
+  bulkCard: boolean;
+  index: number;
+  step: DealStep;
+}
+
+type PauseKind = "deal" | "effect";
+
+const holdsBeforeDiscard = (step: DealStep) =>
+  step.partnerId !== null || step.card.kind === "secondChance";
+
+const midBatchSettle = ({ step, tracker }: StepContext) => {
+  if (step.to.kind === "bust") {
+    tracker.played.bust += 1;
+
+    return bustSettle(step.to.playerId);
+  }
+
+  if (step.to.kind !== "hand") {
+    return null;
+  }
+
+  const frozenEvents = tracker.events.filter(
+    (event) => event.type === "frozen"
+  );
+
+  const byId = frozenEvents[tracker.played.freeze]?.by?.id ?? null;
+  tracker.played.freeze += 1;
+
+  return freezeSettle(step.to.playerId, byId);
+};
+
 export const createDealPlayback = (
   motion: DealMotion,
   publish: (view: DealPlaybackView) => void,
-  cue: (cue: RoomCue) => void,
+  cue: (cue: RoomCue, audible?: boolean) => void,
   haptic: (cue: HapticOutcome | "turn") => void
 ) => {
   const queue: QueuedRoom[] = [];
   let latest: PlaybackInput | null = null;
   let settled: RoomView | null = null;
   let run: AbortController | null = null;
-  let pause: AbortController | null = null;
+  let pause: { controller: AbortController; kind: PauseKind } | null = null;
   let frame = emptyFrame;
   let moveCuePending = false;
+  let moveSoundPending = false;
   let moveHapticPending = false;
 
   const hapticPlayer = (item: QueuedRoom) =>
     latest && item.hapticSyncId === latest.syncId ? latest.playerId : null;
 
   const behind = () => queue.some((queued) => queued.deals);
+  const backlogged = () => queue.length >= SETTLE_BACKLOG;
 
-  const waitForPause = async (ms: number, signal: AbortSignal) => {
-    if (behind() || signal.aborted) {
+  const cutsShort = (kind: PauseKind) =>
+    kind === "deal" ? behind() : backlogged();
+
+  const waitForPause = async (
+    ms: number,
+    signal: AbortSignal,
+    kind: PauseKind = "deal"
+  ) => {
+    if (signal.aborted || cutsShort(kind)) {
       return;
     }
 
     const controller = new AbortController();
-    pause = controller;
+    pause = { controller, kind };
     const pauseSignal = AbortSignal.any([signal, controller.signal]);
     const { promise, resolve } = Promise.withResolvers<undefined>();
 
@@ -190,7 +297,7 @@ export const createDealPlayback = (
     clearTimeout(timer);
     pauseSignal.removeEventListener("abort", done);
 
-    if (pause === controller) {
+    if (pause?.controller === controller) {
       pause = null;
     }
   };
@@ -217,7 +324,8 @@ export const createDealPlayback = (
 
     if (myMove && moveCuePending) {
       moveCuePending = false;
-      cue("turn");
+      cue("turn", moveSoundPending);
+      moveSoundPending = false;
 
       if (moveHapticPending) {
         alert = "turn";
@@ -232,55 +340,166 @@ export const createDealPlayback = (
     }
   };
 
-  const playSteps = async (
-    previous: RoomView,
-    current: RoomView,
-    steps: DealStep[],
-    newRound: boolean,
-    item: QueuedRoom,
-    signal: AbortSignal
+  const landDiscard = async (
+    step: DealStep,
+    discardMs: number,
+    { signal, tracker }: Transition
   ) => {
-    const bulkDeal =
-      newRound && steps.filter(isDeckToHand).length >= BULK_DEAL_MIN_CARDS;
+    const saved = step.partnerId !== null;
+
+    if (holdsBeforeDiscard(step)) {
+      await waitForPause(
+        saved ? SAVE_HOLD_MS : DISCARD_HOLD_MS,
+        signal,
+        "effect"
+      );
+
+      if (signal.aborted) {
+        return;
+      }
+    }
+
+    if (saved) {
+      cue("secondChance");
+      tracker.played.secondChance += 1;
+    }
+
+    await motion.land(step, discardMs, signal);
+
+    if (!signal.aborted) {
+      await waitForPause(
+        saved ? SAVE_SETTLE_MS : PAUSE_MS,
+        signal,
+        saved ? "effect" : "deal"
+      );
+    }
+  };
+
+  const settleMidBatch = async (context: StepContext) => {
+    const { current, index, previous, signal, steps } = context;
+    await waitForPause(PAUSE_MS, signal);
+
+    if (signal.aborted) {
+      return;
+    }
+
+    const settle = midBatchSettle(context);
+
+    if (settle === null) {
+      return;
+    }
+
+    show(
+      {
+        moment: settle.moment,
+        room: dealFrame(previous, current, steps, index + 1, { landed: true }),
+        step: null,
+      },
+      settle.cue ? [settle.cue] : []
+    );
+    await waitForPause(settle.duration, signal, "effect");
+  };
+
+  const landStep = async (context: StepContext) => {
+    const { bulkCard, index, item, signal, step, steps, tracker } = context;
+    const discardMs = behind() ? HURRIED_DISCARD_MS : DISCARD_MS;
+    show({ incomingCardId: null }, [], landedHaptic(step, hapticPlayer(item)));
+
+    if (step.to.kind === "played") {
+      cue("flipThree");
+      tracker.played.flipThree += 1;
+      await motion.land(step, discardMs, signal);
+
+      if (!signal.aborted) {
+        await waitForPause(FLIP_START_PAUSE_MS, signal, "effect");
+      }
+
+      return;
+    }
+
+    cue("reveal");
+
+    if (step.to.kind === "discard") {
+      await landDiscard(step, discardMs, context);
+
+      return;
+    }
+
+    await motion.land(step, discardMs, signal);
+
+    if (signal.aborted) {
+      return;
+    }
+
+    if (isMidBatchOutcome(step, index, steps.length)) {
+      await settleMidBatch(context);
+
+      return;
+    }
+
+    if (!bulkCard) {
+      await waitForPause(step.flip ? FLIP_PAUSE_MS : PAUSE_MS, signal);
+    }
+  };
+
+  const playLeadIn = async (step: DealStep, transition: Transition) => {
+    const { current, item, signal, tracker } = transition;
+    const firstFlip = step.flip;
+
+    if (!firstFlip) {
+      return;
+    }
+
+    const sounds: RoomCue[] = [];
+
+    if (tracker.counts.flipThree > tracker.played.flipThree) {
+      tracker.played.flipThree += 1;
+      sounds.push("flipThree");
+    }
+
+    show(
+      {
+        moment: null,
+        step: { ...step, flip: { ...firstFlip, index: 0 } },
+      },
+      sounds,
+      flipThreeHaptic(step, current, hapticPlayer(item))
+    );
+    await waitForPause(FLIP_LEAD_IN_MS, signal, "effect");
+  };
+
+  const playSteps = async (transition: Transition, newRound: boolean) => {
+    const { current, item, previous, signal, steps } = transition;
+    const bulkDeal = isBulkDeal(steps, newRound);
 
     for (const [index, step] of steps.entries()) {
       if (signal.aborted) {
         return;
       }
 
-      const announced = steps[index - 1]?.to.kind === "played";
-      const flipHaptic = flipThreeHaptic(step, current, hapticPlayer(item));
-      const firstFlip = step.flip?.index === 1 ? step.flip : null;
-      const leadIn = firstFlip !== null && !behind() && !announced;
+      const leadIn = needsLeadIn(step, steps[index - 1], behind());
 
       if (leadIn) {
-        show(
-          { step: { ...step, flip: { ...firstFlip, index: 0 } } },
-          [],
-          flipHaptic
-        );
-        await waitForPause(FLIP_LEAD_IN_MS, signal);
-      }
+        await playLeadIn(step, transition);
 
-      if (signal.aborted) {
-        return;
+        if (signal.aborted) {
+          return;
+        }
       }
 
       const bulkCard = bulkDeal && isOrdinaryDealCard(step);
-
-      const fly = motion.captureFlight(
-        step,
-        bulkCard || behind() ? HURRIED_FLIGHT_MS : FLIGHT_MS
-      );
+      const ms = bulkCard || behind() ? HURRIED_FLIGHT_MS : FLIGHT_MS;
+      const fly = motion.captureFlight(step, ms);
 
       show(
         {
           incomingCardId: step.card.id,
+          moment: null,
           room: dealFrame(previous, current, steps, index + 1),
           step,
         },
         [],
-        leadIn ? undefined : flipHaptic
+        leadIn ? undefined : flipThreeHaptic(step, current, hapticPlayer(item))
       );
       await fly?.(signal);
 
@@ -288,32 +507,24 @@ export const createDealPlayback = (
         return;
       }
 
-      show(
-        { incomingCardId: null },
-        [],
-        landedHaptic(step, hapticPlayer(item))
-      );
-      cue("reveal");
-      await motion.land(
-        step,
-        behind() ? HURRIED_DISCARD_MS : DISCARD_MS,
-        signal
-      );
+      await landStep({ ...transition, bulkCard, index, step });
+    }
 
-      if (!bulkCard) {
-        await waitForPause(step.flip ? FLIP_PAUSE_MS : PAUSE_MS, signal);
-      }
+    const lastStep = steps.at(-1);
+
+    if (
+      !signal.aborted &&
+      bulkDeal &&
+      lastStep !== undefined &&
+      isOrdinaryDealCard(lastStep)
+    ) {
+      await waitForPause(BULK_SETTLE_MS, signal);
     }
   };
 
-  const playTransition = async (
-    previous: RoomView,
-    current: RoomView,
-    steps: DealStep[],
-    item: QueuedRoom,
-    signal: AbortSignal
-  ) => {
-    show({ dealing: true });
+  const playTransition = async (transition: Transition, reshuffle: boolean) => {
+    const { current, previous, signal, steps, tracker } = transition;
+    show({ dealing: true, moment: null });
     const newRound = roundStarted(previous, current);
 
     if (newRound) {
@@ -322,9 +533,147 @@ export const createDealPlayback = (
 
     if (newRound && previous.phase !== "lobby" && !behind()) {
       await motion.sweep(signal);
+
+      if (signal.aborted) {
+        return;
+      }
     }
 
-    await playSteps(previous, current, steps, newRound, item, signal);
+    if (reshuffle) {
+      show({ dealing: true, moment: { kind: "reshuffle" }, step: null }, [
+        "shuffle",
+      ]);
+      tracker.reshuffled = true;
+      await motion.reshuffle(signal);
+
+      if (signal.aborted) {
+        return;
+      }
+    }
+
+    if (steps.length > 0) {
+      await playSteps(transition, newRound);
+    }
+  };
+
+  const prepareTurn = (previous: RoomView, current: RoomView) => {
+    const animate = motion.allowed();
+    const steps = animate ? planDeal(previous, current) : [];
+    const events = newLogEntries(previous, current);
+
+    const gameEvents = events.flatMap((entry) =>
+      isChat(entry) ? [] : [entry.event]
+    );
+
+    return {
+      animate,
+      events,
+      reshuffle: didReshuffle(previous, current, gameEvents),
+      steps,
+      tracker: trackTransition(gameEvents),
+    };
+  };
+
+  const resolveTurn = (
+    previous: RoomView,
+    current: RoomView,
+    viewerId: string | null,
+    item: QueuedRoom,
+    setup: ReturnType<typeof prepareTurn>
+  ) => {
+    const { animate, events, steps, tracker } = setup;
+    const playerId = hapticPlayer(item);
+
+    const outcome: HapticOutcome | null =
+      playerId === null
+        ? null
+        : settledHaptic(previous, current, playerId, steps);
+
+    const settle = animate
+      ? trailingSettle(tracker, current, steps.length > 0)
+      : null;
+
+    const sounds =
+      settle === null
+        ? roomCues(previous, current, viewerId).filter(
+            (sound) => !cueAlreadyPlayed(sound, tracker, steps.length > 0)
+          )
+        : ([] satisfies RoomCue[]);
+
+    return {
+      chat: chatCue(events, viewerId),
+      finale: gameOverCue(previous, current, viewerId),
+      outcome,
+      playerId,
+      settle,
+      sounds,
+    };
+  };
+
+  const settleTrailing = async ({
+    chat,
+    current,
+    finale,
+    outcome,
+    playerId,
+    settle,
+    signal,
+  }: {
+    chat: RoomCue | null;
+    current: RoomView;
+    finale: "win" | "lose" | null;
+    outcome: HapticOutcome | null;
+    playerId: string | null;
+    settle: MomentSettle;
+    signal: AbortSignal;
+  }) => {
+    const momentSounds: RoomCue[] = [
+      ...(settle.cue ? [settle.cue] : []),
+      ...(chat ? [chat] : []),
+    ];
+
+    const winnerCelebrates =
+      finale !== null &&
+      outcome === "celebrate" &&
+      !(
+        settle.moment.kind === "flipSeven" &&
+        settle.moment.playerId === playerId
+      );
+
+    show(
+      { dealing: true, moment: settle.moment, room: current, step: null },
+      momentSounds,
+      winnerCelebrates ? null : outcome
+    );
+    await waitForPause(settle.duration, signal, "effect");
+
+    if (signal.aborted) {
+      return null;
+    }
+
+    return {
+      outcome: winnerCelebrates ? outcome : null,
+      sounds: finale ? [finale] : [],
+    };
+  };
+
+  const holdChoiceIfOther = async ({
+    current,
+    outcome,
+    signal,
+    sounds,
+  }: {
+    current: RoomView;
+    outcome: HapticOutcome | null;
+    signal: AbortSignal;
+    sounds: RoomCue[];
+  }) => {
+    show(
+      { dealing: false, moment: null, room: current, step: null },
+      sounds,
+      outcome
+    );
+    await waitForPause(CHOICE_SHOW_MS, signal, "effect");
   };
 
   const drain = async (signal: AbortSignal) => {
@@ -337,31 +686,58 @@ export const createDealPlayback = (
       let outcome: HapticOutcome | null = null;
 
       if (previous && latest) {
-        const animate = motion.allowed();
-        const steps = animate ? planDeal(previous, current) : [];
+        const viewerId = latest.playerId;
+        const setup = prepareTurn(previous, current);
 
-        if (animate && reshuffled(previous, current)) {
-          motion.reshuffle();
-        }
-
-        if (steps.length > 0) {
-          await playTransition(previous, current, steps, item, signal);
+        if (setup.animate && (setup.steps.length > 0 || setup.reshuffle)) {
+          await playTransition(
+            {
+              current,
+              item,
+              previous,
+              signal,
+              steps: setup.steps,
+              tracker: setup.tracker,
+            },
+            setup.reshuffle
+          );
         }
 
         if (signal.aborted) {
           return;
         }
 
-        const playerId = hapticPlayer(item);
+        const resolved = resolveTurn(previous, current, viewerId, item, setup);
+        ({ outcome, sounds } = resolved);
 
-        if (playerId !== null) {
-          outcome = settledHaptic(previous, current, playerId, steps);
+        if (resolved.settle !== null) {
+          const afterSettle = await settleTrailing({
+            chat: resolved.chat,
+            current,
+            finale: resolved.finale,
+            outcome,
+            playerId: resolved.playerId,
+            settle: resolved.settle,
+            signal,
+          });
+
+          if (!afterSettle) {
+            return;
+          }
+
+          ({ outcome, sounds } = afterSettle);
         }
 
-        sounds = roomCues(previous, current, latest.playerId).filter(
-          (sound) =>
-            steps.length === 0 || (sound !== "deal" && sound !== "reveal")
-        );
+        if (isOtherChoice(setup.animate, current, setup.steps, viewerId)) {
+          await holdChoiceIfOther({ current, outcome, signal, sounds });
+
+          if (signal.aborted) {
+            return;
+          }
+
+          sounds = [];
+          outcome = null;
+        }
       }
 
       const caughtUp = queue.length === 0;
@@ -371,7 +747,12 @@ export const createDealPlayback = (
       }
 
       show(
-        { dealing: !caughtUp && frame.dealing, room: current, step: null },
+        {
+          dealing: !caughtUp && frame.dealing,
+          moment: null,
+          room: current,
+          step: null,
+        },
         sounds,
         outcome
       );
@@ -391,6 +772,7 @@ export const createDealPlayback = (
     settled = null;
     frame = emptyFrame;
     moveCuePending = false;
+    moveSoundPending = false;
     moveHapticPending = false;
   };
 
@@ -402,10 +784,23 @@ export const createDealPlayback = (
     moveHapticPending &&= live;
     const move = ownMove(next);
 
-    if (move !== (previous && ownMove(previous))) {
-      moveCuePending = move !== null;
-      moveHapticPending = moveCuePending && live;
+    const previousMove = previous && ownMove(previous);
+
+    if (move === previousMove) {
+      return;
     }
+
+    const sameMoveContinues =
+      previous !== null &&
+      previousMove !== null &&
+      previous.room.round === next.room.round &&
+      previous.room.choice === null &&
+      (next.room.choice === null || next.room.choice.card.kind === "freeze");
+
+    moveCuePending = move !== null;
+    moveSoundPending =
+      moveCuePending && (moveSoundPending || !sameMoveContinues);
+    moveHapticPending = moveCuePending && live;
   };
 
   return {
@@ -462,8 +857,8 @@ export const createDealPlayback = (
         room: next.room,
       });
 
-      if (deals) {
-        pause?.abort();
+      if (pause && cutsShort(pause.kind)) {
+        pause.controller.abort();
       }
 
       if (!run) {

@@ -72,8 +72,50 @@ describe(roomCues, () => {
 
     expect(roomCues(before, bust, "me")).toStrictEqual(["bust"]);
     expect(
-      roomCues(before, { ...bust, phase: "gameOver" }, "me")
+      roomCues(before, { ...bust, phase: "gameOver", winnerIds: ["me"] }, "me")
     ).toStrictEqual(["win"]);
+  });
+
+  it.each([
+    { player: { id: "me", name: "Me" }, type: "secondChanceKept" },
+    {
+      by: { id: "opponent", name: "Opp" },
+      target: { id: "me", name: "Me" },
+      type: "secondChanceGiven",
+    },
+    {
+      by: { id: "opponent", name: "Opp" },
+      card: "freeze",
+      target: { id: "me", name: "Me" },
+      type: "actionAssigned",
+    },
+  ] satisfies GameEvent[])(
+    "uses the normal reveal sound for $type",
+    (event) => {
+      const after: RoomView = {
+        ...before,
+        log: [
+          ...before.log,
+          { at: LOGGED_AT, event, game: 1, id: 8, round: 1 },
+        ],
+      };
+
+      expect(roomCues(before, after, "me")).toStrictEqual(["reveal"]);
+    }
+  );
+
+  it("plays the losing cue only at a seat that did not win", () => {
+    const over: RoomView = {
+      ...before,
+      phase: "gameOver",
+      winnerIds: ["opponent"],
+    };
+
+    expect({
+      loser: roomCues(before, over, "me"),
+      spectator: roomCues(before, over, null),
+      winner: roomCues(before, over, "opponent"),
+    }).toStrictEqual({ loser: ["lose"], spectator: ["win"], winner: ["win"] });
   });
 
   it("plays a message sound for other players' chat, not your own", () => {
@@ -116,10 +158,10 @@ describe(eventCue, () => {
     [{ card: 4, player: me, type: "busted" }, "bust"],
     [{ player: me, type: "flipSeven" }, "flipSeven"],
     [{ by: opp, points: 3, target: me, type: "frozen" }, "freeze"],
-    [{ by: opp, target: me, type: "flipThreeStarted" }, "special"],
+    [{ by: opp, target: me, type: "flipThreeStarted" }, "flipThree"],
     [{ by: opp, target: me, type: "secondChanceGiven" }, "special"],
     [{ player: me, type: "secondChanceKept" }, "special"],
-    [{ card: 4, player: me, type: "secondChanceUsed" }, "special"],
+    [{ card: 4, player: me, type: "secondChanceUsed" }, "secondChance"],
     [
       { by: opp, card: "freeze", target: me, type: "actionAssigned" },
       "special",
@@ -128,7 +170,8 @@ describe(eventCue, () => {
     [{ player: opp, type: "botAdded" }, "join"],
     [{ scores: [], tiedAt: null, type: "roundOver" }, null],
     [{ player: me, type: "secondChanceDiscarded" }, null],
-    [{ how: "left", player: opp, type: "evicted" }, null],
+    [{ how: "left", player: opp, type: "evicted" }, "leave"],
+    [{ type: "deckReshuffled" }, "shuffle"],
   ] satisfies [GameEvent, string | null][])("cues %j with %s", (event, cue) => {
     expect(eventCue(event)).toBe(cue);
   });

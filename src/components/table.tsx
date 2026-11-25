@@ -211,6 +211,7 @@ export default function Table(
           actionsDisabled={props.actionsDisabled}
           playback={{
             dealing: props.dealing === true,
+            moment: props.dealMoment ?? null,
             roundPoints: props.roundPoints,
             step: props.dealStep ?? null,
           }}
@@ -229,6 +230,8 @@ export default function Table(
                       actionsDisabled={props.actionsDisabled}
                       removeDisabled={props.offline}
                       roundPoints={pointsOf(props.roundPoints, id)}
+                      dealing={props.dealing === true}
+                      dealMoment={props.dealMoment ?? null}
                       dealStep={props.dealStep}
                       moves={moves()}
                       onPick={chooseTarget}
@@ -266,10 +269,8 @@ export default function Table(
         </div>
         <div class="flight-layer" data-flight-layer="" aria-hidden="true" />
         <div class="flight-layer" data-chip-layer="" aria-hidden="true" />
-        <Show when={props.room.phase === "gameOver"}>
-          <Confetti />
-        </Show>
         <Show when={props.room.phase === "gameOver" && props.dealing !== true}>
+          <Confetti />
           <GameOverDialog
             room={props.room}
             playerId={props.playerId}

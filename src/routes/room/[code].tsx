@@ -71,8 +71,10 @@ const Room = (props: { code: string }) => {
       flush();
       openTable(view.room?.phase ?? null);
     },
-    (cue) => {
-      sounds.play(cue);
+    (cue, audible = true) => {
+      if (audible) {
+        sounds.play(cue);
+      }
 
       if (cue === "turn") {
         nudge(roomPage?.querySelector("[data-action-bar]") ?? null);
@@ -319,6 +321,7 @@ const Room = (props: { code: string }) => {
                     offline={unavailable()}
                     latestRoom={connection.room()}
                     dealing={table().dealing}
+                    dealMoment={table().moment}
                     dealStep={table().step}
                     roundPoints={table().roundPoints}
                     spectator={spectator()}

@@ -471,16 +471,24 @@ export const absorbCard = async (
   );
 };
 
+const RIFFLE_MS = 480;
+
 /** Gives the deck a quick riffle when the discard pile is shuffled back in. */
-export const riffleDeck = (deck: Element) => {
-  deck.animate(
+export const riffleDeck = async (deck: Element, signal: AbortSignal) => {
+  await settle(
     [
-      { transform: "none" },
-      { transform: "translateX(-0.25rem) rotate(-6deg)" },
-      { transform: "translateX(0.25rem) rotate(6deg)" },
-      { transform: "none" },
+      deck.animate(
+        [
+          { transform: "none" },
+          { transform: "translateX(-0.25rem) rotate(-6deg)" },
+          { transform: "translateX(0.25rem) rotate(6deg)" },
+          { transform: "none" },
+        ],
+        { duration: RIFFLE_MS, easing: "ease-in-out" }
+      ),
     ],
-    { duration: 480, easing: "ease-in-out" }
+    RIFFLE_MS,
+    signal
   );
 };
 

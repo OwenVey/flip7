@@ -141,11 +141,11 @@ export const createDealMotion: (
       signal
     );
   },
-  reshuffle: () => {
+  reshuffle: async (signal) => {
     const deck = table()?.querySelector(deckBack);
 
     if (deck) {
-      riffleDeck(deck);
+      await riffleDeck(deck, signal);
     }
   },
   sweep: async (signal) => {

@@ -5,6 +5,7 @@ import type { Player } from "../game/engine";
 import type { RoomView } from "../game/protocol";
 import { room } from "../test/room-view";
 import type { DealStep } from "./deal-plan";
+import type { PlaybackMoment } from "./playback-moments";
 import { samePrompt, tablePrompt } from "./table-prompt";
 import type { PromptPlayback } from "./table-prompt";
 
@@ -14,6 +15,7 @@ const FIVE: Card = { id: 9, kind: "number", value: 5 };
 const playback = (overrides: Partial<PromptPlayback> = {}) =>
   ({
     dealing: false,
+    moment: null,
     roundPoints: new Map(),
     step: null,
     ...overrides,
@@ -419,6 +421,141 @@ describe(tablePrompt, () => {
     );
 
     expect(tablePrompt(view, "b", playback()).headline).toBe(expected);
+  });
+
+  it("shows the tied score on a tie-break roundOver prompt", () => {
+    const view = room({
+      log: [
+        {
+          at: 0,
+          event: { scores: [], tiedAt: 205, type: "roundOver" },
+          game: 1,
+          id: 1,
+          round: 1,
+        },
+      ],
+      phase: "roundOver",
+      turnId: null,
+    });
+
+    expect(tablePrompt(view, "b", playback())).toMatchObject({
+      headline: "End of round 1",
+      note: "Tied at 205 — play another round",
+    });
+  });
+
+  it.each([
+    {
+      expected: { headline: "Shuffling the discard pile…" },
+      moment: { kind: "reshuffle" },
+      name: "reshuffle",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "Deck empty", note: "Round over" },
+      moment: { kind: "outOfCards" },
+      name: "outOfCards",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "You Flipped 7!" },
+      moment: { kind: "flipSeven", playerId: "a" },
+      name: "own Flip 7",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "Ben Flipped 7!" },
+      moment: { kind: "flipSeven", playerId: "b" },
+      name: "other Flip 7",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "You busted!" },
+      moment: { kind: "bust", playerId: "a" },
+      name: "own bust",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "Ben busted!" },
+      moment: { kind: "bust", playerId: "b" },
+      name: "other bust",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "You were frozen!" },
+      moment: { byId: "b", kind: "freeze", playerId: "a" },
+      name: "frozen by another player",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "You froze yourself!" },
+      moment: { byId: "a", kind: "freeze", playerId: "a" },
+      name: "froze self",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "Ben froze themselves!" },
+      moment: { byId: "b", kind: "freeze", playerId: "b" },
+      name: "other froze themselves",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "Ben was frozen!" },
+      moment: { byId: "a", kind: "freeze", playerId: "b" },
+      name: "other was frozen",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "You stayed", note: "+1 point" },
+      moment: { kind: "stay", playerId: "a", points: 1 },
+      name: "own singular stay",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "Ben stayed", note: "+12 points" },
+      moment: { kind: "stay", playerId: "b", points: 12 },
+      name: "other stay",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "Second Chance saves you!" },
+      moment: { kind: "saved", playerId: "a" },
+      name: "own Second Chance save",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "Second Chance saves Ben!" },
+      moment: { kind: "saved", playerId: "b" },
+      name: "other Second Chance save",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "You got a Second Chance!" },
+      moment: { kind: "secondChanceGiven", playerId: "a" },
+      name: "received Second Chance",
+      viewer: "a",
+    },
+    {
+      expected: { headline: "Ben got a Second Chance" },
+      moment: { kind: "secondChanceGiven", playerId: "b" },
+      name: "other received Second Chance",
+      viewer: "a",
+    },
+  ] satisfies {
+    expected: Partial<ReturnType<typeof tablePrompt>>;
+    moment: PlaybackMoment;
+    name: string;
+    viewer: string;
+  }[])("narrates settling moment: $name", ({ expected, moment, viewer }) => {
+    const view = room({ phase: "gameOver", turnId: null, winnerIds: ["b"] });
+
+    expect(
+      tablePrompt(view, viewer, playback({ dealing: true, moment }))
+    ).toStrictEqual({
+      controls: { kind: "none" },
+      yours: false,
+      ...expected,
+    });
   });
 });
 
