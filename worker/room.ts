@@ -11,7 +11,9 @@ import type { ServerMessage } from "../src/game/protocol";
 import { createRoom, deliver, newStoredRoom } from "../src/game/room";
 import type {
   Admission,
+  RoomEffect,
   RoomOutcome,
+  RoomTransport,
   Seats,
   StoredRoom,
 } from "../src/game/room";
@@ -45,7 +47,7 @@ const send = (ws: WebSocket, message: ServerMessage) => {
 };
 
 // WARNING: messages share arrays with the live room, so serialize them now to match the broadcast position just saved.
-const framesOf = (outcome: RoomOutcome) => {
+const framesOf = (outcome: Pick<RoomOutcome, "effects">) => {
   const frames = new Map<ServerMessage, string>();
 
   for (const effect of outcome.effects) {
@@ -155,7 +157,7 @@ export class GameRoom extends Server<Env> {
     } else if (message.type === "chat") {
       await this.carryOut(room.chat(ws.id, message.text), ws);
     } else if (message.type === "typing") {
-      await this.carryOut(room.typing(ws.id), ws);
+      this.relay(room.typing(ws.id, message.active));
     } else if (message.type === "sync") {
       send(ws, room.viewFor(ws.id));
     } else if (message.type === "watch") {
@@ -206,9 +208,31 @@ export class GameRoom extends Server<Env> {
       await this.store.save(stored, outcome.alarmAt);
     }
 
-    deliver(outcome, {
+    deliver(outcome, this.transport(frameOf, outcome.expired, sender));
+
+    if (outcome.expired) {
+      for (const connection of this.getConnections()) {
+        if (connection.readyState === WebSocket.OPEN) {
+          connection.close(ROOM_MISSING_CLOSE_CODE, "Room closed");
+        }
+      }
+    }
+  }
+
+  private relay(effects: RoomEffect[]) {
+    const outcome = { effects };
+
+    deliver(outcome, this.transport(framesOf(outcome), false));
+  }
+
+  private transport(
+    frameOf: (message: ServerMessage) => string,
+    expired: boolean,
+    sender?: WebSocket
+  ) {
+    const transport: RoomTransport = {
       broadcast: (message, preview) => {
-        if (outcome.expired) {
+        if (expired) {
           return;
         }
 
@@ -217,8 +241,10 @@ export class GameRoom extends Server<Env> {
         }
       },
       relay: (message, except) => {
+        const skipped = new Set(except);
+
         for (const connection of this.getConnections<Admission>()) {
-          if (connection.state && connection.id !== except) {
+          if (connection.state && !skipped.has(connection.id)) {
             sendFrame(connection, frameOf(message));
           }
         }
@@ -231,14 +257,8 @@ export class GameRoom extends Server<Env> {
           sendFrame(sender, frameOf(message));
         }
       },
-    });
+    };
 
-    if (outcome.expired) {
-      for (const connection of this.getConnections()) {
-        if (connection.readyState === WebSocket.OPEN) {
-          connection.close(ROOM_MISSING_CLOSE_CODE, "Room closed");
-        }
-      }
-    }
+    return transport;
   }
 }

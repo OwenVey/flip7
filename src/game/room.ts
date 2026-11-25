@@ -29,6 +29,7 @@ import {
   listSeqsOf,
   ROOM_REMOVED_CLOSE_CODE,
   toRoomPreview,
+  TYPING_RELAY_MS,
   toStateMessage,
 } from "./protocol";
 import type { ListSeqs, PreviewMessage, ServerMessage } from "./protocol";
@@ -57,6 +58,8 @@ export interface StoredRoom extends RoomTimers {
 export interface Seat {
   playerId: string;
   seatedAt: number;
+  /** The last typing message the room relayed from this connection, or null before one and after a chat. */
+  typing: { active: boolean; at: number } | null;
 }
 
 /** Admission follows the connection across Worker hibernation. */
@@ -103,7 +106,7 @@ export interface RoomDeps {
 export type RoomEffect =
   | { type: "reply"; message: ServerMessage }
   | { type: "broadcast"; message: ServerMessage; preview: PreviewMessage }
-  | { type: "relay"; message: ServerMessage; except: string }
+  | { type: "relay"; message: ServerMessage; except: string[] }
   | { type: "close"; connectionId: string; code: number; reason: string };
 
 type PlannedEffect =
@@ -125,12 +128,15 @@ export interface RoomOutcome {
 export interface RoomTransport {
   reply: (message: ServerMessage) => void;
   broadcast: (message: ServerMessage, preview: PreviewMessage) => void;
-  relay: (message: ServerMessage, except: string) => void;
+  relay: (message: ServerMessage, except: readonly string[]) => void;
   close: (connectionId: string, code: number, reason: string) => void;
 }
 
 /** Carries out an outcome's effects in order. Save the room before calling this. */
-export const deliver = (outcome: RoomOutcome, transport: RoomTransport) => {
+export const deliver = (
+  outcome: Pick<RoomOutcome, "effects">,
+  transport: RoomTransport
+) => {
   for (const effect of outcome.effects) {
     switch (effect.type) {
       case "reply": {
@@ -243,14 +249,17 @@ export const createRoom = (
   };
 
   const seat = (connectionId: string, playerId: string) => {
-    seats.assign(connectionId, { playerId, seatedAt: deps.now() });
+    seats.assign(connectionId, {
+      playerId,
+      seatedAt: deps.now(),
+      typing: null,
+    });
   };
 
   const welcome = (playerId: string, token: string) =>
     reply({
       lastRequestId: stored.lastRequests[playerId],
       playerId,
-      supportsTyping: true,
       token,
       type: "welcome",
     });
@@ -545,25 +554,45 @@ export const createRoom = (
         attempt(() => {
           chat(game, seatedPlayer(connectionId), text);
 
+          const sender = seatOf(connectionId);
+
+          if (sender) {
+            seats.assign(connectionId, { ...sender, typing: null });
+          }
+
           return [BROADCAST];
         })
       );
     },
 
-    typing: (connectionId: string) => {
-      const playerId = seatOf(connectionId)?.playerId;
+    typing: (connectionId: string, active: boolean) => {
+      const effects: RoomEffect[] = [];
+      const sender = seatOf(connectionId);
 
-      return finish(
-        playerId !== undefined && findPlayer(game, playerId)
-          ? [
-              {
-                except: connectionId,
-                message: { playerId, type: "typing" },
-                type: "relay",
-              },
-            ]
-          : []
-      );
+      if (!sender || !findPlayer(game, sender.playerId)) {
+        return effects;
+      }
+
+      const now = deps.now();
+      const last = sender.typing;
+
+      const relayed = active
+        ? last === null || now - last.at >= TYPING_RELAY_MS
+        : last?.active === true;
+
+      if (relayed) {
+        seats.assign(connectionId, {
+          ...sender,
+          typing: { active, at: active || last === null ? now : last.at },
+        });
+        effects.push({
+          except: seatedConnections(sender.playerId).map(({ id }) => id),
+          message: { active, playerId: sender.playerId, type: "typing" },
+          type: "relay",
+        });
+      }
+
+      return effects;
     },
 
     command: (connectionId: string, command: GameCommand) => {

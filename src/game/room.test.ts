@@ -4,7 +4,11 @@ import type { Card } from "./cards";
 import { chat, DRAW_LIMIT, MAX_PLAYERS, nextRound, startGame } from "./engine";
 import type { DrawEvent } from "./engine";
 import { MAX_SPECTATORS } from "./moves";
-import { HEARTBEAT_STALE_MS, ROOM_REMOVED_CLOSE_CODE } from "./protocol";
+import {
+  HEARTBEAT_STALE_MS,
+  ROOM_REMOVED_CLOSE_CODE,
+  TYPING_RELAY_MS,
+} from "./protocol";
 import type { ServerMessage } from "./protocol";
 import { createRoom, newStoredRoom } from "./room";
 import type { Admission, RoomOutcome, Seats } from "./room";
@@ -132,6 +136,25 @@ const joinAs = (h: Harness, connectionId: string, name: string) => {
   return welcomeOf(h.room.join(connectionId, name, null));
 };
 
+const typingRelays = () => {
+  const h = harness();
+  joinAs(h, "ana-tab", "Ana");
+  joinAs(h, "ben-tab", "Ben");
+
+  const relayed = (...changes: boolean[]) =>
+    changes.flatMap((active) =>
+      h.room
+        .typing("ana-tab", active)
+        .map((effect) =>
+          effect.type === "relay" && effect.message.type === "typing"
+            ? effect.message.active
+            : null
+        )
+    );
+
+  return { h, relayed };
+};
+
 const player = (h: Harness, id: string) => {
   const found = h.stored.game.players.find((candidate) => candidate.id === id);
 
@@ -172,7 +195,6 @@ describe("joining a room", () => {
     expect(welcomeOf(outcome)).toStrictEqual({
       lastRequestId: undefined,
       playerId: "id-1",
-      supportsTyping: true,
       token: "id-2",
       type: "welcome",
     });
@@ -180,6 +202,7 @@ describe("joining a room", () => {
     expect(h.seatOf("tab")).toStrictEqual({
       playerId: "id-1",
       seatedAt: START,
+      typing: null,
     });
     expect(outcome.alarmAt).toBe(START + HEARTBEAT_STALE_MS);
   });
@@ -329,22 +352,42 @@ describe("commands", () => {
     ]);
   });
 
-  it("relays a seated player's typing to everyone else without changing the room", () => {
+  it("relays a seated player's typing to everyone but their own seat, without changing the room", () => {
     const h = harness();
     const ana = joinAs(h, "ana-tab", "Ana");
     joinAs(h, "ben-tab", "Ben");
+    h.connect("ana-phone");
+    h.room.join("ana-phone", "", ana.token);
     h.connect("lurker");
     const before = structuredClone(h.stored);
 
-    expect(h.room.typing("ana-tab").effects).toStrictEqual([
+    expect(h.room.typing("ana-tab", true)).toStrictEqual([
       {
-        except: "ana-tab",
-        message: { playerId: ana.playerId, type: "typing" },
+        except: ["ana-tab", "ana-phone"],
+        message: { active: true, playerId: ana.playerId, type: "typing" },
         type: "relay",
       },
     ]);
-    expect(h.room.typing("lurker").effects).toStrictEqual([]);
+    expect(h.room.typing("lurker", true)).toStrictEqual([]);
     expect(h.stored).toStrictEqual(before);
+  });
+
+  it("relays one typing stop after each start, and none before", () => {
+    const { relayed } = typingRelays();
+
+    expect(relayed(false, true, false, false)).toStrictEqual([true, false]);
+  });
+
+  it("relays typing starts at most every few seconds, or again after a chat", () => {
+    const { h, relayed } = typingRelays();
+
+    expect(relayed(true, true)).toStrictEqual([true]);
+
+    h.advance(TYPING_RELAY_MS);
+    expect(relayed(true)).toStrictEqual([true]);
+
+    h.room.chat("ana-tab", "hi");
+    expect(relayed(true)).toStrictEqual([true]);
   });
 });
 

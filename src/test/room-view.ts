@@ -18,6 +18,7 @@ export const room = (overrides: Partial<RoomView> = {}) => {
     hostId: "a",
     log: [
       {
+        about: [],
         at: LOGGED_AT,
         game: 1,
         id: 1,

@@ -12,8 +12,9 @@ import {
 import type { SnapPoint } from "@ui-sdk/solid/drawer";
 import { createSignal, Show, untrack } from "solid-js";
 
-import type { LogEntry, Phase } from "../game/engine";
+import type { LogEntry, LogPlayer, Phase } from "../game/engine";
 import { countChatsAfter } from "../lib/game-log-entries";
+import type { ChatControls } from "../lib/room-connection";
 import GameLog, { CHAT_AND_GAME_LOG_TITLE } from "./game-log";
 import Tooltip from "./tooltip";
 
@@ -30,10 +31,11 @@ export default function ChatSheet(props: {
   log: LogEntry[];
   phase: Phase;
   playerId: string | null;
-  onChat?: ((text: string) => boolean) | undefined;
-  players?: readonly { id: string; name: string }[];
-  typing?: readonly string[];
-  onTyping?: (() => void) | undefined;
+  /** Missing for a spectator, who can read the chat but not send to it. */
+  chat?: ChatControls | undefined;
+  players: readonly LogPlayer[];
+  /** Other players typing a chat message, by player ID. */
+  typing: readonly string[];
   /** Set with `onOpenChange` when the page also needs to close the sheet. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -122,10 +124,9 @@ export default function ChatSheet(props: {
             log={props.log}
             phase={props.phase}
             playerId={props.playerId}
-            onChat={props.onChat}
+            chat={props.chat}
             players={props.players}
             typing={props.typing}
-            onTyping={props.onTyping}
           />
         </div>
       </DrawerContent>

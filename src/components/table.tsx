@@ -6,7 +6,7 @@ import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { availableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { pointsOf } from "../lib/deal-playback";
-import type { RoomConnection } from "../lib/room-connection";
+import type { ChatControls } from "../lib/room-connection";
 import { passDealerChip } from "../lib/table-motion";
 import type { ChipSpot } from "../lib/table-motion";
 import ActionBar from "./action-bar";
@@ -38,10 +38,9 @@ export default function Table(
   props: TableProps &
     DealProps &
     RoundPointsByPlayer & {
-      chat: RoomConnection["chat"];
+      chat: ChatControls;
       /** Other players typing a chat message, by player ID. */
-      typing?: readonly string[];
-      onTyping?: () => void;
+      typing: readonly string[];
       /**
        * The room as last confirmed, ahead of deal playback. Settings read it so
        * a change shows as soon as the room accepts it, not after the deal.
@@ -52,6 +51,7 @@ export default function Table(
     }
 ) {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
+  const chat = () => (props.playerId === null ? undefined : props.chat);
 
   const playerIds = createMemo(() => props.room.players.map(({ id }) => id), {
     equals: samePlayerIds,
@@ -144,10 +144,9 @@ export default function Table(
               log={props.room.log}
               phase={props.room.phase}
               playerId={props.playerId}
-              onChat={props.playerId === null ? undefined : props.chat}
+              chat={chat()}
               players={props.room.players}
               typing={props.typing}
-              onTyping={props.playerId === null ? undefined : props.onTyping}
             />
             <InviteButton brief collapsible />
             <Show when={moves().host.configure}>
@@ -242,10 +241,9 @@ export default function Table(
               log={props.room.log}
               phase={props.room.phase}
               playerId={props.playerId}
-              onChat={props.playerId === null ? undefined : props.chat}
+              chat={chat()}
               players={props.room.players}
               typing={props.typing}
-              onTyping={props.playerId === null ? undefined : props.onTyping}
             />
           </div>
         </div>

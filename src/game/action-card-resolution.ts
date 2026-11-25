@@ -60,7 +60,11 @@ interface ResolutionState extends ActionCardState {
   players: readonly (CardOwner & { status: string })[];
 }
 
-type Say = (text: string, cue?: "special") => void;
+/** Logs a line, with the players it names. */
+type Say = (
+  text: string,
+  said?: { about?: readonly CardOwner[]; cue?: "special" }
+) => void;
 
 interface ResolutionEffects {
   apply: (owner: CardOwner, card: ActionCard, targetId: string) => void;
@@ -196,7 +200,10 @@ const assignDeferred = (
     targetId === assignment.chooserId
       ? `${chooser?.name ?? "Someone"} assigned ${cardLabel(card)} to themselves.`
       : `${chooser?.name ?? "Someone"} assigned ${cardLabel(card)} to ${target?.name ?? "someone"}.`,
-    "special"
+    {
+      about: [chooser, target].filter((player) => player !== undefined),
+      cue: "special",
+    }
   );
 };
 
@@ -294,7 +301,8 @@ const stepActionQueue = (
   if (target?.status !== "active") {
     state.discard.push(queued.card);
     effects.say(
-      `${cardLabel(queued.card)} for ${target?.name ?? "a player who left"} was discarded, since they're out of the round.`
+      `${cardLabel(queued.card)} for ${target?.name ?? "a player who left"} was discarded, since they're out of the round.`,
+      { about: target ? [target] : [] }
     );
 
     return true;

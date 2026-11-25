@@ -4,15 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { parseClientMessage } from "../game/client-message";
 import { DRAW_LIMIT } from "../game/engine";
-import { ROOM_REMOVED_CLOSE_CODE } from "../game/protocol";
+import { ROOM_REMOVED_CLOSE_CODE, TYPING_SEND_MS } from "../game/protocol";
 import type { ServerMessage } from "../game/protocol";
 import { createRoom, deliver, newStoredRoom } from "../game/room";
-import type { Admission, RoomOutcome, Seats } from "../game/room";
-import {
-  createRoomClient,
-  TYPING_SEND_MS,
-  TYPING_SHOWN_MS,
-} from "./room-client";
+import type {
+  Admission,
+  RoomOutcome,
+  RoomTransport,
+  Seats,
+} from "../game/room";
+import { createRoomClient, TYPING_SHOWN_MS } from "./room-client";
 import type { RoomClientDeps } from "./room-client";
 
 const START = 1_000_000;
@@ -39,7 +40,7 @@ const hasTraffic = (links: Map<string, Link>) =>
     (link) => link.toServer.length > 0 || link.toClient.length > 0
   );
 
-const network = (supportsTyping = true) => {
+const network = () => {
   let linkCount = 0;
   let idCount = 0;
   const connections = new Map<string, ServerConnection>();
@@ -71,8 +72,8 @@ const network = (supportsTyping = true) => {
     random: () => 0.5,
   });
 
-  const carryOut = (outcome: RoomOutcome, sender: Link | null) => {
-    deliver(outcome, {
+  const transport = (sender: Link | null) => {
+    const delivery: RoomTransport = {
       broadcast: (message, preview) => {
         for (const link of links.values()) {
           if (link.open) {
@@ -90,7 +91,7 @@ const network = (supportsTyping = true) => {
         for (const link of links.values()) {
           if (
             link.open &&
-            link.id !== except &&
+            !except.includes(link.id) &&
             connections.get(link.id)?.admission
           ) {
             link.toClient.push(message);
@@ -98,14 +99,15 @@ const network = (supportsTyping = true) => {
         }
       },
       reply: (message) => {
-        if (!supportsTyping && message.type === "welcome") {
-          const { supportsTyping: _supportsTyping, ...welcome } = message;
-          sender?.toClient.push(welcome);
-        } else {
-          sender?.toClient.push(message);
-        }
+        sender?.toClient.push(message);
       },
-    });
+    };
+
+    return delivery;
+  };
+
+  const carryOut = (outcome: RoomOutcome, sender: Link | null) => {
+    deliver(outcome, transport(sender));
   };
 
   const handleFrame = (link: Link, frame: string) => {
@@ -123,7 +125,10 @@ const network = (supportsTyping = true) => {
     } else if (message.type === "chat") {
       carryOut(room.chat(link.id, message.text), link);
     } else if (message.type === "typing") {
-      carryOut(room.typing(link.id), link);
+      deliver(
+        { effects: room.typing(link.id, message.active) },
+        transport(link)
+      );
     } else if (message.type === "sync") {
       syncs.push(link.id);
       link.toClient.push(room.viewFor(link.id));
@@ -382,23 +387,12 @@ describe("typing through the room client", () => {
     vi.useRealTimers();
   });
 
-  it("only sends chat to a room that has not advertised typing", () => {
-    const net = network(false);
-    const ana = net.join("Ana");
-
-    ana.client.typing();
-    expect(ana.client.chat("hi")).toBeTruthy();
-    expect(ana.link?.toServer.map(parseClientMessage)).toStrictEqual([
-      { type: "chat", text: "hi" },
-    ]);
-  });
-
   it("shows a player typing to everyone else until they send", () => {
     const net = network();
     const ana = net.join("Ana");
     const ben = net.join("Ben");
 
-    ana.client.typing();
+    ana.client.typing(true);
     net.flush();
 
     expect(ben.client.state.typing).toStrictEqual([ana.client.state.playerId]);
@@ -410,12 +404,35 @@ describe("typing through the room client", () => {
     expect(ben.client.state.typing).toStrictEqual([]);
   });
 
+  it("stops showing a player typing when they clear their draft", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+
+    ana.client.typing(true);
+    ana.client.typing(false);
+    ana.client.typing(false);
+
+    expect(
+      ana.link?.toServer
+        .map(parseClientMessage)
+        .filter((message) => message?.type === "typing")
+    ).toStrictEqual([
+      { active: true, type: "typing" },
+      { active: false, type: "typing" },
+    ]);
+
+    net.flush();
+
+    expect(ben.client.state.typing).toStrictEqual([]);
+  });
+
   it("stops showing a player typing when they go quiet", () => {
     const net = network();
     const ana = net.join("Ana");
     const ben = net.join("Ben");
 
-    ana.client.typing();
+    ana.client.typing(true);
     net.flush();
     vi.advanceTimersByTime(TYPING_SHOWN_MS);
 
@@ -429,18 +446,18 @@ describe("typing through the room client", () => {
     const sent = () =>
       ana.link?.toServer.filter((frame) => frame.includes('"typing"')).length;
 
-    ana.client.typing();
-    ana.client.typing();
+    ana.client.typing(true);
+    ana.client.typing(true);
 
     expect(sent()).toBe(1);
 
     vi.advanceTimersByTime(TYPING_SEND_MS);
-    ana.client.typing();
+    ana.client.typing(true);
 
     expect(sent()).toBe(2);
 
     ana.client.chat("hi");
-    ana.client.typing();
+    ana.client.typing(true);
 
     expect(sent()).toBe(3);
   });

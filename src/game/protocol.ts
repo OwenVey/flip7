@@ -17,6 +17,15 @@ export const HEARTBEAT_INTERVAL_MS = 10_000;
 
 /** A socket that hasn't pinged for this long is treated as gone. */
 export const HEARTBEAT_STALE_MS = 25_000;
+
+/** The least time between a player's typing messages. */
+export const TYPING_SEND_MS = 3000;
+
+/**
+ * The least time between typing messages the room relays for one connection.
+ * Shorter than `TYPING_SEND_MS`, so network jitter doesn't drop honest pings.
+ */
+export const TYPING_RELAY_MS = 2000;
 export const ROOM_REMOVED_CLOSE_CODE = 4001;
 export const ROOM_MISSING_CLOSE_CODE = 4002;
 export const ROOM_PARTY = "game-room";
@@ -186,8 +195,6 @@ export type ServerMessage =
   | {
       lastRequestId?: string;
       playerId: string;
-      /** Missing when the room Worker does not recognize typing pings. */
-      supportsTyping?: true;
       token: string;
       type: "welcome";
     }
@@ -197,7 +204,7 @@ export type ServerMessage =
   | { requestId: string; type: "accepted" }
   | { message: string; requestId: string; type: "rejected" }
   | { lists: RoomListUpdates; room: SentRoomView; type: "state" }
-  | { playerId: string; type: "typing" }
+  | { active: boolean; playerId: string; type: "typing" }
   | { message: string; type: "error" };
 
 export const toRoomView = (
@@ -342,11 +349,8 @@ export const parseServerMessage = (raw: string) => {
       }
 
       case "typing": {
-        return v.is(v.string(), message.playerId) ? message : null;
-      }
-
-      case "welcome": {
-        return v.is(v.optional(v.literal(true)), message.supportsTyping)
+        return v.is(v.string(), message.playerId) &&
+          v.is(v.boolean(), message.active)
           ? message
           : null;
       }
@@ -354,7 +358,8 @@ export const parseServerMessage = (raw: string) => {
       case "accepted":
       case "error":
       case "rejected":
-      case "watching": {
+      case "watching":
+      case "welcome": {
         return message;
       }
 

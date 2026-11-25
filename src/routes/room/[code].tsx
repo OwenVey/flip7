@@ -315,7 +315,6 @@ const Room = (props: { code: string }) => {
                     send={connection.send}
                     chat={connection.chat}
                     typing={connection.typing()}
-                    onTyping={connection.sendTyping}
                     actionsDisabled={table().actionsDisabled}
                     offline={unavailable()}
                     latestRoom={connection.room()}
@@ -332,7 +331,6 @@ const Room = (props: { code: string }) => {
                   send={connection.send}
                   chat={connection.chat}
                   typing={connection.typing()}
-                  onTyping={connection.sendTyping}
                   actionsDisabled={unavailable()}
                   spectator={spectator()}
                   onWatchInstead={connection.watchInstead}

@@ -17,7 +17,15 @@ const before: RoomView = {
   ...toRoomView("ABCDE", game),
   drawSeq: 10,
   log: [
-    { at: LOGGED_AT, cue: "bank", game: 1, id: 7, round: 1, text: "Banked." },
+    {
+      about: [],
+      at: LOGGED_AT,
+      cue: "bank",
+      game: 1,
+      id: 7,
+      round: 1,
+      text: "Banked.",
+    },
   ],
   phase: "playing",
   round: 1,
@@ -45,6 +53,7 @@ describe(roomCues, () => {
       log: [
         ...before.log,
         {
+          about: [],
           at: LOGGED_AT,
           cue: "bust",
           game: 1,
@@ -67,6 +76,7 @@ describe(roomCues, () => {
       log: [
         ...before.log,
         {
+          about: [],
           at: LOGGED_AT,
           from: { avatar: 1, id: "opponent", name: "Opp" },
           game: 1,

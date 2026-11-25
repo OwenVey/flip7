@@ -4,11 +4,13 @@ import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LogEntry } from "../game/engine";
+import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
 import GameLog from "./game-log";
 
 const entries = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
+    about: [{ id: `p${index}`, name: `Player ${index}` }],
     at: 0,
     cue: "bank",
     game: 1,
@@ -20,14 +22,43 @@ const entries = (count: number) =>
 const ana = { avatar: 1, id: "a", name: "Ana" };
 const ben = { avatar: 2, id: "b", name: "Ben" };
 const players = [ana, ben];
+const anaNamed = { id: ana.id, name: ana.name };
+const benNamed = { id: ben.id, name: ben.name };
 
 const twoRounds = () => {
-  const cues: Pick<LogEntry, "cue" | "from" | "round" | "text">[] = [
-    { cue: "bank", round: 1, text: "Ana stayed and banked 12 points." },
-    { cue: "bust", round: 1, text: "Ben was dealt a duplicate 9 and busted." },
-    { from: ben, round: 1, text: "ouch" },
-    { round: 2, text: "Round 2 begins. Ana deals." },
-    { cue: "bank", round: 2, text: "Ben stayed and banked 30 points." },
+  const cues: Pick<
+    LogEntry,
+    "about" | "cue" | "from" | "round" | "scores" | "text"
+  >[] = [
+    {
+      about: [anaNamed],
+      cue: "bank",
+      round: 1,
+      text: "Ana stayed and banked 12 points.",
+    },
+    {
+      about: [benNamed],
+      cue: "bust",
+      round: 1,
+      text: "Ben was dealt a duplicate 9 and busted.",
+    },
+    { about: [], from: ben, round: 1, text: "ouch" },
+    {
+      about: [],
+      round: 1,
+      scores: [
+        { ...anaNamed, points: 12 },
+        { ...benNamed, points: 0 },
+      ],
+      text: "Round 1 is over.",
+    },
+    { about: [anaNamed], round: 2, text: "Round 2 begins. Ana deals." },
+    {
+      about: [benNamed],
+      cue: "bank",
+      round: 2,
+      text: "Ben stayed and banked 30 points.",
+    },
   ];
 
   const log: LogEntry[] = cues.map((entry, index) => ({
@@ -72,7 +103,15 @@ describe("<GameLog />", () => {
   afterEach(cleanup);
 
   it("tells spectators why they can't chat", () => {
-    render(() => <GameLog phase="playing" log={entries(1)} playerId={null} />);
+    render(() => (
+      <GameLog
+        phase="playing"
+        log={entries(1)}
+        playerId={null}
+        players={players}
+        typing={[]}
+      />
+    ));
 
     expect(screen.queryByRole("textbox", { name: "Chat message" })).toBeNull();
     expect(screen.getByText("Join as a player to chat.")).toBeInTheDocument();
@@ -90,9 +129,23 @@ describe("<GameLog />", () => {
       { at: now + 3000, text: "Room unlocked." },
       { at: now + 4000, from: guest, text: "Ready?" },
       { at: now + 64_000, from: guest, text: "Still here." },
-    ].map((entry, index) => ({ ...entry, game: 1, id: index + 1, round: 1 }));
+    ].map((entry, index) => ({
+      ...entry,
+      about: [],
+      game: 1,
+      id: index + 1,
+      round: 1,
+    }));
 
-    render(() => <GameLog phase="playing" log={log} playerId={own.id} />);
+    render(() => (
+      <GameLog
+        phase="playing"
+        log={log}
+        playerId={own.id}
+        players={[own, guest]}
+        typing={[]}
+      />
+    ));
 
     const bubbles = screen
       .getAllByRole("listitem")
@@ -121,7 +174,9 @@ describe("<GameLog />", () => {
         phase="playing"
         log={[]}
         playerId="p0"
-        onChat={(text) => {
+        players={players}
+        typing={[]}
+        chat={chatControls((text) => {
           if (!connected()) {
             return false;
           }
@@ -129,7 +184,7 @@ describe("<GameLog />", () => {
           sent.push(text);
 
           return true;
-        }}
+        })}
       />
     ));
 
@@ -178,6 +233,7 @@ describe("<GameLog />", () => {
         log={twoRounds()}
         playerId="a"
         players={players}
+        typing={[]}
       />
     ));
 
@@ -205,6 +261,7 @@ describe("<GameLog />", () => {
         "Ana stayed +12 points",
         "Ben busted · duplicate 9",
         "Benouch",
+        "Round 1 is over.",
         "Ana deals.",
         "Ben stayed +30 points",
       ],
@@ -224,7 +281,29 @@ describe("<GameLog />", () => {
       "playing" | "roundOver" | "gameOver"
     >("playing");
 
-    render(() => <GameLog phase={phase()} log={twoRounds()} playerId="a" />);
+    const log = twoRounds();
+    log.push({
+      about: [],
+      at: Date.now(),
+      game: 1,
+      id: log.length + 1,
+      round: 2,
+      scores: [
+        { ...anaNamed, points: 0 },
+        { ...benNamed, points: 30 },
+      ],
+      text: "Round 2 is over.",
+    });
+
+    render(() => (
+      <GameLog
+        phase={phase()}
+        log={log}
+        playerId="a"
+        players={players}
+        typing={[]}
+      />
+    ));
 
     expect(screen.queryByRole("button", { name: "Round 2" })).toBeNull();
     setPhase("roundOver");
@@ -242,6 +321,7 @@ describe("<GameLog />", () => {
   it("keeps a chat run split by an event even when the event is hidden", () => {
     const log: LogEntry[] = [
       {
+        about: [],
         at: 1000,
         game: 1,
         id: 1,
@@ -249,11 +329,27 @@ describe("<GameLog />", () => {
         round: 1,
         text: "First",
       },
-      { at: 2000, game: 1, id: 2, round: 1, text: "Room unlocked." },
-      { at: 3000, game: 1, id: 3, from: ben, round: 1, text: "Second" },
+      { about: [], at: 2000, game: 1, id: 2, round: 1, text: "Room unlocked." },
+      {
+        about: [],
+        at: 3000,
+        game: 1,
+        id: 3,
+        from: ben,
+        round: 1,
+        text: "Second",
+      },
     ];
 
-    render(() => <GameLog phase="roundOver" log={log} playerId="a" />);
+    render(() => (
+      <GameLog
+        phase="roundOver"
+        log={log}
+        playerId="a"
+        players={players}
+        typing={[]}
+      />
+    ));
 
     expect(isContinuation("Second")).toBeFalsy();
     fireEvent.click(screen.getByRole("radio", { name: "Chat" }));
@@ -268,6 +364,7 @@ describe("<GameLog />", () => {
 
     try {
       const entry = {
+        about: [],
         at: Date.now(),
         game: 1,
         round: 1,
@@ -277,7 +374,15 @@ describe("<GameLog />", () => {
 
       const [log, setLog] = createSignal<LogEntry[]>([entry]);
 
-      render(() => <GameLog phase="playing" log={log()} playerId="a" />);
+      render(() => (
+        <GameLog
+          phase="playing"
+          log={log()}
+          playerId="a"
+          players={players}
+          typing={[]}
+        />
+      ));
       const viewport = screen.getByRole("log");
       Object.defineProperties(viewport, {
         clientHeight: { value: 200 },
@@ -314,15 +419,22 @@ describe("<GameLog />", () => {
   it("keeps round headings over chat in the Chat filter", () => {
     const log = twoRounds();
     log.push({
+      about: [],
       at: Date.now(),
       from: ana,
       game: 1,
-      id: 6,
+      id: log.length + 1,
       round: 2,
       text: "gg",
     });
     render(() => (
-      <GameLog phase="playing" log={log} playerId="a" players={players} />
+      <GameLog
+        phase="playing"
+        log={log}
+        playerId="a"
+        players={players}
+        typing={[]}
+      />
     ));
 
     fireEvent.click(screen.getByRole("radio", { name: "Chat" }));
@@ -343,6 +455,7 @@ describe("<GameLog />", () => {
         log={twoRounds()}
         playerId="b"
         players={players}
+        typing={[]}
       />
     ));
     fireEvent.click(screen.getByRole("button", { name: "Round 1" }));
@@ -365,6 +478,7 @@ describe("<GameLog />", () => {
         log={twoRounds()}
         playerId="a"
         players={players}
+        typing={[]}
       />
     ));
     fireEvent.click(screen.getByRole("button", { name: "Round 1" }));
@@ -390,8 +504,8 @@ describe("<GameLog />", () => {
     expect(screen.queryByText("Highlighting")).toBeNull();
   });
 
-  it("counts characters near the limit and reports typing", () => {
-    let typed = 0;
+  it("counts characters near the limit and reports typing until the draft is cleared", () => {
+    const chat = chatControls();
     render(() => (
       <GameLog
         phase="playing"
@@ -399,10 +513,7 @@ describe("<GameLog />", () => {
         playerId="a"
         players={players}
         typing={["b"]}
-        onChat={() => true}
-        onTyping={() => {
-          typed += 1;
-        }}
+        chat={chat}
       />
     ));
 
@@ -412,8 +523,10 @@ describe("<GameLog />", () => {
 
     fireEvent.input(draft, { target: { value: "hi" } });
     flush();
+    fireEvent.input(draft, { target: { value: "" } });
+    flush();
 
-    expect(typed).toBe(1);
+    expect(chat.typed).toStrictEqual([true, false]);
     expect(charCount()).not.toBeVisible();
 
     fireEvent.input(draft, { target: { value: "x".repeat(170) } });
@@ -427,7 +540,14 @@ describe("<GameLog />", () => {
     const [log, setLog] = createSignal(entries(2));
 
     render(() => (
-      <GameLog phase="playing" log={log()} playerId="p0" onChat={() => true} />
+      <GameLog
+        phase="playing"
+        log={log()}
+        playerId="p0"
+        players={players}
+        typing={[]}
+        chat={chatControls()}
+      />
     ));
 
     const first = stayed(0);

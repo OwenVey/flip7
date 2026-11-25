@@ -1,5 +1,5 @@
-import type { LogEntry } from "../game/engine";
-import { sameName } from "../game/names";
+import { LOG_TEXT } from "../game/engine";
+import type { LogEntry, LogPlayer } from "../game/engine";
 
 export const SECOND_MS = 1000;
 export const MINUTE_MS = 60 * SECOND_MS;
@@ -97,21 +97,21 @@ const cueIcons = {
 type DetailSpec =
   | { text: string }
   | { card: string; label: string }
-  | { points: string; player: string };
+  | { points: string };
 
 type EventRule = [RegExp, string, (readonly DetailSpec[])?, EventIconKey?];
 
 export type EventDetail =
   | { kind: "text"; text: string }
   | { kind: "card"; label: string; number: number }
-  | { kind: "points"; player: string; points: number };
+  | { kind: "points"; points: number };
 
 export const eventCopy = {
   bank: [
     [
       /^(?<player>.+) stayed and banked (?<points>\d+) points?\.$/u,
       "$<player> stayed",
-      [{ player: "$<player>", points: "$<points>" }],
+      [{ points: "$<points>" }],
     ],
   ],
   bust: [
@@ -128,12 +128,12 @@ export const eventCopy = {
     [
       /^(?<player>.+) played Freeze on themselves and banked (?<points>\d+) points?\.$/u,
       "$<player> froze themselves",
-      [{ player: "$<player>", points: "$<points>" }],
+      [{ points: "$<points>" }],
     ],
     [
       /^(?<player>.+) played Freeze on (?<target>.+), who banked (?<points>\d+) points?\.$/u,
       "$<target> was frozen",
-      [{ player: "$<target>", points: "$<points>" }, { text: "by $<player>" }],
+      [{ points: "$<points>" }, { text: "by $<player>" }],
     ],
   ],
   special: [
@@ -182,7 +182,6 @@ const fillDetail = (text: string, pattern: RegExp, spec: DetailSpec) => {
   if ("points" in spec) {
     return {
       kind: "points",
-      player: fill(spec.player),
       points: Number(fill(spec.points)),
     } satisfies EventDetail;
   }
@@ -219,20 +218,10 @@ export const detailText = (detail: EventDetail) => {
   }
 };
 
-const SELF = "themselves";
-
-const namedPlayers = (match: RegExpExecArray) =>
-  [match.groups?.player, match.groups?.target].filter(
-    (name, index, names): name is string =>
-      name !== undefined && name !== SELF && names.indexOf(name) === index
-  );
-
-const deckReshuffled = "The discard pile was shuffled into a new deck.";
-
 const systemIcons = new Map<string, EventIconKey>([
-  [deckReshuffled, "shuffle"],
-  ["Room locked.", "lock"],
-  ["Room unlocked.", "lock-open"],
+  [LOG_TEXT.deckReshuffled, "shuffle"],
+  [LOG_TEXT.roomLocked, "lock"],
+  [LOG_TEXT.roomUnlocked, "lock-open"],
 ]);
 
 export const roundAnnouncement =
@@ -240,12 +229,9 @@ export const roundAnnouncement =
 
 export const winnerAnnouncement = /^.+ wins with \d+ points!$/u;
 
-export const systemCopy = new Map([
-  [deckReshuffled, "Deck rebuilt from the discard pile."],
-  [
-    "No cards are left to draw, so the round ends.",
-    "Deck empty · round ended.",
-  ],
+export const systemCopy = new Map<string, string>([
+  [LOG_TEXT.deckReshuffled, "Deck rebuilt from the discard pile."],
+  [LOG_TEXT.outOfCards, "Deck empty · round ended."],
 ]);
 
 interface LogEventCopy {
@@ -253,7 +239,6 @@ interface LogEventCopy {
   details: EventDetail[];
   icon: EventIconKey | undefined;
   outcome: string;
-  players: string[];
 }
 
 export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
@@ -265,7 +250,6 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
       details: [],
       icon: "playing-cards",
       outcome: entry.text.slice(roundPrefix.length),
-      players: [],
     } satisfies LogEventCopy;
   }
 
@@ -275,9 +259,7 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
   const cueIcon = entry.cue === undefined ? undefined : cueIcons[entry.cue];
 
   for (const [pattern, outcome, details = [], icon] of rules) {
-    const match = pattern.exec(entry.text);
-
-    if (match) {
+    if (pattern.test(entry.text)) {
       return {
         announcement: false,
         details: details.map((detail) =>
@@ -285,7 +267,6 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
         ),
         icon: icon ?? cueIcon,
         outcome: entry.text.replace(pattern, outcome),
-        players: namedPlayers(match),
       } satisfies LogEventCopy;
     }
   }
@@ -302,7 +283,6 @@ export const eventDetails = (entry: LogEntry, hasRoundHeading: boolean) => {
     details: [],
     icon,
     outcome: systemText ?? entry.text,
-    players: [],
   } satisfies LogEventCopy;
 };
 
@@ -314,37 +294,34 @@ const sameList = <T>(a: T[], b: T[], same: (x: T, y: T) => boolean) =>
 export const sameDetails = (a: EventDetails, b: EventDetails) =>
   a.announcement === b.announcement &&
   sameList(a.details, b.details, (x, y) => detailText(x) === detailText(y)) &&
-  sameList(a.players, b.players, (x, y) => x === y) &&
   a.icon === b.icon &&
   a.outcome === b.outcome;
 
 /** Whether an entry is about this player: a chat they sent, or an event that names them. */
-export const involves = (entry: LogEntry, name: string) => {
-  if (entry.from !== undefined) {
-    return sameName(entry.from.name, name);
-  }
+export const involves = (entry: LogEntry, playerId: string) =>
+  entry.from?.id === playerId ||
+  entry.about.some((player) => player.id === playerId);
 
-  return eventDetails(entry, false).players.some((player) =>
-    sameName(player, name)
-  );
-};
+export type NamePart = { text: string } | { player: LogPlayer };
 
-export type NamePart = { text: string } | { name: string };
-
-/** Splits text around the given player names, so each name can be shown on its own. */
-export const nameParts = (text: string, names: readonly string[]) => {
+/** Splits text around the given players' names, so each name can be shown on its own. */
+export const nameParts = (text: string, players: readonly LogPlayer[]) => {
   const parts: NamePart[] = [];
-  const longestFirst = [...names].toSorted((a, b) => b.length - a.length);
+
+  const longestFirst = players.toSorted(
+    (a, b) => b.name.length - a.name.length
+  );
+
   let rest = text;
 
   while (rest !== "") {
-    let next: { at: number; name: string } | undefined;
+    let next: { at: number; player: LogPlayer } | undefined;
 
-    for (const name of longestFirst) {
-      const at = rest.indexOf(name);
+    for (const player of longestFirst) {
+      const at = rest.indexOf(player.name);
 
       if (at !== -1 && (next === undefined || at < next.at)) {
-        next = { at, name };
+        next = { at, player };
       }
     }
 
@@ -357,8 +334,8 @@ export const nameParts = (text: string, names: readonly string[]) => {
       parts.push({ text: rest.slice(0, next.at) });
     }
 
-    parts.push({ name: next.name });
-    rest = rest.slice(next.at + next.name.length);
+    parts.push({ player: next.player });
+    rest = rest.slice(next.at + next.player.name.length);
   }
 
   return parts;
@@ -367,35 +344,29 @@ export const nameParts = (text: string, names: readonly string[]) => {
 const countLabel = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
-/** A finished round in a few words: the biggest bank, then the busts and Flip 7s. */
+/** A finished round in a few words: the round's top score, then the Flip 7s and busts. */
 export const summarizeRound = (entries: readonly LogEntry[]) => {
   let best: { name: string; points: number } | undefined;
   let busts = 0;
   const flipSevens: string[] = [];
 
   for (const entry of entries) {
-    if (entry.from !== undefined) {
-      continue;
-    }
-
-    const copy = eventDetails(entry, false);
-
-    const [player] = copy.players;
-
     if (entry.cue === "bust") {
       busts += 1;
     }
 
+    const [player] = entry.about;
+
     if (entry.cue === "flipSeven" && player !== undefined) {
-      flipSevens.push(player);
+      flipSevens.push(player.name);
     }
 
-    for (const detail of copy.details) {
+    for (const score of entry.scores ?? []) {
       if (
-        detail.kind === "points" &&
-        (best === undefined || detail.points > best.points)
+        score.points > 0 &&
+        (best === undefined || score.points > best.points)
       ) {
-        best = { name: detail.player, points: detail.points };
+        best = score;
       }
     }
   }

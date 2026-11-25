@@ -50,8 +50,7 @@ import {
 } from "solid-js";
 
 import { CHAT_MAX_LENGTH } from "../game/engine";
-import type { LogEntry, Phase } from "../game/engine";
-import { sameName } from "../game/names";
+import type { LogEntry, LogPlayer, Phase } from "../game/engine";
 import {
   continuesChat,
   countChatsAfter,
@@ -73,7 +72,9 @@ import type {
   EventDetail,
   EventIconKey,
   LogGroup,
+  NamePart,
 } from "../lib/game-log-entries";
+import type { ChatControls } from "../lib/room-connection";
 import PlayerAvatar from "./player-avatar";
 import Tooltip from "./tooltip";
 
@@ -156,50 +157,64 @@ const ClockMinute = (props: { at: number | null; class?: string }) => {
 };
 
 interface Spotlight {
-  name: string | null;
-  toggle: (name: string) => void;
+  player: LogPlayer | null;
+  toggle: (player: LogPlayer) => void;
 }
+
+const samePart = (a: NamePart, b: NamePart) =>
+  "text" in a
+    ? "text" in b && a.text === b.text
+    : "player" in b && a.player.id === b.player.id;
 
 const Named = (props: {
   text: string;
-  names: readonly string[];
+  players: readonly LogPlayer[];
   spotlight: Spotlight;
-}) => (
-  <For each={nameParts(props.text, props.names)}>
-    {(part) =>
-      "text" in part ? (
-        part.text
-      ) : (
-        <button
-          type="button"
-          class="log-name"
-          aria-pressed={
-            props.spotlight.name !== null &&
-            sameName(props.spotlight.name, part.name)
-              ? "true"
-              : "false"
-          }
-          onClick={() => {
-            props.spotlight.toggle(part.name);
-          }}
-        >
-          {part.name}
-        </button>
-      )
-    }
-  </For>
-);
+}) => {
+  const parts = createMemo(() => nameParts(props.text, props.players), {
+    equals: (a, b) =>
+      a.length === b.length &&
+      a.every((part, index) => {
+        const other = b[index];
+
+        return other !== undefined && samePart(part, other);
+      }),
+  });
+
+  return (
+    <For each={parts()}>
+      {(part) =>
+        "text" in part ? (
+          part.text
+        ) : (
+          <button
+            type="button"
+            class="log-name"
+            aria-pressed={
+              props.spotlight.player?.id === part.player.id ? "true" : "false"
+            }
+            onClick={() => {
+              props.spotlight.toggle(part.player);
+            }}
+          >
+            {part.player.name}
+          </button>
+        )
+      }
+    </For>
+  );
+};
 
 const Detail = (props: {
   detail: EventDetail;
-  names: readonly string[];
+  players: readonly LogPlayer[];
   spotlight: Spotlight;
 }) => (
   <Switch
     fallback={
       <Named
         text={detailText(props.detail)}
-        names={props.names}
+        players={props.players}
         spotlight={props.spotlight}
       />
     }
@@ -278,7 +293,7 @@ const GameEvent = (props: {
           <span class="log-outcome">
             <Named
               text={copy().outcome}
-              names={copy().players}
+              players={props.entry.about}
               spotlight={props.spotlight}
             />
           </span>
@@ -290,7 +305,7 @@ const GameEvent = (props: {
                   <Show when={detail().kind !== "points"}>{"·\u00A0"}</Show>
                   <Detail
                     detail={detail()}
-                    names={copy().players}
+                    players={props.entry.about}
                     spotlight={props.spotlight}
                   />
                 </span>
@@ -333,10 +348,7 @@ const ChatMessage = (props: {
 
 const CHAT_COUNT_FROM = CHAT_MAX_LENGTH - 40;
 
-const ChatForm = (props: {
-  onSend: (text: string) => boolean;
-  onTyping: (() => void) | undefined;
-}) => {
+const ChatForm = (props: { chat: ChatControls; onSent: () => void }) => {
   const [text, setText] = createSignal("");
   const [failed, setFailed] = createSignal(false);
   const message = createMemo(() => text().trim());
@@ -349,11 +361,12 @@ const ChatForm = (props: {
       return;
     }
 
-    const sent = props.onSend(draft);
+    const sent = props.chat.send(draft);
     setFailed(!sent);
 
     if (sent) {
       setText("");
+      props.onSent();
     }
   };
 
@@ -372,10 +385,7 @@ const ChatForm = (props: {
         value={text()}
         onValueChange={(value) => {
           setText(value);
-
-          if (value.trim() !== "") {
-            props.onTyping?.();
-          }
+          props.chat.typing(value.trim() !== "");
         }}
         maxlength={CHAT_MAX_LENGTH}
         aria-describedby={countId}
@@ -423,7 +433,6 @@ const LogRound = (props: {
   continuations: ReadonlySet<number>;
   collapsible: boolean;
   playerId: string | null;
-  myName: string | null;
   newFrom: number | undefined;
   spotlight: Spotlight;
   now: () => number;
@@ -470,19 +479,19 @@ const LogRound = (props: {
         const continuation = () => props.continuations.has(entry().id);
 
         const mine = createMemo(() => {
-          const name = props.myName;
+          const { playerId } = props;
 
           return (
-            name !== null &&
+            playerId !== null &&
             entry().from === undefined &&
-            involves(entry(), name)
+            involves(entry(), playerId)
           );
         });
 
         const spotlit = createMemo(() => {
-          const { name } = props.spotlight;
+          const { player } = props.spotlight;
 
-          return name !== null && involves(entry(), name);
+          return player !== null && involves(entry(), player.id);
         });
 
         return (
@@ -594,11 +603,12 @@ export default function GameLog(props: {
   log: LogEntry[];
   phase: Phase;
   playerId: string | null;
-  onChat?: ((text: string) => boolean) | undefined;
+  /** Missing for a spectator, who can read the chat but not send to it. */
+  chat?: ChatControls | undefined;
   inSheet?: boolean;
-  players?: readonly { id: string; name: string }[];
-  typing?: readonly string[];
-  onTyping?: (() => void) | undefined;
+  players: readonly LogPlayer[];
+  /** Other players typing a chat message, by player ID. */
+  typing: readonly string[];
 }) {
   const [filter, setFilter] = createSignal<LogFilter>("All");
   const now = createPolled(Date.now, SECOND_MS);
@@ -698,36 +708,34 @@ export default function GameLog(props: {
     }
   );
 
-  const [spotlit, setSpotlit] = createSignal<string | null>(null);
+  const [spotlit, setSpotlit] = createSignal<LogPlayer | null>(null);
 
   const spotlight: Spotlight = {
-    get name() {
+    get player() {
       return spotlit();
     },
-    toggle: (name) => {
-      setSpotlit((current) =>
-        current !== null && sameName(current, name) ? null : name
-      );
+    toggle: (player) => {
+      setSpotlit((current) => (current?.id === player.id ? null : player));
     },
   };
-
-  const myName = createMemo(
-    () =>
-      props.players?.find((player) => player.id === props.playerId)?.name ??
-      null
-  );
 
   const currentRound = createMemo(() => roundKey(props.log.at(-1)));
 
   const roundFinished = () =>
     props.phase === "roundOver" || props.phase === "gameOver";
 
-  const typingNames = createMemo(() =>
-    (props.typing ?? []).flatMap((id) => {
-      const name = props.players?.find((player) => player.id === id)?.name;
+  const typingNames = createMemo(
+    () => {
+      const typing = new Set(props.typing);
 
-      return name === undefined ? [] : [name];
-    })
+      return props.players.flatMap((player) =>
+        typing.has(player.id) ? [player.name] : []
+      );
+    },
+    {
+      equals: (a, b) =>
+        a.length === b.length && a.every((name, index) => name === b[index]),
+    }
   );
 
   return (
@@ -823,7 +831,6 @@ export default function GameLog(props: {
                               roundKey(group().entries[0]) !== currentRound())
                           }
                           playerId={props.playerId}
-                          myName={myName()}
                           newFrom={newFrom()}
                           spotlight={spotlight}
                           now={now}
@@ -853,10 +860,10 @@ export default function GameLog(props: {
       </ScrollArea>
       <div class="log-compose">
         <Show when={spotlit()}>
-          {(name) => (
+          {(player) => (
             <p class="log-spotlight">
               <span>
-                Highlighting <strong>{name()}</strong>
+                Highlighting <strong>{player().name}</strong>
               </span>
               <Button
                 data-size="sm"
@@ -873,21 +880,15 @@ export default function GameLog(props: {
           {typingLabel(typingNames())}
         </p>
         <Show
-          when={props.onChat}
+          when={props.chat}
           fallback={<p class="muted chat-hint">Join as a player to chat.</p>}
         >
-          {(onChat) => (
+          {(chat) => (
             <ChatForm
-              onSend={(message) => {
-                const sent = onChat()(message);
-
-                if (sent) {
-                  setNewFrom(undefined);
-                }
-
-                return sent;
+              chat={chat()}
+              onSent={() => {
+                setNewFrom(undefined);
               }}
-              onTyping={props.onTyping}
             />
           )}
         </Show>

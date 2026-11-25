@@ -5,6 +5,7 @@ import {
   receiveState,
   ROOM_MISSING_CLOSE_CODE,
   ROOM_REMOVED_CLOSE_CODE,
+  TYPING_SEND_MS,
 } from "../game/protocol";
 import type {
   ReceivedLists,
@@ -94,9 +95,6 @@ const TRY_AGAIN = "Reconnecting. Try again in a moment.";
 /** How long a player shows as typing after their last typing message. */
 export const TYPING_SHOWN_MS = 5000;
 
-/** The least time between this player's typing messages. */
-export const TYPING_SEND_MS = 3000;
-
 const shouldRecheck = (retryCount: number) =>
   retryCount === 1 ||
   (retryCount > 0 && retryCount % FAILURES_BEFORE_RECHECK === 0);
@@ -146,7 +144,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   let wasVisible = false;
   const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
   let typingSentAt: number | null = null;
-  let supportsTyping = false;
+  let typingShown = false;
 
   const update = (patch: Partial<Omit<RoomClientState, "canAct">>) => {
     const next = { ...state, ...patch };
@@ -237,8 +235,8 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     seatedPlayerId = null;
     lastRequestId = undefined;
     awaitingWelcome = false;
-    supportsTyping = false;
     typingSentAt = null;
+    typingShown = false;
     clearTyping();
 
     if (state.joining) {
@@ -407,14 +405,17 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       }
 
       case "typing": {
-        showTyping(message.playerId);
+        if (message.active) {
+          showTyping(message.playerId);
+        } else {
+          stopTyping(message.playerId);
+        }
 
         return;
       }
 
       case "welcome": {
         awaitingWelcome = false;
-        supportsTyping = message.supportsTyping === true;
         deps.token.set(message.token);
         deps.watchPreference.set(false);
         synced = false;
@@ -565,25 +566,34 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
       if (sent) {
         typingSentAt = null;
+        typingShown = false;
       }
 
       return sent;
     },
 
-    typing: () => {
-      const now = Date.now();
-
-      if (
-        !supportsTyping ||
-        !state.online ||
-        !state.ready ||
-        (typingSentAt !== null && now - typingSentAt < TYPING_SEND_MS)
-      ) {
+    typing: (active: boolean) => {
+      if (!state.online || !state.ready) {
         return;
       }
 
-      if (raw({ type: "typing" })) {
+      if (!active) {
+        if (typingShown && raw({ active: false, type: "typing" })) {
+          typingShown = false;
+        }
+
+        return;
+      }
+
+      const now = Date.now();
+
+      if (typingSentAt !== null && now - typingSentAt < TYPING_SEND_MS) {
+        return;
+      }
+
+      if (raw({ active: true, type: "typing" })) {
         typingSentAt = now;
+        typingShown = true;
       }
     },
 

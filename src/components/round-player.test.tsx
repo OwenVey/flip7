@@ -14,6 +14,7 @@ import { availableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { pointsOf, roundPointsFor } from "../lib/deal-playback";
 import type { RoomConnection } from "../lib/room-connection";
+import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
 import { room } from "../test/room-view";
 import { agent, agentApproval, Table } from "../test/table";
@@ -316,7 +317,8 @@ describe("<RoundPlayer />", () => {
         room={room()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
         actionsDisabled
         dealing
         offline={offline()}
@@ -338,7 +340,8 @@ describe("<RoundPlayer />", () => {
         room={room()}
         playerId="a"
         send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -383,7 +386,8 @@ describe("<RoundPlayer />", () => {
         room={room({ choice })}
         playerId="a"
         send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -416,7 +420,8 @@ describe("<RoundPlayer />", () => {
         room={room({ choice })}
         playerId="a"
         send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
     const seat = screen.getByRole("article", { name: "Ana, 40 points" });
@@ -432,7 +437,8 @@ describe("<RoundPlayer />", () => {
         room={room({ choice })}
         playerId="b"
         send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
     expect(screen.queryByRole("button", { name: "Freeze Ben" })).toBeNull();
@@ -462,7 +468,8 @@ describe("<RoundPlayer />", () => {
         room={view}
         playerId="a"
         send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
     expect(screen.getByText(/Pick who gets their Freeze/u)).toBeVisible();
@@ -496,7 +503,8 @@ describe("<RoundPlayer />", () => {
         room={view()}
         playerId="a"
         send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
         actionsDisabled={syncing()}
       />
     ));

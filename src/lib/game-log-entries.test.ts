@@ -16,7 +16,7 @@ import {
   startGame,
   stay,
 } from "../game/engine";
-import type { GameCue, GameState, LogEntry } from "../game/engine";
+import type { GameCue, GameState, LogEntry, LogPlayer } from "../game/engine";
 import { DEFAULT_SETTINGS } from "../game/settings";
 import type { EventDetail } from "./game-log-entries";
 import {
@@ -290,8 +290,7 @@ const messageFrom = (
   return entry;
 };
 
-const pts = (points: number, player: string) =>
-  ({ kind: "points", player, points }) as const;
+const pts = (points: number) => ({ kind: "points", points }) as const;
 
 const dupe = (number: number) =>
   ({ kind: "card", label: "duplicate", number }) as const;
@@ -304,10 +303,7 @@ const event = (
   details: EventDetail[] | undefined,
   icon?: string
 ) => ({
-  announcement: false,
-  details: details ?? [],
-  icon,
-  outcome,
+  copy: { announcement: false, details: details ?? [], icon, outcome },
   players,
 });
 
@@ -316,7 +312,6 @@ const announcement = (outcome: string, icon?: string) => ({
   details: [],
   icon,
   outcome,
-  players: [],
 });
 
 const unchangedMessages = [
@@ -334,12 +329,12 @@ describe("the engine's messages in the Chat & Log", () => {
     [
       "stayPoints",
       cuedEntry("bank"),
-      event("Ada stayed", ["Ada"], [pts(10, "Ada")], "coins"),
+      event("Ada stayed", ["Ada"], [pts(10)], "coins"),
     ],
     [
       "stayOnePoint",
       cuedEntry("bank"),
-      event("Ada stayed", ["Ada"], [pts(1, "Ada")], "coins"),
+      event("Ada stayed", ["Ada"], [pts(1)], "coins"),
     ],
     [
       "bust",
@@ -354,7 +349,7 @@ describe("the engine's messages in the Chat & Log", () => {
     [
       "freezeSelf",
       cuedEntry("freeze"),
-      event("Ada froze themselves", ["Ada"], [pts(5, "Ada")], "snowflake"),
+      event("Ada froze themselves", ["Ada"], [pts(5)], "snowflake"),
     ],
     [
       "freezeOther",
@@ -362,7 +357,7 @@ describe("the engine's messages in the Chat & Log", () => {
       event(
         "Bo was frozen",
         ["Ada", "Bo"],
-        [pts(3, "Bo"), words("by Ada")],
+        [pts(3), words("by Ada")],
         "snowflake"
       ),
     ],
@@ -419,13 +414,23 @@ describe("the engine's messages in the Chat & Log", () => {
     [
       "reshuffle",
       fromEnd(),
-      announcement("Deck rebuilt from the discard pile.", "shuffle"),
+      {
+        copy: announcement("Deck rebuilt from the discard pile.", "shuffle"),
+        players: [],
+      },
     ],
-    ["outOfCards", fromEnd(2), announcement("Deck empty · round ended.")],
+    [
+      "outOfCards",
+      fromEnd(2),
+      { copy: announcement("Deck empty · round ended."), players: [] },
+    ],
   ] as const)("shortens %s", (scenario, pick, expected) => {
-    expect(eventDetails(messageFrom(scenario, pick), true)).toStrictEqual(
-      expected
-    );
+    const entry = messageFrom(scenario, pick);
+
+    expect({
+      copy: eventDetails(entry, true),
+      players: entry.about.map((player) => player.name),
+    }).toStrictEqual(expected);
   });
 
   it.each(unchangedMessages)(
@@ -448,8 +453,8 @@ describe("the engine's messages in the Chat & Log", () => {
         .slice(-2)
         .map((entry) => eventDetails(entry, true))
     ).toStrictEqual([
-      event("Room locked.", [], undefined, "lock"),
-      event("Room unlocked.", [], undefined, "lock-open"),
+      event("Room locked.", [], undefined, "lock").copy,
+      event("Room unlocked.", [], undefined, "lock-open").copy,
     ]);
   });
 
@@ -669,30 +674,40 @@ let logId = 0;
 const logEntry = (text: string, extra: Partial<LogEntry> = {}) => {
   logId += 1;
 
-  return {
+  const entry: LogEntry = {
+    about: [],
     at: 0,
     game: 1,
     id: logId,
     round: 1,
     text,
     ...extra,
-  } satisfies LogEntry;
+  };
+
+  return entry;
 };
 
 const said = (name: string, text: string, at = 0) =>
   logEntry(text, { at, from: { avatar: null, id: name, name } });
 
+const ada = { id: "a", name: "Ada" };
+const bo = { id: "b", name: "Bo" };
+const cy = { id: "c", name: "Cy" };
+
 describe(nameParts, () => {
   it("splits out each name, longest first where names overlap", () => {
-    expect(nameParts("Ash froze Ashley", ["Ash", "Ashley"])).toStrictEqual([
-      { name: "Ash" },
+    const ash = { id: "x", name: "Ash" };
+    const ashley = { id: "y", name: "Ashley" };
+
+    expect(nameParts("Ash froze Ashley", [ash, ashley])).toStrictEqual([
+      { player: ash },
       { text: " froze " },
-      { name: "Ashley" },
+      { player: ashley },
     ]);
   });
 
   it("keeps text without names whole", () => {
-    expect(nameParts("Room locked.", ["Ada"])).toStrictEqual([
+    expect(nameParts("Room locked.", [ada])).toStrictEqual([
       { text: "Room locked." },
     ]);
     expect(nameParts("from Ada", [])).toStrictEqual([{ text: "from Ada" }]);
@@ -700,14 +715,28 @@ describe(nameParts, () => {
 });
 
 describe(involves, () => {
-  it("finds a player named anywhere in an event, ignoring case", () => {
+  it("finds every player an event names, by ID", () => {
     const frozen = logEntry("Ada played Freeze on Bo, who banked 3 points.", {
+      about: [ada, bo],
       cue: "freeze",
     });
 
-    expect(involves(frozen, "bo")).toBeTruthy();
-    expect(involves(frozen, "Ada")).toBeTruthy();
-    expect(involves(frozen, "Cy")).toBeFalsy();
+    expect(involves(frozen, bo.id)).toBeTruthy();
+    expect(involves(frozen, ada.id)).toBeTruthy();
+    expect(involves(frozen, cy.id)).toBeFalsy();
+  });
+
+  it("tells apart players whose names overlap", () => {
+    const alex = { id: "x", name: "Alex" };
+    const alexander = { id: "y", name: "Alexander" };
+
+    const stayed = logEntry("Alexander stayed and banked 4 points.", {
+      about: [alexander],
+      cue: "bank",
+    });
+
+    expect(involves(stayed, alexander.id)).toBeTruthy();
+    expect(involves(stayed, alex.id)).toBeFalsy();
   });
 
   it("counts a chat as its sender's", () => {
@@ -716,34 +745,66 @@ describe(involves, () => {
   });
 });
 
+const roundOver = (scores: [LogPlayer, number][]) =>
+  logEntry("Round 1 is over.", {
+    scores: scores.map(([player, points]) => ({ ...player, points })),
+  });
+
 describe(summarizeRound, () => {
-  it("names the biggest bank, then Flip 7s and busts", () => {
+  it("names the round's top score, then Flip 7s and busts", () => {
     expect(
       summarizeRound([
-        logEntry("Ada stayed and banked 12 points.", { cue: "bank" }),
-        logEntry("Bo was dealt a duplicate 5 and busted.", { cue: "bust" }),
-        said("Bo", "ugh"),
-        logEntry("Cy earned the Flip 7 bonus!", { cue: "flipSeven" }),
-        logEntry("Ada played Freeze on Cy, who banked 40 points.", {
-          cue: "freeze",
+        logEntry("Bo was dealt a duplicate 5 and busted.", {
+          about: [bo],
+          cue: "bust",
         }),
-        logEntry("Ada was dealt a duplicate 9 and busted.", { cue: "bust" }),
+        said("Bo", "ugh"),
+        logEntry("Cy earned the Flip 7 bonus!", {
+          about: [cy],
+          cue: "flipSeven",
+        }),
+        logEntry("Ada was dealt a duplicate 9 and busted.", {
+          about: [ada],
+          cue: "bust",
+        }),
+        roundOver([
+          [ada, 0],
+          [bo, 0],
+          [cy, 40],
+        ]),
       ])
     ).toStrictEqual(["Cy +40", "Cy flipped 7", "2 busts"]);
   });
 
-  it("credits the player frozen when their name starts with the Freeze player's name", () => {
+  it("credits a Flip 7 player's score, which no bank line shows", () => {
     expect(
       summarizeRound([
-        logEntry("Alex played Freeze on Alexander, who banked 12 points.", {
-          cue: "freeze",
+        logEntry("Bo stayed and banked 8 points.", {
+          about: [bo],
+          cue: "bank",
         }),
+        logEntry("Ada earned the Flip 7 bonus!", {
+          about: [ada],
+          cue: "flipSeven",
+        }),
+        roundOver([
+          [ada, 23],
+          [bo, 8],
+        ]),
       ])
-    ).toStrictEqual(["Alexander +12"]);
+    ).toStrictEqual(["Ada +23", "Ada flipped 7"]);
+  });
+
+  it("sums up a round the engine played to a Flip 7", () => {
+    expect(summarizeRound(scenarios.flipSeven())).toStrictEqual([
+      expect.stringMatching(/^Ada \+\d+$/u),
+      "Ada flipped 7",
+    ]);
   });
 
   it("says nothing for a round without scores", () => {
     expect(summarizeRound([logEntry("Round 1 is over.")])).toStrictEqual([]);
+    expect(summarizeRound([roundOver([[ada, 0]])])).toStrictEqual([]);
   });
 });
 
