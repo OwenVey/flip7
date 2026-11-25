@@ -4,9 +4,10 @@ import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LogEntry } from "../game/engine";
+import { createChatLogReads } from "../lib/chat-log-reads";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
-import GameLog from "./game-log";
+import GameLog, { ChatLog } from "./game-log";
 
 const entries = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
@@ -403,15 +404,24 @@ describe("<GameLog />", () => {
 
       const [log, setLog] = createSignal<LogEntry[]>([entry]);
 
-      render(() => (
-        <GameLog
-          inSheet
-          log={log()}
-          playerId="a"
-          players={players}
-          typing={[]}
-        />
-      ));
+      render(() => {
+        const reads = createChatLogReads({
+          log,
+          playerId: () => "a",
+          shown: () => true,
+        });
+
+        return (
+          <ChatLog
+            inSheet
+            reads={reads}
+            log={log()}
+            playerId="a"
+            players={players}
+            typing={[]}
+          />
+        );
+      });
       const viewport = screen.getByRole("log");
       Object.defineProperties(viewport, {
         clientHeight: { value: 200 },

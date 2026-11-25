@@ -1,3 +1,5 @@
+import { setTimeout as delay } from "node:timers/promises";
+
 import { captureArtifact } from "@solidjs/diagnostics";
 import {
   cleanup,
@@ -40,6 +42,16 @@ const spectator = () => ({
     unavailable: false,
   },
   onLeave: vi.fn<() => void>(),
+});
+
+const benChat = (id: number, text: string) => ({
+  about: [],
+  at: LOGGED_AT,
+  from: { avatar: 1, id: "b", name: "Ben" },
+  game: 1,
+  id,
+  round: 1,
+  text,
 });
 
 describe("<Table />", () => {
@@ -1279,6 +1291,49 @@ describe("<Table />", () => {
     flush();
     expect(screen.queryByRole("dialog", { name: "Chat & Log" })).toBeNull();
     expect(toggle).toHaveFocus();
+  });
+
+  it("keeps chat read in the open sheet read when the round end closes it", async () => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("width < 64rem"),
+    }));
+
+    try {
+      const [view, setView] = createSignal(room());
+
+      render(() => (
+        <Table
+          room={view()}
+          playerId="a"
+          send={vi.fn<RoomConnection["send"]>()}
+          chat={chatControls()}
+          typing={[]}
+        />
+      ));
+
+      const toggle = screen.getByRole("button", { name: "Chat & Log" });
+      toggle.click();
+      flush();
+      const sheet = await screen.findByRole("dialog", { name: "Chat & Log" });
+
+      setView(room({ log: [benChat(1, "gl")] }));
+      flush();
+      await delay(0);
+      const chatted = room({ log: [benChat(1, "gl"), benChat(2, "nice hit")] });
+      setView(chatted);
+      flush();
+      expect(within(sheet).getByText("nice hit")).toBeVisible();
+
+      setView({ ...chatted, phase: "roundOver" });
+      flush();
+
+      await screen.findByRole("dialog", { name: "Scores" });
+      expect(screen.queryByRole("dialog", { name: "Chat & Log" })).toBeNull();
+      expect(toggle).toHaveAccessibleName("Chat & Log");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("keeps the chat draft after dismissing the sheet with Escape", async () => {
