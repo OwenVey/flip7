@@ -258,6 +258,77 @@ describe("<GameLog />", () => {
     expect(toggle).toHaveAttribute("aria-controls", panel?.id);
   });
 
+  it("stays on an unfolded round instead of following the end", async () => {
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
+    });
+
+    const resizeCallbacks = new Map<Element, () => void>();
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Deliver layout changes that jsdom cannot measure.
+    vi.stubGlobal(
+      "ResizeObserver",
+      class extends ResizeObserver {
+        // oxlint-disable-next-line promise/prefer-await-to-callbacks -- ResizeObserver delivers a callback.
+        constructor(callback: ResizeObserverCallback) {
+          super(callback);
+          this.observe = (element) => {
+            resizeCallbacks.set(element, () => {
+              // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Deliver the ResizeObserver notification.
+              callback([], this);
+            });
+          };
+        }
+      }
+    );
+
+    try {
+      render(() => (
+        <GameLog log={twoRounds()} playerId="a" players={players} typing={[]} />
+      ));
+
+      const viewport = screen.getByRole("log");
+      const area = viewport.closest('[data-slot="scroll-area"]');
+
+      expect(area).toHaveAttribute("data-sticking");
+
+      const toggle = screen.getByRole("button", { name: "Round 1" });
+      Object.defineProperties(viewport, {
+        clientHeight: { value: 200 },
+        scrollHeight: {
+          get: () =>
+            toggle.getAttribute("aria-expanded") === "true" ? 700 : 500,
+        },
+      });
+      viewport.scrollTop = 300;
+      fireEvent.scroll(viewport);
+      vi.advanceTimersToNextFrame();
+      flush();
+
+      fireEvent.click(toggle);
+      flush();
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      fireEvent.scroll(viewport);
+      vi.advanceTimersToNextFrame();
+      flush();
+      resizeCallbacks.get(viewport)?.();
+
+      expect(viewport.scrollTop).toBe(300);
+      expect(area).not.toHaveAttribute("data-sticking");
+
+      viewport.scrollTop = 500;
+      fireEvent.scroll(viewport);
+      vi.advanceTimersToNextFrame();
+      await Promise.resolve();
+      flush();
+
+      expect(area).toHaveAttribute("data-sticking");
+    } finally {
+      cleanup();
+      vi.unstubAllGlobals();
+      vi.useRealTimers();
+    }
+  });
+
   it("makes the last round foldable as soon as it finishes", () => {
     const [log, setLog] = createSignal(twoRounds());
 

@@ -399,6 +399,7 @@ const LogRound = (props: {
   playerId: string | null;
   newFrom: number | undefined;
   now: number;
+  onUnfold: () => void;
 }) => {
   const spotlight = useContext(SpotlightContext);
   const [open, setOpen] = createSignal(false);
@@ -499,6 +500,10 @@ const LogRound = (props: {
       class="log-group"
       open={!collapsed()}
       onOpenChange={(next) => {
+        if (next) {
+          props.onUnfold();
+        }
+
         setOpen(next);
       }}
     >
@@ -514,6 +519,7 @@ const LogRound = (props: {
               <h3>
                 <CollapsibleTrigger
                   class="log-round-toggle"
+                  data-size="compact"
                   data-variant="disclosure"
                 >
                   <ChevronRight aria-hidden="true" size={12} />
@@ -595,6 +601,21 @@ export const ChatLog = (
 
   const scroll = createScrollAreaController();
 
+  const [followsEnd, setFollowsEnd] = createSignal(true);
+
+  const stayAboveUnfoldedRound = () => {
+    if (!scroll.isSticking()) {
+      return;
+    }
+
+    setFollowsEnd(false);
+    requestAnimationFrame(() => {
+      if (scroll.isAtEnd()) {
+        setFollowsEnd(true);
+      }
+    });
+  };
+
   const [spotlit, setSpotlit] = createSignal<LogPlayer | null>(null);
 
   const spotlitIds = createProjection<Partial<Record<string, true>>>(() => {
@@ -655,6 +676,7 @@ export const ChatLog = (
             const option = LOG_FILTERS.find((candidate) => candidate === next);
 
             if (option !== undefined) {
+              setFollowsEnd(true);
               scroll.scrollToEnd({ behavior: "instant" });
               props.reads.setFilter(option);
             }
@@ -684,10 +706,19 @@ export const ChatLog = (
         <ScrollArea
           class="log-body scroll-fades"
           type="auto"
-          stickToEnd
+          stickToEnd={followsEnd()}
           controller={scroll}
         >
           {(state) => {
+            createEffect(
+              () => state.atEnd,
+              (atEnd) => {
+                if (atEnd) {
+                  setFollowsEnd(true);
+                }
+              }
+            );
+
             createEffect(
               () => ({ atEnd: state.atEnd, following: state.sticking }),
               (position) => {
@@ -726,6 +757,7 @@ export const ChatLog = (
                             playerId={props.reads.playerId()}
                             newFrom={props.reads.newFrom()}
                             now={now()}
+                            onUnfold={stayAboveUnfoldedRound}
                           />
                         )}
                       </For>
