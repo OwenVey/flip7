@@ -1,9 +1,9 @@
 # pnpm
-/pnpm-@solidjs+diagnostics-agent-loops
-/pnpm-@solidjs+web-server-components
+/agent-loops
 /pnpm-@ui-sdk+core-ui-sdk
-/pnpm-solid-js-reactivity-diagnostics
-/pnpm-solid-js-solid-2.0
-/pnpm-solid-js-solid-2.0-cheatsheet
 /pnpm-ultracite-ultracite
+/reactivity-diagnostics
+/server-components
+/solid-2.0
+/solid-2.0-cheatsheet
 # pnpm end
