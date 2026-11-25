@@ -14,7 +14,10 @@ export default function Document(props: ParentProps) {
     <html lang="en">
       <head>
         <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover"
+        />
         <meta name="color-scheme" content="light" />
         <meta name="theme-color" content="#0e3a2c" />
         <link rel="icon" href="/favicon.ico" sizes="32x32" />

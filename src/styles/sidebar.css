@@ -230,6 +230,17 @@
   border-radius: 1.5rem 1.5rem 0 0;
   background: var(--paper);
 
+  /* Paper continues below the sheet, so iOS's see-through toolbar and keyboard bar show the sheet, not the page. */
+  &::after {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 100%;
+    block-size: 100lvh;
+    background: var(--paper);
+    pointer-events: none;
+    content: "";
+  }
+
   & [data-slot="drawer-handle"] {
     position: absolute;
     z-index: 1;
