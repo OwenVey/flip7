@@ -519,7 +519,7 @@ const LogRound = (props: {
               <h3>
                 <CollapsibleTrigger
                   class="log-round-toggle"
-                  data-size="compact"
+                  data-size="sm"
                   data-variant="disclosure"
                 >
                   <ChevronRight aria-hidden="true" size={12} />
