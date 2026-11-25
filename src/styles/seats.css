@@ -573,9 +573,7 @@
     white-space: nowrap;
   }
 
-  & .seat-avatar,
-  & .dealer-chip,
-  & .host-chip {
+  & .seat-avatar {
     flex: none;
   }
 }
@@ -609,6 +607,28 @@
 
   & > .avatar-tag[data-tone="bot"] {
     background: color-mix(in oklab, var(--bot) 25%, white);
+  }
+}
+
+/* The host wears a crown: it sits on top of the avatar, its base over the head, tipped a little. */
+.seat-avatar > .host-chip {
+  position: absolute;
+  inset-block-start: -0.625rem;
+  inset-inline-start: 50%;
+  width: auto;
+  height: auto;
+  border: 0;
+  background: none;
+  translate: -50% 0;
+  rotate: -12deg;
+
+  & svg {
+    display: block;
+    overflow: visible;
+    fill: var(--gold);
+    stroke: var(--ink);
+    stroke-linejoin: round;
+    stroke-width: 1.75;
   }
 }
 
@@ -790,6 +810,20 @@
   isolation: isolate;
   /* Room below for the end-of-round stamp that straddles the bottom edge, kept always so seats don't jump. */
   margin-block-end: 0.375rem;
+}
+
+/* Like a poker dealer button, the dealer chip rests on the corner of the dealer's mat. */
+.hand-area > .dealer-chip {
+  position: absolute;
+  z-index: 2;
+  /* Clear of the header row above, which ends just 0.5rem away. */
+  inset-block-start: -0.375rem;
+  inset-inline-end: -0.375rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, white 55%, transparent),
+    1.5px 1.5px 0 var(--ink);
 }
 
 .hand {
