@@ -166,6 +166,14 @@
     }
   }
 
+  /* iOS Safari colors its bottom toolbar from the pixels just below this fixed bar, so an outer gold ring would turn the toolbar gold. Draw the ring inside the border instead. */
+  .action-bar[data-turn] {
+    box-shadow:
+      inset 0 0 0 var(--turn-ring-width) var(--turn-ring-color),
+      var(--shadow-print),
+      var(--shadow-table);
+  }
+
   .action-bar-content {
     flex-wrap: wrap;
     gap: 0.5rem 0.75rem;
