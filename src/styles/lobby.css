@@ -334,13 +334,13 @@ button.room-code {
   }
 }
 
-/* Like the table sidebar, the log stops 1rem above the bottom edge and scrolls inside. It starts about 10.5rem down, below the nav and the lobby's taller heading. */
+/* Like the table sidebar, the log runs to 1rem above the bottom edge and scrolls inside. It starts about 10.5rem down, below the nav and the lobby's taller heading. */
 @media (--lg) and (not (--short)) {
   .lobby > .log {
     position: sticky;
     inset-block-start: 0.5rem;
     grid-template-rows: auto auto minmax(0, 1fr) auto;
-    max-block-size: calc(100dvh - 11.5rem);
+    block-size: calc(100dvh - 11.5rem);
 
     & .log-scroll {
       max-block-size: none;

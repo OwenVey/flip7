@@ -336,13 +336,14 @@
   }
 }
 
+/* The sidebar runs to 1rem above the bottom edge. Scores take what they need, up to their cap, and the log fills the rest. */
 @media (--lg) and (not (--short)) {
   .table-sidebar {
     --sidebar-height: calc(100dvh - 9rem);
     position: sticky;
     inset-block-start: 0.5rem;
     grid-template-rows: auto minmax(0, 1fr);
-    max-block-size: var(--sidebar-height);
+    block-size: var(--sidebar-height);
     align-self: start;
 
     & > .panel {
