@@ -9,10 +9,17 @@ import {
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { addBot, addPlayer, createGame, MAX_PLAYERS } from "../game/engine";
+import {
+  addBot,
+  addPlayer,
+  backToLobby,
+  createGame,
+  MAX_PLAYERS,
+} from "../game/engine";
 import { toRoomView } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
+import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
 import Lobby from "./lobby";
 
@@ -59,7 +66,13 @@ describe("<Lobby />", () => {
     const [room, setRoom] = createSignal<RoomView>(roomOf(MAX_PLAYERS - 1));
 
     render(() => (
-      <Lobby chat={() => true} room={room()} playerId="p0" send={send} />
+      <Lobby
+        chat={chatControls()}
+        typing={[]}
+        room={room()}
+        playerId="p0"
+        send={send}
+      />
     ));
     const button = addBotButton();
     expect(button).not.toHaveAttribute("aria-disabled");
@@ -78,7 +91,8 @@ describe("<Lobby />", () => {
     const [paused, setPaused] = createSignal(true);
     render(() => (
       <Lobby
-        chat={() => true}
+        chat={chatControls()}
+        typing={[]}
         room={roomWithBot()}
         playerId="p0"
         send={send}
@@ -105,7 +119,8 @@ describe("<Lobby />", () => {
 
     const { container } = render(() => (
       <Lobby
-        chat={() => true}
+        chat={chatControls()}
+        typing={[]}
         room={room()}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
@@ -129,7 +144,8 @@ describe("<Lobby />", () => {
   it("lists only seated players to assistive tech", () => {
     render(() => (
       <Lobby
-        chat={() => true}
+        chat={chatControls()}
+        typing={[]}
         room={roomOf(1)}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
@@ -148,7 +164,8 @@ describe("<Lobby />", () => {
 
     render(() => (
       <Lobby
-        chat={() => true}
+        chat={chatControls()}
+        typing={[]}
         room={room()}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
@@ -167,10 +184,46 @@ describe("<Lobby />", () => {
     expect(screen.getByText("Waiting for players…")).toBe(seat);
   });
 
+  it("keeps the final round folded after the host returns to the lobby", () => {
+    const state = createGame();
+    addPlayer(state, "p0", "Host", 1);
+    state.phase = "gameOver";
+    state.round = 1;
+    state.log.push({
+      about: [],
+      at: Date.now(),
+      game: 1,
+      id: state.logSeq + 1,
+      round: 1,
+      scores: [{ id: "p0", name: "Host", points: 21 }],
+      text: "Host wins with 202 points!",
+    });
+    backToLobby(state, "p0");
+
+    render(() => (
+      <Lobby
+        chat={chatControls()}
+        typing={[]}
+        room={toRoomView("ABCDE", state)}
+        playerId="p0"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+
+    const log = within(screen.getByRole("log", { name: "Chat & Log" }));
+
+    expect(log.getByRole("button", { name: "Round 1" })).toHaveAttribute(
+      "aria-expanded",
+      "false"
+    );
+    expect(log.getByText("Host +21")).toBeVisible();
+  });
+
   it("shows spectators the chat log and their actions, without Leave", () => {
     render(() => (
       <Lobby
-        chat={() => true}
+        chat={chatControls()}
+        typing={[]}
         room={roomOf(2)}
         playerId={null}
         send={vi.fn<RoomConnection["send"]>()}
@@ -196,7 +249,8 @@ describe("<Lobby />", () => {
 
     render(() => (
       <Lobby
-        chat={() => true}
+        chat={chatControls()}
+        typing={[]}
         room={room()}
         playerId={null}
         send={vi.fn<RoomConnection["send"]>()}
@@ -224,7 +278,8 @@ describe("<Lobby />", () => {
   it("lets seated players chat in the lobby", () => {
     render(() => (
       <Lobby
-        chat={() => true}
+        chat={chatControls()}
+        typing={[]}
         room={roomOf(2)}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
@@ -241,7 +296,8 @@ describe("<Lobby />", () => {
 
     render(() => (
       <Lobby
-        chat={() => true}
+        chat={chatControls()}
+        typing={[]}
         room={room()}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
@@ -264,7 +320,8 @@ describe("<Lobby />", () => {
   it("shows guests the player count without the Add bot button", () => {
     render(() => (
       <Lobby
-        chat={() => true}
+        chat={chatControls()}
+        typing={[]}
         room={roomOf(3)}
         playerId="p1"
         send={vi.fn<RoomConnection["send"]>()}
@@ -278,7 +335,13 @@ describe("<Lobby />", () => {
   it("removes a bot in one tap but asks before removing a person", () => {
     const send = vi.fn<RoomConnection["send"]>();
     render(() => (
-      <Lobby chat={() => true} room={roomWithBot()} playerId="p0" send={send} />
+      <Lobby
+        chat={chatControls()}
+        typing={[]}
+        room={roomWithBot()}
+        playerId="p0"
+        send={send}
+      />
     ));
     const [guest, bot] = screen.getAllByRole("button", { name: /^Remove/u });
 
@@ -294,7 +357,8 @@ describe("<Lobby />", () => {
   it("offers the invite only in the Invite friends card", () => {
     render(() => (
       <Lobby
-        chat={() => true}
+        chat={chatControls()}
+        typing={[]}
         room={roomOf(1)}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
@@ -313,7 +377,13 @@ describe("<Lobby />", () => {
   it("sends the host's settings changes and shows the room's saved values", () => {
     const send = vi.fn<RoomConnection["send"]>();
     render(() => (
-      <Lobby chat={() => true} room={roomWithBot()} playerId="p0" send={send} />
+      <Lobby
+        chat={chatControls()}
+        typing={[]}
+        room={roomWithBot()}
+        playerId="p0"
+        send={send}
+      />
     ));
 
     expect(screen.getByRole("radio", { name: "200" })).toBeChecked();
@@ -332,7 +402,8 @@ describe("<Lobby />", () => {
   it("shows guests the settings and marks vacant seats as locked", () => {
     render(() => (
       <Lobby
-        chat={() => true}
+        chat={chatControls()}
+        typing={[]}
         room={{
           ...roomWithBot(),
           settings: { botSpeed: "fast", locked: true, targetScore: 100 },
@@ -358,7 +429,8 @@ describe("<Lobby />", () => {
 
     render(() => (
       <Lobby
-        chat={() => true}
+        chat={chatControls()}
+        typing={[]}
         room={room()}
         playerId="p0"
         send={vi.fn<RoomConnection["send"]>()}
@@ -380,7 +452,13 @@ describe("<Lobby />", () => {
   it("shows the host a disabled Start game that says what it's waiting for", () => {
     const send = vi.fn<RoomConnection["send"]>();
     render(() => (
-      <Lobby chat={() => true} room={roomOf(1)} playerId="p0" send={send} />
+      <Lobby
+        chat={chatControls()}
+        typing={[]}
+        room={roomOf(1)}
+        playerId="p0"
+        send={send}
+      />
     ));
 
     const start = screen.getByRole("button", { name: "Start game" });

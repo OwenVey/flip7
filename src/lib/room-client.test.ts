@@ -4,10 +4,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { parseClientMessage } from "../game/client-message";
 import { DRAW_LIMIT } from "../game/engine";
-import { ROOM_REMOVED_CLOSE_CODE } from "../game/protocol";
+import {
+  ROOM_REMOVED_CLOSE_CODE,
+  TYPING_SEND_MS,
+  TYPING_SHOWN_MS,
+} from "../game/protocol";
 import type { ServerMessage } from "../game/protocol";
 import { createRoom, deliver, newStoredRoom } from "../game/room";
-import type { Admission, RoomOutcome, Seats } from "../game/room";
+import type {
+  Admission,
+  RoomOutcome,
+  RoomTransport,
+  Seats,
+} from "../game/room";
 import { createRoomClient } from "./room-client";
 import type { RoomClientDeps } from "./room-client";
 
@@ -67,8 +76,8 @@ const network = () => {
     random: () => 0.5,
   });
 
-  const carryOut = (outcome: RoomOutcome, sender: Link | null) => {
-    deliver(outcome, {
+  const transport = (sender: Link | null) => {
+    const delivery: RoomTransport = {
       broadcast: (message, preview) => {
         for (const link of links.values()) {
           if (link.open) {
@@ -82,10 +91,27 @@ const network = () => {
         connections.delete(connectionId);
         links.get(connectionId)?.toClient.push({ closeCode: code });
       },
+      relay: (message, except) => {
+        for (const link of links.values()) {
+          if (
+            link.open &&
+            !except.includes(link.id) &&
+            connections.get(link.id)?.admission
+          ) {
+            link.toClient.push(message);
+          }
+        }
+      },
       reply: (message) => {
         sender?.toClient.push(message);
       },
-    });
+    };
+
+    return delivery;
+  };
+
+  const carryOut = (outcome: RoomOutcome, sender: Link | null) => {
+    deliver(outcome, transport(sender));
   };
 
   const handleFrame = (link: Link, frame: string) => {
@@ -102,6 +128,11 @@ const network = () => {
       );
     } else if (message.type === "chat") {
       carryOut(room.chat(link.id, message.text), link);
+    } else if (message.type === "typing") {
+      deliver(
+        { effects: room.typing(link.id, message.active) },
+        transport(link)
+      );
     } else if (message.type === "sync") {
       syncs.push(link.id);
       link.toClient.push(room.viewFor(link.id));
@@ -350,6 +381,96 @@ const logIds = (player: TestPlayer) =>
 
 const serverLogIds = (net: ReturnType<typeof network>) =>
   net.stored.game.log.map((entry) => entry.id);
+
+describe("typing through the room client", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows a player typing to everyone else until they send", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+
+    ana.client.typing(true);
+    net.flush();
+
+    expect(ben.client.state.typing).toStrictEqual([ana.client.state.playerId]);
+    expect(ana.client.state.typing).toStrictEqual([]);
+
+    ana.client.chat("hi");
+    net.flush();
+
+    expect(ben.client.state.typing).toStrictEqual([]);
+  });
+
+  it("stops showing a player typing when they clear their draft", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+
+    ana.client.typing(true);
+    ana.client.typing(false);
+    ana.client.typing(false);
+
+    expect(
+      ana.link?.toServer
+        .map(parseClientMessage)
+        .filter((message) => message?.type === "typing")
+    ).toStrictEqual([
+      { active: true, type: "typing" },
+      { active: false, type: "typing" },
+    ]);
+
+    net.flush();
+
+    expect(ben.client.state.typing).toStrictEqual([]);
+  });
+
+  it("stops showing a player typing when they go quiet", () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+
+    ana.client.typing(true);
+    net.flush();
+    vi.advanceTimersByTime(TYPING_SHOWN_MS);
+
+    expect(ben.client.state.typing).toStrictEqual([]);
+  });
+
+  it("keeps the typing start cooldown across a chat send", () => {
+    const net = network();
+    const ana = net.join("Ana");
+
+    const sent = () =>
+      ana.link?.toServer.filter((frame) => frame.includes('"typing"')).length;
+
+    ana.client.typing(true);
+    ana.client.typing(true);
+
+    expect(sent()).toBe(1);
+
+    vi.advanceTimersByTime(TYPING_SEND_MS);
+    ana.client.typing(true);
+
+    expect(sent()).toBe(2);
+
+    ana.client.chat("hi");
+    ana.client.typing(true);
+
+    expect(sent()).toBe(2);
+
+    vi.advanceTimersByTime(TYPING_SEND_MS);
+    ana.client.typing(true);
+
+    expect(sent()).toBe(3);
+  });
+});
 
 describe("the log through the room client", () => {
   beforeEach(() => {

@@ -18,7 +18,7 @@ import { availableMoves, MIN_PLAYERS } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { hostName } from "../lib/host";
 import { createCopy } from "../lib/invite";
-import type { RoomConnection } from "../lib/room-connection";
+import type { ChatControls, RoomConnection } from "../lib/room-connection";
 import { pop } from "../lib/table-motion";
 import ChatSheet from "./chat-sheet";
 import GameLog from "./game-log";
@@ -74,7 +74,9 @@ export default function Lobby(props: {
   room: RoomView;
   playerId: string | null;
   send: RoomConnection["send"];
-  chat: RoomConnection["chat"];
+  chat: ChatControls;
+  /** Other players typing a chat message, by player ID. */
+  typing: readonly string[];
   actionsDisabled?: boolean;
   /** A Spectator's Join and Leave, shown where a player's Leave goes. */
   spectator?: Spectator;
@@ -84,6 +86,7 @@ export default function Lobby(props: {
 }) {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
   const isHost = () => moves().host.configure;
+  const chat = () => (props.playerId === null ? undefined : props.chat);
 
   const addBotBlocked = () =>
     props.actionsDisabled === true || !moves().host.addBot;
@@ -125,7 +128,9 @@ export default function Lobby(props: {
           <ChatSheet
             log={props.room.log}
             playerId={props.playerId}
-            onChat={props.playerId === null ? undefined : props.chat}
+            chat={chat()}
+            players={props.room.players}
+            typing={props.typing}
           />
           <Show
             when={props.playerId !== null}
@@ -304,7 +309,9 @@ export default function Lobby(props: {
         <GameLog
           log={props.room.log}
           playerId={props.playerId}
-          onChat={props.playerId === null ? undefined : props.chat}
+          chat={chat()}
+          players={props.room.players}
+          typing={props.typing}
         />
       </div>
     </div>

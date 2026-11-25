@@ -29,6 +29,8 @@ import {
   listSeqsOf,
   ROOM_REMOVED_CLOSE_CODE,
   toRoomPreview,
+  TYPING_RELAY_MS,
+  TYPING_SHOWN_MS,
   toStateMessage,
 } from "./protocol";
 import type { ListSeqs, PreviewMessage, ServerMessage } from "./protocol";
@@ -57,6 +59,8 @@ export interface StoredRoom extends RoomTimers {
 export interface Seat {
   playerId: string;
   seatedAt: number;
+  /** The last typing message the room relayed from this connection, or null before one and after a chat. */
+  typing: { active: boolean; at: number } | null;
 }
 
 /** Admission follows the connection across Worker hibernation. */
@@ -97,11 +101,13 @@ export interface RoomDeps {
 /**
  * Something the transport must do, in order: reply to the sender, broadcast
  * the live table to admitted connections and the join preview to visitors,
- * or close a connection. Live broadcasts carry new list entries only.
+ * relay a passing message to every other admitted connection, or close a
+ * connection. Live broadcasts carry new list entries only.
  */
 export type RoomEffect =
   | { type: "reply"; message: ServerMessage }
   | { type: "broadcast"; message: ServerMessage; preview: PreviewMessage }
+  | { type: "relay"; message: ServerMessage; except: string[] }
   | { type: "close"; connectionId: string; code: number; reason: string };
 
 type PlannedEffect =
@@ -123,11 +129,15 @@ export interface RoomOutcome {
 export interface RoomTransport {
   reply: (message: ServerMessage) => void;
   broadcast: (message: ServerMessage, preview: PreviewMessage) => void;
+  relay: (message: ServerMessage, except: readonly string[]) => void;
   close: (connectionId: string, code: number, reason: string) => void;
 }
 
 /** Carries out an outcome's effects in order. Save the room before calling this. */
-export const deliver = (outcome: RoomOutcome, transport: RoomTransport) => {
+export const deliver = (
+  outcome: Pick<RoomOutcome, "effects">,
+  transport: RoomTransport
+) => {
   for (const effect of outcome.effects) {
     switch (effect.type) {
       case "reply": {
@@ -137,6 +147,11 @@ export const deliver = (outcome: RoomOutcome, transport: RoomTransport) => {
 
       case "broadcast": {
         transport.broadcast(effect.message, effect.preview);
+        break;
+      }
+
+      case "relay": {
+        transport.relay(effect.message, effect.except);
         break;
       }
 
@@ -234,8 +249,64 @@ export const createRoom = (
     return playerId;
   };
 
+  const typing: (connectionId: string, active: boolean) => RoomEffect[] = (
+    connectionId,
+    active
+  ) => {
+    const sender = seatOf(connectionId);
+
+    if (!sender || !findPlayer(game, sender.playerId)) {
+      return [];
+    }
+
+    const now = deps.now();
+    const last = sender.typing;
+
+    if (
+      active
+        ? last !== null && now - last.at < TYPING_RELAY_MS
+        : last?.active !== true
+    ) {
+      return [];
+    }
+
+    seats.assign(connectionId, {
+      ...sender,
+      typing: { active, at: active ? now : (last?.at ?? now) },
+    });
+
+    const siblings = seatedConnections(sender.playerId);
+
+    if (
+      !active &&
+      siblings.some(({ id, admission }) => {
+        const other = playerSeat(admission)?.typing;
+
+        return (
+          id !== connectionId &&
+          other?.active === true &&
+          now - other.at < TYPING_SHOWN_MS
+        );
+      })
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        except: siblings.map(({ id }) => id),
+        message: { active, playerId: sender.playerId, type: "typing" },
+        type: "relay",
+      },
+    ];
+  };
+
   const seat = (connectionId: string, playerId: string) => {
-    seats.assign(connectionId, { playerId, seatedAt: deps.now() });
+    seats.assign(connectionId, {
+      playerId,
+      seatedAt: deps.now(),
+      typing: null,
+    });
   };
 
   const welcome = (playerId: string, token: string) =>
@@ -536,10 +607,12 @@ export const createRoom = (
         attempt(() => {
           chat(game, seatedPlayer(connectionId), text);
 
-          return [BROADCAST];
+          return [BROADCAST, ...typing(connectionId, false)];
         })
       );
     },
+
+    typing,
 
     command: (connectionId: string, command: GameCommand) => {
       touch();

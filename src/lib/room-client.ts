@@ -5,6 +5,8 @@ import {
   receiveState,
   ROOM_MISSING_CLOSE_CODE,
   ROOM_REMOVED_CLOSE_CODE,
+  TYPING_SEND_MS,
+  TYPING_SHOWN_MS,
 } from "../game/protocol";
 import type {
   ReceivedLists,
@@ -46,6 +48,8 @@ export interface RoomClientState {
   online: boolean;
   notice: Notice | null;
   canAct: boolean;
+  /** Other players typing a chat message right now, by player ID. */
+  typing: string[];
 }
 
 /**
@@ -117,6 +121,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     sending: false,
     status: "connecting",
     syncId: 0,
+    typing: [],
     watchError: "",
     watchPending: false,
     watching: false,
@@ -135,6 +140,9 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   const roomCommands = new Map<string, PendingReply>();
   let stopped = false;
   let wasVisible = false;
+  const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  let typingSentAt: number | null = null;
+  let typingShown = false;
 
   const update = (patch: Partial<Omit<RoomClientState, "canAct">>) => {
     const next = { ...state, ...patch };
@@ -179,6 +187,38 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     }
   };
 
+  const stopTyping = (playerId: string) => {
+    clearTimeout(typingTimers.get(playerId));
+
+    if (typingTimers.delete(playerId)) {
+      update({ typing: state.typing.filter((id) => id !== playerId) });
+    }
+  };
+
+  const clearTyping = () => {
+    for (const playerId of typingTimers.keys()) {
+      stopTyping(playerId);
+    }
+  };
+
+  const showTyping = (playerId: string) => {
+    if (playerId === seatedPlayerId) {
+      return;
+    }
+
+    clearTimeout(typingTimers.get(playerId));
+    typingTimers.set(
+      playerId,
+      setTimeout(() => {
+        stopTyping(playerId);
+      }, TYPING_SHOWN_MS)
+    );
+
+    if (!state.typing.includes(playerId)) {
+      update({ typing: [...state.typing, playerId] });
+    }
+  };
+
   const finishJoin = (error = "") => {
     clearTimeout(joinTimeout);
     joinTimeout = undefined;
@@ -193,6 +233,9 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     seatedPlayerId = null;
     lastRequestId = undefined;
     awaitingWelcome = false;
+    typingSentAt = null;
+    typingShown = false;
+    clearTyping();
 
     if (state.joining) {
       finishJoin("Connection lost while joining. Try again when reconnected.");
@@ -353,6 +396,16 @@ export const createRoomClient = (deps: RoomClientDeps) => {
         return;
       }
 
+      case "typing": {
+        if (message.active) {
+          showTyping(message.playerId);
+        } else {
+          stopTyping(message.playerId);
+        }
+
+        return;
+      }
+
       case "welcome": {
         awaitingWelcome = false;
         deps.token.set(message.token);
@@ -501,13 +554,38 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     },
 
     chat: (text: string) => {
-      if (!state.online || !state.ready || !raw({ text, type: "chat" })) {
-        notify(TRY_AGAIN);
+      const sent = state.online && state.ready && raw({ text, type: "chat" });
 
-        return false;
+      if (sent) {
+        typingShown = false;
       }
 
-      return true;
+      return sent;
+    },
+
+    typing: (active: boolean) => {
+      if (!state.online || !state.ready) {
+        return;
+      }
+
+      if (!active) {
+        if (typingShown && raw({ active: false, type: "typing" })) {
+          typingShown = false;
+        }
+
+        return;
+      }
+
+      const now = Date.now();
+
+      if (typingSentAt !== null && now - typingSentAt < TYPING_SEND_MS) {
+        return;
+      }
+
+      if (raw({ active: true, type: "typing" })) {
+        typingSentAt = now;
+        typingShown = true;
+      }
     },
 
     closed: (code: number, retryCount: number) => {

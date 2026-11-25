@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RoomView } from "../game/protocol";
 import { roundPointsFor } from "../lib/deal-playback";
 import type { RoomConnection } from "../lib/room-connection";
+import { chatControls } from "../test/chat";
 import { room } from "../test/room-view";
 import { Table } from "../test/table";
 import ActionBar from "./action-bar";
@@ -46,7 +47,8 @@ describe("<ActionBar />", () => {
         room={room({ turnId: "b" })}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
         dealing
         dealStep={{
           card: { id: 2, kind: "number", value: 3 },

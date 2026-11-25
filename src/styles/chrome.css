@@ -259,6 +259,11 @@ main {
   font-weight: 600;
 }
 
+/* An empty toast region still spans the bottom of the screen, and iOS Safari then paints solid bars instead of letting the page run under its toolbar. */
+[data-slot="toast-region"]:has([data-slot="toast-list"]:empty) {
+  visibility: hidden;
+}
+
 .chat-hint {
   font-size: var(--text-sm);
   text-align: center;

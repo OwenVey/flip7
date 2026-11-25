@@ -124,6 +124,7 @@
 /* One base for every button-like part, so neighbors always match. Change looks with data-variant, size with data-size. */
 :is(
   [data-slot="button"],
+  [data-slot="collapsible-trigger"],
   [data-slot="alert-dialog-trigger"],
   [data-slot="alert-dialog-close"],
   [data-slot="dialog-trigger"],
@@ -151,6 +152,20 @@
   &:active:not([data-disabled], [aria-disabled="true"]) {
     transform: translate(2px, 2px);
     box-shadow: 0 0 0 var(--button-ink);
+  }
+
+  &[data-variant="disclosure"] {
+    padding-inline: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    color: inherit;
+    font: inherit;
+
+    &:active:not([data-disabled], [aria-disabled="true"]) {
+      transform: none;
+      box-shadow: none;
+    }
   }
 
   /* A paper button whose red ink warns without competing with the main action. */

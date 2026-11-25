@@ -7,6 +7,7 @@ import {
   backToLobby,
   chat,
   choose,
+  configure,
   createGame,
   hit,
   nextRound,
@@ -15,14 +16,21 @@ import {
   startGame,
   stay,
 } from "../game/engine";
-import type { GameCue, GameState, LogEntry } from "../game/engine";
+import type { GameCue, GameState, LogEntry, LogPlayer } from "../game/engine";
+import { logCopy } from "../game/log-copy";
 import { DEFAULT_SETTINGS } from "../game/settings";
+import type { EventDetail } from "./game-log-entries";
 import {
   countChatsAfter,
   eventCopy,
   eventDetails,
+  eventDetailsWithMentions,
   groupLog,
   HOUR_MS,
+  involves,
+  nameParts,
+  shownTimes,
+  summarizeRound,
   MINUTE_MS,
   roundAnnouncement,
   SECOND_MS,
@@ -99,6 +107,14 @@ const fromEnd =
     log.at(-offset);
 
 const scenarios = {
+  lockRoom: () => {
+    const state = createGame();
+    addPlayer(state, "a", NAMES.a, 1);
+    configure(state, "a", { locked: true });
+    configure(state, "a", { locked: false });
+
+    return state.log;
+  },
   assign: () => {
     const state = deal(["a", "b", "c"], [num(5), num(3), num(8)]);
     rig(state, [flipThree(), freeze(), flipThree(), num(2)]);
@@ -276,16 +292,26 @@ const messageFrom = (
   return entry;
 };
 
-const event = (outcome: string, detail: string | undefined, icon?: string) => ({
-  announcement: false,
-  detail,
-  icon,
-  outcome,
+const pts = (points: number) => ({ kind: "points", points }) as const;
+
+const dupe = (number: number) =>
+  ({ kind: "card", label: "duplicate", number }) as const;
+
+const words = (text: string) => ({ kind: "text", text }) as const;
+
+const event = (
+  outcome: string,
+  players: string[],
+  details: EventDetail[] | undefined,
+  icon?: string
+) => ({
+  copy: { announcement: false, details: details ?? [], icon, outcome },
+  players,
 });
 
 const announcement = (outcome: string, icon?: string) => ({
   announcement: true,
-  detail: undefined,
+  details: [],
   icon,
   outcome,
 });
@@ -295,71 +321,136 @@ const unchangedMessages = [
   ["joinLobby", cuedEntry("join"), "user-plus"],
   ["joinMidRound", cuedEntry("join"), "user-plus"],
   ["botAdded", cuedEntry("join"), "user-plus"],
-  ["offlineStayByGame", cuedEntry("bank"), "coins"],
-  ["offlineStayByHost", cuedEntry("bank"), "coins"],
   ["winner", fromEnd(), "trophy"],
 ] as const;
 
 describe("the engine's messages in the Chat & Log", () => {
   it.each([
-    ["stayPoints", cuedEntry("bank"), event("Ada stayed", "+10 pts", "coins")],
-    ["stayOnePoint", cuedEntry("bank"), event("Ada stayed", "+1 pts", "coins")],
-    ["bust", cuedEntry("bust"), event("Ada busted", "duplicate 5", "circle-x")],
+    [
+      "stayPoints",
+      cuedEntry("bank"),
+      event("Ada stayed", ["Ada"], [pts(10)], "coins"),
+    ],
+    [
+      "stayOnePoint",
+      cuedEntry("bank"),
+      event("Ada stayed", ["Ada"], [pts(1)], "coins"),
+    ],
+    [
+      "offlineStayByGame",
+      cuedEntry("bank"),
+      event(
+        "The game stayed for Ada",
+        ["Ada"],
+        [pts(5), words("Ada is offline")],
+        "coins"
+      ),
+    ],
+    [
+      "offlineStayByHost",
+      cuedEntry("bank"),
+      event(
+        "Ada stayed for Bo",
+        ["Ada", "Bo"],
+        [pts(3), words("Bo is offline")],
+        "coins"
+      ),
+    ],
+    [
+      "bust",
+      cuedEntry("bust"),
+      event("Ada busted", ["Ada"], [dupe(5)], "circle-x"),
+    ],
     [
       "flipSeven",
       cuedEntry("flipSeven"),
-      event("Ada flipped 7!", undefined, "flame"),
+      event("Ada flipped 7!", ["Ada"], undefined, "flame"),
     ],
     [
       "freezeSelf",
       cuedEntry("freeze"),
-      event("Ada froze themselves", "+5 pts", "snowflake"),
+      event("Ada froze themselves", ["Ada"], [pts(5)], "snowflake"),
     ],
     [
       "freezeOther",
       cuedEntry("freeze"),
-      event("Bo was frozen", "+3 pts · by Ada", "snowflake"),
+      event(
+        "Bo was frozen",
+        ["Ada", "Bo"],
+        [pts(3), words("by Ada")],
+        "snowflake"
+      ),
     ],
     [
       "secondChanceSave",
       cuedEntry("special"),
-      event("Ada used Second Chance", "duplicate 5", "heart"),
+      event("Ada used Second Chance", ["Ada"], [dupe(5)], "heart"),
     ],
     [
       "secondChanceSave",
       cuedEntry("special", 0),
-      event("Ada got a Second Chance", undefined, "heart"),
+      event("Ada got a Second Chance", ["Ada"], undefined, "heart"),
     ],
     [
       "flipThreeOnOther",
       cuedEntry("special", 0),
-      event("Bo must flip three", "from Ada", "playing-cards-fan"),
+      event(
+        "Bo must flip three",
+        ["Ada", "Bo"],
+        [words("from Ada")],
+        "playing-cards-fan"
+      ),
     ],
     [
       "assign",
       cuedEntry("special", 1),
-      event("Bo assigned Freeze", "to themselves", "arrow-right"),
+      event(
+        "Bo assigned Freeze",
+        ["Bo"],
+        [words("to themselves")],
+        "arrow-right"
+      ),
     ],
     [
       "assign",
       cuedEntry("special", 2),
-      event("Bo assigned Flip Three", "to Cy", "arrow-right"),
+      event(
+        "Bo assigned Flip Three",
+        ["Bo", "Cy"],
+        [words("to Cy")],
+        "arrow-right"
+      ),
     ],
     [
       "giveSecondChance",
       cuedEntry("special"),
-      event("Cy got Second Chance", "from Ada", "heart"),
+      event(
+        "Cy got Second Chance",
+        ["Ada", "Cy"],
+        [words("from Ada")],
+        "heart"
+      ),
     ],
     [
       "reshuffle",
       fromEnd(),
-      announcement("Deck rebuilt from the discard pile.", "shuffle"),
+      {
+        copy: announcement("Deck rebuilt from the discard pile.", "shuffle"),
+        players: [],
+      },
     ],
-    ["outOfCards", fromEnd(2), announcement("Deck empty · round ended.")],
+    [
+      "outOfCards",
+      fromEnd(2),
+      { copy: announcement("Deck empty · round ended."), players: [] },
+    ],
   ] as const)("shortens %s", (scenario, pick, expected) => {
-    expect(eventDetails(messageFrom(scenario, pick), true)).toStrictEqual(
-      expected
-    );
+    const entry = messageFrom(scenario, pick);
+
+    expect({
+      copy: eventDetails(entry, true),
+      players: entry.about.map((player) => player.name),
+    }).toStrictEqual(expected);
   });
 
   it.each(unchangedMessages)(
@@ -367,11 +458,25 @@ describe("the engine's messages in the Chat & Log", () => {
     (scenario, pick, icon) => {
       const entry = messageFrom(scenario, pick);
 
-      expect(eventDetails(entry, true)).toStrictEqual(
-        event(entry.text, undefined, icon)
-      );
+      expect(eventDetails(entry, true)).toMatchObject({
+        details: [],
+        icon,
+        outcome: entry.text,
+      });
     }
   );
+
+  it("shows short lock and unlock events with matching icons", () => {
+    expect(
+      scenarios
+        .lockRoom()
+        .slice(-2)
+        .map((entry) => eventDetails(entry, true))
+    ).toStrictEqual([
+      event("Room locked.", [], undefined, "lock").copy,
+      event("Room unlocked.", [], undefined, "lock-open").copy,
+    ]);
+  });
 
   it.each([
     ["roundOver", fromEnd(), "Round 1 is over."],
@@ -582,4 +687,174 @@ describe(timeLabel, () => {
       expect(formats.exact.format(at)).toMatch(/^\d{1,2}:\d{2}:\d{2}\s[AP]M$/u);
     }
   );
+});
+
+let logId = 0;
+
+const logEntry = (text: string, extra: Partial<LogEntry> = {}) => {
+  logId += 1;
+
+  const entry: LogEntry = {
+    about: [],
+    at: 0,
+    game: 1,
+    id: logId,
+    round: 1,
+    text,
+    ...extra,
+  };
+
+  return entry;
+};
+
+const said = (name: string, text: string, at = 0) =>
+  logEntry(text, { at, from: { avatar: null, id: name, name } });
+
+const ada = { id: "a", name: "Ada" };
+const bo = { id: "b", name: "Bo" };
+const cy = { id: "c", name: "Cy" };
+
+describe(nameParts, () => {
+  it("keeps short names out of ordinary words after formatting a Freeze", () => {
+    const player = { id: "x", name: "a" };
+
+    const entry = logEntry("", {
+      ...logCopy`${player} played Freeze on ${bo}, who banked 3 points.`,
+      cue: "freeze",
+    });
+
+    const copy = eventDetailsWithMentions(entry, true);
+
+    expect(nameParts(copy.outcome, entry.about)).toStrictEqual([
+      { player: entry.about[1] },
+      { text: " was frozen" },
+    ]);
+    const [, detail] = copy.details;
+
+    const text = detail?.kind === "text" ? detail.text : "";
+    expect(nameParts(text, entry.about)).toStrictEqual([
+      { text: "by " },
+      { player: entry.about[0] },
+    ]);
+  });
+
+  it("keeps ordinary text whole even when it contains a player's name", () => {
+    expect(nameParts("from Ada", [ada])).toStrictEqual([{ text: "from Ada" }]);
+  });
+});
+
+describe(involves, () => {
+  it("finds every player an event names, by ID", () => {
+    const frozen = logEntry("Ada played Freeze on Bo, who banked 3 points.", {
+      about: [
+        { ...ada, offset: 0 },
+        { ...bo, offset: "Ada played Freeze on ".length },
+      ],
+      cue: "freeze",
+    });
+
+    expect(involves(frozen, bo.id)).toBeTruthy();
+    expect(involves(frozen, ada.id)).toBeTruthy();
+    expect(involves(frozen, cy.id)).toBeFalsy();
+  });
+
+  it("tells apart players whose names overlap", () => {
+    const alex = { id: "x", name: "Alex" };
+    const alexander = { id: "y", name: "Alexander" };
+
+    const stayed = logEntry("Alexander stayed and banked 4 points.", {
+      about: [{ ...alexander, offset: 0 }],
+      cue: "bank",
+    });
+
+    expect(involves(stayed, alexander.id)).toBeTruthy();
+    expect(involves(stayed, alex.id)).toBeFalsy();
+  });
+
+  it("counts a chat as its sender's", () => {
+    expect(involves(said("Ada", "hi Bo"), "Ada")).toBeTruthy();
+    expect(involves(said("Ada", "hi Bo"), "Bo")).toBeFalsy();
+  });
+});
+
+const roundOver = (scores: [LogPlayer, number][]) =>
+  logEntry("Round 1 is over.", {
+    scores: scores.map(([player, points]) => ({ ...player, points })),
+  });
+
+describe(summarizeRound, () => {
+  it("names the round's top score, then Flip 7s and busts", () => {
+    expect(
+      summarizeRound([
+        logEntry("Bo was dealt a duplicate 5 and busted.", {
+          about: [{ ...bo, offset: 0 }],
+          cue: "bust",
+        }),
+        said("Bo", "ugh"),
+        logEntry("Cy earned the Flip 7 bonus!", {
+          about: [{ ...cy, offset: 0 }],
+          cue: "flipSeven",
+        }),
+        logEntry("Ada was dealt a duplicate 9 and busted.", {
+          about: [{ ...ada, offset: 0 }],
+          cue: "bust",
+        }),
+        roundOver([
+          [ada, 0],
+          [bo, 0],
+          [cy, 40],
+        ]),
+      ])
+    ).toStrictEqual(["Cy +40", "Cy flipped 7", "2 busts"]);
+  });
+
+  it("credits a Flip 7 player's score, which no bank line shows", () => {
+    expect(
+      summarizeRound([
+        logEntry("Bo stayed and banked 8 points.", {
+          about: [{ ...bo, offset: 0 }],
+          cue: "bank",
+        }),
+        logEntry("Ada earned the Flip 7 bonus!", {
+          about: [{ ...ada, offset: 0 }],
+          cue: "flipSeven",
+        }),
+        roundOver([
+          [ada, 23],
+          [bo, 8],
+        ]),
+      ])
+    ).toStrictEqual(["Ada +23", "Ada flipped 7"]);
+  });
+
+  it("sums up a round the engine played to a Flip 7", () => {
+    expect(summarizeRound(scenarios.flipSeven())).toStrictEqual([
+      expect.stringMatching(/^Ada \+\d+$/u),
+      "Ada flipped 7",
+    ]);
+  });
+
+  it("says nothing for a round without scores", () => {
+    expect(summarizeRound([logEntry("Round 1 is over.")])).toStrictEqual([]);
+    expect(summarizeRound([roundOver([[ada, 0]])])).toStrictEqual([]);
+  });
+});
+
+describe(shownTimes, () => {
+  it("shows a time once per minute of game events and once per chat run", () => {
+    const entries = [
+      logEntry("first", { at: 0 }),
+      logEntry("same minute", { at: 30 * SECOND_MS }),
+      logEntry("a minute on", { at: MINUTE_MS }),
+      said("Ada", "hi", MINUTE_MS + SECOND_MS),
+      said("Ada", "again", MINUTE_MS + 2 * SECOND_MS),
+      logEntry("after a chat", { at: MINUTE_MS + 3 * SECOND_MS }),
+    ];
+
+    const shown = shownTimes(entries);
+
+    expect(
+      entries.flatMap((entry) => (shown.has(entry.id) ? [entry.text] : []))
+    ).toStrictEqual(["first", "a minute on", "hi", "after a chat"]);
+  });
 });

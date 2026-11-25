@@ -18,10 +18,15 @@
 }
 
 .scroll-fades {
+  --scroll-fade-depth: 2rem;
   --scroll-fade-stops:
-    var(--paper) 0 8%, color-mix(in oklab, var(--paper) 90%, transparent) 27%,
-    color-mix(in oklab, var(--paper) 52%, transparent) 55%,
-    color-mix(in oklab, var(--paper) 14%, transparent) 80%, transparent;
+    color-mix(in oklab, var(--paper) 90%, var(--ink)), transparent;
+  --scroll-start-direction: to bottom;
+  --scroll-end-direction: to top;
+  --scroll-start-fade: linear-gradient(
+    var(--scroll-start-direction),
+    var(--scroll-fade-stops)
+  );
   position: relative;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
@@ -38,22 +43,39 @@
     position: absolute;
     z-index: 2;
     pointer-events: none;
+    content: "";
+  }
+
+  &::before,
+  &::after,
+  &.leaderboard-body thead th::after {
+    opacity: 0;
+  }
+
+  &::before {
+    background: var(--scroll-start-fade);
+  }
+
+  &::after {
+    background: linear-gradient(
+      var(--scroll-end-direction),
+      var(--scroll-fade-stops)
+    );
   }
 
   &:not([data-horizontal]) {
-    &:not(.leaderboard-body, [data-at-y-start])::before {
-      inset: 0 0 auto;
-      height: min(1.5rem, 28%);
-      background: linear-gradient(var(--scroll-fade-stops));
-      content: "";
+    &::before,
+    &::after {
+      height: min(var(--scroll-fade-depth), 28%);
     }
 
-    &:not([data-at-y-end])::after {
+    &::before {
+      inset: 0 0 auto;
+    }
+
+    &::after {
       inset-inline: 0;
       inset-block-end: 0;
-      height: min(1.5rem, 28%);
-      background: linear-gradient(to top, var(--scroll-fade-stops));
-      content: "";
     }
 
     &.log-body::after {
@@ -76,22 +98,64 @@
       width: min(1.5rem, 28%);
     }
 
-    &:not([data-at-x-start])::before {
+    &::before {
       inset-inline-start: 0;
-      background: linear-gradient(
-        var(--scroll-start-direction),
-        var(--scroll-fade-stops)
-      );
-      content: "";
     }
 
-    &:not([data-at-x-end])::after {
+    &::after {
       inset-inline-end: 0;
-      background: linear-gradient(
-        var(--scroll-end-direction),
-        var(--scroll-fade-stops)
-      );
-      content: "";
+    }
+  }
+
+  /* Each fade's strength follows the scroll offset, so it grows in over the first rem of scrolling and is gone at the edge. */
+  @supports (animation-timeline: scroll()) and (timeline-scope: --scroll-fade) {
+    timeline-scope: --scroll-fade;
+
+    & > [data-slot="scroll-area-viewport"] {
+      scroll-timeline: --scroll-fade block;
+    }
+
+    &[data-horizontal] > [data-slot="scroll-area-viewport"] {
+      scroll-timeline: --scroll-fade inline;
+    }
+
+    &::before,
+    &::after,
+    &.leaderboard-body thead th::after {
+      /* Longhands, because Lightning CSS folds a timeline into the shorthand, which browsers reject. */
+      animation-name: scroll-fade-in;
+      animation-fill-mode: both;
+      animation-timing-function: linear;
+      animation-timeline: --scroll-fade;
+      animation-range: 0 var(--scroll-fade-depth);
+    }
+
+    &::after {
+      animation-name: scroll-fade-out;
+      animation-range: calc(100% - var(--scroll-fade-depth)) 100%;
+    }
+
+    /* Following new messages, or jumping to them, clears the bottom fade at once. */
+    &.leaderboard-body::before,
+    &.log-body[data-sticking]::after {
+      animation-name: none;
+    }
+  }
+
+  @supports not (
+    (animation-timeline: scroll()) and (timeline-scope: --scroll-fade)
+  ) {
+    &:not([data-horizontal], .leaderboard-body, [data-at-y-start])::before,
+    &:not([data-horizontal], [data-at-y-end], .log-body[data-sticking])::after,
+    &[data-horizontal]:not([data-at-x-start])::before,
+    &[data-horizontal]:not([data-at-x-end])::after,
+    &.leaderboard-body:not([data-at-y-start]) thead th::after {
+      opacity: 1;
+
+      /* Animate entry. Reaching an edge clears its fade in the same frame. */
+      @media (prefers-reduced-motion: no-preference) {
+        transition: opacity var(--duration-base) ease-out;
+      }
     }
   }
 
@@ -143,6 +207,26 @@
         }
       }
     }
+  }
+}
+
+@keyframes scroll-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scroll-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
   }
 }
 
@@ -227,14 +311,64 @@
   }
 }
 
-.chat-form {
+.log-spotlight {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0.25rem 0.25rem 0.25rem 0.75rem;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-md);
+  background: var(--gold-soft);
+  color: var(--ink);
+  font-size: var(--text-xs);
+}
 
-  & [data-slot="input"] {
-    flex: 1;
-    min-width: 0;
+/* Highlighting a player dims every other line, so theirs stand out. */
+:is(.log, .stack):has(.log-spotlight)
+  .log-group
+  li:not([data-spotlit], .log-new) {
+  opacity: 0.4;
+}
+
+.log-compose {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.log-typing {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  font-style: italic;
+}
+
+.chat-count {
+  grid-column: 1;
+  justify-self: end;
+  color: var(--ink-soft);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+
+  &[data-full] {
+    color: var(--danger);
+    font-weight: 600;
+  }
+}
+
+.chat-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+
+  & .chat-send-status {
+    grid-column: 1 / -1;
+
+    &:empty {
+      position: absolute;
+    }
   }
 }
 
@@ -251,6 +385,41 @@
     justify-content: space-between;
     padding-block: 0.375rem 0.125rem;
     border-block-start: 1px solid var(--gold-deep);
+  }
+
+  & .log-round-toggle {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: center;
+    letter-spacing: var(--tracking-wider);
+    text-transform: inherit;
+
+    &:active {
+      transform: none;
+    }
+
+    & svg {
+      transition: rotate var(--duration-fast) ease-out;
+    }
+
+    &[data-open] svg {
+      rotate: 90deg;
+    }
+
+    &:hover {
+      color: var(--ink);
+    }
+  }
+
+  & > [data-slot="collapsible-panel"] {
+    padding-block-end: 0;
+  }
+
+  & .log-round-summary {
+    flex: 1;
+    min-inline-size: 0;
+    color: var(--ink-soft);
+    font-size: var(--text-xs);
   }
 
   & h3 {
@@ -293,9 +462,14 @@
 
   & li[data-kind="game"]:has(> time:not(.log-time-heading)) {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 0.625rem;
+    grid-template-columns: minmax(0, 1fr) 3.5ch;
+    column-gap: 0.375rem;
     align-items: baseline;
+
+    & > time {
+      text-align: end;
+      white-space: normal;
+    }
   }
 
   & .log-time-heading {
@@ -316,6 +490,93 @@
 
   & .log-event-text {
     grid-column: 2;
+  }
+
+  & li[data-mine] {
+    margin-inline: -0.375rem;
+    padding-inline: 0.375rem;
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklab, var(--gold) 22%, transparent);
+  }
+
+  & li:not(.log-new) {
+    transition: opacity var(--duration-fast) ease-out;
+  }
+
+  & .log-new {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0;
+    color: var(--danger);
+    font-size: var(--text-2xs);
+    font-weight: 800;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+
+    &::before,
+    &::after {
+      flex: 1;
+      block-size: 1px;
+      background: currentcolor;
+      content: "";
+    }
+  }
+
+  & .log-name {
+    padding: 0;
+    border: 0;
+    border-radius: 0.125rem;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline dotted
+      color-mix(in oklab, currentcolor 40%, transparent);
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration-color: currentcolor;
+    }
+
+    &[aria-pressed="true"] {
+      background: var(--gold);
+      box-shadow: 0 0 0 0.125rem var(--gold);
+      color: var(--ink);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ui-ring-border);
+      outline-offset: 1px;
+    }
+  }
+
+  & .log-card {
+    display: inline-block;
+    min-inline-size: 1.25rem;
+    padding-inline: 0.25rem;
+    border: 1px solid var(--chip-color);
+    border-radius: 0.25rem;
+    background: var(--paper-light);
+    color: color-mix(in oklab, var(--chip-color) 60%, var(--ink));
+    font-family: var(--font-numeral);
+    font-weight: 900;
+    line-height: var(--leading-tight);
+    text-align: center;
+  }
+
+  & .log-points {
+    padding-inline: 0.25rem;
+    border-radius: var(--radius-full);
+    background: color-mix(in oklab, var(--success) 14%, transparent);
+    color: var(--success);
+    font-family: var(--font-numeral);
+    font-weight: 900;
+  }
+
+  & .log-detail {
+    display: inline-block;
+    max-inline-size: 100%;
   }
 
   & .log-event[data-announcement] .log-event-text {
@@ -359,23 +620,97 @@
 
   /* Bubbles take at least most of the column, so short messages line up with the log lines around them. */
   & li[data-kind="chat"] {
+    --bubble-fill: var(--paper-deep);
+    --bubble-shadow: 2px 2px 0 var(--ink);
+    --tail-direction: -1;
+    --inline-direction: 1;
     justify-self: start;
     min-inline-size: 70%;
     max-inline-size: 90%;
     margin-block: 0.125rem 0.25rem;
-    margin-inline: 0.25rem;
+    margin-inline: 0.5rem;
     padding: 0.375rem 0.625rem;
     border: 1px solid var(--ink);
     border-radius: var(--radius-sm);
-    background: var(--paper-deep);
-    box-shadow: 2px 2px 0 var(--ink);
+    background: var(--bubble-fill);
+    box-shadow: var(--bubble-shadow);
     color: var(--ink);
     font-size: var(--text-sm);
+
+    &[data-continuation] {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: 0.625rem;
+      align-items: baseline;
+      margin-block-start: 0;
+      padding-block: 0.25rem;
+    }
+
+    &:has(+ [data-continuation]) {
+      margin-block-end: 0;
+    }
+
+    &:dir(rtl) {
+      --inline-direction: -1;
+    }
+
+    @supports (clip-path: shape(from 0 0, line to 100% 100%, close)) {
+      /* Draw the outline and fill from the same contour, including the tail. */
+      &:not(:has(+ [data-continuation])) {
+        position: relative;
+        isolation: isolate;
+        margin-block-end: 0.625rem;
+        border-color: transparent;
+        background: none;
+        box-shadow: none;
+        filter: drop-shadow(var(--bubble-shadow));
+
+        &::before,
+        &::after {
+          --body-bottom: calc(100% - var(--tail-height));
+          position: absolute;
+          z-index: -1;
+          pointer-events: none;
+          scale: calc(var(--tail-direction) * var(--inline-direction)) 1;
+          clip-path: shape(
+            from var(--bubble-radius) 0,
+            hline to calc(100% - var(--bubble-radius)),
+            arc to 100% var(--bubble-radius) of var(--bubble-radius) cw,
+            vline to 100%,
+            line to calc(100% - var(--tail-width)) var(--body-bottom),
+            hline to var(--bubble-radius),
+            arc to 0 calc(var(--body-bottom) - var(--bubble-radius)) of
+              var(--bubble-radius) cw,
+            vline to var(--bubble-radius),
+            arc to var(--bubble-radius) 0 of var(--bubble-radius) cw,
+            close
+          );
+          content: "";
+        }
+
+        &::before {
+          --bubble-radius: var(--radius-sm);
+          --tail-height: 5px;
+          --tail-width: 9px;
+          inset: -1px -1px -6px;
+          background: var(--ink);
+        }
+
+        &::after {
+          --bubble-radius: calc(var(--radius-sm) - 1px);
+          --tail-height: 4.25px;
+          --tail-width: 7.75px;
+          inset: 0 0 -4.25px;
+          background: var(--bubble-fill);
+        }
+      }
+    }
   }
 
   & li[data-kind="chat"][data-own] {
+    --bubble-fill: color-mix(in oklab, var(--gold) 30%, var(--paper));
+    --tail-direction: 1;
     justify-self: end;
-    background: color-mix(in oklab, var(--gold) 30%, var(--paper));
   }
 
   & .log-message-header {

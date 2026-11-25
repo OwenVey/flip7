@@ -12,6 +12,7 @@ import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import { calculateRoundScore } from "../game/cards";
 import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
+import { chatControls } from "../test/chat";
 import { LOGGED_AT, room } from "../test/room-view";
 import { agent, Table } from "../test/table";
 
@@ -57,7 +58,8 @@ describe("<Table />", () => {
         })}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -84,7 +86,8 @@ describe("<Table />", () => {
         room={view()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -132,7 +135,8 @@ describe("<Table />", () => {
         room={room({ spectatorCount: 2 })}
         playerId={null}
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
         spectator={spectator()}
       />
     ));
@@ -154,7 +158,8 @@ describe("<Table />", () => {
         room={room()}
         playerId="a"
         send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -186,7 +191,8 @@ describe("<Table />", () => {
         })}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
         actionsDisabled
         dealing
       />
@@ -207,7 +213,8 @@ describe("<Table />", () => {
         room={room()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -254,7 +261,8 @@ describe("<Table />", () => {
         room={room()}
         playerId="b"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
         actionsDisabled
         dealing
       />
@@ -276,7 +284,8 @@ describe("<Table />", () => {
         room={room()}
         playerId="b"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -292,7 +301,8 @@ describe("<Table />", () => {
         room={room()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -339,7 +349,8 @@ describe("<Table />", () => {
           room={view()}
           playerId="a"
           send={vi.fn<RoomConnection["send"]>()}
-          chat={vi.fn<RoomConnection["chat"]>()}
+          chat={chatControls()}
+          typing={[]}
         />
       ));
 
@@ -381,7 +392,8 @@ describe("<Table />", () => {
         room={room({ phase: "roundOver" })}
         playerId="b"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -417,7 +429,8 @@ describe("<Table />", () => {
           room={state()}
           playerId="a"
           send={vi.fn<RoomConnection["send"]>()}
-          chat={vi.fn<RoomConnection["chat"]>()}
+          chat={chatControls()}
+          typing={[]}
           roundPoints={
             new Map([
               ["a", points()],
@@ -492,7 +505,8 @@ describe("<Table />", () => {
         room={view}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
         dealing={dealing()}
       />
     ));
@@ -523,7 +537,8 @@ describe("<Table />", () => {
         room={room()}
         playerId="a"
         send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -548,12 +563,13 @@ describe("<Table />", () => {
   });
 
   it("sends a chat message and shows chat in the game log", async () => {
-    const chat = vi.fn<RoomConnection["chat"]>();
+    const chat = chatControls();
     render(() => (
       <Table
         room={room({
           log: [
             {
+              about: [],
               at: LOGGED_AT,
               game: 1,
               id: 1,
@@ -561,6 +577,7 @@ describe("<Table />", () => {
               text: "Round 1 begins. Ben deals.",
             },
             {
+              about: [],
               at: LOGGED_AT,
               from: { avatar: 1, id: "b", name: "Ben" },
               game: 1,
@@ -573,6 +590,7 @@ describe("<Table />", () => {
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
         chat={chat}
+        typing={[]}
       />
     ));
 
@@ -588,7 +606,7 @@ describe("<Table />", () => {
     });
 
     expect(result.error).toBeUndefined();
-    expect(chat).toHaveBeenCalledWith("you too");
+    expect(chat.sent).toStrictEqual(["you too"]);
   });
 
   it("groups old game events by clock minute and keeps per-message timestamps", () => {
@@ -598,6 +616,7 @@ describe("<Table />", () => {
         room={room({
           log: [
             {
+              about: [],
               at,
               game: 1,
               id: 2,
@@ -605,6 +624,7 @@ describe("<Table />", () => {
               text: "Round 1 begins. Ben deals.",
             },
             {
+              about: [],
               at,
               cue: "bust",
               game: 1,
@@ -613,6 +633,7 @@ describe("<Table />", () => {
               text: "Ben was dealt a duplicate 6 and busted.",
             },
             {
+              about: [],
               at: at + 1000,
               cue: "bank",
               game: 1,
@@ -621,6 +642,7 @@ describe("<Table />", () => {
               text: "Ana stayed and banked 44 points.",
             },
             {
+              about: [],
               at: at + 2000,
               cue: "freeze",
               game: 1,
@@ -629,6 +651,7 @@ describe("<Table />", () => {
               text: "Ben played Freeze on Ana, who banked 26 points.",
             },
             {
+              about: [],
               at: at + 3000,
               cue: "special",
               game: 1,
@@ -637,6 +660,7 @@ describe("<Table />", () => {
               text: "Ben assigned Flip Three to Ana.",
             },
             {
+              about: [],
               at: at + 4000,
               cue: "special",
               game: 1,
@@ -645,6 +669,7 @@ describe("<Table />", () => {
               text: "Ben is holding a Second Chance.",
             },
             {
+              about: [],
               at: at + 60_000,
               from: { avatar: 1, id: "b", name: "Ben" },
               game: 1,
@@ -653,6 +678,7 @@ describe("<Table />", () => {
               text: "Good round",
             },
             {
+              about: [],
               at: at + 61_000,
               from: { avatar: 1, id: "a", name: "Ana" },
               game: 1,
@@ -661,6 +687,7 @@ describe("<Table />", () => {
               text: "Thanks!",
             },
             {
+              about: [],
               at: at + 62_000,
               game: 1,
               id: 10,
@@ -668,6 +695,7 @@ describe("<Table />", () => {
               text: "Round 2 is over.",
             },
             {
+              about: [],
               at: at + 62_000,
               game: 1,
               id: 11,
@@ -675,6 +703,7 @@ describe("<Table />", () => {
               text: "The discard pile was shuffled into a new deck.",
             },
             {
+              about: [],
               at: at + 62_000,
               game: 1,
               id: 12,
@@ -685,7 +714,8 @@ describe("<Table />", () => {
         })}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -696,8 +726,11 @@ describe("<Table />", () => {
 
       return {
         announcement: row.querySelector("[data-announcement]") !== null,
+        about: [],
         at: time?.getAttribute("datetime"),
-        text: row.textContent?.replace(time?.textContent ?? "", ""),
+        text: row.textContent
+          ?.replace(time?.textContent ?? "", "")
+          .replaceAll("\u00A0", " "),
       };
     });
 
@@ -729,8 +762,8 @@ describe("<Table />", () => {
     expect(rows.slice(0, 6).map((row) => row.text)).toStrictEqual([
       "Ben deals.",
       "Ben busted · duplicate 6",
-      "Ana stayed · +44 pts",
-      "Ana was frozen · +26 pts · by Ben",
+      "Ana stayed +44 points",
+      "Ana was frozen +26 points · by Ben",
       "Ben assigned Flip Three · to Ana",
       "Ben got a Second Chance",
     ]);
@@ -753,6 +786,7 @@ describe("<Table />", () => {
           room={room({
             log: [
               {
+                about: [],
                 at,
                 game: 1,
                 id: 1,
@@ -760,6 +794,7 @@ describe("<Table />", () => {
                 text: "Round 1 begins. Ben deals.",
               },
               {
+                about: [],
                 at,
                 from: { avatar: 1, id: "b", name: "Ben" },
                 game: 1,
@@ -771,7 +806,8 @@ describe("<Table />", () => {
           })}
           playerId="a"
           send={vi.fn<RoomConnection["send"]>()}
-          chat={vi.fn<RoomConnection["chat"]>()}
+          chat={chatControls()}
+          typing={[]}
         />
       ));
 
@@ -813,7 +849,8 @@ describe("<Table />", () => {
         room={view()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -833,6 +870,7 @@ describe("<Table />", () => {
         log: [
           ...view().log,
           {
+            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "b", name: "Ben" },
             game: 1,
@@ -841,6 +879,7 @@ describe("<Table />", () => {
             text: "gl",
           },
           {
+            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "a", name: "Ana" },
             game: 1,
@@ -861,7 +900,7 @@ describe("<Table />", () => {
       hiddenMessage: log.queryByText("gl"),
       unread: unread.textContent,
     }).toStrictEqual({
-      chatFilter: "Chat",
+      chatFilter: "Chat1",
       hiddenMessage: null,
       unread: "1 unread message",
     });
@@ -913,7 +952,8 @@ describe("<Table />", () => {
         room={view()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -936,9 +976,24 @@ describe("<Table />", () => {
       room({
         log: [
           ...view().log,
-          { at: LOGGED_AT, game: 1, id: 2, round: 1, text: "Ben stayed." },
-          { at: LOGGED_AT, game: 1, id: 3, round: 1, text: "Round 2 begins." },
           {
+            about: [],
+            at: LOGGED_AT,
+            game: 1,
+            id: 2,
+            round: 1,
+            text: "Ben stayed.",
+          },
+          {
+            about: [],
+            at: LOGGED_AT,
+            game: 1,
+            id: 3,
+            round: 1,
+            text: "Round 2 begins.",
+          },
+          {
+            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "b", name: "Ben" },
             game: 1,
@@ -947,6 +1002,7 @@ describe("<Table />", () => {
             text: "Good luck!",
           },
           {
+            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "a", name: "Ana" },
             game: 1,
@@ -987,6 +1043,7 @@ describe("<Table />", () => {
         log: [
           ...view().log,
           {
+            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "b", name: "Ben" },
             game: 1,
@@ -1038,7 +1095,8 @@ describe("<Table />", () => {
         room={room()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -1075,7 +1133,8 @@ describe("<Table />", () => {
         room={room()}
         playerId="a"
         send={send}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
         actionsDisabled
         dealing
       />
@@ -1098,7 +1157,8 @@ describe("<Table />", () => {
         room={room()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
         offline={offline()}
       />
     ));
@@ -1139,7 +1199,8 @@ describe("<Table />", () => {
         room={view}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -1161,7 +1222,8 @@ describe("<Table />", () => {
         room={view()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -1172,6 +1234,7 @@ describe("<Table />", () => {
       room({
         log: [
           {
+            about: [],
             at: LOGGED_AT,
             game: 1,
             id: 1,
@@ -1179,6 +1242,7 @@ describe("<Table />", () => {
             text: "Round 1 begins. Ben deals.",
           },
           {
+            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "b", name: "Ben" },
             game: 1,
@@ -1187,6 +1251,7 @@ describe("<Table />", () => {
             text: "gl",
           },
           {
+            about: [],
             at: LOGGED_AT,
             from: { avatar: 1, id: "a", name: "Ana" },
             game: 1,
@@ -1222,7 +1287,8 @@ describe("<Table />", () => {
         room={room()}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
 
@@ -1259,7 +1325,8 @@ describe("<Table />", () => {
         room={room()}
         playerId="b"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
     const seat = screen.getByRole("article", { name: "Ana, 40 points" });
@@ -1275,14 +1342,23 @@ describe("<Table />", () => {
         room={room({
           log: [
             {
+              about: [],
               at: LOGGED_AT,
               game: 1,
               id: 1,
               round: 1,
               text: "Round 1 begins. Ben deals.",
             },
-            { at: LOGGED_AT, game: 1, id: 2, round: 0, text: "Cal joined." },
             {
+              about: [],
+              at: LOGGED_AT,
+              game: 1,
+              id: 2,
+              round: 0,
+              text: "Cal joined.",
+            },
+            {
+              about: [],
               at: LOGGED_AT,
               game: 2,
               id: 3,
@@ -1293,7 +1369,8 @@ describe("<Table />", () => {
         })}
         playerId="a"
         send={vi.fn<RoomConnection["send"]>()}
-        chat={vi.fn<RoomConnection["chat"]>()}
+        chat={chatControls()}
+        typing={[]}
       />
     ));
     const log = screen.getByRole("log");

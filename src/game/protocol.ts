@@ -1,6 +1,7 @@
 import * as v from "valibot";
 
 import { projectActionCards } from "./action-card-resolution";
+import { isAvatar } from "./avatars";
 import { DRAW_LIMIT, LOG_LIMIT } from "./engine";
 import type { DrawEvent, GameState, HeldCard, LogEntry } from "./engine";
 import { MAX_SPECTATORS } from "./moves";
@@ -17,6 +18,18 @@ export const HEARTBEAT_INTERVAL_MS = 10_000;
 
 /** A socket that hasn't pinged for this long is treated as gone. */
 export const HEARTBEAT_STALE_MS = 25_000;
+
+/** The least time between typing starts sent by one browser. */
+export const TYPING_SEND_MS = 3000;
+
+/**
+ * The least time between typing starts the room relays for one seat.
+ * Shorter than `TYPING_SEND_MS`, so network jitter doesn't drop honest pings.
+ */
+export const TYPING_RELAY_MS = 2000;
+
+/** How long a typing start remains active without another one. */
+export const TYPING_SHOWN_MS = 5000;
 export const ROOM_REMOVED_CLOSE_CODE = 4001;
 export const ROOM_MISSING_CLOSE_CODE = 4002;
 export const ROOM_PARTY = "game-room";
@@ -131,8 +144,60 @@ const ListUpdateSchema = v.looseObject({
   seq: v.pipe(v.number(), v.integer()),
 });
 
+const nonNegativeInteger = v.pipe(v.number(), v.integer(), v.minValue(0));
+
+const LATEST_DATE_MS = 8_640_000_000_000_000;
+
+const logPlayerFields = {
+  id: v.pipe(v.string(), v.nonEmpty()),
+  name: v.pipe(v.string(), v.nonEmpty(), v.maxLength(NAME_MAX_LENGTH)),
+};
+
+const LogEntrySchema = v.pipe(
+  v.object({
+    about: v.array(
+      v.object({ ...logPlayerFields, offset: nonNegativeInteger })
+    ),
+    at: v.pipe(nonNegativeInteger, v.maxValue(LATEST_DATE_MS)),
+    cue: v.optional(
+      v.picklist(["bank", "bust", "flipSeven", "freeze", "join", "special"])
+    ),
+    from: v.optional(
+      v.object({
+        ...logPlayerFields,
+        avatar: v.nullable(v.custom<number>(isAvatar)),
+      })
+    ),
+    game: nonNegativeInteger,
+    id: nonNegativeInteger,
+    round: nonNegativeInteger,
+    scores: v.optional(
+      v.array(v.object({ ...logPlayerFields, points: nonNegativeInteger }))
+    ),
+    text: v.string(),
+  }),
+  v.check(({ about, text }) => {
+    let end = 0;
+
+    for (const { name, offset } of about) {
+      if (offset < end || !text.startsWith(name, offset)) {
+        return false;
+      }
+
+      end = offset + name.length;
+    }
+
+    return true;
+  })
+);
+
+const LogUpdateSchema = v.object({
+  ...ListUpdateSchema.entries,
+  entries: v.array(LogEntrySchema),
+});
+
 const StateMessageSchema = v.looseObject({
-  lists: v.looseObject({ draws: ListUpdateSchema, log: ListUpdateSchema }),
+  lists: v.looseObject({ draws: ListUpdateSchema, log: LogUpdateSchema }),
   room: v.looseObject({
     code: v.string(),
     hostId: v.nullable(v.string()),
@@ -195,6 +260,7 @@ export type ServerMessage =
   | { requestId: string; type: "accepted" }
   | { message: string; requestId: string; type: "rejected" }
   | { lists: RoomListUpdates; room: SentRoomView; type: "state" }
+  | { active: boolean; playerId: string; type: "typing" }
   | { message: string; type: "error" };
 
 export const toRoomView = (
@@ -336,6 +402,13 @@ export const parseServerMessage = (raw: string) => {
 
       case "watchError": {
         return v.is(v.string(), message.message) ? message : null;
+      }
+
+      case "typing": {
+        return v.is(v.string(), message.playerId) &&
+          v.is(v.boolean(), message.active)
+          ? message
+          : null;
       }
 
       case "accepted":

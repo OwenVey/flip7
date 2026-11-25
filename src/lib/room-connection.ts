@@ -224,7 +224,7 @@ export const createRoomConnection = (code: string) => {
 
   return {
     canAct: createMemo(() => state().canAct),
-    chat: client.chat,
+    chat: { send: client.chat, typing: client.typing } satisfies ChatControls,
     clearJoinError: client.clearJoinError,
     join: (name: string, avatar: number) => {
       setSavedName(name);
@@ -245,6 +245,7 @@ export const createRoomConnection = (code: string) => {
     savedName,
     send: client.send,
     status: createMemo(() => state().status),
+    typing: createMemo(() => state().typing),
     stopWatching: client.stopWatching,
     syncId: createMemo(() => state().syncId),
     watch: client.watch,
@@ -256,3 +257,9 @@ export const createRoomConnection = (code: string) => {
 };
 
 export type RoomConnection = ReturnType<typeof createRoomConnection>;
+
+/** What a seated player can do in the chat: send a message, and say whether they're typing one. */
+export interface ChatControls {
+  send: (text: string) => boolean;
+  typing: (active: boolean) => void;
+}

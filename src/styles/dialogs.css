@@ -41,7 +41,11 @@
   }
 }
 
-:is([data-slot="alert-dialog-title"], [data-slot="dialog-title"]) {
+:is(
+  [data-slot="alert-dialog-title"],
+  [data-slot="dialog-title"],
+  [data-slot="drawer-title"]
+) {
   font-size: var(--text-lg);
 }
 
