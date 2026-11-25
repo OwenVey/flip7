@@ -33,12 +33,14 @@
     }
   }
 
-  /* Your own row, tinted like your seat and marked with an ink edge so it stays distinct on medal rows and without relying on color alone. */
+  /* Your own row, tinted like your seat and marked with a gold edge framed in ink so it echoes the You badge and stays distinct on medal rows. */
   & tr[data-me] {
     background: var(--gold-soft);
 
     & > :first-child {
-      box-shadow: inset 3px 0 0 var(--ink);
+      box-shadow:
+        inset 4px 0 0 var(--gold),
+        inset 5px 0 0 var(--ink);
     }
   }
 
