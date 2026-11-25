@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal } from "solid-js";
 
+import { isChat } from "../game/engine";
 import type { LogEntry } from "../game/engine";
 import { countChatsAfter } from "./game-log-entries";
 
@@ -38,6 +39,41 @@ export interface ChatLogReads {
   visible: () => LogEntry[];
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- Compares fields of events already parsed at the wire.
+const sameValue: (a: unknown, b: unknown) => boolean = (a, b) => {
+  if (a === b) {
+    return true;
+  }
+
+  if (
+    !(a instanceof Object) ||
+    !(b instanceof Object) ||
+    Array.isArray(a) !== Array.isArray(b)
+  ) {
+    return false;
+  }
+
+  const fields = new Map(Object.entries(b));
+  const entries = Object.entries(a);
+
+  return (
+    entries.length === fields.size &&
+    entries.every(
+      ([key, value]) => fields.has(key) && sameValue(value, fields.get(key))
+    )
+  );
+};
+
+const sameContent = (a: LogEntry, b: LogEntry) => {
+  if (isChat(a) || isChat(b)) {
+    return (
+      isChat(a) && isChat(b) && a.text === b.text && a.from.id === b.from.id
+    );
+  }
+
+  return sameValue(a.event, b.event);
+};
+
 const sameEntry = (a: LogEntry, b: LogEntry | undefined) =>
   a === b ||
   (b !== undefined &&
@@ -45,8 +81,7 @@ const sameEntry = (a: LogEntry, b: LogEntry | undefined) =>
     a.at === b.at &&
     a.game === b.game &&
     a.round === b.round &&
-    a.text === b.text &&
-    a.from?.id === b.from?.id);
+    sameContent(a, b));
 
 const survivingReadLimit = (before: LogEntry[], log: LogEntry[]) => {
   const oldTail = before.at(-1);
@@ -91,9 +126,7 @@ export const createChatLogReads = (source: ReadSource) => {
       return log;
     }
 
-    return log.filter(
-      (entry) => (entry.from !== undefined) === (current === "Chat")
-    );
+    return log.filter((entry) => isChat(entry) === (current === "Chat"));
   });
 
   const latestId = createMemo(() => visible().at(-1)?.id ?? 0);

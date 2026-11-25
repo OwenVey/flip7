@@ -51,22 +51,27 @@ import {
   useContext,
 } from "solid-js";
 
-import { CHAT_MAX_LENGTH } from "../game/engine";
-import type { LogEntry, LogPlayer } from "../game/engine";
+import { CHAT_MAX_LENGTH, isChat } from "../game/engine";
+import type {
+  ChatEntry,
+  EventEntry,
+  LogEntry,
+  LogPlayer,
+} from "../game/engine";
+import { settlesRound } from "../game/game-events";
 import { createChatLogReads, LOG_FILTERS } from "../lib/chat-log-reads";
 import type { ChatLogReads } from "../lib/chat-log-reads";
 import {
   continuesChat,
   detailText,
-  eventDetailsWithMentions,
+  eventCopy,
   groupLog,
   HOUR_MS,
   involvedIds,
   involves,
   localTime,
   MINUTE_MS,
-  nameParts,
-  sameDetails,
+  sameCopy,
   SECOND_MS,
   shownTimes,
   timeLabel,
@@ -78,6 +83,7 @@ import type {
   NamePart,
 } from "../lib/game-log-entries";
 import type { ChatControls } from "../lib/room-connection";
+import { eventCue } from "../lib/room-cues";
 import PlayerAvatar from "./player-avatar";
 import Tooltip from "./tooltip";
 
@@ -124,11 +130,7 @@ const LogTime = (props: { at: number; now: number }) => {
 };
 
 const oldGameMinute = (entry: LogEntry | undefined, now: number) => {
-  if (
-    entry === undefined ||
-    entry.from !== undefined ||
-    entry.at > now - HOUR_MS
-  ) {
+  if (entry === undefined || isChat(entry) || entry.at > now - HOUR_MS) {
     return null;
   }
 
@@ -179,37 +181,21 @@ const PlayerName = (props: { player: LogPlayer; class?: string }) => {
   );
 };
 
-const samePart = (a: NamePart, b: NamePart) =>
-  "text" in a
-    ? "text" in b && a.text === b.text
-    : "player" in b && a.player.id === b.player.id;
+const Named = (props: { parts: readonly NamePart[] }) => (
+  <For each={props.parts}>
+    {(part) =>
+      "text" in part ? part.text : <PlayerName player={part.player} />
+    }
+  </For>
+);
 
-const Named = (props: { text: string; players: readonly LogPlayer[] }) => {
-  const parts = createMemo(() => nameParts(props.text, props.players), {
-    equals: (a, b) =>
-      a.length === b.length &&
-      a.every((part, index) => {
-        const other = b[index];
-
-        return other !== undefined && samePart(part, other);
-      }),
-  });
-
-  return (
-    <For each={parts()}>
-      {(part) =>
-        "text" in part ? part.text : <PlayerName player={part.player} />
-      }
-    </For>
-  );
-};
-
-const Detail = (props: {
-  detail: EventDetail;
-  players: readonly LogPlayer[];
-}) => (
+const Detail = (props: { detail: EventDetail }) => (
   <Switch
-    fallback={<Named text={detailText(props.detail)} players={props.players} />}
+    fallback={
+      <Show when={props.detail.kind === "text" ? props.detail : undefined}>
+        {(text) => <Named parts={text().parts} />}
+      </Show>
+    }
   >
     <Match when={props.detail.kind === "card" ? props.detail : undefined}>
       {(card) => (
@@ -238,16 +224,15 @@ const Detail = (props: {
 );
 
 const GameEvent = (props: {
-  entry: LogEntry;
+  entry: EventEntry;
   hasRoundHeading: boolean;
   previous: LogEntry | undefined;
   showTime: boolean;
   now: number;
 }) => {
-  const copy = createMemo(
-    () => eventDetailsWithMentions(props.entry, props.hasRoundHeading),
-    { equals: sameDetails }
-  );
+  const copy = createMemo(() => eventCopy(props.entry, props.hasRoundHeading), {
+    equals: sameCopy,
+  });
 
   const Icon = dynamic(() => {
     const key = copy().icon;
@@ -282,7 +267,7 @@ const GameEvent = (props: {
         <Icon class="log-event-icon" aria-hidden="true" size={13} />
         <span class="log-event-text">
           <span class="log-outcome">
-            <Named text={copy().outcome} players={props.entry.about} />
+            <Named parts={copy().outcome} />
           </span>
           <For each={copy().details} keyed={(detail) => detailText(detail)}>
             {(detail) => (
@@ -290,7 +275,7 @@ const GameEvent = (props: {
                 {" "}
                 <span class="log-detail">
                   <Show when={detail().kind !== "points"}>{"·\u00A0"}</Show>
-                  <Detail detail={detail()} players={props.entry.about} />
+                  <Detail detail={detail()} />
                 </span>
               </>
             )}
@@ -305,8 +290,7 @@ const GameEvent = (props: {
 };
 
 const ChatMessage = (props: {
-  author: NonNullable<LogEntry["from"]>;
-  entry: LogEntry;
+  entry: ChatEntry;
   continuation: boolean;
   now: number;
 }) => (
@@ -314,15 +298,15 @@ const ChatMessage = (props: {
     <Show when={!props.continuation}>
       <div class="log-message-header">
         <span class="log-author-line">
-          <PlayerAvatar player={props.author} size="sm" />
-          <PlayerName player={props.author} class="log-author" />
+          <PlayerAvatar player={props.entry.from} size="sm" />
+          <PlayerName player={props.entry.from} class="log-author" />
         </span>
         <LogTime at={props.entry.at} now={props.now} />
       </div>
     </Show>
     <span>
       <Show when={props.continuation}>
-        <span class="sr-only">{props.author.name}: </span>
+        <span class="sr-only">{props.entry.from.name}: </span>
       </Show>
       {props.entry.text}
     </span>
@@ -422,7 +406,7 @@ const LogRound = (props: {
 
   const shown = createMemo(() =>
     collapsed()
-      ? props.group.entries.filter((entry) => entry.from !== undefined)
+      ? props.group.entries.filter((entry) => isChat(entry))
       : props.group.entries
   );
 
@@ -432,7 +416,7 @@ const LogRound = (props: {
     collapsed() &&
     props.newFrom !== undefined &&
     props.group.entries.some(
-      (entry) => entry.id === props.newFrom && entry.from === undefined
+      (entry) => entry.id === props.newFrom && !isChat(entry)
     );
 
   const rows = () => (
@@ -442,13 +426,23 @@ const LogRound = (props: {
 
         const continuation = () => props.continuations.has(entry().id);
 
+        const message = () => {
+          const current = entry();
+
+          return isChat(current) ? current : undefined;
+        };
+
+        const happened = () => {
+          const current = entry();
+
+          return isChat(current) ? undefined : current;
+        };
+
         const mine = createMemo(() => {
           const { playerId } = props;
 
           return (
-            playerId !== null &&
-            entry().from === undefined &&
-            involves(entry(), playerId)
+            playerId !== null && !isChat(entry()) && involves(entry(), playerId)
           );
         });
 
@@ -465,33 +459,34 @@ const LogRound = (props: {
             </Show>
             <li
               data-continuation={continuation() ? "" : undefined}
-              data-cue={entry().cue}
-              data-kind={entry().from ? "chat" : "game"}
+              data-cue={eventCue(happened()?.event) ?? undefined}
+              data-kind={message() ? "chat" : "game"}
               data-mine={mine() ? "" : undefined}
-              data-own={entry().from?.id === props.playerId ? "" : undefined}
+              data-own={message()?.from.id === props.playerId ? "" : undefined}
               data-spotlit={spotlit() ? "" : undefined}
             >
-              <Show
-                when={entry().from}
-                fallback={
-                  <GameEvent
-                    entry={entry()}
-                    hasRoundHeading={props.group.heading !== ""}
-                    previous={previous()}
-                    showTime={times().has(entry().id)}
-                    now={props.now}
-                  />
-                }
-              >
-                {(author) => (
-                  <ChatMessage
-                    author={author()}
-                    entry={entry()}
-                    continuation={continuation()}
-                    now={props.now}
-                  />
-                )}
-              </Show>
+              <Switch>
+                <Match when={message()}>
+                  {(chat) => (
+                    <ChatMessage
+                      entry={chat()}
+                      continuation={continuation()}
+                      now={props.now}
+                    />
+                  )}
+                </Match>
+                <Match when={happened()}>
+                  {(event) => (
+                    <GameEvent
+                      entry={event()}
+                      hasRoundHeading={props.group.heading !== ""}
+                      previous={previous()}
+                      showTime={times().has(entry().id)}
+                      now={props.now}
+                    />
+                  )}
+                </Match>
+              </Switch>
             </li>
           </>
         );
@@ -724,7 +719,8 @@ export const ChatLog = (
                             collapsible={
                               props.reads.filter() !== "Chat" &&
                               group().entries.some(
-                                (entry) => entry.scores !== undefined
+                                (entry) =>
+                                  !isChat(entry) && settlesRound(entry.event)
                               )
                             }
                             playerId={props.reads.playerId()}

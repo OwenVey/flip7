@@ -4,11 +4,12 @@ import type { Card } from "./cards";
 import {
   chat,
   DEAL_HISTORY_LIMIT,
+  isChat,
   MAX_PLAYERS,
   nextRound,
   startGame,
 } from "./engine";
-import type { DealEvent } from "./engine";
+import type { DealEvent, LogEntry } from "./engine";
 import { MAX_SPECTATORS } from "./moves";
 import {
   HEARTBEAT_STALE_MS,
@@ -130,8 +131,13 @@ const broadcastOf = (outcome: RoomOutcome) => {
   return found.message;
 };
 
+const logEvents = (entries: LogEntry[]) =>
+  entries.flatMap((entry) => (isChat(entry) ? [] : [entry.event]));
+
 const logTexts = (message: StateMessage) =>
-  message.lists.log.entries.map((entry) => entry.text);
+  message.lists.log.entries.map((entry) =>
+    isChat(entry) ? entry.text : entry.event.type
+  );
 
 const dealSeqs = (message: StateMessage) =>
   message.lists.dealHistory.entries.map((event) => event.seq);
@@ -697,9 +703,10 @@ describe("room settings", () => {
       locked: false,
       targetScore: 100,
     });
-    expect(h.stored.game.log.map((entry) => entry.text)).toContain(
-      "The host set the winning score to 100."
-    );
+    expect(logEvents(h.stored.game.log)).toContainEqual({
+      targetScore: 100,
+      type: "targetScoreSet",
+    });
   });
 
   it("rejects a guest changing settings", () => {
@@ -800,7 +807,7 @@ describe("sending the log", () => {
     h.room.join("ana-tab-2", "", ana.token);
 
     expect(opened.lists.log.after).toBeNull();
-    expect(logTexts(opened)).toStrictEqual(["Ana joined.", "hello"]);
+    expect(logTexts(opened)).toStrictEqual(["joined", "hello"]);
   });
 
   it("broadcasts only the entries added since the last broadcast", () => {
@@ -888,7 +895,7 @@ describe("sending the log", () => {
     const snapshot = h.room.snapshot();
 
     expect(snapshot.lists.log.after).toBeNull();
-    expect(logTexts(snapshot)).toStrictEqual(["Ana joined.", "one"]);
+    expect(logTexts(snapshot)).toStrictEqual(["joined", "one"]);
     expect(h.stored).toStrictEqual(stored);
   });
 
@@ -1246,7 +1253,9 @@ describe("spectating a room", () => {
       seat: { watchedAt: START },
       token: false,
     });
-    expect(logTexts(broadcastOf(switched))).toContain("Ben left to watch.");
+    expect(logEvents(broadcastOf(switched).lists.log.entries)).toContainEqual(
+      expect.objectContaining({ how: "leftToWatch", type: "evicted" })
+    );
   });
 
   it("keeps the last human seated when watching would leave only bots", () => {

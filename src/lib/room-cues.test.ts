@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { addPlayer, createGame } from "../game/engine";
+import type { GameEvent } from "../game/game-events";
 import { toRoomView } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
-import { roomCues } from "./room-cues";
+import { eventCue, roomCues } from "./room-cues";
 
 const LOGGED_AT = Date.now();
 
@@ -18,13 +19,16 @@ const before: RoomView = {
   drawSeq: 10,
   log: [
     {
-      about: [],
       at: LOGGED_AT,
-      cue: "bank",
+      event: {
+        by: { kind: "player" },
+        player: { id: "me", name: "Me" },
+        points: 5,
+        type: "stayed",
+      },
       game: 1,
       id: 7,
       round: 1,
-      text: "Banked.",
     },
   ],
   phase: "playing",
@@ -53,13 +57,15 @@ describe(roomCues, () => {
       log: [
         ...before.log,
         {
-          about: [],
           at: LOGGED_AT,
-          cue: "bust",
+          event: {
+            card: 4,
+            player: { id: "opponent", name: "Opp" },
+            type: "busted",
+          },
           game: 1,
           id: 8,
           round: 1,
-          text: "Busted.",
         },
       ],
     };
@@ -76,7 +82,6 @@ describe(roomCues, () => {
       log: [
         ...before.log,
         {
-          about: [],
           at: LOGGED_AT,
           from: { avatar: 1, id: "opponent", name: "Opp" },
           game: 1,
@@ -89,5 +94,42 @@ describe(roomCues, () => {
 
     expect(roomCues(before, chat, "me")).toStrictEqual(["message"]);
     expect(roomCues(before, chat, "opponent")).toStrictEqual([]);
+  });
+});
+
+describe(eventCue, () => {
+  const me = { id: "me", name: "Me" };
+  const opp = { id: "opponent", name: "Opp" };
+
+  it.each([
+    [{ by: { kind: "player" }, player: me, points: 5, type: "stayed" }, "bank"],
+    [{ by: { kind: "game" }, player: me, points: 5, type: "stayed" }, "bank"],
+    [
+      {
+        by: { host: opp, kind: "host" },
+        player: me,
+        points: 5,
+        type: "stayed",
+      },
+      "bank",
+    ],
+    [{ card: 4, player: me, type: "busted" }, "bust"],
+    [{ player: me, type: "flipSeven" }, "flipSeven"],
+    [{ by: opp, points: 3, target: me, type: "frozen" }, "freeze"],
+    [{ by: opp, target: me, type: "flipThreeStarted" }, "special"],
+    [{ by: opp, target: me, type: "secondChanceGiven" }, "special"],
+    [{ player: me, type: "secondChanceKept" }, "special"],
+    [{ card: 4, player: me, type: "secondChanceUsed" }, "special"],
+    [
+      { by: opp, card: "freeze", target: me, type: "actionAssigned" },
+      "special",
+    ],
+    [{ player: me, type: "joined", waitsFor: null }, "join"],
+    [{ player: opp, type: "botAdded" }, "join"],
+    [{ scores: [], tiedAt: null, type: "roundOver" }, null],
+    [{ player: me, type: "secondChanceDiscarded" }, null],
+    [{ how: "left", player: opp, type: "evicted" }, null],
+  ] satisfies [GameEvent, string | null][])("cues %j with %s", (event, cue) => {
+    expect(eventCue(event)).toBe(cue);
   });
 });

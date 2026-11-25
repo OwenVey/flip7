@@ -19,12 +19,11 @@ export const room = (overrides: Partial<RoomView> = {}) => {
     hostId: "a",
     log: [
       {
-        about: [],
         at: LOGGED_AT,
+        event: { dealer: { id: "b", name: "Ben" }, type: "roundStarted" },
         game: 1,
         id: 1,
         round: 1,
-        text: "Round 1 begins. Ben deals.",
       },
     ],
     phase: "playing",

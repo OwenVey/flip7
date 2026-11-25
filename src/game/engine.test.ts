@@ -11,6 +11,7 @@ import {
   choose,
   createGame,
   GameError,
+  isChat,
   hit,
   kick,
   leave,
@@ -46,6 +47,12 @@ const multiplierCard = () => ({ id: id(), kind: "double" }) satisfies Card;
 const freeze = () => ({ id: id(), kind: "freeze" }) satisfies Card;
 const flipThree = () => ({ id: id(), kind: "flipThree" }) satisfies Card;
 const secondChance = () => ({ id: id(), kind: "secondChance" }) satisfies Card;
+
+const lastEvent = (state: GameState, fromEnd = 1) => {
+  const entry = state.log.at(-fromEnd);
+
+  return entry === undefined || isChat(entry) ? undefined : entry.event;
+};
 
 const player = (state: GameState, playerId: string) => {
   const found = state.players.find((candidate) => candidate.id === playerId);
@@ -484,7 +491,9 @@ describe("evicting a player", () => {
       "a",
       "c",
     ]);
-    expect(state.log.at(-1)?.text).toBe("b was removed by the host.");
+    expect(state.log.at(-1)).toMatchObject({
+      event: { how: "kicked", player: { id: "b", name: "b" }, type: "evicted" },
+    });
   });
 
   it("only lets the host kick, and not themselves", () => {
@@ -513,7 +522,9 @@ describe("evicting a player", () => {
     leave(state, "a", random);
 
     expect(state.hostId).toBe("b");
-    expect(state.log.at(-1)?.text).toBe("a left.");
+    expect(state.log.at(-1)).toMatchObject({
+      event: { how: "left", player: { id: "a", name: "a" }, type: "evicted" },
+    });
   });
 });
 
@@ -526,9 +537,12 @@ describe("an offline player", () => {
     player(state, "a").connected = false;
     expect(playForAbsent(state, random)).toBeTruthy();
     expect(state.turnId).toBe("b");
-    expect(state.log.at(-1)?.text).toBe(
-      "a is offline, so the game stayed for them and banked 5 points."
-    );
+    expect(lastEvent(state)).toStrictEqual({
+      by: { kind: "game" },
+      player: { id: "a", name: "a" },
+      points: 5,
+      type: "stayed",
+    });
   });
 
   it("gives their action card to someone else", () => {
@@ -565,12 +579,12 @@ describe("the host moving for an offline player", () => {
     playFor(state, "a", "b", { type: "stay" }, random);
 
     expect(player(state, "b").status).toBe("stayed");
-    expect(
-      state.log.some(
-        (entry) =>
-          entry.text === "a stayed for b, who is offline, and banked 3 points."
-      )
-    ).toBeTruthy();
+    expect(lastEvent(state, 2)).toStrictEqual({
+      by: { host: { id: "a", name: "a" }, kind: "host" },
+      player: { id: "b", name: "b" },
+      points: 3,
+      type: "stayed",
+    });
   });
 
   it("hits for them", () => {
@@ -583,7 +597,12 @@ describe("the host moving for an offline player", () => {
 
     expect(player(state, "b").hand).toHaveLength(2);
     expect(state.turnId).toBe("c");
-    expect(state.log.at(-1)?.text).toBe("a hit for b, who is offline.");
+    expect(lastEvent(state)).toStrictEqual({
+      by: { host: { id: "a", name: "a" }, kind: "host" },
+      move: "hit",
+      player: { id: "b", name: "b" },
+      type: "movedForOffline",
+    });
   });
 
   it("chooses who gets their action card", () => {
@@ -621,16 +640,33 @@ describe("the host moving for an offline player", () => {
 });
 
 describe("the game log", () => {
+  it("records a Stay with what the hand scored", () => {
+    const state = setup(["a", "b"], [num(10), num(3)]);
+    stay(state, "a", random);
+
+    expect(lastEvent(state)).toStrictEqual({
+      by: { kind: "player" },
+      player: { id: "a", name: "a" },
+      points: 10,
+      type: "stayed",
+    });
+  });
+
   it("says how many points a Freeze banks, even none", () => {
     const state = setup(["a", "b", "c"], [freeze(), num(3), num(4)]);
 
     choose(state, "a", "b", random);
 
-    expect(
-      state.log.some(
-        (entry) => entry.text === "a played Freeze on b, who banked 0 points."
-      )
-    ).toBeTruthy();
+    expect(state.log).toContainEqual(
+      expect.objectContaining({
+        event: {
+          by: { id: "a", name: "a" },
+          points: 0,
+          target: { id: "b", name: "b" },
+          type: "frozen",
+        },
+      })
+    );
   });
 
   it("numbers each game and files lobby entries under round 0", () => {
@@ -659,7 +695,7 @@ describe("the game log", () => {
     expect(state.log.length).toBeGreaterThan(0);
     expect(state.log.every((entry) => entry.game === 1)).toBeTruthy();
     expect(state.log[0]?.id).toBe(lobbySeq + 1);
-    expect(state.log.some((entry) => entry.text === "ready?")).toBeFalsy();
+    expect(state.log.some((entry) => isChat(entry))).toBeFalsy();
   });
 
   it("keeps the log when a start is refused", () => {
@@ -670,7 +706,7 @@ describe("the game log", () => {
     expect(() => {
       startGame(state, "a", random);
     }).toThrow(GameError);
-    expect(state.log.at(-1)?.text).toBe("anyone?");
+    expect(state.log.at(-1)).toMatchObject({ text: "anyone?" });
     expect(state.logClearedAt).toBe(0);
   });
 
@@ -746,7 +782,9 @@ describe(chat, () => {
     }).toThrow(GameError);
 
     chat(state, "a", "x".repeat(CHAT_MAX_LENGTH + 50));
-    expect(state.log.at(-1)?.text).toHaveLength(CHAT_MAX_LENGTH);
+    expect(state.log.at(-1)).toMatchObject({
+      text: "x".repeat(CHAT_MAX_LENGTH),
+    });
   });
 
   it("only accepts messages from players in the room", () => {
@@ -992,7 +1030,7 @@ describe("held action cards through eviction", () => {
     });
     expect(state.log).toContainEqual(
       expect.objectContaining({
-        text: "Freeze for a player who left was discarded, since they're out of the round.",
+        event: { card: "freeze", target: null, type: "actionDiscarded" },
       })
     );
   });

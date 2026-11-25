@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { LogEntry } from "../game/engine";
+import type { ChatEntry, EventEntry, LogEntry } from "../game/engine";
 import { createChatLogReads } from "../lib/chat-log-reads";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
@@ -11,13 +11,16 @@ import GameLog, { ChatLog } from "./game-log";
 
 const entries = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
-    about: [{ id: `p${index}`, name: `Player ${index}`, offset: 0 }],
     at: 0,
-    cue: "bank",
+    event: {
+      by: { kind: "player" },
+      player: { id: `p${index}`, name: `Player ${index}` },
+      points: index + 1,
+      type: "stayed",
+    },
     game: 1,
     id: index + 1,
     round: 1,
-    text: `Player ${index} stayed and banked ${index + 1} points.`,
   })) satisfies LogEntry[];
 
 const ana = { avatar: 1, id: "a", name: "Ana" };
@@ -27,42 +30,41 @@ const anaNamed = { id: ana.id, name: ana.name };
 const benNamed = { id: ben.id, name: ben.name };
 
 const twoRounds = () => {
-  const cues: Pick<
-    LogEntry,
-    "about" | "cue" | "from" | "round" | "scores" | "text"
-  >[] = [
+  const cues: (
+    | Pick<ChatEntry, "from" | "round" | "text">
+    | Pick<EventEntry, "event" | "round">
+  )[] = [
     {
-      about: [{ ...anaNamed, offset: 0 }],
-      cue: "bank",
+      event: {
+        by: { kind: "player" },
+        player: anaNamed,
+        points: 12,
+        type: "stayed",
+      },
       round: 1,
-      text: "Ana stayed and banked 12 points.",
     },
+    { event: { card: 9, player: benNamed, type: "busted" }, round: 1 },
+    { from: ben, round: 1, text: "ouch" },
     {
-      about: [{ ...benNamed, offset: 0 }],
-      cue: "bust",
+      event: {
+        scores: [
+          { ...anaNamed, points: 12 },
+          { ...benNamed, points: 0 },
+        ],
+        tiedAt: null,
+        type: "roundOver",
+      },
       round: 1,
-      text: "Ben was dealt a duplicate 9 and busted.",
     },
-    { about: [], from: ben, round: 1, text: "ouch" },
+    { event: { dealer: anaNamed, type: "roundStarted" }, round: 2 },
     {
-      about: [],
-      round: 1,
-      scores: [
-        { ...anaNamed, points: 12 },
-        { ...benNamed, points: 0 },
-      ],
-      text: "Round 1 is over.",
-    },
-    {
-      about: [{ ...anaNamed, offset: "Round 2 begins. ".length }],
+      event: {
+        by: { kind: "player" },
+        player: benNamed,
+        points: 30,
+        type: "stayed",
+      },
       round: 2,
-      text: "Round 2 begins. Ana deals.",
-    },
-    {
-      about: [{ ...benNamed, offset: 0 }],
-      cue: "bank",
-      round: 2,
-      text: "Ben stayed and banked 30 points.",
     },
   ];
 
@@ -75,6 +77,8 @@ const twoRounds = () => {
 
   return log;
 };
+
+const fields = (id: number, at: number) => ({ at, game: 1, id, round: 1 });
 
 const withoutTimes = (row: HTMLElement) => {
   const copy = row.cloneNode(true);
@@ -121,20 +125,14 @@ describe("<GameLog />", () => {
     const guest = { avatar: 2, id: "p1", name: "Ben" };
     const now = Date.now();
 
-    const log = [
-      { at: now, from: own, text: "Hello!" },
-      { at: now + 1000, from: own, text: "Good luck!" },
-      { at: now + 2000, from: guest, text: "You too!" },
-      { at: now + 3000, text: "Room unlocked." },
-      { at: now + 4000, from: guest, text: "Ready?" },
-      { at: now + 64_000, from: guest, text: "Still here." },
-    ].map((entry, index) => ({
-      ...entry,
-      about: [],
-      game: 1,
-      id: index + 1,
-      round: 1,
-    }));
+    const log: LogEntry[] = [
+      { ...fields(1, now), from: own, text: "Hello!" },
+      { ...fields(2, now + 1000), from: own, text: "Good luck!" },
+      { ...fields(3, now + 2000), from: guest, text: "You too!" },
+      { ...fields(4, now + 3000), event: { locked: false, type: "lockSet" } },
+      { ...fields(5, now + 4000), from: guest, text: "Ready?" },
+      { ...fields(6, now + 64_000), from: guest, text: "Still here." },
+    ];
 
     render(() => (
       <GameLog log={log} playerId={own.id} players={[own, guest]} typing={[]} />
@@ -263,16 +261,18 @@ describe("<GameLog />", () => {
     const [log, setLog] = createSignal(twoRounds());
 
     const settlement: LogEntry = {
-      about: [],
       at: Date.now(),
+      event: {
+        scores: [
+          { ...anaNamed, points: 0 },
+          { ...benNamed, points: 30 },
+        ],
+        tiedAt: null,
+        type: "roundOver",
+      },
       game: 1,
       id: log().length + 1,
       round: 2,
-      scores: [
-        { ...anaNamed, points: 0 },
-        { ...benNamed, points: 30 },
-      ],
-      text: "Round 2 is over.",
     };
 
     render(() => (
@@ -291,7 +291,6 @@ describe("<GameLog />", () => {
   it("keeps a chat run split by an event even when the event is hidden", () => {
     const log: LogEntry[] = [
       {
-        about: [],
         at: 1000,
         game: 1,
         id: 1,
@@ -300,16 +299,13 @@ describe("<GameLog />", () => {
         text: "First",
       },
       {
-        about: [],
         at: 2000,
+        event: { scores: [], tiedAt: null, type: "roundOver" },
         game: 1,
         id: 2,
         round: 1,
-        scores: [],
-        text: "Round 1 is over.",
       },
       {
-        about: [],
         at: 3000,
         game: 1,
         id: 3,
@@ -336,13 +332,12 @@ describe("<GameLog />", () => {
 
     try {
       const entry = {
-        about: [],
         at: Date.now(),
+        event: { dealer: benNamed, type: "roundStarted" },
         game: 1,
         round: 1,
         id: 1,
-        text: "Round 1 begins. Ben deals.",
-      };
+      } satisfies LogEntry;
 
       const [log, setLog] = createSignal<LogEntry[]>([entry]);
 
@@ -367,11 +362,19 @@ describe("<GameLog />", () => {
         entry,
         {
           ...entry,
+          event: {
+            scores: [{ ...benNamed, points: 8 }],
+            tiedAt: null,
+            type: "roundOver",
+          },
           id: 2,
-          scores: [{ ...benNamed, points: 8 }],
-          text: "Round 1 is over.",
         },
-        { ...entry, id: 3, round: 2, text: "Round 2 begins. Ana deals." },
+        {
+          ...entry,
+          event: { dealer: anaNamed, type: "roundStarted" },
+          id: 3,
+          round: 2,
+        },
       ]);
       flush();
 
@@ -394,13 +397,12 @@ describe("<GameLog />", () => {
 
     try {
       const entry = {
-        about: [],
         at: Date.now(),
+        event: { dealer: benNamed, type: "roundStarted" },
         game: 1,
         round: 1,
         id: 1,
-        text: "Round 1 begins. Ben deals.",
-      };
+      } satisfies LogEntry;
 
       const [log, setLog] = createSignal<LogEntry[]>([entry]);
 
@@ -427,7 +429,10 @@ describe("<GameLog />", () => {
       await Promise.resolve();
       flush();
 
-      setLog([entry, { ...entry, from: ben, id: 2, text: "gl" }]);
+      setLog([
+        entry,
+        { at: entry.at, from: ben, game: 1, id: 2, round: 1, text: "gl" },
+      ]);
       flush();
 
       expect(
@@ -442,7 +447,6 @@ describe("<GameLog />", () => {
   it("keeps round headings over chat in the Chat filter", () => {
     const log = twoRounds();
     log.push({
-      about: [],
       at: Date.now(),
       from: ana,
       game: 1,

@@ -329,7 +329,14 @@ describe("2. normal turns", () => {
     stay(state, "a", random);
 
     expect(state.log).toContainEqual(
-      expect.objectContaining({ text: "a stayed and banked 6 points." })
+      expect.objectContaining({
+        event: {
+          by: { kind: "player" },
+          player: { id: "a", name: "a" },
+          points: 6,
+          type: "stayed",
+        },
+      })
     );
     expect(a.lastRound?.total).toBe(6);
   });
@@ -869,7 +876,7 @@ describe("5. card lifecycle", () => {
     });
     expect(state.log).toContainEqual(
       expect.objectContaining({
-        text: "The discard pile was shuffled into a new deck.",
+        event: { type: "deckReshuffled" },
       })
     );
   });
@@ -891,7 +898,7 @@ describe("5. no cards left to draw", () => {
     expect(scores(state)).toStrictEqual({ a: 9, b: 8, c: 5 });
     expect(state.log).toContainEqual(
       expect.objectContaining({
-        text: "No cards are left to draw, so the round ends.",
+        event: { type: "outOfCards" },
       })
     );
   });

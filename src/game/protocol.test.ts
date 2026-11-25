@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { addBot, addPlayer, createGame } from "./engine";
+import type { GameEvent } from "./game-events";
 import {
   cleanName,
   parseServerMessage,
@@ -124,45 +125,113 @@ describe(parseServerMessage, () => {
     ).toBeNull();
   });
 
-  it.each([
-    { about: undefined },
-    { about: [{ id: "a", name: "", offset: 0 }] },
-    { about: [{ id: "a", name: "Ana", offset: 1 }] },
-    { scores: [{ id: "a", name: "Ana", points: "5" }] },
-    { at: 8_640_000_000_000_001 },
-    { from: { avatar: 26, id: "a", name: "Ana" } },
-    { from: { avatar: 0, id: "a", name: "Ana" } },
-  ])("rejects corrupt log data %j", (changes) => {
+  const withLog = (entries: unknown[]) => {
     const message = state();
     const { log } = message.lists;
-    const entries = log.entries.map((entry) => ({ ...entry, ...changes }));
 
+    return JSON.stringify({
+      ...message,
+      lists: { ...message.lists, log: { ...log, entries } },
+    });
+  };
+
+  const ana = { id: "a", name: "Ana" };
+  const fields = { at: 0, game: 1, id: 90, round: 1 };
+  const chatEntry = { ...fields, from: { ...ana, avatar: 1 }, text: "hi" };
+
+  it.each([
+    { at: 8_640_000_000_000_001 },
+    { from: { ...ana, avatar: 26 } },
+    { from: { ...ana, avatar: 0 } },
+    { from: { avatar: 1, id: "a", name: "" } },
+    { text: 5 },
+  ])("rejects corrupt chat %j", (changes) => {
     expect(
-      parseServerMessage(
-        JSON.stringify({
-          ...message,
-          lists: { ...message.lists, log: { ...log, entries } },
-        })
-      )
+      parseServerMessage(withLog([{ ...chatEntry, ...changes }]))
     ).toBeNull();
   });
 
+  it.each([
+    undefined,
+    { type: "mystery" },
+    { player: { id: "a", name: "" }, type: "joined", waitsFor: null },
+    { by: { kind: "player" }, player: ana, points: "5", type: "stayed" },
+    { by: { kind: "robot" }, player: ana, points: 5, type: "stayed" },
+    { card: 13, player: ana, type: "busted" },
+    { by: ana, card: "secondChance", target: ana, type: "actionAssigned" },
+    { cards: [], type: "heldActionsDiscarded" },
+    { targetScore: 150, type: "targetScoreSet" },
+    {
+      scores: [{ ...ana, points: "5" }],
+      tiedAt: null,
+      type: "roundOver",
+    },
+  ])("rejects a corrupt game event %j", (event) => {
+    expect(parseServerMessage(withLog([{ ...fields, event }]))).toBeNull();
+  });
+
+  it("accepts every kind of game event the engine records", () => {
+    const ben = { id: "b", name: "Ben" };
+    const host = { host: ana, kind: "host" } as const;
+
+    const events = [
+      { player: ana, type: "joined", waitsFor: null },
+      { player: ana, type: "joined", waitsFor: "game" },
+      { player: ben, type: "botAdded" },
+      { how: "leftToWatch", player: ben, type: "evicted" },
+      { player: ben, type: "hostChanged" },
+      { targetScore: 300, type: "targetScoreSet" },
+      { botSpeed: "fast", type: "botSpeedSet" },
+      { locked: true, type: "lockSet" },
+      { type: "gameAbandoned" },
+      { dealer: null, type: "roundStarted" },
+      { type: "deckReshuffled" },
+      { type: "outOfCards" },
+      { by: { kind: "player" }, player: ana, points: 0, type: "stayed" },
+      { by: host, player: ben, points: 3, type: "stayed" },
+      {
+        by: { kind: "game" },
+        move: "choose",
+        player: ben,
+        type: "movedForOffline",
+      },
+      { card: 12, player: ana, type: "busted" },
+      { player: ana, type: "flipSeven" },
+      { player: ana, type: "secondChanceKept" },
+      { card: 0, player: ana, type: "secondChanceUsed" },
+      { by: null, target: ben, type: "secondChanceGiven" },
+      { player: ana, type: "secondChanceDiscarded" },
+      { by: ana, points: 4, target: ben, type: "frozen" },
+      { by: ana, target: ana, type: "flipThreeStarted" },
+      { by: ben, card: "flipThree", target: null, type: "actionAssigned" },
+      { cards: ["freeze", "flipThree"], type: "heldActionsDiscarded" },
+      { card: "freeze", target: null, type: "actionDiscarded" },
+      { scores: [{ ...ana, points: 9 }], tiedAt: 200, type: "roundOver" },
+      { player: ana, points: 210, scores: [], type: "gameWon" },
+    ] satisfies GameEvent[];
+
+    const entries = events.map((event, index) => ({
+      ...fields,
+      event,
+      id: index + 1,
+    }));
+
+    expect(parseServerMessage(withLog([...entries, chatEntry]))).toMatchObject({
+      lists: { log: { entries: [...entries, chatEntry] } },
+    });
+  });
+
   it("accepts a chat entry with an avatar, or none for a bot", () => {
-    const message = state();
-    const { log } = message.lists;
-    const [entry] = log.entries;
-
-    const entries = [
-      { ...entry, from: { avatar: 25, id: "a", name: "Ana" }, id: 90 },
-      { ...entry, from: { avatar: null, id: "b", name: "Ben" }, id: 91 },
-    ];
-
     expect(
       parseServerMessage(
-        JSON.stringify({
-          ...message,
-          lists: { ...message.lists, log: { ...log, entries } },
-        })
+        withLog([
+          { ...chatEntry, from: { avatar: 25, id: "a", name: "Ana" }, id: 90 },
+          {
+            ...chatEntry,
+            from: { avatar: null, id: "b", name: "Ben" },
+            id: 91,
+          },
+        ])
       )
     ).not.toBeNull();
   });
