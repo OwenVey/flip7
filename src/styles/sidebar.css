@@ -338,13 +338,19 @@
 
 /* Keep the sidebar in view as the player panels scroll with the page. */
 @media (--lg) and (not (--short)) {
+  .table {
+    flex: 1;
+  }
+
   .table-sidebar {
     display: flex;
     flex-direction: column;
     position: sticky;
     inset-block-start: 0.5rem;
     align-self: start;
-    block-size: calc(100dvh - 9rem);
+    /* Let the table rows set the available height without the sidebar growing them. */
+    contain: size;
+    block-size: min(100%, calc(100dvh - 9rem));
 
     & > .panel {
       gap: 0.625rem;

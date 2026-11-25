@@ -190,7 +190,15 @@ main {
 }
 
 @media (--lg) and (not (--short)) {
+  body:has(> .room-page > .table) {
+    display: flex;
+    flex-direction: column;
+  }
+
   .room-page:has(> .table) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
     padding-block-end: 1rem;
   }
 }
