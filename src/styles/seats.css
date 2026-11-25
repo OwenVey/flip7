@@ -554,7 +554,8 @@
   flex: 1 1 0;
   gap: 0.375rem;
   align-items: center;
-  min-inline-size: 0;
+  /* The avatar and the first few letters of the name always show. */
+  min-inline-size: 5rem;
   /*
    * Clip sideways only, so the avatar's tag can hang below the row. The tag is
    * wider than the avatar, so the padding leaves room for it on the left.

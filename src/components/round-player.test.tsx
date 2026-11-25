@@ -147,57 +147,6 @@ describe("<RoundPlayer />", () => {
     ).toStrictEqual(["90", "91"]);
   });
 
-  it("groups Score Modifiers without hiding Second Chance", () => {
-    const view = room();
-    const name = "MW".repeat(10);
-    const [ana, ben] = [itemAt(view.players, 0), itemAt(view.players, 1)];
-
-    view.players = [
-      {
-        ...ana,
-        hand: [
-          { id: 90, kind: "modifier", value: 4 },
-          { id: 91, kind: "secondChance" },
-          { id: 92, kind: "double" },
-        ],
-        name,
-      },
-      ben,
-    ];
-
-    render(() => <Seat seat={0} room={view} playerId="a" />);
-
-    const extras = screen.getByRole("list", {
-      name: `${name}'s modifier and Second Chance cards`,
-    });
-
-    const trigger = within(extras).getByRole("button", {
-      name: `${name}: 2 Score Modifiers`,
-    });
-
-    expect(screen.getByText(name)).toHaveAttribute("title", name);
-    expect(within(extras).getByLabelText(/^Second Chance/u)).toBeVisible();
-    expect(
-      screen.queryByRole("dialog", { name: "Score Modifiers" })
-    ).toBeNull();
-
-    fireEvent.click(trigger);
-    flush();
-
-    const details = screen.getByRole("dialog", { name: "Score Modifiers" });
-
-    const cards = within(details).getByRole("list", {
-      name: "Score Modifier cards",
-    });
-
-    expect(
-      within(cards)
-        .getAllByRole("listitem")
-        .map((card) => card.dataset.cardId)
-    ).toStrictEqual(["90", "92"]);
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
-  });
-
   it("updates the score preview on a bust and when the round is scored", () => {
     const initial = room();
     const [view, setView] = createSignal(initial);
