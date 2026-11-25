@@ -599,7 +599,12 @@
   }
 
   &
-    li:is([data-cue="flipSeven"], [data-cue="special"])
+    li:is(
+      [data-cue="flipSeven"],
+      [data-cue="flipThree"],
+      [data-cue="secondChance"],
+      [data-cue="special"]
+    )
     :is(.log-event-icon, .log-outcome) {
     color: var(--accent);
   }

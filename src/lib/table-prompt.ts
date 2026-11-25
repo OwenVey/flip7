@@ -1,6 +1,6 @@
 import { cardLabel } from "../game/cards";
 import type { Card } from "../game/cards";
-import { FLIP_THREE_COUNT } from "../game/engine";
+import { FLIP_THREE_COUNT, isChat } from "../game/engine";
 import type { Player } from "../game/engine";
 import { availableMoves } from "../game/moves";
 import type { AvailableMoves } from "../game/moves";
@@ -8,7 +8,7 @@ import type { RoomView } from "../game/protocol";
 import { stepPlayerId } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
 import { pointsOf } from "./deal-playback";
-import type { DealPlaybackView } from "./deal-playback";
+import type { DealPlaybackView, PlaybackMoment } from "./deal-playback";
 import { hostName } from "./host";
 import { nameOf } from "./player-name";
 import { rankPlayers } from "./standings";
@@ -49,7 +49,9 @@ export interface TablePrompt {
 export type PromptPlayback = Pick<
   DealPlaybackView,
   "dealing" | "step" | "roundPoints"
->;
+> & {
+  moment?: PlaybackMoment | null;
+};
 
 const NONE: PromptControls = { kind: "none" };
 const RECONNECT_NOTE = "Play resumes when a player reconnects.";
@@ -160,6 +162,8 @@ const roundEndHeadline = (room: RoomView) => {
 
 type Prompt = Omit<TablePrompt, "yours">;
 
+type PromptLines = Pick<TablePrompt, "headline" | "note">;
+
 const gameOverPrompt = (room: RoomView, moves: AvailableMoves) =>
   ({
     controls: moves.host.lobby
@@ -172,8 +176,20 @@ const gameOverPrompt = (room: RoomView, moves: AvailableMoves) =>
     winner: true,
   }) satisfies Prompt;
 
-const roundOverPrompt = (room: RoomView, moves: AvailableMoves) =>
-  ({
+const roundOverPrompt = (room: RoomView, moves: AvailableMoves) => {
+  const over = room.log.findLast(
+    (entry) =>
+      !isChat(entry) &&
+      entry.round === room.round &&
+      entry.event.type === "roundOver"
+  );
+
+  const tiedAt =
+    over && !isChat(over) && over.event.type === "roundOver"
+      ? over.event.tiedAt
+      : null;
+
+  return {
     controls: moves.host.nextRound
       ? { kind: "nextRound" }
       : {
@@ -181,7 +197,11 @@ const roundOverPrompt = (room: RoomView, moves: AvailableMoves) =>
           text: `Waiting for ${hostName(room)} to start the next round.`,
         },
     headline: roundEndHeadline(room),
-  }) satisfies Prompt;
+    ...(tiedAt !== null && {
+      note: `Tied at ${tiedAt} — play another round`,
+    }),
+  } satisfies Prompt;
+};
 
 const choicePrompt = (
   room: RoomView,
@@ -288,12 +308,89 @@ const turnPrompt = (
   };
 };
 
+const stayNote = (points: number) =>
+  `+${points} ${points === 1 ? "point" : "points"}`;
+
+const momentPrompt = (
+  room: RoomView,
+  playerId: string | null,
+  moment: PlaybackMoment
+) => {
+  if (moment.kind === "reshuffle") {
+    return { headline: "Shuffling the discard pile…" } satisfies PromptLines;
+  }
+
+  if (moment.kind === "outOfCards") {
+    return { headline: "Deck empty", note: "Round over" } satisfies PromptLines;
+  }
+
+  const isMe = moment.playerId === playerId;
+  const name = nameOf(room, moment.playerId);
+
+  switch (moment.kind) {
+    case "flipSeven": {
+      return {
+        headline: isMe ? "You Flipped 7!" : `${name} Flipped 7!`,
+      } satisfies PromptLines;
+    }
+
+    case "bust": {
+      return {
+        headline: isMe ? "You busted!" : `${name} busted!`,
+      } satisfies PromptLines;
+    }
+
+    case "freeze": {
+      if (moment.byId === moment.playerId) {
+        return {
+          headline: isMe ? "You froze yourself!" : `${name} froze themselves!`,
+        } satisfies PromptLines;
+      }
+
+      return {
+        headline: isMe ? "You were frozen!" : `${name} was frozen!`,
+      } satisfies PromptLines;
+    }
+
+    case "stay": {
+      return {
+        headline: isMe ? "You stayed" : `${name} stayed`,
+        note: stayNote(moment.points),
+      } satisfies PromptLines;
+    }
+
+    case "saved": {
+      return {
+        headline: isMe
+          ? "Second Chance saves you!"
+          : `Second Chance saves ${name}!`,
+      } satisfies PromptLines;
+    }
+
+    case "secondChanceGiven": {
+      return {
+        headline: isMe
+          ? "You got a Second Chance!"
+          : `${name} got a Second Chance`,
+      } satisfies PromptLines;
+    }
+
+    default: {
+      return moment satisfies never;
+    }
+  }
+};
+
 const promptFor = (
   room: RoomView,
   playerId: string | null,
   moves: AvailableMoves,
-  { dealing, roundPoints, step }: PromptPlayback
+  { dealing, moment, roundPoints, step }: PromptPlayback
 ) => {
+  if (dealing && moment) {
+    return { controls: NONE, ...momentPrompt(room, playerId, moment) };
+  }
+
   if (room.phase === "gameOver") {
     return gameOverPrompt(room, moves);
   }

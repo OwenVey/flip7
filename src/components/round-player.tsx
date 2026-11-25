@@ -11,6 +11,7 @@ import type { AvailableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
+import type { PlaybackMoment } from "../lib/deal-playback";
 import { nameOf } from "../lib/player-name";
 import { scoreMeter } from "../lib/score-meter";
 import { pop } from "../lib/table-motion";
@@ -82,6 +83,8 @@ interface RoundPlayerProps {
   player: Player;
   playerId: string | null;
   moves: AvailableMoves;
+  dealing?: boolean;
+  dealMoment?: PlaybackMoment | null;
   dealStep?: DealStep | null;
   roundPoints: number;
   actionsDisabled?: boolean;
@@ -138,7 +141,9 @@ const RoundPlayer = (props: RoundPlayerProps) => {
   const isHost = () => props.room.hostId === props.player.id;
 
   const hasDecision = createMemo(
-    () => props.moves.waitingOn?.playerId === props.player.id
+    () =>
+      (props.dealMoment === undefined || props.dealMoment === null) &&
+      props.moves.waitingOn?.playerId === props.player.id
   );
 
   const canKick = createMemo(() =>
@@ -149,9 +154,11 @@ const RoundPlayer = (props: RoundPlayerProps) => {
 
   const isWinner = () =>
     props.room.phase === "gameOver" &&
+    props.dealing !== true &&
     props.room.winnerIds.includes(props.player.id);
 
   const pickKind = createMemo(() =>
+    props.dealing !== true &&
     props.moves.choice?.targets.includes(props.player.id) === true
       ? props.room.choice?.card.kind
       : undefined
@@ -206,7 +213,11 @@ const RoundPlayer = (props: RoundPlayerProps) => {
       data-winner={isWinner() ? "" : undefined}
       data-offline={props.player.connected ? undefined : ""}
       data-pickable={pickKind()}
-      data-unpickable={props.moves.choice && !pickKind() ? "" : undefined}
+      data-unpickable={
+        props.dealing !== true && props.moves.choice && !pickKind()
+          ? ""
+          : undefined
+      }
       aria-label={`${props.player.name}, ${props.player.score} points`}
     >
       <Show when={pickKind()}>

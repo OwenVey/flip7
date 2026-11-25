@@ -51,13 +51,37 @@ const gameAtFirstTurn = () => {
   return game;
 };
 
-const playback = (animate = true, playerId = "a") => {
+const wait = async (ms: number, signal: AbortSignal) => {
+  if (ms <= 0) {
+    return;
+  }
+
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+
+  const done = () => {
+    resolve(undefined);
+  };
+
+  const timer = setTimeout(done, ms);
+  signal.addEventListener("abort", done, { once: true });
+  await promise;
+  clearTimeout(timer);
+  signal.removeEventListener("abort", done);
+};
+
+const playback = (
+  animate = true,
+  playerId = "a",
+  delays: { landMs?: number; reshuffleMs?: number } = {}
+) => {
   let shown = initialDealPlayback;
   let motionEnabled = animate;
+  let reshuffles = 0;
   const cues: RoomCue[] = [];
   const haptics: (HapticOutcome | "turn")[] = [];
   const readinessAtTurnCue: boolean[] = [];
   const flights: { cardId: number; duration: number }[] = [];
+  const lands: number[] = [];
   const steps: DealStep[] = [];
 
   const motion: DealMotion = {
@@ -65,20 +89,16 @@ const playback = (animate = true, playerId = "a") => {
     captureFlight: (step, duration) => async (signal) => {
       flights.push({ cardId: step.card.id, duration });
       steps.push(step);
-      const { promise, resolve } = Promise.withResolvers<undefined>();
-
-      const done = () => {
-        resolve(undefined);
-      };
-
-      const timer = setTimeout(done, duration);
-      signal.addEventListener("abort", done, { once: true });
-      await promise;
-      clearTimeout(timer);
-      signal.removeEventListener("abort", done);
+      await wait(duration, signal);
     },
-    land: async () => {},
-    reshuffle: () => {},
+    land: async (step, _discardDuration, signal) => {
+      lands.push(step.card.id);
+      await wait(delays.landMs ?? 0, signal);
+    },
+    reshuffle: async (signal) => {
+      reshuffles += 1;
+      await wait(delays.reshuffleMs ?? 0, signal);
+    },
     sweep: async () => {},
   };
 
@@ -87,8 +107,10 @@ const playback = (animate = true, playerId = "a") => {
     (frame) => {
       shown = frame;
     },
-    (cue) => {
-      cues.push(cue);
+    (cue, audible = true) => {
+      if (audible) {
+        cues.push(cue);
+      }
 
       if (cue === "turn") {
         readinessAtTurnCue.push(shown.myMove && !shown.actionsDisabled);
@@ -104,7 +126,11 @@ const playback = (animate = true, playerId = "a") => {
     cues,
     flights,
     haptics,
+    lands,
     readinessAtTurnCue,
+    get reshuffles() {
+      return reshuffles;
+    },
     setMotion: (enabled: boolean) => {
       motionEnabled = enabled;
       instance.syncMotion(true);
@@ -200,6 +226,44 @@ describe(createDealPlayback, () => {
     expect(table.haptics).toStrictEqual(["freeze"]);
   });
 
+  it("lets Freeze settle before alerting the next player in a two-player game", async () => {
+    const game = gameAtFirstTurn();
+    game.deck = [freeze];
+    hit(game, "a", random);
+    const table = playback(true, "b");
+    table.show(view(game));
+
+    choose(game, "a", "a", random);
+    const frozen = view(game);
+    table.show(frozen);
+    await vi.advanceTimersByTimeAsync(320);
+
+    expect(table.shown).toMatchObject({
+      actionsDisabled: true,
+      myMove: false,
+      room: frozen,
+    });
+    expect({ cues: table.cues, haptics: table.haptics }).toStrictEqual({
+      cues: ["reveal", "freeze"],
+      haptics: [],
+    });
+
+    table.show({ ...frozen, spectatorCount: 1 });
+    await vi.advanceTimersByTimeAsync(519);
+    expect(table.cues).toStrictEqual(["reveal", "freeze"]);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(table.shown).toMatchObject({
+      actionsDisabled: false,
+      myMove: true,
+      room: { spectatorCount: 1 },
+    });
+    expect({ cues: table.cues, haptics: table.haptics }).toStrictEqual({
+      cues: ["reveal", "freeze", "turn"],
+      haptics: ["turn"],
+    });
+  });
+
   it("celebrates once when the same Flip 7 also wins the game", () => {
     const game = gameAtFirstTurn();
     const [player] = game.players;
@@ -257,6 +321,21 @@ describe(createDealPlayback, () => {
     table.show(view(game), true, 2);
     expect(table.haptics).toStrictEqual(["turn"]);
   });
+
+  it.each([true, false])(
+    "plays one normal reveal for keeping a Second Chance with motion %s",
+    async (animate) => {
+      const game = gameAtFirstTurn();
+      const table = playback(animate, "b");
+      table.show(view(game));
+      game.deck = [{ id: 1006, kind: "secondChance" }];
+      hit(game, "a", random);
+      table.show(view(game));
+      await vi.runAllTimersAsync();
+
+      expect(table.cues).toStrictEqual(["reveal", "turn"]);
+    }
+  );
 
   it("reveals a landed choice before cueing its usable move", async () => {
     const game = gameAtFirstTurn();
@@ -344,7 +423,7 @@ describe(createDealPlayback, () => {
     expect(table.shown.roundPoints.get("a")).toBe(0);
   });
 
-  it("reveals a 16-player opening deal in 2240 ms", async () => {
+  it("reveals a 16-player opening deal in 2380 ms", async () => {
     const game = gameAtFirstTurn();
     const playerCount = 16;
 
@@ -365,7 +444,7 @@ describe(createDealPlayback, () => {
     table.show(before);
     table.show(after);
 
-    await vi.advanceTimersByTimeAsync(2239);
+    await vi.advanceTimersByTimeAsync(2379);
     expect(table.shown.actionsDisabled).toBeTruthy();
     expect(table.flights).toHaveLength(playerCount);
 
@@ -500,6 +579,7 @@ describe(createDealPlayback, () => {
     expect(table.shown).toStrictEqual({
       actionsDisabled: false,
       dealing: false,
+      moment: null,
       myMove: true,
       room: latest,
       roundPoints: new Map([
@@ -556,10 +636,10 @@ describe(createDealPlayback, () => {
       dealing: false,
       room: choice,
     });
-    expect(table.cues).toStrictEqual(["turn", "reveal", "turn"]);
+    expect(table.cues).toStrictEqual(["turn", "reveal"]);
   });
 
-  it("cues a fresh choice once across retries, rejoin and target changes", () => {
+  it("keeps the Freeze choice quiet across retries, rejoin and target changes", () => {
     const game = gameAtFirstTurn();
     const table = playback(false);
     const first = view(game);
@@ -581,7 +661,9 @@ describe(createDealPlayback, () => {
 
     table.show({ ...choice, choice: { ...prompt, options: ["b"] } });
 
-    expect(table.cues).toStrictEqual(["turn", "reveal", "turn"]);
+    expect(table.shown.myMove).toBeTruthy();
+    expect(table.readinessAtTurnCue).toStrictEqual([true, true]);
+    expect(table.cues).toStrictEqual(["turn", "reveal"]);
     expect(table.flights).toStrictEqual([]);
   });
 
@@ -610,7 +692,7 @@ describe(createDealPlayback, () => {
     expect(table.shown.myMove).toBeTruthy();
   });
 
-  it("cues a fresh turn when the Room is waiting on the same player again", () => {
+  it("keeps successive Hits quiet when the same player remains active", () => {
     const game = gameAtFirstTurn();
     game.deck = [freeze];
     hit(game, "a", random);
@@ -621,9 +703,12 @@ describe(createDealPlayback, () => {
     game.deck = [number];
     hit(game, "a", random);
     table.show(view(game));
+    game.deck = [{ id: 1005, kind: "number", value: 8 }];
+    hit(game, "a", random);
+    table.show(view(game));
 
     expect(table.shown.myMove).toBeTruthy();
-    expect(table.cues).toStrictEqual(["turn", "reveal", "turn"]);
+    expect(table.cues).toStrictEqual(["turn", "reveal", "reveal"]);
   });
 
   it("allows the host to move for an offline player without a personal cue", () => {
@@ -716,6 +801,498 @@ describe(createDealPlayback, () => {
       room: newRoom,
     });
     expect(table.cues).toStrictEqual(["turn"]);
+  });
+
+  it("lets Flip 7 celebrate before opening gameOver and fires win afterward", async () => {
+    const game = gameAtFirstTurn();
+    const [player] = game.players;
+
+    if (player === undefined) {
+      throw new Error("Expected Ada at the table");
+    }
+
+    player.score = game.settings.targetScore - 1;
+    player.hand = Array.from({ length: 6 }, (_, value) => ({
+      id: 1100 + value,
+      kind: "number",
+      value,
+    }));
+
+    const winner = playback();
+    const loser = playback(true, "b");
+    winner.show(view(game));
+    loser.show(view(game));
+    winner.cues.length = 0;
+
+    game.deck = [number];
+    hit(game, "a", random);
+    const over = view(game);
+    winner.show(over);
+    loser.show(over);
+
+    await vi.advanceTimersByTimeAsync(320);
+    expect({
+      dealing: winner.shown.dealing,
+      haptics: winner.haptics,
+      loserCues: loser.cues,
+      moment: winner.shown.moment,
+      winnerCues: winner.cues,
+    }).toStrictEqual({
+      dealing: true,
+      haptics: ["celebrate"],
+      loserCues: ["reveal", "flipSeven"],
+      moment: { kind: "flipSeven", playerId: "a" },
+      winnerCues: ["reveal", "flipSeven"],
+    });
+
+    await vi.advanceTimersByTimeAsync(1399);
+    expect(winner.cues).toStrictEqual(["reveal", "flipSeven"]);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect({
+      dealing: winner.shown.dealing,
+      haptics: winner.haptics,
+      loserCues: loser.cues,
+      moment: winner.shown.moment,
+      winnerCues: winner.cues,
+    }).toStrictEqual({
+      dealing: false,
+      haptics: ["celebrate"],
+      loserCues: ["reveal", "flipSeven", "lose"],
+      moment: null,
+      winnerCues: ["reveal", "flipSeven", "win"],
+    });
+  });
+
+  it("lets Bust settle before alerting the next player", async () => {
+    const game = gameAtFirstTurn();
+    const table = playback(true, "b");
+    table.show(view(game));
+
+    game.deck = [{ id: 1005, kind: "number", value: 5 }];
+    hit(game, "a", random);
+    table.show(view(game));
+
+    await vi.advanceTimersByTimeAsync(320);
+    expect({
+      cues: table.cues,
+      dealing: table.shown.dealing,
+      moment: table.shown.moment,
+      myMove: table.shown.myMove,
+    }).toStrictEqual({
+      cues: ["reveal", "bust"],
+      dealing: true,
+      moment: { kind: "bust", playerId: "a" },
+      myMove: false,
+    });
+
+    await vi.advanceTimersByTimeAsync(639);
+    expect(table.cues).toStrictEqual(["reveal", "bust"]);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect({
+      cues: table.cues,
+      dealing: table.shown.dealing,
+      moment: table.shown.moment,
+      myMove: table.shown.myMove,
+    }).toStrictEqual({
+      cues: ["reveal", "bust", "turn"],
+      dealing: false,
+      moment: null,
+      myMove: true,
+    });
+  });
+
+  it("paces consecutive Stays sequentially instead of stacking bank cues", async () => {
+    const game = gameAtFirstTurn();
+    addPlayer(game, "c", "Cat", 1);
+    game.phase = "roundOver";
+    game.round = 0;
+    game.dealerIndex = 1;
+    game.deck = [
+      { id: 1003, kind: "number", value: 4 },
+      { id: 1002, kind: "number", value: 3 },
+      { id: 1001, kind: "number", value: 5 },
+    ];
+    nextRound(game, "a", random);
+
+    const table = playback(true, "c");
+    table.show(view(game));
+
+    stay(game, "a", random);
+    table.show(view(game));
+    stay(game, "b", random);
+    table.show(view(game));
+
+    expect({
+      cues: table.cues,
+      dealing: table.shown.dealing,
+      moment: table.shown.moment,
+    }).toStrictEqual({
+      cues: ["bank"],
+      dealing: true,
+      moment: { kind: "stay", playerId: "a", points: 5 },
+    });
+
+    await vi.advanceTimersByTimeAsync(460);
+    expect({
+      cues: table.cues,
+      dealing: table.shown.dealing,
+      moment: table.shown.moment,
+    }).toStrictEqual({
+      cues: ["bank", "bank"],
+      dealing: true,
+      moment: { kind: "stay", playerId: "b", points: 3 },
+    });
+
+    await vi.advanceTimersByTimeAsync(460);
+    expect({
+      cues: table.cues,
+      dealing: table.shown.dealing,
+      moment: table.shown.moment,
+      myMove: table.shown.myMove,
+    }).toStrictEqual({
+      cues: ["bank", "bank", "turn"],
+      dealing: false,
+      moment: null,
+      myMove: true,
+    });
+  });
+
+  it("holds a Second Chance duplicate, plays secondChance on discard, and keeps it in Flip Three", async () => {
+    const game = gameAtFirstTurn();
+    const [player] = game.players;
+
+    if (player === undefined) {
+      throw new Error("Expected Ada at the table");
+    }
+
+    player.hand.push({ id: 1005, kind: "secondChance" });
+    const table = playback(true, "b");
+    table.show(view(game));
+
+    game.deck = [{ id: 1006, kind: "number", value: 5 }];
+    hit(game, "a", random);
+    table.show(view(game));
+
+    await vi.advanceTimersByTimeAsync(280);
+    expect({ cues: table.cues, lands: table.lands }).toStrictEqual({
+      cues: ["reveal"],
+      lands: [],
+    });
+
+    await vi.advanceTimersByTimeAsync(320);
+    expect({ cues: table.cues, lands: table.lands }).toStrictEqual({
+      cues: ["reveal", "secondChance"],
+      lands: [1006],
+    });
+
+    await vi.advanceTimersByTimeAsync(450);
+    expect(table.cues).toStrictEqual(["reveal", "secondChance", "turn"]);
+
+    const flipGame = gameAtFirstTurn();
+    const [ada] = flipGame.players;
+
+    if (ada === undefined) {
+      throw new Error("Expected Ada at the table");
+    }
+
+    ada.hand.push({ id: 2005, kind: "secondChance" });
+    flipGame.deck = [{ id: 2006, kind: "flipThree" }];
+    hit(flipGame, "a", random);
+    const flipTable = playback(true, "b");
+    flipTable.show(view(flipGame));
+
+    flipGame.deck = [
+      { id: 2009, kind: "number", value: 4 },
+      { id: 2008, kind: "number", value: 4 },
+      { id: 2007, kind: "number", value: 5 },
+    ];
+    choose(flipGame, "a", "a", random);
+    flipTable.show(view(flipGame));
+
+    await vi.runAllTimersAsync();
+    expect(flipTable.cues).toStrictEqual([
+      "flipThree",
+      "reveal",
+      "secondChance",
+      "reveal",
+      "reveal",
+      "bust",
+      "turn",
+    ]);
+  });
+
+  it("shuffles the deck before flying the next card and does not replay shuffle", async () => {
+    const game = gameAtFirstTurn();
+    game.discard = [number];
+    game.deck = [];
+    const table = playback(true, "b", { reshuffleMs: 480 });
+    table.show(view(game));
+
+    hit(game, "a", random);
+    table.show(view(game));
+
+    expect({
+      cues: table.cues,
+      flights: table.flights,
+      moment: table.shown.moment,
+      reshuffles: table.reshuffles,
+    }).toStrictEqual({
+      cues: ["shuffle"],
+      flights: [],
+      moment: { kind: "reshuffle" },
+      reshuffles: 1,
+    });
+
+    await vi.advanceTimersByTimeAsync(479);
+    expect(table.flights).toStrictEqual([]);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect({
+      flights: table.flights,
+      moment: table.shown.moment,
+    }).toStrictEqual({
+      flights: [{ cardId: number.id, duration: 280 }],
+      moment: null,
+    });
+
+    await vi.runAllTimersAsync();
+    expect(table.cues).toStrictEqual(["shuffle", "reveal", "turn"]);
+  });
+
+  it("plays flipThree when Flip Three activates and pauses before the first flip", async () => {
+    const game = gameAtFirstTurn();
+    const flipThree = { id: 1005, kind: "flipThree" } as const;
+    game.deck = [flipThree];
+    hit(game, "a", random);
+
+    const table = playback(true, "b");
+    table.show(view(game));
+
+    game.deck = [
+      { id: 1008, kind: "number", value: 8 },
+      { id: 1007, kind: "number", value: 6 },
+      { id: 1006, kind: "number", value: 4 },
+    ];
+    choose(game, "a", "b", random);
+    table.show(view(game));
+
+    await vi.advanceTimersByTimeAsync(280);
+    expect({ cues: table.cues, flights: table.flights }).toStrictEqual({
+      cues: ["flipThree"],
+      flights: [{ cardId: flipThree.id, duration: 280 }],
+    });
+
+    await vi.advanceTimersByTimeAsync(199);
+    expect(table.flights).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(table.flights).toHaveLength(2);
+
+    await vi.runAllTimersAsync();
+    expect(table.cues).toStrictEqual([
+      "flipThree",
+      "reveal",
+      "reveal",
+      "reveal",
+      "turn",
+    ]);
+  });
+
+  it("holds a non-local action card choice visible before a queued target flies", async () => {
+    const game = gameAtFirstTurn();
+    const table = playback(true, "b");
+    table.show(view(game));
+
+    game.deck = [freeze];
+    hit(game, "a", random);
+    const choiceRoom = view(game);
+    table.show(choiceRoom);
+
+    choose(game, "a", "b", random);
+    table.show(view(game));
+
+    await vi.advanceTimersByTimeAsync(280);
+    expect({
+      cues: table.cues,
+      dealing: table.shown.dealing,
+      flights: table.flights,
+      room: table.shown.room,
+    }).toStrictEqual({
+      cues: ["reveal"],
+      dealing: false,
+      flights: [{ cardId: freeze.id, duration: 280 }],
+      room: choiceRoom,
+    });
+
+    await vi.advanceTimersByTimeAsync(379);
+    expect(table.flights).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(table.flights).toHaveLength(2);
+  });
+
+  it("settles a mid-batch Freeze before discarding a queued Flip Three", async () => {
+    const game = gameAtFirstTurn();
+    addPlayer(game, "c", "Cat", 1);
+    game.phase = "roundOver";
+    game.round = 0;
+    game.dealerIndex = 1;
+    const heldFreeze = { id: 1010, kind: "freeze" } as const;
+    const heldFlip = { id: 1011, kind: "flipThree" } as const;
+    game.deck = [
+      { id: 1003, kind: "number", value: 8 },
+      { id: 1002, kind: "number", value: 3 },
+      { id: 1001, kind: "number", value: 5 },
+    ];
+    nextRound(game, "a", random);
+    game.deck = [
+      { id: 1012, kind: "number", value: 11 },
+      heldFlip,
+      heldFreeze,
+      { id: 1009, kind: "number", value: 1 },
+      { id: 1008, kind: "flipThree" },
+    ];
+    hit(game, "a", random);
+    choose(game, "a", "c", random);
+    choose(game, "c", "b", random);
+
+    const table = playback(true, "a");
+    table.show(view(game));
+
+    choose(game, "c", "b", random);
+    table.show(view(game));
+
+    await vi.advanceTimersByTimeAsync(320);
+    expect({
+      benStatus: table.shown.room?.players[1]?.status,
+      cues: table.cues,
+      flights: table.flights,
+      lands: table.lands,
+      moment: table.shown.moment,
+    }).toStrictEqual({
+      benStatus: "frozen",
+      cues: ["reveal", "freeze"],
+      flights: [{ cardId: heldFreeze.id, duration: 280 }],
+      lands: [heldFreeze.id],
+      moment: { byId: "c", kind: "freeze", playerId: "b" },
+    });
+
+    await vi.advanceTimersByTimeAsync(519);
+    expect(table.flights).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(table.flights).toHaveLength(2);
+
+    await vi.advanceTimersByTimeAsync(580);
+    expect({ cues: table.cues, lands: table.lands }).toStrictEqual({
+      cues: ["reveal", "freeze", "reveal"],
+      lands: [heldFreeze.id, heldFlip.id],
+    });
+  });
+
+  it("holds an extra Second Chance before discarding and settles a Second Chance gift", async () => {
+    const game = gameAtFirstTurn();
+    const [ada, ben] = game.players;
+
+    if (!(ada && ben)) {
+      throw new Error("Expected Ada and Ben at the table");
+    }
+
+    ada.hand.push({ id: 1005, kind: "secondChance" });
+    ben.hand.push({ id: 1006, kind: "secondChance" });
+
+    const table = playback(true, "b");
+    table.show(view(game));
+    game.deck = [{ id: 1007, kind: "secondChance" }];
+    hit(game, "a", random);
+    table.show(view(game));
+
+    await vi.advanceTimersByTimeAsync(280);
+    expect({ cues: table.cues, lands: table.lands }).toStrictEqual({
+      cues: ["reveal"],
+      lands: [],
+    });
+
+    await vi.advanceTimersByTimeAsync(300);
+    expect(table.lands).toStrictEqual([1007]);
+
+    const giftGame = gameAtFirstTurn();
+    const [giftAda] = giftGame.players;
+
+    if (!giftAda) {
+      throw new Error("Expected Ada at the table");
+    }
+
+    giftAda.hand.push({ id: 2005, kind: "secondChance" });
+    const giftTable = playback(true, "b");
+    giftTable.show(view(giftGame));
+    giftGame.deck = [{ id: 2006, kind: "secondChance" }];
+    hit(giftGame, "a", random);
+    giftTable.show(view(giftGame));
+
+    await vi.advanceTimersByTimeAsync(320);
+    expect({
+      cues: giftTable.cues,
+      moment: giftTable.shown.moment,
+    }).toStrictEqual({
+      cues: ["reveal"],
+      moment: { kind: "secondChanceGiven", playerId: "b" },
+    });
+
+    await vi.advanceTimersByTimeAsync(320);
+    expect(giftTable.cues).toStrictEqual(["reveal", "turn"]);
+  });
+
+  it("lets Freeze settle before playing the gameOver finale", async () => {
+    const game = gameAtFirstTurn();
+    const [ada] = game.players;
+
+    if (!ada) {
+      throw new Error("Expected Ada at the table");
+    }
+
+    ada.score = game.settings.targetScore;
+    stay(game, "a", random);
+
+    const winner = playback(true, "a");
+    const loser = playback(true, "b");
+    winner.show(view(game));
+    loser.show(view(game));
+    loser.cues.length = 0;
+
+    game.deck = [freeze];
+    hit(game, "b", random);
+    const over = view(game);
+    winner.show(over);
+    loser.show(over);
+
+    await vi.advanceTimersByTimeAsync(320);
+    expect({
+      dealing: winner.shown.dealing,
+      loserCues: loser.cues,
+      moment: winner.shown.moment,
+      winnerCues: winner.cues,
+    }).toStrictEqual({
+      dealing: true,
+      loserCues: ["reveal", "freeze"],
+      moment: { byId: "b", kind: "freeze", playerId: "b" },
+      winnerCues: ["reveal", "freeze"],
+    });
+
+    await vi.advanceTimersByTimeAsync(520);
+    expect({
+      dealing: winner.shown.dealing,
+      loserCues: loser.cues,
+      moment: winner.shown.moment,
+      winnerCues: winner.cues,
+    }).toStrictEqual({
+      dealing: false,
+      loserCues: ["reveal", "freeze", "lose"],
+      moment: null,
+      winnerCues: ["reveal", "freeze", "win"],
+    });
   });
 });
 

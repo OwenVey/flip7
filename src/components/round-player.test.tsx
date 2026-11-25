@@ -13,6 +13,7 @@ import { calculateRoundScore } from "../game/cards";
 import { availableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { pointsOf, roundPointsFor } from "../lib/deal-playback";
+import type { PlaybackMoment } from "../lib/deal-playback";
 import type { RoomConnection } from "../lib/room-connection";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
@@ -523,5 +524,95 @@ describe("<RoundPlayer />", () => {
     expect(
       screen.getByRole("button", { name: "Freeze yourself" })
     ).toBeEnabled();
+  });
+
+  it("suppresses turn rings, target highlights, winner badges, and confetti while settling", () => {
+    const [dealing, setDealing] = createSignal(true);
+
+    const [moment, setMoment] = createSignal<PlaybackMoment | null>({
+      kind: "bust",
+      playerId: "b",
+    });
+
+    const [view, setView] = createSignal(room({ turnId: "a" }));
+
+    const { container } = render(() => (
+      <Table
+        room={view()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={chatControls()}
+        typing={[]}
+        dealing={dealing()}
+        dealMoment={moment()}
+      />
+    ));
+
+    const ana = screen.getByRole("article", { name: "Ana, 40 points" });
+    const ben = screen.getByRole("article", { name: "Ben, 12 points" });
+
+    expect(ana).not.toHaveAttribute("data-turn");
+    expect(screen.getByText("Ben busted!")).toBeVisible();
+
+    setMoment(null);
+    setDealing(false);
+    flush();
+    expect(ana).toHaveAttribute("data-turn");
+
+    setDealing(true);
+    setMoment({ kind: "flipSeven", playerId: "b" });
+    setView(room({ phase: "gameOver", turnId: null, winnerIds: ["b"] }));
+    flush();
+
+    expect({
+      confetti: container.querySelector(".confetti") !== null,
+      winner: Object.hasOwn(ben.dataset, "winner"),
+    }).toStrictEqual({ confetti: false, winner: false });
+
+    setMoment(null);
+    setDealing(false);
+    flush();
+
+    expect({
+      confetti: container.querySelector(".confetti") !== null,
+      winner: Object.hasOwn(ben.dataset, "winner"),
+    }).toStrictEqual({ confetti: true, winner: true });
+  });
+
+  it("suppresses seat pickability while cards are still dealing", () => {
+    const [dealing, setDealing] = createSignal(true);
+
+    const choice = {
+      card: { id: 9, kind: "freeze" as const },
+      chooserId: "a",
+      options: ["b"],
+    };
+
+    render(() => (
+      <Table
+        room={room({ choice })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={chatControls()}
+        typing={[]}
+        dealing={dealing()}
+      />
+    ));
+
+    const ana = screen.getByRole("article", { name: "Ana, 40 points" });
+    const ben = screen.getByRole("article", { name: "Ben, 12 points" });
+
+    expect({
+      anaUnpickable: Object.hasOwn(ana.dataset, "unpickable"),
+      benPickable: Object.hasOwn(ben.dataset, "pickable"),
+    }).toStrictEqual({ anaUnpickable: false, benPickable: false });
+
+    setDealing(false);
+    flush();
+
+    expect({
+      anaUnpickable: Object.hasOwn(ana.dataset, "unpickable"),
+      benPickable: ben.dataset.pickable,
+    }).toStrictEqual({ anaUnpickable: true, benPickable: "freeze" });
   });
 });

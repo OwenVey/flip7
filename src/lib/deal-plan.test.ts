@@ -294,4 +294,47 @@ describe(dealFrame, () => {
     expect(frame.players.map((player) => player.hand)).toStrictEqual([[], []]);
     expect(frame.turnId).toBeNull();
   });
+
+  it("applies a landed Freeze before discarding a queued Flip Three", () => {
+    const state = setup(["a", "b", "c"], [num(5), num(3), num(8)]);
+    const heldFreeze = freeze();
+    const heldFlip = flipThree();
+    rig(state, [flipThree(), num(1), heldFreeze, heldFlip, num(11)]);
+    hit(state, "a", random);
+    choose(state, "a", "c", random);
+    choose(state, "c", "b", random);
+    const before = view(state);
+    choose(state, "c", "b", random);
+    const after = view(state);
+    const steps = planDeal(before, after);
+
+    expect(dealFrame(before, after, steps, 1).players[1]?.status).toBe(
+      "active"
+    );
+    expect(
+      dealFrame(before, after, steps, 1, { landed: true }).players[1]?.status
+    ).toBe("frozen");
+    expect(dealFrame(before, after, steps, 2).players[1]?.status).toBe(
+      "frozen"
+    );
+  });
+
+  it("applies a landed Bust before discarding held Flip Three actions", () => {
+    const state = setup(["a", "b"], [num(5), num(3)]);
+    rig(state, [flipThree(), freeze(), num(3), num(9)]);
+    hit(state, "a", random);
+    const before = view(state);
+    choose(state, "a", "b", random);
+    const after = view(state);
+    const steps = planDeal(before, after);
+    const landed = dealFrame(before, after, steps, 3, { landed: true });
+
+    expect(landed.players[1]).toMatchObject({
+      bustCard: { kind: "number", value: 3 },
+      status: "busted",
+    });
+    expect(dealFrame(before, after, steps, 4).players[1]?.status).toBe(
+      "busted"
+    );
+  });
 });

@@ -379,6 +379,22 @@ const complete = (
   frame.held = frame.held.filter((entry) => entry.card.id !== step.card.id);
 };
 
+const settleStep = (seats: Map<string, Seat>, step: DealStep) => {
+  if (step.to.kind === "bust") {
+    const seat = seats.get(step.to.playerId);
+
+    if (seat) {
+      seat.player = { ...seat.player, status: "busted" };
+    }
+  } else if (step.to.kind === "hand" && step.card.kind === "freeze") {
+    const seat = seats.get(step.to.playerId);
+
+    if (seat) {
+      seat.player = { ...seat.player, status: "frozen" };
+    }
+  }
+};
+
 export const stepPlayerId = (step: DealStep) =>
   step.to.kind === "choice" ? null : step.to.playerId;
 
@@ -391,7 +407,8 @@ export const dealFrame = (
   previous: RoomView,
   current: RoomView,
   steps: DealStep[],
-  shown: number
+  shown: number,
+  options?: { landed?: boolean }
 ) => {
   const newRound = roundStarted(previous, current);
   const before = new Map(previous.players.map((seat) => [seat.id, seat]));
@@ -429,6 +446,9 @@ export const dealFrame = (
 
     if (index < shown - 1) {
       complete(seats, frame, step);
+      settleStep(seats, step);
+    } else if (options?.landed === true) {
+      settleStep(seats, step);
     }
   }
 
