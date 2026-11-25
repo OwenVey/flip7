@@ -21,6 +21,7 @@
 
   & h1 {
     min-width: 0;
+    white-space: nowrap;
   }
 
   & .row {
@@ -144,5 +145,12 @@
     & .watcher-count-short {
       display: inline;
     }
+  }
+}
+
+/* The narrowest phones set the heading a step smaller, so "Round 12" stays on one line beside the buttons. */
+@container table-header (width < 20rem) {
+  .table-header h1 {
+    font-size: 1.5rem;
   }
 }

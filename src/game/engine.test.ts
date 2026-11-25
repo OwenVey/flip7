@@ -787,6 +787,17 @@ describe(chat, () => {
     });
   });
 
+  it("cuts a long message between emoji, never inside one", () => {
+    const state = createGame();
+    addPlayer(state, "a", "Ana", 1);
+
+    chat(state, "a", "👍🏽".repeat(CHAT_MAX_LENGTH + 1));
+
+    expect(state.log.at(-1)).toMatchObject({
+      text: "👍🏽".repeat(CHAT_MAX_LENGTH),
+    });
+  });
+
   it("only accepts messages from players in the room", () => {
     const state = createGame();
 

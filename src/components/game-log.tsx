@@ -171,6 +171,7 @@ const PlayerName = (props: { player: LogPlayer; class?: string }) => {
     <button
       type="button"
       class={["log-name", props.class]}
+      dir="auto"
       title={props.player.name}
       aria-pressed={spotlight.has(props.player.id) ? "true" : "false"}
       onClick={() => {

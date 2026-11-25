@@ -282,7 +282,7 @@ describe(tablePrompt, () => {
           kind: "waitForHost",
           text: "Waiting for Ana to play again or head back to the lobby.",
         },
-        headline: "Ana and Ben wins!",
+        headline: "Ana and Ben win!",
         winner: true,
         yours: false,
       },
@@ -301,6 +301,36 @@ describe(tablePrompt, () => {
       name: "announces the winner even while the last cards play back",
       play: dealing(step()),
       view: room({ phase: "gameOver", turnId: null, winnerIds: ["b"] }),
+      viewer: "a",
+    },
+    {
+      expected: {
+        controls: { canStart: true, kind: "gameOver" },
+        headline: "Cleo wins!",
+        winner: true,
+        yours: false,
+      },
+      name: "names a winner who has left the room",
+      play: playback(),
+      view: room({
+        log: [
+          {
+            at: 0,
+            event: {
+              player: { id: "c", name: "Cleo" },
+              points: 205,
+              scores: [],
+              type: "gameWon",
+            },
+            game: 1,
+            id: 2,
+            round: 1,
+          },
+        ],
+        phase: "gameOver",
+        turnId: null,
+        winnerIds: ["c"],
+      }),
       viewer: "a",
     },
     {

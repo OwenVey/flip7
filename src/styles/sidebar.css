@@ -380,7 +380,7 @@
       flex: 0 1 auto;
       grid-template-rows: auto minmax(0, 1fr);
       min-block-size: 0;
-      max-block-size: 50%;
+      max-block-size: 40%;
     }
 
     & .leaderboard {
@@ -412,7 +412,7 @@
     & .log {
       flex: 1 1 15rem;
       grid-template-rows: auto auto minmax(0, 1fr) auto;
-      min-block-size: min(10rem, 100%);
+      min-block-size: min(15rem, 100%);
     }
 
     & .log-scroll {

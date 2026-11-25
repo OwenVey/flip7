@@ -349,6 +349,31 @@ describe("<Table />", () => {
     expect(scores).toHaveFocus();
   });
 
+  it.each([
+    { layout: "beside the table", sheet: false },
+    { layout: "in the sheet", sheet: true },
+  ])("renders the Chat & Log once when it shows $layout", ({ sheet }) => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+    vi.stubGlobal("matchMedia", () => ({ matches: sheet }));
+
+    try {
+      render(() => (
+        <Table
+          room={room()}
+          playerId="a"
+          send={vi.fn<RoomConnection["send"]>()}
+          chat={chatControls()}
+          typing={[]}
+        />
+      ));
+      flush();
+
+      expect(document.querySelectorAll(".log-scroll")).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("opens the Scores sheet once per round end and lists busted players", async () => {
     // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
     vi.stubGlobal("matchMedia", (query: string) => ({

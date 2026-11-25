@@ -127,7 +127,11 @@ const Leaderboard = (
                   >
                     <td>{entry().rank}</td>
                     <th scope="row">
-                      <span class="leaderboard-name">
+                      <span
+                        class="leaderboard-name"
+                        dir="auto"
+                        title={entry().player.name}
+                      >
                         {entry().player.name}
                       </span>
                       <Show when={id === props.playerId}>

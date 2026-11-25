@@ -12,7 +12,7 @@ import type { DealPlaybackView } from "./deal-playback";
 import { hostName } from "./host";
 import type { PlaybackMoment } from "./playback-moments";
 import { nameOf } from "./player-name";
-import { rankPlayers } from "./standings";
+import { rankPlayers, winnerNames } from "./standings";
 
 /**
  * Which controls the action bar offers alongside the Table prompt: Hit and
@@ -165,6 +165,11 @@ type Prompt = Omit<TablePrompt, "yours">;
 
 type PromptLines = Pick<TablePrompt, "headline" | "note">;
 
+const winnersHeadline = (names: string[]) =>
+  names.length > 1
+    ? `${names.join(" and ")} win!`
+    : `${names[0] ?? "Someone"} wins!`;
+
 const gameOverPrompt = (room: RoomView, moves: AvailableMoves) =>
   ({
     controls: moves.host.lobby
@@ -173,7 +178,7 @@ const gameOverPrompt = (room: RoomView, moves: AvailableMoves) =>
           kind: "waitForHost",
           text: `Waiting for ${hostName(room)} to play again or head back to the lobby.`,
         },
-    headline: `${room.winnerIds.map((id) => nameOf(room, id)).join(" and ")} wins!`,
+    headline: winnersHeadline(winnerNames(room)),
     winner: true,
   }) satisfies Prompt;
 

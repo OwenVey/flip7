@@ -22,7 +22,7 @@ import {
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import { hostName } from "../lib/host";
-import { rankPlayers } from "../lib/standings";
+import { finalStandings } from "../lib/standings";
 import PlayerAvatar from "./player-avatar";
 import ScrollFade from "./scroll-fade";
 import Tooltip from "./tooltip";
@@ -104,7 +104,7 @@ export default function GameOverDialog(props: {
     };
   });
 
-  const standings = createMemo(() => rankPlayers(props.room.players));
+  const standings = createMemo(() => finalStandings(props.room));
 
   const winnerIds = createMemo(() => new Set(props.room.winnerIds));
 
@@ -196,9 +196,18 @@ export default function GameOverDialog(props: {
                   }
                 >
                   <span class="game-over-rank">{entry().rank}</span>
-                  <PlayerAvatar player={entry().player} />
+                  <Show
+                    when={!entry().player.left}
+                    fallback={<span class="avatar" aria-hidden="true" />}
+                  >
+                    <PlayerAvatar player={entry().player} />
+                  </Show>
                   <span class="game-over-name">
-                    <span class="game-over-name-text">
+                    <span
+                      class="game-over-name-text"
+                      dir="auto"
+                      title={entry().player.name}
+                    >
                       {entry().player.name}
                     </span>
                     <Show when={entry().player.id === props.playerId}>
@@ -210,6 +219,10 @@ export default function GameOverDialog(props: {
                       <span class="badge" data-tone="bot">
                         Bot
                       </span>
+                    </Show>
+                    <Show when={entry().player.left}>
+                      {" "}
+                      <span class="badge">Left</span>
                     </Show>
                   </span>
                   <FinalScore

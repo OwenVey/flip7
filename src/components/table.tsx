@@ -1,7 +1,14 @@
 import Trophy from "@lucide/solid/icons/trophy";
 import { createAlertDialogController } from "@ui-sdk/solid/alert-dialog";
 import { createPopoverController } from "@ui-sdk/solid/popover";
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onSettled,
+  Show,
+} from "solid-js";
 
 import { availableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
@@ -92,6 +99,23 @@ export default function Table(
     }
   );
 
+  const [sheetTable, setSheetTable] = createSignal(false);
+
+  onSettled(() => {
+    const query = globalThis.matchMedia?.(SHEET_TABLE_QUERY);
+
+    const sync = () => {
+      setSheetTable(query?.matches);
+    };
+
+    sync();
+    query?.addEventListener?.("change", sync);
+
+    return () => {
+      query?.removeEventListener?.("change", sync);
+    };
+  });
+
   const [scoresOpen, setScoresOpen] = createSignal(false);
   const [logOpenedAt, setLogOpenedAt] = createSignal<number | null>();
 
@@ -161,6 +185,7 @@ export default function Table(
               chat={chat()}
               players={props.room.players}
               typing={props.typing}
+              logInSheet={sheetTable()}
             />
             <InviteButton brief collapsible />
             <Show when={moves().host.configure}>
@@ -258,13 +283,15 @@ export default function Table(
                 />
               </ScrollFade>
             </section>
-            <GameLog
-              log={props.room.log}
-              playerId={props.playerId}
-              chat={chat()}
-              players={props.room.players}
-              typing={props.typing}
-            />
+            <Show when={!sheetTable()}>
+              <GameLog
+                log={props.room.log}
+                playerId={props.playerId}
+                chat={chat()}
+                players={props.room.players}
+                typing={props.typing}
+              />
+            </Show>
           </div>
         </div>
         <div class="flight-layer" data-flight-layer="" aria-hidden="true" />

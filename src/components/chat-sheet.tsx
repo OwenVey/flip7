@@ -31,6 +31,11 @@ export default function ChatSheet(
     /** Set with `onOpenChange` when the page also needs to close the sheet. */
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
+    /**
+     * False while the page shows the log elsewhere, so a long log isn't
+     * rendered twice. The sheet still mounts it whenever it is open.
+     */
+    logInSheet?: boolean;
   }
 ) {
   const [ownOpen, setOwnOpen] = createSignal(false);
@@ -112,13 +117,15 @@ export default function ChatSheet(
           class="chat-sheet-body"
           data-agent-hidden={open() ? undefined : ""}
         >
-          <ChatLog
-            reads={reads}
-            inSheet
-            chat={props.chat}
-            players={props.players}
-            typing={props.typing}
-          />
+          <Show when={props.logInSheet !== false || open()}>
+            <ChatLog
+              reads={reads}
+              inSheet
+              chat={props.chat}
+              players={props.players}
+              typing={props.typing}
+            />
+          </Show>
         </div>
       </DrawerContent>
     </Drawer>

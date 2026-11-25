@@ -1,0 +1,21 @@
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/**
+ * Cuts text to at most `max` characters as people see them, so an emoji
+ * sequence or an accented letter is never split in half.
+ */
+export const clipText = (text: string, max: number) => {
+  let clipped = "";
+  let count = 0;
+
+  for (const { segment } of graphemes.segment(text)) {
+    if (count === max) {
+      break;
+    }
+
+    clipped += segment;
+    count += 1;
+  }
+
+  return clipped;
+};

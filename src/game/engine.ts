@@ -30,6 +30,7 @@ import { nameKey, sameName } from "./names";
 import type { Player, RoundStatus } from "./player";
 import { DEFAULT_SETTINGS } from "./settings";
 import type { RoomSettings } from "./settings";
+import { clipText } from "./text";
 
 export { MAX_PLAYERS } from "./moves";
 
@@ -227,7 +228,11 @@ const getPlayer = (state: GameState, id: string) => {
 
 export const chat = (state: GameState, playerId: string, raw: string) => {
   const player = getPlayer(state, playerId);
-  const text = raw.replaceAll(WHITESPACE, " ").trim().slice(0, CHAT_MAX_LENGTH);
+
+  const text = clipText(
+    raw.replaceAll(WHITESPACE, " ").trim(),
+    CHAT_MAX_LENGTH
+  );
 
   if (text === "") {
     throw new GameError("Type a message first.");
