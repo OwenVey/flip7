@@ -198,7 +198,9 @@ export default function GameOverDialog(props: {
                   <span class="game-over-rank">{entry().rank}</span>
                   <PlayerAvatar player={entry().player} />
                   <span class="game-over-name">
-                    {entry().player.name}
+                    <span class="game-over-name-text">
+                      {entry().player.name}
+                    </span>
                     <Show when={entry().player.id === props.playerId}>
                       {" "}
                       <span class="badge">You</span>
