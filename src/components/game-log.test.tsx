@@ -147,7 +147,7 @@ describe("<GameLog />", () => {
       bubbles.map((row) => ({
         continuation: Object.hasOwn(row.dataset, "continuation"),
         own: Object.hasOwn(row.dataset, "own"),
-        author: row.querySelector("strong")?.textContent ?? null,
+        author: row.querySelector(".log-author")?.textContent ?? null,
       }))
     ).toStrictEqual([
       { continuation: false, own: true, author: "Owen" },
@@ -390,6 +390,58 @@ describe("<GameLog />", () => {
     }
   });
 
+  it("counts unread chat on the sheet's Chat filter while scrolled up", async () => {
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
+    });
+
+    try {
+      const entry = {
+        about: [],
+        at: Date.now(),
+        game: 1,
+        round: 1,
+        id: 1,
+        text: "Round 1 begins. Ben deals.",
+      };
+
+      const [log, setLog] = createSignal<LogEntry[]>([entry]);
+
+      render(() => (
+        <GameLog
+          inSheet
+          log={log()}
+          playerId="a"
+          players={players}
+          typing={[]}
+        />
+      ));
+      const viewport = screen.getByRole("log");
+      Object.defineProperties(viewport, {
+        clientHeight: { value: 200 },
+        scrollHeight: { value: 500 },
+      });
+      viewport.scrollTop = 300;
+      fireEvent.scroll(viewport);
+      vi.advanceTimersToNextFrame();
+      viewport.scrollTop = 100;
+      fireEvent.scroll(viewport);
+      vi.advanceTimersToNextFrame();
+      await Promise.resolve();
+      flush();
+
+      setLog([entry, { ...entry, from: ben, id: 2, text: "gl" }]);
+      flush();
+
+      expect(
+        screen.getByRole("radio", { name: "Chat, 1 unread" })
+      ).toHaveTextContent("Chat1");
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps round headings over chat in the Chat filter", () => {
     const log = twoRounds();
     log.push({
@@ -458,6 +510,28 @@ describe("<GameLog />", () => {
     flush();
 
     expect(screen.queryByText("Highlighting")).toBeNull();
+  });
+
+  it("highlights a player's lines when their chat name is tapped", () => {
+    render(() => (
+      <GameLog log={twoRounds()} playerId="a" players={players} typing={[]} />
+    ));
+    fireEvent.click(screen.getByRole("radio", { name: "Chat" }));
+    flush();
+
+    const author = screen.getByRole("button", { name: "Ben" });
+    fireEvent.click(author);
+    flush();
+
+    expect({
+      highlighting: screen.getByText("Highlighting").textContent,
+      pressed: author.getAttribute("aria-pressed"),
+      spotlit: rowTexts("spotlit"),
+    }).toStrictEqual({
+      highlighting: "Highlighting Ben",
+      pressed: "true",
+      spotlit: ["Benouch"],
+    });
   });
 
   it("counts characters near the limit and reports typing until the draft is cleared", () => {

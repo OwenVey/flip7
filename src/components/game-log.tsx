@@ -106,10 +106,10 @@ const eventIcons = {
   "user-plus": UserPlus,
 } satisfies Record<EventIconKey, typeof Flame>;
 
-const LogTime = (props: { at: number; now: () => number }) => {
+const LogTime = (props: { at: number; now: number }) => {
   const time = createMemo(() => new Date(props.at));
 
-  const label = createMemo(() => timeLabel(time(), props.now()), {
+  const label = createMemo(() => timeLabel(time(), props.now), {
     equals: (a, b) => a.long === b.long && a.short === b.short,
   });
 
@@ -124,11 +124,11 @@ const LogTime = (props: { at: number; now: () => number }) => {
   );
 };
 
-const oldGameMinute = (entry: LogEntry | undefined, now: () => number) => {
+const oldGameMinute = (entry: LogEntry | undefined, now: number) => {
   if (
     entry === undefined ||
     entry.from !== undefined ||
-    entry.at > now() - HOUR_MS
+    entry.at > now - HOUR_MS
   ) {
     return null;
   }
@@ -250,7 +250,7 @@ const GameEvent = (props: {
   hasRoundHeading: boolean;
   previous: LogEntry | undefined;
   showTime: boolean;
-  now: () => number;
+  now: number;
   spotlight: Spotlight;
 }) => {
   const copy = createMemo(
@@ -325,14 +325,26 @@ const ChatMessage = (props: {
   author: NonNullable<LogEntry["from"]>;
   entry: LogEntry;
   continuation: boolean;
-  now: () => number;
+  now: number;
+  spotlight: Spotlight;
 }) => (
   <>
     <Show when={!props.continuation}>
       <div class="log-message-header">
         <span class="log-author-line">
           <PlayerAvatar player={props.author} size="sm" />
-          <strong class="log-author">{props.author.name}</strong>
+          <button
+            type="button"
+            class="log-name log-author"
+            aria-pressed={
+              props.spotlight.player?.id === props.author.id ? "true" : "false"
+            }
+            onClick={() => {
+              props.spotlight.toggle(props.author);
+            }}
+          >
+            {props.author.name}
+          </button>
         </span>
         <LogTime at={props.entry.at} now={props.now} />
       </div>
@@ -432,7 +444,7 @@ const LogRound = (props: {
   playerId: string | null;
   newFrom: number | undefined;
   spotlight: Spotlight;
-  now: () => number;
+  now: number;
 }) => {
   const [open, setOpen] = createSignal(false);
   const collapsed = () => props.collapsible && !open();
@@ -525,6 +537,7 @@ const LogRound = (props: {
                     entry={entry()}
                     continuation={continuation()}
                     now={props.now}
+                    spotlight={props.spotlight}
                   />
                 )}
               </Show>
@@ -654,7 +667,8 @@ export default function GameLog(props: {
       : 0
   );
 
-  const hiddenChats = () => (filter() === "Game" ? unreadChats() : 0);
+  const filterChats = () =>
+    props.inSheet === true || filter() === "Game" ? unreadChats() : 0;
 
   const scroll = createScrollAreaController();
 
@@ -770,15 +784,15 @@ export default function GameLog(props: {
             <SegmentedControlItem
               value={option}
               aria-label={
-                option === "Chat" && hiddenChats() > 0
-                  ? `Chat, ${hiddenChats()} unread`
+                option === "Chat" && filterChats() > 0
+                  ? `Chat, ${filterChats()} unread`
                   : undefined
               }
             >
               {option}
-              <Show when={option === "Chat" && hiddenChats() > 0}>
+              <Show when={option === "Chat" && filterChats() > 0}>
                 <span class="log-unread" aria-hidden="true">
-                  {hiddenChats()}
+                  {filterChats()}
                 </span>
               </Show>
             </SegmentedControlItem>
@@ -827,7 +841,7 @@ export default function GameLog(props: {
                           playerId={props.playerId}
                           newFrom={newFrom()}
                           spotlight={spotlight}
-                          now={now}
+                          now={now()}
                         />
                       )}
                     </For>

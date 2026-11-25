@@ -1,6 +1,7 @@
 import * as v from "valibot";
 
 import { projectActionCards } from "./action-card-resolution";
+import { isAvatar } from "./avatars";
 import { DRAW_LIMIT, LOG_LIMIT } from "./engine";
 import type { DrawEvent, GameState, HeldCard, LogEntry } from "./engine";
 import { MAX_SPECTATORS } from "./moves";
@@ -145,6 +146,8 @@ const ListUpdateSchema = v.looseObject({
 
 const nonNegativeInteger = v.pipe(v.number(), v.integer(), v.minValue(0));
 
+const LATEST_DATE_MS = 8_640_000_000_000_000;
+
 const logPlayerFields = {
   id: v.pipe(v.string(), v.nonEmpty()),
   name: v.pipe(v.string(), v.nonEmpty(), v.maxLength(NAME_MAX_LENGTH)),
@@ -155,12 +158,15 @@ const LogEntrySchema = v.pipe(
     about: v.array(
       v.object({ ...logPlayerFields, offset: nonNegativeInteger })
     ),
-    at: nonNegativeInteger,
+    at: v.pipe(nonNegativeInteger, v.maxValue(LATEST_DATE_MS)),
     cue: v.optional(
       v.picklist(["bank", "bust", "flipSeven", "freeze", "join", "special"])
     ),
     from: v.optional(
-      v.object({ ...logPlayerFields, avatar: v.nullable(v.number()) })
+      v.object({
+        ...logPlayerFields,
+        avatar: v.nullable(v.custom<number>(isAvatar)),
+      })
     ),
     game: nonNegativeInteger,
     id: nonNegativeInteger,

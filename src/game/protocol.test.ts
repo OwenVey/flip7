@@ -102,6 +102,9 @@ describe(parseServerMessage, () => {
     { about: [{ id: "a", name: "", offset: 0 }] },
     { about: [{ id: "a", name: "Ana", offset: 1 }] },
     { scores: [{ id: "a", name: "Ana", points: "5" }] },
+    { at: 8_640_000_000_000_001 },
+    { from: { avatar: 26, id: "a", name: "Ana" } },
+    { from: { avatar: 0, id: "a", name: "Ana" } },
   ])("rejects corrupt log data %j", (changes) => {
     const message = state();
     const { log } = message.lists;
@@ -115,6 +118,26 @@ describe(parseServerMessage, () => {
         })
       )
     ).toBeNull();
+  });
+
+  it("accepts a chat entry with an avatar, or none for a bot", () => {
+    const message = state();
+    const { log } = message.lists;
+    const [entry] = log.entries;
+
+    const entries = [
+      { ...entry, from: { avatar: 25, id: "a", name: "Ana" }, id: 90 },
+      { ...entry, from: { avatar: null, id: "b", name: "Ben" }, id: 91 },
+    ];
+
+    expect(
+      parseServerMessage(
+        JSON.stringify({
+          ...message,
+          lists: { ...message.lists, log: { ...log, entries } },
+        })
+      )
+    ).not.toBeNull();
   });
 
   it.each([
