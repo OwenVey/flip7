@@ -82,32 +82,30 @@ export default function RoomSettingsForm(props: {
         </Field>
       </Show>
 
-      <Show when={hasBots(props.room)}>
-        <Field class="setting">
-          <FieldLabel>Bot speed</FieldLabel>
-          <SegmentedControl
-            value={props.room.settings.botSpeed}
-            readOnly={props.readOnly}
-            onValueChange={(next, details) => {
-              details.cancel();
-              const botSpeed = BOT_SPEEDS.find((speed) => speed === next);
+      <Field class="setting">
+        <FieldLabel>Bot speed</FieldLabel>
+        <SegmentedControl
+          value={props.room.settings.botSpeed}
+          readOnly={props.readOnly}
+          onValueChange={(next, details) => {
+            details.cancel();
+            const botSpeed = BOT_SPEEDS.find((speed) => speed === next);
 
-              if (botSpeed !== undefined) {
-                props.onChange({ botSpeed });
-              }
-            }}
-          >
-            <SegmentedControlIndicator />
-            <For each={BOT_SPEEDS}>
-              {(speed) => (
-                <SegmentedControlItem value={speed}>
-                  {BOT_SPEED_LABELS[speed]}
-                </SegmentedControlItem>
-              )}
-            </For>
-          </SegmentedControl>
-        </Field>
-      </Show>
+            if (botSpeed !== undefined) {
+              props.onChange({ botSpeed });
+            }
+          }}
+        >
+          <SegmentedControlIndicator />
+          <For each={BOT_SPEEDS}>
+            {(speed) => (
+              <SegmentedControlItem value={speed}>
+                {BOT_SPEED_LABELS[speed]}
+              </SegmentedControlItem>
+            )}
+          </For>
+        </SegmentedControl>
+      </Field>
 
       <Field class="setting">
         <div class="setting-copy">
