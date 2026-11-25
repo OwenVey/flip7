@@ -4,7 +4,8 @@ import * as entrypoint from "./worker" with { type: "cf-worker" };
 
 const gameWorker = defineWorker({
   assets: {
-    runWorkerFirst: ["/", "!/.env", "!/.git/*", "!/config.php"],
+    // WARNING: run_worker_first needs a non-negative rule; "/" already reaches the Worker.
+    runWorkerFirst: ["/", "!/.*", "!/*/.*"],
   },
   compatibilityDate: "2026-07-22",
   compatibilityFlags: ["nodejs_compat"],
