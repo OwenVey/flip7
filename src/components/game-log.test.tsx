@@ -1,7 +1,7 @@
 import { expectNoDiagnostics } from "@solidjs/diagnostics";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LogEntry } from "../game/engine";
 import { captureScenario } from "../test/diagnostics";
@@ -60,6 +60,9 @@ const rowTexts = (has?: string) =>
     .filter((row) => has === undefined || Object.hasOwn(row.dataset, has))
     .map(withoutTimes);
 
+const isContinuation = (text: string) =>
+  screen.getByText(text).closest("li")?.dataset.continuation !== undefined;
+
 const charCount = () => screen.queryByText(/^\d+\/200$/u);
 
 const stayed = (index: number) =>
@@ -69,7 +72,7 @@ describe("<GameLog />", () => {
   afterEach(cleanup);
 
   it("tells spectators why they can't chat", () => {
-    render(() => <GameLog log={entries(1)} playerId={null} />);
+    render(() => <GameLog phase="playing" log={entries(1)} playerId={null} />);
 
     expect(screen.queryByRole("textbox", { name: "Chat message" })).toBeNull();
     expect(screen.getByText("Join as a player to chat.")).toBeInTheDocument();
@@ -89,7 +92,7 @@ describe("<GameLog />", () => {
       { at: now + 64_000, from: guest, text: "Still here." },
     ].map((entry, index) => ({ ...entry, game: 1, id: index + 1, round: 1 }));
 
-    render(() => <GameLog log={log} playerId={own.id} />);
+    render(() => <GameLog phase="playing" log={log} playerId={own.id} />);
 
     const bubbles = screen
       .getAllByRole("listitem")
@@ -115,6 +118,7 @@ describe("<GameLog />", () => {
     const sent: string[] = [];
     render(() => (
       <GameLog
+        phase="playing"
         log={[]}
         playerId="p0"
         onChat={(text) => {
@@ -168,7 +172,14 @@ describe("<GameLog />", () => {
   });
 
   it("folds a finished round into a summary that keeps its chat", () => {
-    render(() => <GameLog log={twoRounds()} playerId="a" players={players} />);
+    render(() => (
+      <GameLog
+        phase="playing"
+        log={twoRounds()}
+        playerId="a"
+        players={players}
+      />
+    ));
 
     const toggle = screen.getByRole("button", { name: "Round 1" });
 
@@ -199,6 +210,105 @@ describe("<GameLog />", () => {
       ],
       summary: undefined,
     });
+
+    const panel = toggle
+      .closest(".log-group")
+      ?.querySelector('[data-slot="collapsible-panel"]');
+
+    expect(panel).toHaveTextContent("Ana stayed");
+    expect(toggle).toHaveAttribute("aria-controls", panel?.id);
+  });
+
+  it("makes the last round foldable as soon as it finishes", () => {
+    const [phase, setPhase] = createSignal<
+      "playing" | "roundOver" | "gameOver"
+    >("playing");
+
+    render(() => <GameLog phase={phase()} log={twoRounds()} playerId="a" />);
+
+    expect(screen.queryByRole("button", { name: "Round 2" })).toBeNull();
+    setPhase("roundOver");
+    flush();
+
+    const toggle = screen.getByRole("button", { name: "Round 2" });
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Ben +30")).toBeVisible();
+    setPhase("gameOver");
+    flush();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("keeps a chat run split by an event even when the event is hidden", () => {
+    const log: LogEntry[] = [
+      {
+        at: 1000,
+        game: 1,
+        id: 1,
+        from: ben,
+        round: 1,
+        text: "First",
+      },
+      { at: 2000, game: 1, id: 2, round: 1, text: "Room unlocked." },
+      { at: 3000, game: 1, id: 3, from: ben, round: 1, text: "Second" },
+    ];
+
+    render(() => <GameLog phase="roundOver" log={log} playerId="a" />);
+
+    expect(isContinuation("Second")).toBeFalsy();
+    fireEvent.click(screen.getByRole("radio", { name: "Chat" }));
+    flush();
+    expect(isContinuation("Second")).toBeFalsy();
+  });
+
+  it("puts the New marker above a folded round with the first unread event", async () => {
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
+    });
+
+    try {
+      const entry = {
+        at: Date.now(),
+        game: 1,
+        round: 1,
+        id: 1,
+        text: "Round 1 begins. Ben deals.",
+      };
+
+      const [log, setLog] = createSignal<LogEntry[]>([entry]);
+
+      render(() => <GameLog phase="playing" log={log()} playerId="a" />);
+      const viewport = screen.getByRole("log");
+      Object.defineProperties(viewport, {
+        clientHeight: { value: 200 },
+        scrollHeight: { value: 500 },
+      });
+      viewport.scrollTop = 300;
+      fireEvent.scroll(viewport);
+      vi.advanceTimersToNextFrame();
+      viewport.scrollTop = 100;
+      fireEvent.scroll(viewport);
+      vi.advanceTimersToNextFrame();
+      await Promise.resolve();
+      flush();
+
+      setLog([
+        entry,
+        { ...entry, id: 2, text: "Round 1 is over." },
+        { ...entry, id: 3, round: 2, text: "Round 2 begins. Ana deals." },
+      ]);
+      flush();
+
+      expect(
+        screen.getByRole("button", { name: "Jump to latest · 2 new" })
+      ).toBeVisible();
+
+      const marker = screen.getByText("New").parentElement;
+      expect(marker?.nextElementSibling).toHaveTextContent("Round 1");
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
   });
 
   it("keeps round headings over chat in the Chat filter", () => {
@@ -211,7 +321,9 @@ describe("<GameLog />", () => {
       round: 2,
       text: "gg",
     });
-    render(() => <GameLog log={log} playerId="a" players={players} />);
+    render(() => (
+      <GameLog phase="playing" log={log} playerId="a" players={players} />
+    ));
 
     fireEvent.click(screen.getByRole("radio", { name: "Chat" }));
     flush();
@@ -225,7 +337,14 @@ describe("<GameLog />", () => {
   });
 
   it("tints your own events and shows cards and points as chips", () => {
-    render(() => <GameLog log={twoRounds()} playerId="b" players={players} />);
+    render(() => (
+      <GameLog
+        phase="playing"
+        log={twoRounds()}
+        playerId="b"
+        players={players}
+      />
+    ));
     fireEvent.click(screen.getByRole("button", { name: "Round 1" }));
     flush();
 
@@ -240,7 +359,14 @@ describe("<GameLog />", () => {
   });
 
   it("highlights a player's lines when their name is tapped", () => {
-    render(() => <GameLog log={twoRounds()} playerId="a" players={players} />);
+    render(() => (
+      <GameLog
+        phase="playing"
+        log={twoRounds()}
+        playerId="a"
+        players={players}
+      />
+    ));
     fireEvent.click(screen.getByRole("button", { name: "Round 1" }));
     flush();
 
@@ -268,6 +394,7 @@ describe("<GameLog />", () => {
     let typed = 0;
     render(() => (
       <GameLog
+        phase="playing"
         log={[]}
         playerId="a"
         players={players}
@@ -299,7 +426,9 @@ describe("<GameLog />", () => {
   it("keeps existing events quiet when a new snapshot repeats them", async () => {
     const [log, setLog] = createSignal(entries(2));
 
-    render(() => <GameLog log={log()} playerId="p0" onChat={() => true} />);
+    render(() => (
+      <GameLog phase="playing" log={log()} playerId="p0" onChat={() => true} />
+    ));
 
     const first = stayed(0);
 

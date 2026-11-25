@@ -12,7 +12,7 @@ import {
 import type { SnapPoint } from "@ui-sdk/solid/drawer";
 import { createSignal, Show, untrack } from "solid-js";
 
-import type { LogEntry } from "../game/engine";
+import type { LogEntry, Phase } from "../game/engine";
 import { countChatsAfter } from "../lib/game-log-entries";
 import GameLog, { CHAT_AND_GAME_LOG_TITLE } from "./game-log";
 import Tooltip from "./tooltip";
@@ -28,6 +28,7 @@ const SNAP_POINTS: SnapPoint[] = [HALF, "content"];
  */
 export default function ChatSheet(props: {
   log: LogEntry[];
+  phase: Phase;
   playerId: string | null;
   onChat?: ((text: string) => boolean) | undefined;
   players?: readonly { id: string; name: string }[];
@@ -119,6 +120,7 @@ export default function ChatSheet(props: {
           <GameLog
             inSheet
             log={props.log}
+            phase={props.phase}
             playerId={props.playerId}
             onChat={props.onChat}
             players={props.players}

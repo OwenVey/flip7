@@ -39,7 +39,7 @@ const hasTraffic = (links: Map<string, Link>) =>
     (link) => link.toServer.length > 0 || link.toClient.length > 0
   );
 
-const network = () => {
+const network = (supportsTyping = true) => {
   let linkCount = 0;
   let idCount = 0;
   const connections = new Map<string, ServerConnection>();
@@ -98,7 +98,12 @@ const network = () => {
         }
       },
       reply: (message) => {
-        sender?.toClient.push(message);
+        if (!supportsTyping && message.type === "welcome") {
+          const { supportsTyping: _supportsTyping, ...welcome } = message;
+          sender?.toClient.push(welcome);
+        } else {
+          sender?.toClient.push(message);
+        }
       },
     });
   };
@@ -375,6 +380,17 @@ describe("typing through the room client", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("only sends chat to a room that has not advertised typing", () => {
+    const net = network(false);
+    const ana = net.join("Ana");
+
+    ana.client.typing();
+    expect(ana.client.chat("hi")).toBeTruthy();
+    expect(ana.link?.toServer.map(parseClientMessage)).toStrictEqual([
+      { type: "chat", text: "hi" },
+    ]);
   });
 
   it("shows a player typing to everyone else until they send", () => {

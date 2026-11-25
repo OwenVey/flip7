@@ -124,6 +124,7 @@
 /* One base for every button-like part, so neighbors always match. Change looks with data-variant, size with data-size. */
 :is(
   [data-slot="button"],
+  [data-slot="collapsible-trigger"],
   [data-slot="alert-dialog-trigger"],
   [data-slot="alert-dialog-close"],
   [data-slot="dialog-trigger"],

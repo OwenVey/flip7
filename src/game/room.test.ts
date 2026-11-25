@@ -172,6 +172,7 @@ describe("joining a room", () => {
     expect(welcomeOf(outcome)).toStrictEqual({
       lastRequestId: undefined,
       playerId: "id-1",
+      supportsTyping: true,
       token: "id-2",
       type: "welcome",
     });

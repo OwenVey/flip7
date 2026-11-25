@@ -146,6 +146,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   let wasVisible = false;
   const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
   let typingSentAt: number | null = null;
+  let supportsTyping = false;
 
   const update = (patch: Partial<Omit<RoomClientState, "canAct">>) => {
     const next = { ...state, ...patch };
@@ -236,6 +237,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     seatedPlayerId = null;
     lastRequestId = undefined;
     awaitingWelcome = false;
+    supportsTyping = false;
     typingSentAt = null;
     clearTyping();
 
@@ -412,6 +414,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
       case "welcome": {
         awaitingWelcome = false;
+        supportsTyping = message.supportsTyping === true;
         deps.token.set(message.token);
         deps.watchPreference.set(false);
         synced = false;
@@ -571,6 +574,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       const now = Date.now();
 
       if (
+        !supportsTyping ||
         !state.online ||
         !state.ready ||
         (typingSentAt !== null && now - typingSentAt < TYPING_SEND_MS)

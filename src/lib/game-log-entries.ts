@@ -8,6 +8,8 @@ export const HOUR_MS = 60 * MINUTE_MS;
 export const continuesChat = (entry: LogEntry, previous?: LogEntry) =>
   entry.from !== undefined &&
   previous?.from?.id === entry.from.id &&
+  previous.game === entry.game &&
+  previous.round === entry.round &&
   entry.at - previous.at < MINUTE_MS;
 
 export const countChatsAfter = (
@@ -95,21 +97,21 @@ const cueIcons = {
 type DetailSpec =
   | { text: string }
   | { card: string; label: string }
-  | { points: string };
+  | { points: string; player: string };
 
 type EventRule = [RegExp, string, (readonly DetailSpec[])?, EventIconKey?];
 
 export type EventDetail =
   | { kind: "text"; text: string }
   | { kind: "card"; label: string; number: number }
-  | { kind: "points"; points: number };
+  | { kind: "points"; player: string; points: number };
 
 export const eventCopy = {
   bank: [
     [
       /^(?<player>.+) stayed and banked (?<points>\d+) points?\.$/u,
       "$<player> stayed",
-      [{ points: "$<points>" }],
+      [{ player: "$<player>", points: "$<points>" }],
     ],
   ],
   bust: [
@@ -126,12 +128,12 @@ export const eventCopy = {
     [
       /^(?<player>.+) played Freeze on themselves and banked (?<points>\d+) points?\.$/u,
       "$<player> froze themselves",
-      [{ points: "$<points>" }],
+      [{ player: "$<player>", points: "$<points>" }],
     ],
     [
       /^(?<player>.+) played Freeze on (?<target>.+), who banked (?<points>\d+) points?\.$/u,
       "$<target> was frozen",
-      [{ points: "$<points>" }, { text: "by $<player>" }],
+      [{ player: "$<target>", points: "$<points>" }, { text: "by $<player>" }],
     ],
   ],
   special: [
@@ -180,6 +182,7 @@ const fillDetail = (text: string, pattern: RegExp, spec: DetailSpec) => {
   if ("points" in spec) {
     return {
       kind: "points",
+      player: fill(spec.player),
       points: Number(fill(spec.points)),
     } satisfies EventDetail;
   }
@@ -377,23 +380,22 @@ export const summarizeRound = (entries: readonly LogEntry[]) => {
 
     const copy = eventDetails(entry, false);
 
-    const subject = copy.players.find((name) => copy.outcome.startsWith(name));
+    const [player] = copy.players;
 
     if (entry.cue === "bust") {
       busts += 1;
     }
 
-    if (entry.cue === "flipSeven" && subject !== undefined) {
-      flipSevens.push(subject);
+    if (entry.cue === "flipSeven" && player !== undefined) {
+      flipSevens.push(player);
     }
 
     for (const detail of copy.details) {
       if (
         detail.kind === "points" &&
-        subject !== undefined &&
         (best === undefined || detail.points > best.points)
       ) {
-        best = { name: subject, points: detail.points };
+        best = { name: detail.player, points: detail.points };
       }
     }
   }

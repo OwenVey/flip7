@@ -250,6 +250,7 @@ export const createRoom = (
     reply({
       lastRequestId: stored.lastRequests[playerId],
       playerId,
+      supportsTyping: true,
       token,
       type: "welcome",
     });

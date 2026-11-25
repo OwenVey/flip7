@@ -186,6 +186,8 @@ export type ServerMessage =
   | {
       lastRequestId?: string;
       playerId: string;
+      /** Missing when the room Worker does not recognize typing pings. */
+      supportsTyping?: true;
       token: string;
       type: "welcome";
     }
@@ -343,11 +345,16 @@ export const parseServerMessage = (raw: string) => {
         return v.is(v.string(), message.playerId) ? message : null;
       }
 
+      case "welcome": {
+        return v.is(v.optional(v.literal(true)), message.supportsTyping)
+          ? message
+          : null;
+      }
+
       case "accepted":
       case "error":
       case "rejected":
-      case "watching":
-      case "welcome": {
+      case "watching": {
         return message;
       }
 

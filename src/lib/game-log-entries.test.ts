@@ -290,7 +290,8 @@ const messageFrom = (
   return entry;
 };
 
-const pts = (points: number) => ({ kind: "points", points }) as const;
+const pts = (points: number, player: string) =>
+  ({ kind: "points", player, points }) as const;
 
 const dupe = (number: number) =>
   ({ kind: "card", label: "duplicate", number }) as const;
@@ -333,12 +334,12 @@ describe("the engine's messages in the Chat & Log", () => {
     [
       "stayPoints",
       cuedEntry("bank"),
-      event("Ada stayed", ["Ada"], [pts(10)], "coins"),
+      event("Ada stayed", ["Ada"], [pts(10, "Ada")], "coins"),
     ],
     [
       "stayOnePoint",
       cuedEntry("bank"),
-      event("Ada stayed", ["Ada"], [pts(1)], "coins"),
+      event("Ada stayed", ["Ada"], [pts(1, "Ada")], "coins"),
     ],
     [
       "bust",
@@ -353,7 +354,7 @@ describe("the engine's messages in the Chat & Log", () => {
     [
       "freezeSelf",
       cuedEntry("freeze"),
-      event("Ada froze themselves", ["Ada"], [pts(5)], "snowflake"),
+      event("Ada froze themselves", ["Ada"], [pts(5, "Ada")], "snowflake"),
     ],
     [
       "freezeOther",
@@ -361,7 +362,7 @@ describe("the engine's messages in the Chat & Log", () => {
       event(
         "Bo was frozen",
         ["Ada", "Bo"],
-        [pts(3), words("by Ada")],
+        [pts(3, "Bo"), words("by Ada")],
         "snowflake"
       ),
     ],
@@ -729,6 +730,16 @@ describe(summarizeRound, () => {
         logEntry("Ada was dealt a duplicate 9 and busted.", { cue: "bust" }),
       ])
     ).toStrictEqual(["Cy +40", "Cy flipped 7", "2 busts"]);
+  });
+
+  it("credits the player frozen when their name starts with the Freeze player's name", () => {
+    expect(
+      summarizeRound([
+        logEntry("Alex played Freeze on Alexander, who banked 12 points.", {
+          cue: "freeze",
+        }),
+      ])
+    ).toStrictEqual(["Alexander +12"]);
   });
 
   it("says nothing for a round without scores", () => {
