@@ -27,6 +27,7 @@ import type { GameEvent, LogPlayer, Mover, OfflineMover } from "./game-events";
 import { MAX_PLAYERS, MIN_PLAYERS, rejectMove, waitingOn } from "./moves";
 import type { Move, PlayMove } from "./moves";
 import { nameKey, sameName } from "./names";
+import type { Player, RoundStatus } from "./player";
 import { DEFAULT_SETTINGS } from "./settings";
 import type { RoomSettings } from "./settings";
 
@@ -37,6 +38,8 @@ export { FLIP_THREE_COUNT } from "./action-card-resolution";
 export type { ActionCardChoice, HeldCard } from "./action-card-resolution";
 
 export type { GameEvent, LogPlayer } from "./game-events";
+
+export type { Player, RoundStatus } from "./player";
 
 /** The most log entries a room keeps. The log starts over each game, so this only guards against runaway chat. */
 export const LOG_LIMIT = 1000;
@@ -49,30 +52,6 @@ const WHITESPACE = /\s+/gu;
 export const PHASES = ["lobby", "playing", "roundOver", "gameOver"] as const;
 
 export type Phase = (typeof PHASES)[number];
-
-export type RoundStatus =
-  | "out"
-  | "active"
-  | "stayed"
-  | "frozen"
-  | "busted"
-  | "flipSeven";
-
-export interface Player {
-  id: string;
-  name: string;
-  score: number;
-  /** Bots are always connected. */
-  connected: boolean;
-  /** Set on players the room plays itself. */
-  bot: boolean;
-  /** The avatar a person picked, or null for a bot. */
-  avatar: number | null;
-  status: RoundStatus;
-  hand: Card[];
-  bustCard: Card | null;
-  lastRound: RoundScore | null;
-}
 
 /**
  * What became of a drawn card: kept in the hand, busted the player, cancelled

@@ -87,10 +87,7 @@ export const roundStarted = (previous: RoomView, current: RoomView) =>
     current.round !== previous.round);
 
 /** The parts of the room view that are sent as new entries rather than in full. */
-export interface RoomLists {
-  dealHistory: DealEvent[];
-  log: LogEntry[];
-}
+export type RoomLists = Pick<RoomView, "dealHistory" | "log">;
 
 export type RoomListName = keyof RoomLists;
 

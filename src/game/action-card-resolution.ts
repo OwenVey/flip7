@@ -1,6 +1,6 @@
 import type { ActionCard, Card, HeldActionKind } from "./cards";
-import type { RoundStatus } from "./engine";
 import type { GameEvent, LogPlayer } from "./game-events";
+import type { RoundStatus } from "./player";
 
 export const FLIP_THREE_COUNT = 3;
 

@@ -62,13 +62,20 @@ export const buildDeck = () => {
 
 export type Random = () => number;
 
-export const shuffle = <T>(items: readonly T[], random: Random) => {
-  const result = [...items];
+export const shuffle = (cards: readonly Card[], random: Random) => {
+  const result = [...cards];
 
   for (let i = result.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
-    const picked = result.splice(j, 1, ...result.slice(i, i + 1));
-    result.splice(i, 1, ...picked);
+    const current = result[i];
+    const picked = result[j];
+
+    if (current === undefined || picked === undefined) {
+      throw new Error("Cannot shuffle a missing card.");
+    }
+
+    result[i] = picked;
+    result[j] = current;
   }
 
   return result;
@@ -85,18 +92,6 @@ export const isScoreModifierCard = (card: Card): card is ScoreModifierCard =>
 export const countUniqueNumberCards = (cards: readonly Card[]) =>
   new Set(cards.flatMap((card) => (card.kind === "number" ? [card.value] : [])))
     .size;
-
-/** How a player's round score adds up. */
-export interface RoundScore {
-  /** The sum of their Number cards, before ×2. */
-  numbers: number;
-  doubled: boolean;
-  /** The sum of their additive Score Modifier cards. */
-  modifiers: number;
-  /** Whether they earned the Flip 7 bonus. */
-  flipSeven: boolean;
-  total: number;
-}
 
 export const calculateRoundScore = (cards: readonly Card[]) => {
   let numberCardPoints = 0;
@@ -127,8 +122,15 @@ export const calculateRoundScore = (cards: readonly Card[]) => {
     modifiers: modifierPoints,
     numbers: numberCardPoints,
     total,
-  } satisfies RoundScore;
+  };
 };
+
+/**
+ * How a player's round score adds up. `numbers` is the Number subtotal before
+ * ×2, `modifiers` is the additive Score Modifier subtotal, and `flipSeven`
+ * indicates whether the player earned the Flip 7 bonus.
+ */
+export type RoundScore = ReturnType<typeof calculateRoundScore>;
 
 const KIND_LABELS = {
   modifier: "Score Modifier card",
