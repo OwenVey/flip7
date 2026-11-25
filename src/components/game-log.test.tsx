@@ -263,6 +263,24 @@ describe("<GameLog />", () => {
       toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
     });
 
+    const resizeCallbacks = new Map<Element, () => void>();
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Deliver layout changes that jsdom cannot measure.
+    vi.stubGlobal(
+      "ResizeObserver",
+      class extends ResizeObserver {
+        // oxlint-disable-next-line promise/prefer-await-to-callbacks -- ResizeObserver delivers a callback.
+        constructor(callback: ResizeObserverCallback) {
+          super(callback);
+          this.observe = (element) => {
+            resizeCallbacks.set(element, () => {
+              // oxlint-disable-next-line promise/prefer-await-to-callbacks -- Deliver the ResizeObserver notification.
+              callback([], this);
+            });
+          };
+        }
+      }
+    );
+
     try {
       render(() => (
         <GameLog log={twoRounds()} playerId="a" players={players} typing={[]} />
@@ -292,6 +310,7 @@ describe("<GameLog />", () => {
       fireEvent.scroll(viewport);
       vi.advanceTimersToNextFrame();
       flush();
+      resizeCallbacks.get(viewport)?.();
 
       expect(viewport.scrollTop).toBe(300);
       expect(area).not.toHaveAttribute("data-sticking");
@@ -305,6 +324,7 @@ describe("<GameLog />", () => {
       expect(area).toHaveAttribute("data-sticking");
     } finally {
       cleanup();
+      vi.unstubAllGlobals();
       vi.useRealTimers();
     }
   });
