@@ -180,13 +180,8 @@
   }
 }
 
-/* Side by side, the rules read first, left of Play. Phones keep Play on top. */
 .panel.home-guide {
   grid-template-rows: auto 1fr;
-
-  @media (--lg) {
-    order: -1;
-  }
 }
 
 /* When the guide is taller, Play's dividers share the extra height, split evenly above and below each. */

@@ -24,6 +24,7 @@ const GameLog = (props: {
   players: readonly LogPlayer[];
   typing: readonly string[];
   chat?: ChatControls;
+  round?: number;
 }) => {
   const chatLog = createRoomChatLog({
     chat: props.chat ?? chatControls(),
@@ -32,6 +33,7 @@ const GameLog = (props: {
     playerId: () => props.playerId,
     players: () => props.players,
     resultsRound: () => null,
+    round: () => props.round ?? props.log.at(-1)?.round ?? 0,
     typing: () => props.typing,
   });
 
@@ -357,8 +359,9 @@ describe("<GameLog />", () => {
     }
   });
 
-  it("makes the last round foldable as soon as it finishes", () => {
+  it("keeps the round that just finished unfolded until the next one starts", () => {
     const [log, setLog] = createSignal(twoRounds());
+    const [round, setRound] = createSignal(2);
 
     const settlement: LogEntry = {
       at: Date.now(),
@@ -376,7 +379,13 @@ describe("<GameLog />", () => {
     };
 
     render(() => (
-      <GameLog log={log()} playerId="a" players={players} typing={[]} />
+      <GameLog
+        log={log()}
+        playerId="a"
+        players={players}
+        round={round()}
+        typing={[]}
+      />
     ));
 
     expect(screen.queryByRole("button", { name: "Round 2" })).toBeNull();
@@ -384,6 +393,50 @@ describe("<GameLog />", () => {
     flush();
 
     const toggle = screen.getByRole("button", { name: "Round 2" });
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(rowTexts()).toContain("Ben stayed +30 points");
+
+    setLog([
+      ...log(),
+      {
+        at: Date.now(),
+        event: { dealer: anaNamed, type: "roundStarted" },
+        game: 1,
+        id: log().length + 1,
+        round: 3,
+      },
+    ]);
+    setRound(3);
+    flush();
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("lets the viewer fold the round that just finished", () => {
+    const settled: LogEntry[] = [
+      ...twoRounds(),
+      {
+        at: Date.now(),
+        event: {
+          scores: [{ ...benNamed, points: 30 }],
+          tiedAt: null,
+          type: "roundOver",
+        },
+        game: 1,
+        id: twoRounds().length + 1,
+        round: 2,
+      },
+    ];
+
+    render(() => (
+      <GameLog log={settled} playerId="a" players={players} typing={[]} />
+    ));
+
+    const toggle = screen.getByRole("button", { name: "Round 2" });
+
+    fireEvent.click(toggle);
+    flush();
 
     expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
@@ -514,6 +567,7 @@ describe("<GameLog />", () => {
           playerId: () => "a",
           players: () => players,
           resultsRound: () => null,
+          round: () => 1,
           typing: () => [],
         });
 

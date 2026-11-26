@@ -217,6 +217,7 @@ const Room = (props: { code: string }) => {
                 playerId: () => view().playerId,
                 players: () => view().room.players,
                 resultsRound: () => resultsRound(view().room, table()),
+                round: () => view().room.round,
                 typing: connection.typing,
               });
 

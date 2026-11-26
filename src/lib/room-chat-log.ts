@@ -15,6 +15,8 @@ interface RoomChatLogSource {
   inSheet: () => boolean;
   /** The round whose results the table shows, once Deal playback lets them show. */
   resultsRound: () => number | null;
+  /** The room's current round, 0 in the lobby. Its log stays unfolded until the next round starts. */
+  round: () => number;
 }
 
 /**
@@ -61,6 +63,7 @@ export const createRoomChatLog = (source: RoomChatLogSource) => {
     inSheet: source.inSheet,
     players: source.players,
     reads,
+    round: source.round,
     setSheetOpen: (next: boolean) => {
       setOpenedAt(next && source.inSheet() ? sheetResultsRound() : undefined);
     },

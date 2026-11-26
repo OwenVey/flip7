@@ -195,6 +195,18 @@
       flex: 1 1 0;
     }
 
+    & .headline[data-round-results] {
+      -webkit-line-clamp: 3;
+
+      & .muted {
+        display: block;
+      }
+
+      & .note-separator {
+        display: none;
+      }
+    }
+
     & > p.muted {
       flex: 1 1 100%;
     }

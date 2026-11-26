@@ -18,6 +18,13 @@ const CountUp = (props: { value: number }) => {
   return <>{shown()}</>;
 };
 
+const NotRanked = () => (
+  <>
+    <span aria-hidden="true">–</span>
+    <span class="sr-only">Not ranked yet</span>
+  </>
+);
+
 const roundPointsState = (status: RoundStatus, scored: boolean) => {
   if (status === "busted" || status === "out") {
     return status;
@@ -85,6 +92,12 @@ const Leaderboard = (
       : rankPlayers(props.room.players)
   );
 
+  const unranked = createMemo(
+    () =>
+      props.room.phase !== "gameOver" &&
+      props.room.players.every((player) => player.score === 0)
+  );
+
   const rankedIds = createMemo(() => ranked().map(({ player }) => player.id), {
     equals: samePlayerIds,
   });
@@ -134,7 +147,11 @@ const Leaderboard = (
                     data-medal={medal()}
                     data-winner={won() ? "" : undefined}
                   >
-                    <td>{entry().rank}</td>
+                    <td>
+                      <Show when={!unranked()} fallback={<NotRanked />}>
+                        {entry().rank}
+                      </Show>
+                    </td>
                     <th
                       scope="row"
                       aria-label={`${entry().player.name}${left() ? " (Left)" : ""}${id === props.playerId ? " (You)" : ""}`}

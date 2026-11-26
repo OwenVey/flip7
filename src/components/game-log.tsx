@@ -412,14 +412,15 @@ const LogRound = (props: {
   group: LogGroup;
   continuations: ReadonlySet<number>;
   collapsible: boolean;
+  current: boolean;
   playerId: string | null;
   newFrom: number | undefined;
   now: number;
   onUnfold: () => void;
 }) => {
   const spotlight = useContext(SpotlightContext);
-  const [open, setOpen] = createSignal(false);
-  const collapsed = () => props.collapsible && !open();
+  const [chosen, setChosen] = createSignal<boolean>();
+  const collapsed = () => props.collapsible && !(chosen() ?? props.current);
 
   const shown = createMemo(() =>
     collapsed()
@@ -520,7 +521,7 @@ const LogRound = (props: {
           props.onUnfold();
         }
 
-        setOpen(next);
+        setChosen(next);
       }}
     >
       <Show when={newInSummary()}>
@@ -755,6 +756,11 @@ export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
                                 (entry) =>
                                   !isChat(entry) && settlesRound(entry.event)
                               )
+                            }
+                            current={
+                              group().id === groups().at(-1)?.id &&
+                              group().entries[0]?.round ===
+                                props.chatLog.round()
                             }
                             playerId={reads().playerId()}
                             newFrom={reads().newFrom()}

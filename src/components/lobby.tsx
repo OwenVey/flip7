@@ -61,6 +61,7 @@ const OpenSeat = (props: { next: boolean; locked: boolean }) => (
     class="open-seat"
     aria-hidden="true"
     data-locked={props.locked ? "" : undefined}
+    data-next={props.next ? "" : undefined}
   >
     <Show
       when={props.locked}

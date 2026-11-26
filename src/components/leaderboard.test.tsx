@@ -19,8 +19,44 @@ const Scores = (props: { room: RoomView; playerId: string | null }) => (
   />
 );
 
+const ranks = () =>
+  screen
+    .getAllByRole("row")
+    .slice(1)
+    .map((row) => row.children[0]?.textContent);
+
 describe("<Leaderboard />", () => {
   afterEach(cleanup);
+
+  it("waits for the first points before ranking anyone", () => {
+    const { players } = room();
+    const [ana, ben] = [itemAt(players, 0), itemAt(players, 1)];
+
+    const [view, setView] = createSignal(
+      room({
+        players: [
+          { ...ana, score: 0 },
+          { ...ben, score: 0 },
+        ],
+      })
+    );
+
+    render(() => <Scores room={view()} playerId="a" />);
+
+    expect(ranks()).toStrictEqual(["–Not ranked yet", "–Not ranked yet"]);
+
+    setView(
+      room({
+        players: [
+          { ...ana, score: 0 },
+          { ...ben, score: 12 },
+        ],
+      })
+    );
+    flush();
+
+    expect(ranks()).toStrictEqual(["1", "2"]);
+  });
 
   it("ranks banked scores, shares tied ranks, and updates after scoring", async () => {
     const { players } = room();
