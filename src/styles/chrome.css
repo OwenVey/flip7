@@ -3,6 +3,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem max(1rem, calc((100% - 70rem) / 2));
+  /* Installed on iOS, the rail runs up under the translucent status bar, so its blur shows only wood rather than smearing the rail's edge into the felt. */
+  margin-block-start: calc(-1 * env(safe-area-inset-top));
+  padding-block-start: calc(0.75rem + env(safe-area-inset-top));
   border-bottom: 2px solid var(--rail-edge);
   background:
     repeating-linear-gradient(
