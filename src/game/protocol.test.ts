@@ -42,6 +42,21 @@ describe(codeFromRoomLink, () => {
     expect(codeFromRoomLink("https://flip7.example/room/ABCD")).toBeNull();
     expect(codeFromRoomLink("https://flip7.example/room/ABCIO")).toBeNull();
   });
+
+  it("only reads room codes from a room URL's pathname", () => {
+    expect(
+      codeFromRoomLink("https://flip7.example/?next=/room/ABCDE")
+    ).toBeNull();
+    expect(codeFromRoomLink("https://flip7.example/#/room/ABCDE")).toBeNull();
+    expect(
+      codeFromRoomLink("https://flip7.example/room/ABCDE/settings")
+    ).toBeNull();
+    expect(
+      codeFromRoomLink(
+        "https://flip7.example/?next=/room/ABCDE Join me: https://flip7.example/room/FGHJK"
+      )
+    ).toBe("FGHJK");
+  });
 });
 
 describe(cleanName, () => {

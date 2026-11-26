@@ -46,16 +46,39 @@ export const normalizeCode = (raw: string) => {
   return CODE_PATTERN.test(code) ? code : null;
 };
 
-const ROOM_LINK_PATTERN = new RegExp(
-  `/room/([${CODE_ALPHABET}]{${CODE_LENGTH}})(?=[/?#\\s]|$)`,
+const ROOM_PATH_PATTERN = new RegExp(
+  `^/room/([${CODE_ALPHABET}]{${CODE_LENGTH}})/?$`,
   "iu"
 );
 
+const URL_SCHEME_PATTERN = /^[a-z][a-z\d+.-]*:\/\//iu;
+
 /** The room code in a pasted room link, like `https://…/room/ABCDE`. */
 export const codeFromRoomLink = (text: string) => {
-  const match = ROOM_LINK_PATTERN.exec(text);
+  for (const token of text.trim().split(/\s+/u)) {
+    let url: URL;
 
-  return match?.[1] === undefined ? null : normalizeCode(match[1]);
+    try {
+      url = new URL(
+        URL_SCHEME_PATTERN.test(token) ? token : `https://${token}`
+      );
+    } catch {
+      continue;
+    }
+
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      continue;
+    }
+
+    const match = ROOM_PATH_PATTERN.exec(url.pathname);
+    const code = match?.[1] === undefined ? null : normalizeCode(match[1]);
+
+    if (code !== null) {
+      return code;
+    }
+  }
+
+  return null;
 };
 
 const INVISIBLE_CHARACTERS = /\p{Cf}|(?!\s)\p{Cc}/u;
