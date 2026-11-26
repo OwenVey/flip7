@@ -58,7 +58,7 @@
     "tsrs": "7.1.0-beta.tsrs5",
     "typescript": "^7.0.2",
     "ultracite": "8.3.1",
-    "vite": "^8.3.8",
+    "vite": "^8.4.0",
     "vitest": "^5.1.2"
   },
   "packageManager": "pnpm@12.23.0"
