@@ -61,6 +61,10 @@ export default function Table(
     void props.send({ playerId, type: "kick" });
   };
 
+  const makeHost = (playerId: string) => {
+    void props.send({ playerId, type: "makeHost" });
+  };
+
   const chooseTarget = (targetId: string) => {
     const pick = prompt().players.get(targetId)?.pick;
 
@@ -195,10 +199,11 @@ export default function Table(
                           removeDisabled={props.offline}
                           roundPoints={pointsOf(props.playback.roundPoints, id)}
                           prompt={playerPrompt()}
-                          canRemove={moves().host.kick.includes(id)}
+                          host={moves().host}
                           dealStep={props.playback.step}
                           onPick={chooseTarget}
                           onRemove={removePlayer}
+                          onMakeHost={makeHost}
                         />
                       )}
                     </Show>

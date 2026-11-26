@@ -55,12 +55,8 @@
     opacity: 0.6;
   }
 
-  & :is(.avatar, .badge, .remove-player) {
+  & :is(.avatar, .badge, .player-menu-trigger) {
     flex: none;
-  }
-
-  & .remove-player {
-    margin-left: auto;
   }
 }
 
@@ -177,6 +173,79 @@
       height: 1px;
     }
   }
+}
+
+/*
+ * For the host, another player's avatar opens their actions. A chevron on the
+ * corner says so, and the avatar lifts like a button on hover and focus.
+ */
+.player-menu-trigger {
+  --button-height: auto;
+  position: relative;
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+
+  /* The base button rule would press the whole trigger; the avatar presses instead. */
+  &:active:not([data-disabled], [aria-disabled="true"]) {
+    transform: none;
+  }
+
+  & .avatar {
+    transition:
+      transform var(--duration-instant) ease,
+      box-shadow var(--duration-instant) ease;
+  }
+
+  &:is([data-open], :focus-visible) .avatar {
+    transform: translate(-1px, -1px);
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+
+  @media (hover: hover) {
+    &:hover .avatar {
+      transform: translate(-1px, -1px);
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+  }
+
+  &:active .avatar {
+    transform: translate(1px, 1px);
+    box-shadow: 0 0 0 var(--ink);
+  }
+
+  /* Grows the tap area to 44px without moving the picture. */
+  @media (pointer: coarse) {
+    &::before {
+      position: absolute;
+      inset: calc((var(--control-height-lg) - 100%) / -2);
+      content: "";
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    & .avatar {
+      transition: none;
+    }
+  }
+}
+
+.player-menu-badge {
+  position: absolute;
+  inset-block-end: -0.25rem;
+  inset-inline-end: -0.25rem;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-full);
+  background: var(--paper);
+  color: var(--ink);
+  pointer-events: none;
 }
 
 /* The avatar picker sits inside the left end of the name input. */

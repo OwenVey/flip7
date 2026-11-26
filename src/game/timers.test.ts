@@ -105,6 +105,9 @@ describe("room timers", () => {
     const result = runTimers(timers, START + HOST_GRACE_MS, random, true);
     expect(result.changed).toBeTruthy();
     expect(timers.game.hostId).toBe("b");
+    expect(timers.game.log.at(-1)).toMatchObject({
+      event: { how: "auto", type: "hostChanged" },
+    });
     syncTimers(timers, START + HOST_GRACE_MS);
     expect(timers.hostLeftAt).toBeNull();
   });

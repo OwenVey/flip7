@@ -52,7 +52,7 @@ export default function TableMoreMenu(props: {
       >
         <Ellipsis size={16} aria-hidden="true" />
       </Tooltip>
-      <MenuContent class="table-more-menu" side="bottom" align="end">
+      <MenuContent side="bottom" align="end">
         <MenuItem closeOnSelect={shares()} onSelect={invite}>
           <MenuItemIcon>
             <Switch fallback={<Link2 size={16} />}>

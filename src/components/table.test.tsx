@@ -1601,7 +1601,7 @@ describe("<Table />", () => {
     expect(within(seat).getByText("Thinking…")).toBeVisible();
     expect(screen.getByText("Ana is deciding…")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Hit" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Remove/u })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Options for/u })).toBeNull();
   });
 
   it("names later games in the log's round headings", () => {

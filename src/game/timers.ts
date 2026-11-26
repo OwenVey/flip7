@@ -1,5 +1,5 @@
 import type { Random } from "./cards";
-import { findPlayer, playForAbsent, playForBot, transferHost } from "./engine";
+import { findPlayer, playForAbsent, playForBot, handOffHost } from "./engine";
 import type { GameState } from "./engine";
 import { waitingOn } from "./moves";
 import { HEARTBEAT_STALE_MS } from "./protocol";
@@ -135,7 +135,7 @@ export const runTimers = (
 
   if (room.hostLeftAt !== null && now - room.hostLeftAt >= HOST_GRACE_MS) {
     room.hostLeftAt = null;
-    changed = transferHost(room.game) || changed;
+    changed = handOffHost(room.game) || changed;
   }
 
   if (room.stall && now - room.stall.since >= ABSENT_GRACE_MS) {

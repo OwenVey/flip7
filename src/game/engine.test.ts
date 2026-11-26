@@ -14,6 +14,7 @@ import {
   isChat,
   hit,
   kick,
+  makeHost,
   leave,
   nextRound,
   playFor,
@@ -523,6 +524,24 @@ describe("evicting a player", () => {
       kick(state, "a", "a", random);
     }).toThrow("Use Leave to leave the room.");
     expect(state.players).toHaveLength(2);
+  });
+
+  it("lets the host hand hosting to another online player and says so", () => {
+    const state = setup(["a", "b", "c"], [num(1), num(2), num(3)]);
+
+    makeHost(state, "a", "c");
+
+    expect(state.hostId).toBe("c");
+    expect(state.log.at(-1)).toMatchObject({
+      event: {
+        how: "given",
+        player: { id: "c", name: "c" },
+        type: "hostChanged",
+      },
+    });
+    expect(() => {
+      makeHost(state, "a", "b");
+    }).toThrow("Only the host can hand over hosting.");
   });
 
   it("rejects kicking someone who already left", () => {

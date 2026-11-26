@@ -17,6 +17,7 @@ import {
   kick,
   leave,
   leaveToWatch,
+  makeHost,
   nextRound,
   playFor,
   startGame,
@@ -565,6 +566,12 @@ export const createRoom = (
         kick(game, playerId, command.playerId, random);
 
         return evict(command.playerId, "kicked");
+      }
+
+      case "makeHost": {
+        makeHost(game, playerId, command.playerId);
+
+        return none;
       }
 
       case "leave": {

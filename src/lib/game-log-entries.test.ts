@@ -313,9 +313,14 @@ describe(eventCopy, () => {
       happening("[Bo] left to watch."),
     ],
     [
-      "a new host",
-      { player: bo, type: "hostChanged" },
+      "a new host after the host went offline",
+      { how: "auto", player: bo, type: "hostChanged" },
       happening("[Bo] is now the host."),
+    ],
+    [
+      "a new host the host chose",
+      { how: "given", player: bo, type: "hostChanged" },
+      happening("The host made [Bo] the host."),
     ],
     [
       "a winning score",

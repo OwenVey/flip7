@@ -54,12 +54,11 @@ const Seat = (props: {
       itemAt(props.room.players, props.seat).id
     )}
     prompt={promptOf(props.room, props.playerId, props.seat)}
-    canRemove={availableMoves(props.room, props.playerId).host.kick.includes(
-      itemAt(props.room.players, props.seat).id
-    )}
+    host={availableMoves(props.room, props.playerId).host}
     dealStep={null}
     onPick={vi.fn<(targetId: string) => void>()}
     onRemove={vi.fn<(playerId: string) => void>()}
+    onMakeHost={vi.fn<(playerId: string) => void>()}
   />
 );
 
@@ -357,7 +356,7 @@ describe("<RoundPlayer />", () => {
     expect(meter).toHaveAttribute("data-round", "none");
   });
 
-  it("keeps Remove steady during the deal and blocks it only while offline", () => {
+  it("keeps the player menu steady during the deal and blocks it only while offline", async () => {
     const [offline, setOffline] = createSignal(false);
     render(() => (
       <Table
@@ -372,7 +371,13 @@ describe("<RoundPlayer />", () => {
       />
     ));
 
-    const remove = screen.getByRole("button", { name: "Remove Ben" });
+    fireEvent.click(screen.getByRole("button", { name: "Options for Ben" }));
+    const menu = await screen.findByRole("menu");
+
+    const remove = within(menu).getByRole("menuitem", {
+      name: "Remove from room",
+    });
+
     expect(remove).not.toHaveAttribute("aria-disabled");
 
     setOffline(true);
@@ -381,7 +386,17 @@ describe("<RoundPlayer />", () => {
   });
 
   it("removing a player needs a person to confirm", async () => {
-    const send = vi.fn<RoomConnection["send"]>();
+    const sent = Promise.withResolvers<Parameters<RoomConnection["send"]>[0]>();
+
+    let sends = 0;
+
+    const send: RoomConnection["send"] = async (command) => {
+      sends += 1;
+      sent.resolve(command);
+
+      return await Promise.resolve(true);
+    };
+
     render(() => (
       <Table
         room={room()}
@@ -393,44 +408,39 @@ describe("<RoundPlayer />", () => {
     ));
 
     const ben = within(screen.getByRole("article", { name: "Ben, 12 points" }));
-    expect(ben.getByRole("button", { name: "Remove Ben" })).toBeVisible();
+    expect(ben.getByRole("button", { name: "Options for Ben" })).toBeVisible();
     const scores = within(screen.getByRole("table", { name: "Scores" }));
-    expect(scores.queryByRole("button", { name: /Remove/u })).toBeNull();
+    expect(scores.queryByRole("button", { name: /Options for/u })).toBeNull();
 
     const remove = {
       steps: [
-        { action: "press", args: ["Remove from room"], ref: "Remove Ben" },
+        {
+          action: "press",
+          args: ["Remove from room"],
+          ref: "Options for Ben",
+        },
+        { action: "press", args: ["Remove from room"], ref: "Remove Ben?" },
       ],
     };
 
     agentApproval.approve = false;
     const refused = await agent.act(remove);
     expect(refused.ok).toBeFalsy();
-    expect(send).not.toHaveBeenCalled();
+    expect(sends).toBe(0);
     agentApproval.approve = true;
     await agent.act(remove);
-    expect(send).toHaveBeenCalledWith({ playerId: "b", type: "kick" });
+    await expect(sent.promise).resolves.toStrictEqual({
+      playerId: "b",
+      type: "kick",
+    });
     agentApproval.approve = false;
   });
 
-  it("keeps the host's Remove control available while picking a target", async () => {
-    const choice = {
-      card: { id: 9, kind: "freeze" as const },
-      chooserId: "a",
-      options: ["a", "b"],
-    };
-
-    const sent = Promise.withResolvers<Parameters<RoomConnection["send"]>[0]>();
-
-    const send: RoomConnection["send"] = async (command) => {
-      sent.resolve(command);
-
-      return await Promise.resolve(true);
-    };
-
+  it("lets the host make an online player the host from their avatar", async () => {
+    const send = vi.fn<RoomConnection["send"]>();
     render(() => (
       <Table
-        room={room({ choice })}
+        room={room()}
         playerId="a"
         send={send}
         chat={chatControls()}
@@ -438,19 +448,103 @@ describe("<RoundPlayer />", () => {
       />
     ));
 
-    const remove = screen.getByRole("button", { name: "Remove Ben" });
-    expect(remove).not.toHaveAttribute("aria-disabled");
-    fireEvent.click(remove);
-    flush();
+    expect(
+      screen.queryByRole("button", { name: "Options for Ana" })
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Options for Ben" }));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent)
+    ).toStrictEqual(["Make host", "Remove from room"]);
 
-    const dialog = await screen.findByRole("alertdialog");
-    fireEvent.click(
-      within(dialog).getByRole("button", { name: "Remove from room" })
-    );
-    await expect(sent.promise).resolves.toStrictEqual({
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Make host" }));
+    expect(send).toHaveBeenCalledExactlyOnceWith({
       playerId: "b",
-      type: "kick",
+      type: "makeHost",
     });
+  });
+
+  it("greys out Make host for an offline player and leaves it off a bot's menu", async () => {
+    const view = room();
+    const [ana, ben] = [itemAt(view.players, 0), itemAt(view.players, 1)];
+    view.players = [
+      ana,
+      { ...ben, connected: false },
+      { ...ben, avatar: null, bot: true, id: "t", name: "Torch" },
+    ];
+
+    render(() => (
+      <Table
+        room={view}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={chatControls()}
+        typing={[]}
+      />
+    ));
+
+    fireEvent.click(screen.getByRole("button", { name: "Options for Ben" }));
+    const benMenu = await screen.findByRole("menu");
+
+    const makeHost = within(benMenu).getByRole("menuitem", {
+      name: /Make host/u,
+    });
+
+    expect(makeHost).toHaveAttribute("aria-disabled", "true");
+    expect(makeHost).toHaveTextContent("Offline");
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+    await vi.waitFor(() => {
+      expect(screen.queryByRole("menu")).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Options for Torch" }));
+    const botMenu = await screen.findByRole("menu");
+    expect(
+      within(botMenu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent)
+    ).toStrictEqual(["Remove from room"]);
+  });
+
+  it("shows guests plain avatars with no player menu", () => {
+    render(() => (
+      <Table
+        room={room()}
+        playerId="b"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={chatControls()}
+        typing={[]}
+      />
+    ));
+
+    expect(screen.queryByRole("button", { name: /Options for/u })).toBeNull();
+  });
+
+  it("puts the player menu away while the host picks a target", () => {
+    const choice = {
+      card: { id: 9, kind: "freeze" as const },
+      chooserId: "a",
+      options: ["a", "b"],
+    };
+
+    render(() => (
+      <Table
+        room={room({ choice })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={chatControls()}
+        typing={[]}
+      />
+    ));
+
+    expect(screen.getByRole("button", { name: "Freeze Ben" })).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Options for Ben" })
+    ).toBeNull();
   });
 
   it("the chooser picks an action card target by clicking a seat", () => {
