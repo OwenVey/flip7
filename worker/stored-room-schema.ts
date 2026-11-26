@@ -11,6 +11,7 @@ import {
   HeldActionCardSchema,
   LogEntrySchema,
   normalizeCode,
+  WinnerSchema,
 } from "../src/game/protocol";
 import type { StoredRoom } from "../src/game/room";
 import { BOT_SPEEDS, TARGET_SCORES } from "../src/game/settings";
@@ -94,6 +95,7 @@ const GameStateSchema: v.GenericSchema<unknown, GameState> = v.object({
   }),
   turnAnchor: integer,
   turnId: nullableId,
+  winner: WinnerSchema,
   winnerIds: idList,
 });
 

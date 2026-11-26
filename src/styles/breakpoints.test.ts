@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const stylesDir = import.meta.dirname;
-const tableSource = path.resolve(stylesDir, "../components/table.tsx");
+const tableSource = path.resolve(stylesDir, "../components/table-common.ts");
 
 const readWithoutComments = async (file: string) => {
   const css = await readFile(path.join(stylesDir, file), "utf-8");

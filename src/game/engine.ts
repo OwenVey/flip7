@@ -30,6 +30,7 @@ import { nameKey, sameName } from "./names";
 import type { Player, RoundStatus } from "./player";
 import { DEFAULT_SETTINGS } from "./settings";
 import type { RoomSettings } from "./settings";
+import { CHAT_TEXT_LIMIT, clipText } from "./text";
 
 export { MAX_PLAYERS } from "./moves";
 
@@ -46,7 +47,7 @@ export const LOG_LIMIT = 1000;
 
 /** How many draws and held action resolutions each Room keeps for Deal playback. */
 export const DEAL_HISTORY_LIMIT = 40;
-export const CHAT_MAX_LENGTH = 200;
+export const CHAT_MAX_LENGTH = CHAT_TEXT_LIMIT.graphemes;
 const WHITESPACE = /\s+/gu;
 
 export const PHASES = ["lobby", "playing", "roundOver", "gameOver"] as const;
@@ -125,6 +126,7 @@ export interface GameState extends ActionCardState {
   /** Players still to be dealt an opening card this round, in deal order. */
   openingSlots: string[];
   winnerIds: string[];
+  winner: (LogPlayer & { points: number }) | null;
   /** This game's log, oldest first. Cleared when a game starts. */
   log: LogEntry[];
   /** The id of the newest log entry. Never reset, so ids stay unique for the life of the room. */
@@ -179,6 +181,7 @@ export const createGame = () => {
     settings: { ...DEFAULT_SETTINGS },
     turnAnchor: 0,
     turnId: null,
+    winner: null,
     winnerIds: [],
   };
 
@@ -227,7 +230,11 @@ const getPlayer = (state: GameState, id: string) => {
 
 export const chat = (state: GameState, playerId: string, raw: string) => {
   const player = getPlayer(state, playerId);
-  const text = raw.replaceAll(WHITESPACE, " ").trim().slice(0, CHAT_MAX_LENGTH);
+
+  const text = clipText(
+    raw.replaceAll(WHITESPACE, " ").trim(),
+    CHAT_TEXT_LIMIT
+  );
 
   if (text === "") {
     throw new GameError("Type a message first.");
@@ -516,6 +523,7 @@ const finishRound = (state: GameState) => {
   if (best >= targetScore && leaders.length === 1 && winner !== undefined) {
     state.phase = "gameOver";
     state.winnerIds = [winner.id];
+    state.winner = { ...named(winner), points: best };
     say(state, {
       player: named(winner),
       points: best,
@@ -819,6 +827,7 @@ export const startGame = (
   state.evictedCards = [];
   state.games += 1;
   state.round = 0;
+  state.winner = null;
   state.winnerIds = [];
   state.dealerIndex = Math.floor(random() * state.players.length) - 1;
   startRound(state, random);

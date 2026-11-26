@@ -23,7 +23,7 @@ import RoundPlayer from "./round-player";
 import ScrollFade from "./scroll-fade";
 import { SpectatorActions, WatcherCount } from "./spectator-controls";
 import type { Spectator } from "./spectator-controls";
-import { samePlayerIds, SCORES_TITLE } from "./table-common";
+import { createSheetTable, samePlayerIds, SCORES_TITLE } from "./table-common";
 import type {
   DealProps,
   RoundPointsByPlayer,
@@ -31,8 +31,6 @@ import type {
 } from "./table-common";
 import TableMoreMenu from "./table-more-menu";
 import TableSheet from "./table-sheet";
-
-const SHEET_TABLE_QUERY = "(width < 64rem), (height <= 30rem)";
 
 export default function Table(
   props: TableProps &
@@ -92,6 +90,9 @@ export default function Table(
     }
   );
 
+  const sheetTable = createSheetTable();
+  const chatDraft = createSignal("");
+
   const [scoresOpen, setScoresOpen] = createSignal(false);
   const [logOpenedAt, setLogOpenedAt] = createSignal<number | null>();
 
@@ -104,9 +105,7 @@ export default function Table(
   const sheetResultsRound = createMemo(() => {
     const round = resultsRound();
 
-    return round !== null && globalThis.matchMedia?.(SHEET_TABLE_QUERY).matches
-      ? round
-      : null;
+    return round !== null && sheetTable() ? round : null;
   });
 
   const logOpen = () => {
@@ -116,8 +115,8 @@ export default function Table(
     return openedAt !== undefined && (round === null || openedAt === round);
   };
 
-  createEffect(resultsRound, (round, previous) => {
-    if (round !== null && sheetResultsRound() === round) {
+  createEffect(sheetResultsRound, (round, previous) => {
+    if (round !== null) {
       setLogOpenedAt(undefined);
       setScoresOpen(true);
     } else if (previous !== null && previous !== undefined) {
@@ -159,8 +158,10 @@ export default function Table(
               log={props.room.log}
               playerId={props.playerId}
               chat={chat()}
+              draft={chatDraft}
               players={props.room.players}
               typing={props.typing}
+              logInSheet={sheetTable()}
             />
             <InviteButton brief collapsible />
             <Show when={moves().host.configure}>
@@ -258,13 +259,16 @@ export default function Table(
                 />
               </ScrollFade>
             </section>
-            <GameLog
-              log={props.room.log}
-              playerId={props.playerId}
-              chat={chat()}
-              players={props.room.players}
-              typing={props.typing}
-            />
+            <Show when={!sheetTable()}>
+              <GameLog
+                log={props.room.log}
+                playerId={props.playerId}
+                chat={chat()}
+                draft={chatDraft}
+                players={props.room.players}
+                typing={props.typing}
+              />
+            </Show>
           </div>
         </div>
         <div class="flight-layer" data-flight-layer="" aria-hidden="true" />

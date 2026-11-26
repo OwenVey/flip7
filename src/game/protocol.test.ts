@@ -40,6 +40,26 @@ describe(cleanName, () => {
   it("keeps a space between words that an invisible character sat next to", () => {
     expect(cleanName("Ana \u200B Lee")).toBe("Ana Lee");
   });
+
+  it("keeps the joiners that hold emoji sequences and non-Latin words together", () => {
+    expect(cleanName("👩🏽\u200D💻 Priya")).toBe("👩🏽\u200D💻 Priya");
+    expect(cleanName("می\u200Cخواهم")).toBe("می\u200Cخواهم");
+    expect(cleanName("क\u094D\u200Dष")).toBe("क\u094D\u200Dष");
+    expect(cleanName("An\u200Da")).toBe("Ana");
+  });
+
+  it("cuts a long name between characters, never inside one", () => {
+    expect(
+      cleanName(
+        "Kasia 🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈"
+      )
+    ).toBe(
+      "Kasia 🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈🏳️\u200D🌈"
+    );
+    expect(cleanName("Aleksandra Wiśniewska-Kowalczyk")).toBe(
+      "Aleksandra Wiśniewsk"
+    );
+  });
 });
 
 describe(roundStarted, () => {

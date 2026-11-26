@@ -22,6 +22,7 @@ import type { RoomConnection } from "../lib/room-connection";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
 import { itemAt } from "../test/item-at";
+import { mockMatchMedia } from "../test/match-media";
 import Lobby from "./lobby";
 
 const roomOf = (size: number) => {
@@ -79,6 +80,63 @@ describe("<Lobby />", () => {
 
     const roster = screen.getByRole("list", { name: "Players" });
     expect(within(roster).getByText(name)).toHaveAttribute("title", name);
+  });
+
+  it.each([
+    { layout: "beside the roster", sheet: false },
+    { layout: "in the sheet", sheet: true },
+  ])("renders the Chat & Log once when it shows $layout", ({ sheet }) => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+    vi.stubGlobal("matchMedia", () => ({ matches: sheet }));
+
+    try {
+      render(() => (
+        <Lobby
+          chat={chatControls()}
+          typing={[]}
+          room={roomOf(2)}
+          playerId="p0"
+          send={vi.fn<RoomConnection["send"]>()}
+        />
+      ));
+      flush();
+
+      expect(document.querySelectorAll(".log-scroll")).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("carries a sidebar chat draft into the sheet on resize", async () => {
+    const resize = mockMatchMedia(false);
+
+    try {
+      render(() => (
+        <Lobby
+          chat={chatControls()}
+          typing={[]}
+          room={roomOf(2)}
+          playerId="p0"
+          send={vi.fn<RoomConnection["send"]>()}
+        />
+      ));
+      fireEvent.input(screen.getByRole("textbox", { name: "Chat message" }), {
+        target: { value: "Ready when you are" },
+      });
+      flush();
+
+      resize(true);
+      flush();
+      screen.getByRole("button", { name: "Chat & Log" }).click();
+      flush();
+
+      const sheet = await screen.findByRole("dialog", { name: "Chat & Log" });
+      expect(
+        within(sheet).getByRole("textbox", { name: "Chat message" })
+      ).toHaveValue("Ready when you are");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("keeps the host's Add bot button mounted and focusable once the room fills", () => {
@@ -263,7 +321,7 @@ describe("<Lobby />", () => {
       1
     );
     expect(screen.queryByRole("button", { name: "Watch instead" })).toBeNull();
-    expect(screen.getAllByText("Join as a player to chat.")).toHaveLength(2);
+    expect(screen.getAllByText("Join as a player to chat.")).toHaveLength(1);
     expect(
       screen.getByRole("button", { name: "Chat & Log" })
     ).toBeInTheDocument();

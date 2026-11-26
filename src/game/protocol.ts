@@ -9,8 +9,9 @@ import { MAX_SPECTATORS } from "./moves";
 import { applyListUpdate, listUpdateSince } from "./sequenced-list";
 import type { ListSpec, ListUpdate, ReceivedList } from "./sequenced-list";
 import { BOT_SPEEDS, TARGET_SCORES } from "./settings";
+import { clipText, NAME_TEXT_LIMIT } from "./text";
 
-export const NAME_MAX_LENGTH = 20;
+export const NAME_MAX_LENGTH = NAME_TEXT_LIMIT.graphemes;
 export const HEARTBEAT_PING = "ping";
 export const HEARTBEAT_PONG = "pong";
 
@@ -45,14 +46,45 @@ export const normalizeCode = (raw: string) => {
   return CODE_PATTERN.test(code) ? code : null;
 };
 
-const INVISIBLE_CHARACTERS = /\p{Cf}|(?!\s)\p{Cc}/gu;
+const INVISIBLE_CHARACTERS = /\p{Cf}|(?!\s)\p{Cc}/u;
+const EXTENDED_PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
+const JOINS_EMOJI = /[\p{Extended_Pictographic}\p{Emoji_Modifier}\uFE0F]/u;
+const NON_LATIN_LETTER = /(?!\p{Script=Latin})[\p{L}\p{M}]/u;
 
+const keepsJoiner = (joiner: string, before: string, after: string) =>
+  (NON_LATIN_LETTER.test(before) && NON_LATIN_LETTER.test(after)) ||
+  (joiner === "\u200D" &&
+    JOINS_EMOJI.test(before) &&
+    EXTENDED_PICTOGRAPHIC.test(after));
+
+const visibleCharacters = (raw: string) => {
+  const characters = raw.match(/./gsu) ?? [];
+
+  return characters
+    .filter((character, index) => {
+      if (character !== "\u200C" && character !== "\u200D") {
+        return !INVISIBLE_CHARACTERS.test(character);
+      }
+
+      return keepsJoiner(
+        character,
+        characters[index - 1] ?? "",
+        characters[index + 1] ?? ""
+      );
+    })
+    .join("");
+};
+
+/**
+ * Strips characters a name can't show, keeping the joiners that hold an emoji
+ * sequence or a non-Latin word together, then cuts it to `NAME_MAX_LENGTH`
+ * characters as people see them.
+ */
 export const cleanName = (raw: string) =>
-  raw
-    .replaceAll(INVISIBLE_CHARACTERS, "")
-    .replaceAll(/\s+/gu, " ")
-    .trim()
-    .slice(0, NAME_MAX_LENGTH);
+  clipText(
+    visibleCharacters(raw).replaceAll(/\s+/gu, " ").trim(),
+    NAME_TEXT_LIMIT
+  ).trim();
 
 export interface RoomView extends Pick<
   GameState,
@@ -67,6 +99,7 @@ export interface RoomView extends Pick<
   | "round"
   | "settings"
   | "turnId"
+  | "winner"
   | "winnerIds"
 > {
   code: string;
@@ -212,10 +245,14 @@ const LATEST_DATE_MS = 8_640_000_000_000_000;
 
 const logPlayerFields = {
   id: v.pipe(v.string(), v.nonEmpty()),
-  name: v.pipe(v.string(), v.nonEmpty(), v.maxLength(NAME_MAX_LENGTH)),
+  name: v.pipe(v.string(), v.nonEmpty(), v.maxGraphemes(NAME_MAX_LENGTH)),
 };
 
 const LogPlayerSchema = v.object(logPlayerFields);
+
+export const WinnerSchema = v.nullable(
+  v.object({ ...logPlayerFields, points: nonNegativeInteger })
+);
 
 const OptionalLogPlayerSchema = v.nullable(LogPlayerSchema);
 
@@ -345,6 +382,7 @@ const StateMessageSchema = v.looseObject({
     log: LogUpdateSchema,
   }),
   room: v.looseObject({
+    winner: WinnerSchema,
     code: v.string(),
     dealSeq: nonNegativeInteger,
     drawSeq: nonNegativeInteger,
@@ -442,6 +480,7 @@ export const toRoomView = (
     settings: state.settings,
     spectatorCount,
     turnId: state.turnId,
+    winner: state.winner,
     winnerIds: state.winnerIds,
   };
 

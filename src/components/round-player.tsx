@@ -258,15 +258,17 @@ const RoundPlayer = (props: RoundPlayerProps) => {
               </Tooltip>
             </Show>
           </span>
-          <strong title={props.player.name}>{props.player.name}</strong>
+          <strong dir="auto" title={props.player.name}>
+            {props.player.name}
+          </strong>
           <Show when={isWinner()}>
-            <span class="badge" data-tone="winner">
+            <span class="badge" data-tone="winner" title="Winner">
               <Trophy size={12} aria-hidden="true" />
-              Winner
+              <span class="badge-label">Winner</span>
             </span>
           </Show>
           <Show when={!props.player.connected}>
-            <OfflineBadge />
+            <OfflineBadge compact={isWinner()} />
           </Show>
         </div>
         <div class="seat-meta">

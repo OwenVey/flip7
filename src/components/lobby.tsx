@@ -6,6 +6,7 @@ import { Button } from "@ui-sdk/solid/button";
 import {
   createEffect,
   createMemo,
+  createSignal,
   createUniqueId,
   For,
   onSettled,
@@ -34,6 +35,7 @@ import {
   WatcherCount,
 } from "./spectator-controls";
 import type { Spectator } from "./spectator-controls";
+import { createSheetTable } from "./table-common";
 
 const RoomCode = (props: { code: string }) => {
   const { copied, copy } = createCopy();
@@ -115,6 +117,8 @@ export default function Lobby(props: {
   );
 
   const count = () => `${props.room.players.length} / ${MAX_PLAYERS}`;
+  const sheetTable = createSheetTable();
+  const chatDraft = createSignal("");
 
   return (
     <div class="lobby-page">
@@ -129,8 +133,10 @@ export default function Lobby(props: {
             log={props.room.log}
             playerId={props.playerId}
             chat={chat()}
+            draft={chatDraft}
             players={props.room.players}
             typing={props.typing}
+            logInSheet={sheetTable()}
           />
           <Show
             when={props.playerId !== null}
@@ -260,7 +266,7 @@ export default function Lobby(props: {
                   data-offline={player().connected ? undefined : ""}
                 >
                   <PlayerAvatar player={player()} />
-                  <span class="roster-name" title={player().name}>
+                  <span class="roster-name" dir="auto" title={player().name}>
                     {player().name}
                   </span>
                   <Show when={player().id === props.playerId}>
@@ -308,13 +314,16 @@ export default function Lobby(props: {
           </ul>
         </section>
 
-        <GameLog
-          log={props.room.log}
-          playerId={props.playerId}
-          chat={chat()}
-          players={props.room.players}
-          typing={props.typing}
-        />
+        <Show when={!sheetTable()}>
+          <GameLog
+            log={props.room.log}
+            playerId={props.playerId}
+            chat={chat()}
+            draft={chatDraft}
+            players={props.room.players}
+            typing={props.typing}
+          />
+        </Show>
       </div>
     </div>
   );

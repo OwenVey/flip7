@@ -1,6 +1,7 @@
 import * as v from "valibot";
 
 import { BOT_SPEEDS, TARGET_SCORES } from "./settings";
+import { CHAT_TEXT_LIMIT, NAME_TEXT_LIMIT } from "./text";
 
 const IdSchema = v.pipe(v.string(), v.maxLength(64));
 
@@ -11,7 +12,7 @@ const ForIdSchema = v.optional(IdSchema);
 const ClientMessageSchema = v.variant("type", [
   v.object({
     avatar: v.optional(v.number()),
-    name: v.pipe(v.string(), v.maxLength(200)),
+    name: v.pipe(v.string(), v.maxLength(NAME_TEXT_LIMIT.units)),
     token: v.nullable(IdSchema),
     type: v.literal("join"),
   }),
@@ -49,7 +50,7 @@ const ClientMessageSchema = v.variant("type", [
   }),
   v.object({ requestId: RequestIdSchema, type: v.literal("leave") }),
   v.object({
-    text: v.pipe(v.string(), v.maxLength(2000)),
+    text: v.pipe(v.string(), v.maxLength(CHAT_TEXT_LIMIT.units)),
     type: v.literal("chat"),
   }),
   v.object({ active: v.boolean(), type: v.literal("typing") }),

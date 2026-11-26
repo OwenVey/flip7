@@ -20,7 +20,7 @@ export const fontlessOptions = {
     {
       name: "Big Shoulders Display Variable",
       provider: "npm",
-      glyphs: "0123456789+×",
+      glyphs: "0123456789+×—",
       fallbackInstances: [{ weight: 600 }, { weight: 900 }],
     },
     {

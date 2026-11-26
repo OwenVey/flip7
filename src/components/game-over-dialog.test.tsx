@@ -48,6 +48,7 @@ const room = () => {
     settings: { botSpeed: "normal", locked: false, targetScore: 200 },
     spectatorCount: 0,
     turnId: null,
+    winner: { id: "b", name: "Ben", points: 212 },
     winnerIds: ["b"],
   };
 
@@ -99,6 +100,34 @@ describe("<GameOverDialog />", () => {
         "Waiting for Ana to play again or head back to the lobby."
       )
     ).toBeInTheDocument();
+  });
+
+  it("keeps a winner who has left in the standings, under the name they won with", () => {
+    const view = room();
+    view.players = view.players.filter(({ id }) => id !== "b");
+
+    render(() => (
+      <GameOverDialog
+        room={view}
+        playerId="a"
+        canPlayAgain={false}
+        canReturnToLobby={false}
+        onPlayAgain={vi.fn<() => void>()}
+        onReturnToLobby={vi.fn<() => void>()}
+      />
+    ));
+
+    openDialog();
+
+    expect(screen.getByRole("dialog", { name: "Ben wins!" })).toBeVisible();
+    expect(
+      screen.getByText("You finished 2nd with 140 points.")
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("listitem")
+        .map((item) => item.querySelector(".game-over-name")?.textContent)
+    ).toStrictEqual(["Ben Left", "Ana You", "Cara"]);
   });
 
   it("congratulates the winner and lets the host play again or return to the lobby", () => {

@@ -15,6 +15,7 @@ import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
 import { chatControls } from "../test/chat";
 import { itemAt } from "../test/item-at";
+import { mockMatchMedia } from "../test/match-media";
 import { LOGGED_AT, room } from "../test/room-view";
 import { agent, Table } from "../test/table";
 
@@ -347,6 +348,34 @@ describe("<Table />", () => {
     flush();
     expect(screen.queryByRole("dialog", { name: "Scores" })).toBeNull();
     expect(scores).toHaveFocus();
+  });
+
+  it.each([
+    { layout: "beside the table", sheet: false },
+    { layout: "in the sheet", sheet: true },
+    { layout: "when matchMedia is absent", sheet: undefined },
+  ])("renders the Chat & Log once when it shows $layout", ({ sheet }) => {
+    if (sheet !== undefined) {
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+      vi.stubGlobal("matchMedia", () => ({ matches: sheet }));
+    }
+
+    try {
+      render(() => (
+        <Table
+          room={room()}
+          playerId="a"
+          send={vi.fn<RoomConnection["send"]>()}
+          chat={chatControls()}
+          typing={[]}
+        />
+      ));
+      flush();
+
+      expect(document.querySelectorAll(".log-scroll")).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("opens the Scores sheet once per round end and lists busted players", async () => {
@@ -1247,6 +1276,8 @@ describe("<Table />", () => {
   });
 
   it("clears the unread count when the chat sheet opens and returns focus on close", async () => {
+    mockMatchMedia(true);
+
     const [view, setView] = createSignal(room());
 
     render(() => (
@@ -1410,6 +1441,8 @@ describe("<Table />", () => {
   );
 
   it("keeps chat unread when the sheet closes during a jump to latest", async () => {
+    mockMatchMedia(true);
+
     vi.useFakeTimers({
       toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
     });
@@ -1468,6 +1501,56 @@ describe("<Table />", () => {
   });
 
   it("keeps the chat draft after dismissing the sheet with Escape", async () => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+
+    try {
+      render(() => (
+        <Table
+          room={room()}
+          playerId="a"
+          send={vi.fn<RoomConnection["send"]>()}
+          chat={chatControls()}
+          typing={[]}
+        />
+      ));
+      flush();
+
+      const toggle = screen.getByRole("button", { name: "Chat & Log" });
+      toggle.focus();
+      toggle.click();
+
+      const sheet = await screen.findByRole("dialog", {
+        name: "Chat & Log",
+      });
+
+      const input = within(sheet).getByRole("textbox", {
+        name: "Chat message",
+      });
+
+      fireEvent.input(input, { target: { value: "See you next round" } });
+      flush();
+
+      fireEvent.keyDown(input, { key: "Escape" });
+      flush();
+      expect(toggle).toHaveFocus();
+
+      toggle.click();
+
+      const reopened = await screen.findByRole("dialog", {
+        name: "Chat & Log",
+      });
+
+      expect(
+        within(reopened).getByRole("textbox", { name: "Chat message" })
+      ).toHaveValue("See you next round");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("closes the chat sheet on resize and keeps one log with the same draft", async () => {
+    const resize = mockMatchMedia(true);
     render(() => (
       <Table
         room={room()}
@@ -1477,32 +1560,30 @@ describe("<Table />", () => {
         typing={[]}
       />
     ));
-
-    const toggle = screen.getByRole("button", { name: "Chat & Log" });
-    toggle.focus();
-    toggle.click();
-
-    const sheet = await screen.findByRole("dialog", {
-      name: "Chat & Log",
-    });
-
-    const input = within(sheet).getByRole("textbox", { name: "Chat message" });
-    fireEvent.input(input, { target: { value: "See you next round" } });
+    screen.getByRole("button", { name: "Chat & Log" }).click();
     flush();
 
-    fireEvent.keyDown(input, { key: "Escape" });
+    const sheet = await screen.findByRole("dialog", { name: "Chat & Log" });
+    fireEvent.input(
+      within(sheet).getByRole("textbox", { name: "Chat message" }),
+      {
+        target: { value: "Good game" },
+      }
+    );
     flush();
-    expect(toggle).toHaveFocus();
 
-    toggle.click();
+    resize(false);
+    flush();
 
-    const reopened = await screen.findByRole("dialog", {
-      name: "Chat & Log",
-    });
+    expect(screen.queryByRole("dialog", { name: "Chat & Log" })).toBeNull();
+    expect(document.querySelectorAll(".log-scroll")).toHaveLength(1);
+    expect(screen.getByRole("textbox", { name: "Chat message" })).toHaveValue(
+      "Good game"
+    );
 
-    expect(
-      within(reopened).getByRole("textbox", { name: "Chat message" })
-    ).toHaveValue("See you next round");
+    resize(true);
+    flush();
+    expect(screen.queryByRole("dialog", { name: "Chat & Log" })).toBeNull();
   });
 
   it("other players see whose turn it is, not the Hit button", () => {

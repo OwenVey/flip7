@@ -12,7 +12,7 @@ import type { DealPlaybackView } from "./deal-playback";
 import { hostName } from "./host";
 import type { PlaybackMoment } from "./playback-moments";
 import { nameOf } from "./player-name";
-import { rankPlayers } from "./standings";
+import { rankPlayers, winnerNames, winnersHeadline } from "./standings";
 
 /**
  * Which controls the action bar offers alongside the Table prompt: Hit and
@@ -173,7 +173,7 @@ const gameOverPrompt = (room: RoomView, moves: AvailableMoves) =>
           kind: "waitForHost",
           text: `Waiting for ${hostName(room)} to play again or head back to the lobby.`,
         },
-    headline: `${room.winnerIds.map((id) => nameOf(room, id)).join(" and ")} wins!`,
+    headline: winnersHeadline(winnerNames(room)),
     winner: true,
   }) satisfies Prompt;
 
