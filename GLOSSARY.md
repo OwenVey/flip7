@@ -34,6 +34,8 @@ A multiplayer push-your-luck card game played in shared rooms, where players joi
 
 **Table prompt**: What the action bar tells a player right now: a headline, an optional note, and which controls to offer (Hit and Stay, start the next round, play again). Exactly one applies at a time, chosen from the game's phase, the Move being waited on and Deal playback. When you can make a choice, the prompt asks you to pick a player. Each player panel offers a selection control if the available moves include that player as a target. _Avoid_: action prompt (an action is a kind of card), status
 
+**Chat & Log**: The room's chat and game log, shown as one panel. It lasts as long as the Room, keeps one draft and one unread position per viewer, and sits in a sheet on small screens and beside the table on large ones. _Avoid_: chat panel, activity feed
+
 **Deal playback**: The sequence in which the table reveals dealt cards and shows their results to a player.
 
 ## Clocks

@@ -27,6 +27,7 @@ import RulesDialog from "../../components/rules-dialog";
 import SiteNav from "../../components/site-nav";
 import SoundControls from "../../components/sound-controls";
 import Table from "../../components/table";
+import { createSheetTable } from "../../components/table-common";
 import { normalizeCode } from "../../game/protocol";
 import { DEFAULT_SETTINGS } from "../../game/settings";
 import { createDealMotion } from "../../lib/deal-motion";
@@ -36,6 +37,7 @@ import {
 } from "../../lib/deal-playback";
 import { MOTION_PREFERENCE_QUERY } from "../../lib/motion";
 import { createMoveAlert } from "../../lib/move-alert";
+import { createRoomChatLog } from "../../lib/room-chat-log";
 import { createRoomConnection } from "../../lib/room-connection";
 import { createRoomHaptics } from "../../lib/room-haptics";
 import { createRoomSounds } from "../../lib/room-sounds";
@@ -307,40 +309,53 @@ const Room = (props: { code: string }) => {
             )}
           </Match>
           <Match when={tableView()}>
-            {(view) => (
-              <Show
-                when={view().room.phase === "lobby"}
-                fallback={
-                  <Table
+            {(view) => {
+              const chatLog = createRoomChatLog({
+                chat: connection.chat,
+                inSheet: createSheetTable(),
+                log: () => view().room.log,
+                playerId: () => view().playerId,
+                players: () => view().room.players,
+                resultsRound: () =>
+                  view().room.phase === "roundOver" && !table().dealing
+                    ? view().room.round
+                    : null,
+                typing: connection.typing,
+              });
+
+              return (
+                <Show
+                  when={view().room.phase === "lobby"}
+                  fallback={
+                    <Table
+                      room={view().room}
+                      playerId={view().playerId}
+                      send={connection.send}
+                      chatLog={chatLog}
+                      actionsDisabled={table().actionsDisabled}
+                      offline={unavailable()}
+                      latestRoom={connection.room()}
+                      dealing={table().dealing}
+                      dealMoment={table().moment}
+                      dealStep={table().step}
+                      roundPoints={table().roundPoints}
+                      spectator={spectator()}
+                    />
+                  }
+                >
+                  <Lobby
                     room={view().room}
                     playerId={view().playerId}
                     send={connection.send}
-                    chat={connection.chat}
-                    typing={connection.typing()}
-                    actionsDisabled={table().actionsDisabled}
-                    offline={unavailable()}
-                    latestRoom={connection.room()}
-                    dealing={table().dealing}
-                    dealMoment={table().moment}
-                    dealStep={table().step}
-                    roundPoints={table().roundPoints}
+                    chatLog={chatLog}
+                    actionsDisabled={unavailable()}
                     spectator={spectator()}
+                    onWatchInstead={connection.watchInstead}
+                    watchInsteadPending={connection.watchPending()}
                   />
-                }
-              >
-                <Lobby
-                  room={view().room}
-                  playerId={view().playerId}
-                  send={connection.send}
-                  chat={connection.chat}
-                  typing={connection.typing()}
-                  actionsDisabled={unavailable()}
-                  spectator={spectator()}
-                  onWatchInstead={connection.watchInstead}
-                  watchInsteadPending={connection.watchPending()}
-                />
-              </Show>
-            )}
+                </Show>
+              );
+            }}
           </Match>
         </Switch>
         <ToastRegion toaster={toast} data-agent-hidden>

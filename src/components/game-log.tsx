@@ -61,8 +61,7 @@ import type {
 } from "../game/engine";
 import { settlesRound } from "../game/game-events";
 import { CHAT_TEXT_LIMIT, clipText, textLength } from "../game/text";
-import { createChatLogReads, LOG_FILTERS } from "../lib/chat-log-reads";
-import type { ChatLogReads } from "../lib/chat-log-reads";
+import { LOG_FILTERS } from "../lib/chat-log-reads";
 import {
   continuesChat,
   detailText,
@@ -84,6 +83,7 @@ import type {
   LogGroup,
   NamePart,
 } from "../lib/game-log-entries";
+import type { RoomChatLog } from "../lib/room-chat-log";
 import type { ChatControls } from "../lib/room-connection";
 import { eventCue } from "../lib/room-cues";
 import PlayerAvatar from "./player-avatar";
@@ -577,28 +577,12 @@ const typingLabel = (names: readonly string[]) => {
     : "Several people are typing…";
 };
 
-interface ChatLogContentProps {
-  /** Missing for a spectator, who can read the chat but not send to it. */
-  chat?: ChatControls | undefined;
-  draft?: Signal<string> | undefined;
-  players: readonly LogPlayer[];
-  /** Other players typing a chat message, by player ID. */
-  typing: readonly string[];
-}
-
-export interface ChatLogProps extends ChatLogContentProps {
-  log: LogEntry[];
-  playerId: string | null;
-}
-
-export const ChatLog = (
-  props: ChatLogContentProps & { reads: ChatLogReads; inSheet?: boolean }
-) => {
+export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
   const now = createPolled(Date.now, SECOND_MS);
-  const localDraft = createSignal("");
+  const reads = () => props.chatLog.reads;
 
   const continuations = createMemo(() => {
-    const log = props.reads.log();
+    const log = reads().log();
     const ids = new Set<number>();
 
     for (const [index, entry] of log.entries()) {
@@ -610,11 +594,11 @@ export const ChatLog = (
     return ids;
   });
 
-  const groups = createMemo(() => groupLog(props.reads.visible()));
+  const groups = createMemo(() => groupLog(reads().visible()));
 
   const filterChats = () =>
-    props.inSheet === true || props.reads.filter() === "Game"
-      ? props.reads.unreadChats()
+    props.inSheet === true || reads().filter() === "Game"
+      ? reads().unreadChats()
       : 0;
 
   const scroll = createScrollAreaController();
@@ -651,11 +635,11 @@ export const ChatLog = (
 
   const typingNames = createMemo(
     () => {
-      const typing = new Set(props.typing);
+      const typing = new Set(props.chatLog.typing());
 
-      return props.players.flatMap((player) =>
-        typing.has(player.id) ? [player.name] : []
-      );
+      return props.chatLog
+        .players()
+        .flatMap((player) => (typing.has(player.id) ? [player.name] : []));
     },
     {
       equals: (a, b) =>
@@ -672,33 +656,31 @@ export const ChatLog = (
           <h2>
             {CHAT_AND_GAME_LOG_TITLE}
             <Show
-              when={
-                props.reads.filter() !== "Game" && props.reads.unreadChats() > 0
-              }
+              when={reads().filter() !== "Game" && reads().unreadChats() > 0}
             >
               <span class="log-unread" aria-hidden="true">
-                {props.reads.unreadChats()}
+                {reads().unreadChats()}
               </span>
             </Show>
           </h2>
           <output class="sr-only" aria-label="Unread chat messages">
-            <Show when={props.reads.unreadChats() > 0}>
-              {props.reads.unreadChats()} unread{" "}
-              {props.reads.unreadChats() === 1 ? "message" : "messages"}
+            <Show when={reads().unreadChats() > 0}>
+              {reads().unreadChats()} unread{" "}
+              {reads().unreadChats() === 1 ? "message" : "messages"}
             </Show>
           </output>
         </Show>
         <SegmentedControl
           class="log-filters"
           aria-label="Filter activity"
-          value={props.reads.filter()}
+          value={reads().filter()}
           onValueChange={(next) => {
             const option = LOG_FILTERS.find((candidate) => candidate === next);
 
             if (option !== undefined) {
               setFollowsEnd(true);
               scroll.scrollToEnd({ behavior: "instant" });
-              props.reads.setFilter(option);
+              reads().setFilter(option);
             }
           }}
         >
@@ -742,7 +724,7 @@ export const ChatLog = (
             createEffect(
               () => ({ atEnd: state.atEnd, following: state.sticking }),
               (position) => {
-                props.reads.setScrollPosition(position);
+                reads().setScrollPosition(position);
               }
             );
 
@@ -758,7 +740,7 @@ export const ChatLog = (
                       when={groups().length > 0}
                       fallback={
                         <p class="log-empty">
-                          {EMPTY_MESSAGE[props.reads.filter()]}
+                          {EMPTY_MESSAGE[reads().filter()]}
                         </p>
                       }
                     >
@@ -768,14 +750,14 @@ export const ChatLog = (
                             group={group()}
                             continuations={continuations()}
                             collapsible={
-                              props.reads.filter() !== "Chat" &&
+                              reads().filter() !== "Chat" &&
                               group().entries.some(
                                 (entry) =>
                                   !isChat(entry) && settlesRound(entry.event)
                               )
                             }
-                            playerId={props.reads.playerId()}
-                            newFrom={props.reads.newFrom()}
+                            playerId={reads().playerId()}
+                            newFrom={reads().newFrom()}
                             now={now()}
                             onUnfold={stayAboveUnfoldedRound}
                           />
@@ -795,9 +777,9 @@ export const ChatLog = (
                   >
                     <ArrowDown aria-hidden="true" />
                     Jump to latest
-                    <Show when={props.reads.newEntries() > 0}>
+                    <Show when={reads().newEntries() > 0}>
                       {" "}
-                      · {props.reads.newEntries()} new
+                      · {reads().newEntries()} new
                     </Show>
                   </ScrollAreaScrollToEnd>
                 </div>
@@ -827,15 +809,15 @@ export const ChatLog = (
             {typingLabel(typingNames())}
           </p>
           <Show
-            when={props.chat}
+            when={props.chatLog.chat()}
             fallback={<p class="muted chat-hint">Join as a player to chat.</p>}
           >
             {(chat) => (
               <ChatForm
                 chat={chat()}
-                draft={props.draft ?? localDraft}
+                draft={props.chatLog.draft}
                 onSent={() => {
-                  props.reads.clearNewFrom();
+                  reads().clearNewFrom();
                 }}
               />
             )}
@@ -846,20 +828,11 @@ export const ChatLog = (
   );
 };
 
-export default function GameLog(props: ChatLogProps) {
-  const reads = createChatLogReads({
-    log: () => props.log,
-    playerId: () => props.playerId,
-    shown: () => true,
-  });
-
+/** Chat & Log beside the page, when the layout leaves room for it. */
+export default function ChatLogPanel(props: { chatLog: RoomChatLog }) {
   return (
-    <ChatLog
-      reads={reads}
-      chat={props.chat}
-      draft={props.draft}
-      players={props.players}
-      typing={props.typing}
-    />
+    <Show when={!props.chatLog.inSheet()}>
+      <ChatLog chatLog={props.chatLog} />
+    </Show>
   );
 }

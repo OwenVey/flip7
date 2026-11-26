@@ -6,14 +6,14 @@ import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { availableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { pointsOf } from "../lib/deal-playback";
-import type { ChatControls } from "../lib/room-connection";
+import type { RoomChatLog } from "../lib/room-chat-log";
 import { passDealerChip } from "../lib/table-motion";
 import type { ChipSpot } from "../lib/table-motion";
 import ActionBar from "./action-bar";
 import CardTooltips from "./card-tooltips";
 import ChatSheet from "./chat-sheet";
 import Confetti from "./confetti";
-import GameLog from "./game-log";
+import ChatLogPanel from "./game-log";
 import GameOverDialog from "./game-over-dialog";
 import InviteButton from "./invite-button";
 import Leaderboard from "./leaderboard";
@@ -23,7 +23,7 @@ import RoundPlayer from "./round-player";
 import ScrollFade from "./scroll-fade";
 import { SpectatorActions, WatcherCount } from "./spectator-controls";
 import type { Spectator } from "./spectator-controls";
-import { createSheetTable, samePlayerIds, SCORES_TITLE } from "./table-common";
+import { samePlayerIds, SCORES_TITLE } from "./table-common";
 import type {
   DealProps,
   RoundPointsByPlayer,
@@ -36,9 +36,7 @@ export default function Table(
   props: TableProps &
     DealProps &
     RoundPointsByPlayer & {
-      chat: ChatControls;
-      /** Other players typing a chat message, by player ID. */
-      typing: readonly string[];
+      chatLog: RoomChatLog;
       /**
        * The room as last confirmed, ahead of deal playback. Settings read it so
        * a change shows as soon as the room accepts it, not after the deal.
@@ -49,7 +47,6 @@ export default function Table(
     }
 ) {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
-  const chat = () => (props.playerId === null ? undefined : props.chat);
 
   const playerIds = createMemo(() => props.room.players.map(({ id }) => id), {
     equals: samePlayerIds,
@@ -90,11 +87,7 @@ export default function Table(
     }
   );
 
-  const sheetTable = createSheetTable();
-  const chatDraft = createSignal("");
-
   const [scoresOpen, setScoresOpen] = createSignal(false);
-  const [logOpenedAt, setLogOpenedAt] = createSignal<number | null>();
 
   const resultsRound = createMemo(() =>
     props.room.phase === "roundOver" && props.dealing !== true
@@ -105,19 +98,11 @@ export default function Table(
   const sheetResultsRound = createMemo(() => {
     const round = resultsRound();
 
-    return round !== null && sheetTable() ? round : null;
+    return round !== null && props.chatLog.inSheet() ? round : null;
   });
-
-  const logOpen = () => {
-    const openedAt = logOpenedAt();
-    const round = sheetResultsRound();
-
-    return openedAt !== undefined && (round === null || openedAt === round);
-  };
 
   createEffect(sheetResultsRound, (round, previous) => {
     if (round !== null) {
-      setLogOpenedAt(undefined);
       setScoresOpen(true);
     } else if (previous !== null && previous !== undefined) {
       setScoresOpen(false);
@@ -150,19 +135,7 @@ export default function Table(
                 roundPoints={props.roundPoints}
               />
             </TableSheet>
-            <ChatSheet
-              open={logOpen()}
-              onOpenChange={(open) => {
-                setLogOpenedAt(open ? sheetResultsRound() : undefined);
-              }}
-              log={props.room.log}
-              playerId={props.playerId}
-              chat={chat()}
-              draft={chatDraft}
-              players={props.room.players}
-              typing={props.typing}
-              logInSheet={sheetTable()}
-            />
+            <ChatSheet chatLog={props.chatLog} />
             <InviteButton brief collapsible />
             <Show when={moves().host.configure}>
               <RoomSettingsMenu
@@ -259,16 +232,7 @@ export default function Table(
                 />
               </ScrollFade>
             </section>
-            <Show when={!sheetTable()}>
-              <GameLog
-                log={props.room.log}
-                playerId={props.playerId}
-                chat={chat()}
-                draft={chatDraft}
-                players={props.room.players}
-                typing={props.typing}
-              />
-            </Show>
+            <ChatLogPanel chatLog={props.chatLog} />
           </div>
         </div>
         <div class="flight-layer" data-flight-layer="" aria-hidden="true" />

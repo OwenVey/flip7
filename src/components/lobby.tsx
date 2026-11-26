@@ -6,7 +6,6 @@ import { Button } from "@ui-sdk/solid/button";
 import {
   createEffect,
   createMemo,
-  createSignal,
   createUniqueId,
   For,
   onSettled,
@@ -19,10 +18,11 @@ import { availableMoves, MIN_PLAYERS } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { hostName } from "../lib/host";
 import { createCopy } from "../lib/invite";
-import type { ChatControls, RoomConnection } from "../lib/room-connection";
+import type { RoomChatLog } from "../lib/room-chat-log";
+import type { RoomConnection } from "../lib/room-connection";
 import { pop } from "../lib/table-motion";
 import ChatSheet from "./chat-sheet";
-import GameLog from "./game-log";
+import ChatLogPanel from "./game-log";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
 import OfflineBadge from "./offline-badge";
@@ -35,7 +35,6 @@ import {
   WatcherCount,
 } from "./spectator-controls";
 import type { Spectator } from "./spectator-controls";
-import { createSheetTable } from "./table-common";
 
 const RoomCode = (props: { code: string }) => {
   const { copied, copy } = createCopy();
@@ -76,9 +75,7 @@ export default function Lobby(props: {
   room: RoomView;
   playerId: string | null;
   send: RoomConnection["send"];
-  chat: ChatControls;
-  /** Other players typing a chat message, by player ID. */
-  typing: readonly string[];
+  chatLog: RoomChatLog;
   actionsDisabled?: boolean;
   /** A Spectator's Join and Leave, shown where a player's Leave goes. */
   spectator?: Spectator;
@@ -88,7 +85,6 @@ export default function Lobby(props: {
 }) {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
   const isHost = () => moves().host.configure;
-  const chat = () => (props.playerId === null ? undefined : props.chat);
 
   const addBotBlocked = () =>
     props.actionsDisabled === true || !moves().host.addBot;
@@ -117,8 +113,6 @@ export default function Lobby(props: {
   );
 
   const count = () => `${props.room.players.length} / ${MAX_PLAYERS}`;
-  const sheetTable = createSheetTable();
-  const chatDraft = createSignal("");
 
   return (
     <div class="lobby-page">
@@ -129,15 +123,7 @@ export default function Lobby(props: {
             count={props.room.spectatorCount}
             watching={props.playerId === null}
           />
-          <ChatSheet
-            log={props.room.log}
-            playerId={props.playerId}
-            chat={chat()}
-            draft={chatDraft}
-            players={props.room.players}
-            typing={props.typing}
-            logInSheet={sheetTable()}
-          />
+          <ChatSheet chatLog={props.chatLog} />
           <Show
             when={props.playerId !== null}
             fallback={
@@ -314,16 +300,7 @@ export default function Lobby(props: {
           </ul>
         </section>
 
-        <Show when={!sheetTable()}>
-          <GameLog
-            log={props.room.log}
-            playerId={props.playerId}
-            chat={chat()}
-            draft={chatDraft}
-            players={props.room.players}
-            typing={props.typing}
-          />
-        </Show>
+        <ChatLogPanel chatLog={props.chatLog} />
       </div>
     </div>
   );
