@@ -1,4 +1,4 @@
-import { createRoot, createSignal, flush } from "solid-js";
+import { createRoot, createSignal, flush, untrack } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import plainSvg from "../assets/favicon.svg?raw";
@@ -32,6 +32,7 @@ const createAlert = (
   createRoot((dispose) => {
     const playerId = options.playerId === undefined ? "a" : options.playerId;
     const [view, setView] = createSignal(initial);
+    const [confirmed, setConfirmed] = createSignal(initial.room);
     const [syncId, setSyncId] = createSignal(1);
     const [hidden, setHidden] = createSignal(false);
     const played: string[] = [];
@@ -49,6 +50,7 @@ const createAlert = (
         },
       },
       playerId: () => playerId,
+      room: confirmed,
       syncId,
       tabHidden: hidden,
       title: () => ROOM_TITLE,
@@ -68,11 +70,24 @@ const createAlert = (
         setHidden(next);
         flush();
       },
-      setSyncId: (next: number) => {
-        setSyncId(next);
+      confirm: (next: RoomView, resync = false) => {
+        if (resync) {
+          setSyncId((current) => current + 1);
+        }
+
+        setConfirmed(next);
+        flush();
+      },
+      replay: (next: Shown) => {
+        setView(next);
         flush();
       },
       show: (next: Shown) => {
+        if (next.room !== untrack(confirmed)) {
+          setConfirmed(next.room);
+          flush();
+        }
+
         setView(next);
         flush();
       },
@@ -267,7 +282,7 @@ describe("createMoveAlert rules", () => {
     expect(alert.played).toStrictEqual(["sound", "nudge"]);
 
     alert.show(settled(room({ turnId: "b" })));
-    alert.setSyncId(2);
+    alert.confirm(ownTurn, true);
     alert.show(settled(ownTurn));
     expect(alert.played).toStrictEqual(["sound", "nudge", "sound", "nudge"]);
     alert.dispose();
@@ -307,6 +322,38 @@ describe("createMoveAlert rules", () => {
     alert.show(settled(ownTurn));
     alert.show(settled(room({ drawSeq: 1, turnId: "b" })));
     alert.show(settled(room({ drawSeq: 2, turnId: "a" })));
+    expect(alert.played).toStrictEqual([
+      "sound",
+      "haptic",
+      "nudge",
+      "sound",
+      "haptic",
+      "nudge",
+    ]);
+    alert.dispose();
+  });
+
+  it("stays still for a Move found on reconnect even when playback animates it", () => {
+    const alert = createAlert(settled(ownTurn), { playerId: "b" });
+    const bensTurn = room({ drawSeq: 1, turnId: "b" });
+
+    alert.confirm(bensTurn, true);
+    alert.replay({ ...settled(room({ turnId: "a" })), dealing: true });
+    alert.replay({ ...settled(bensTurn), dealing: true });
+    alert.replay(settled(bensTurn));
+    expect(alert.played).toStrictEqual(["sound", "nudge"]);
+    alert.dispose();
+  });
+
+  it("sounds for a new Move when playback catches up past the turns between", () => {
+    const alert = createAlert(settled(room({ turnId: "b" })));
+
+    alert.show(settled(ownTurn));
+    const adasTurnAgain = room({ drawSeq: 2, turnId: "a" });
+    alert.confirm(room({ drawSeq: 1, turnId: "b" }));
+    alert.replay({ ...settled(ownTurn), dealing: true });
+    alert.confirm(adasTurnAgain);
+    alert.replay(settled(adasTurnAgain));
     expect(alert.played).toStrictEqual([
       "sound",
       "haptic",

@@ -122,6 +122,12 @@ interface MoveAlertOutputs {
 }
 
 interface MoveAlertOptions {
+  /**
+   * The room as last confirmed, ahead of Deal playback. The alert follows each
+   * Move as the room confirms it, so playback catching up or replaying a
+   * resync can't change which Moves are new or arrived live.
+   */
+  room: () => RoomView | null;
   /** What Deal playback shows. A whole `DealPlaybackView` fits. */
   view: () => MoveAlertView;
   playerId: () => string | null;
@@ -149,68 +155,70 @@ const carriesOn = (previous: MoveSeen, next: MoveSeen) =>
 
 /**
  * The Move alert: everything that tells this viewer the game is waiting on
- * them. It fires once Deal playback has shown the Move and the viewer can act,
- * exactly when the action bar says "Your move". It plays the turn sound once
- * per Move (a Freeze choice right after your own hit carries the same Move
- * on), vibrates only for a Move that arrived live in a visible tab, and nudges
- * the action bar. On the browser tab, the icon gets a dot, and in a hidden tab
- * the title and dot blink so the tab stands out. Returns whether the alert is
- * on and the page title to use.
+ * them. It follows Moves as the room confirms them and fires once Deal
+ * playback has shown the Move and the viewer can act, exactly when the action
+ * bar says "Your move". It plays the turn sound once per Move (a Freeze choice
+ * right after your own hit carries the same Move on), vibrates only for a Move
+ * that arrived live in a visible tab, and nudges the action bar. On the
+ * browser tab, the icon gets a dot, and in a hidden tab the title and dot
+ * blink so the tab stands out. Returns whether the alert is on and the page
+ * title to use.
  */
 export const createMoveAlert = (options: MoveAlertOptions) => {
   const tabHidden = options.tabHidden ?? createTabHidden();
 
-  const move = createMemo(() => {
-    const { room } = options.view();
-
-    return room === null
+  const moveIn = (room: RoomView | null) =>
+    room === null
       ? null
       : yourMove(room, options.playerId(), { dealing: false });
-  });
+
+  const confirmedMove = createMemo(() => moveIn(options.room()));
+  const shownMove = createMemo(() => moveIn(options.view().room));
 
   const alerting = createMemo(() => {
     const { actionsDisabled, dealing } = options.view();
 
-    return move() !== null && !dealing && !actionsDisabled;
+    return shownMove() !== null && !dealing && !actionsDisabled;
   });
 
-  let alertPending = false;
+  let pendingMove: string | null = null;
   let soundPending = false;
   let hapticPending = false;
-  let roomSyncId: number | null = null;
 
   createEffect(
     () => ({
-      key: move(),
-      on: alerting(),
-      room: options.view().room,
+      key: confirmedMove(),
+      room: options.room(),
       syncId: options.syncId(),
     }),
     (next, previous) => {
       const live =
         previous?.room !== null &&
         previous?.room !== undefined &&
-        roomSyncId === next.syncId &&
+        previous.syncId === next.syncId &&
         !untrack(tabHidden);
 
       hapticPending &&= live;
 
-      if (next.room !== previous?.room) {
-        roomSyncId = next.syncId;
-      }
-
-      if (next.key !== (previous?.key ?? null)) {
-        const sameMove = previous !== undefined && carriesOn(previous, next);
-        alertPending = next.key !== null;
-        soundPending = alertPending && (soundPending || !sameMove);
-        hapticPending = alertPending && live;
-      }
-
-      if (!next.on || !alertPending) {
+      if (next.key === (previous?.key ?? null)) {
         return;
       }
 
-      alertPending = false;
+      const sameMove = previous !== undefined && carriesOn(previous, next);
+      pendingMove = next.key;
+      soundPending = next.key !== null && (soundPending || !sameMove);
+      hapticPending = next.key !== null && live;
+    }
+  );
+
+  createEffect(
+    () => ({ key: shownMove(), on: alerting() }),
+    ({ key, on }) => {
+      if (!on || key === null || key !== pendingMove) {
+        return;
+      }
+
+      pendingMove = null;
 
       if (soundPending) {
         options.play.sound();

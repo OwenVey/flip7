@@ -106,7 +106,12 @@ const playback = (
   };
 
   const [table, setTable] = createSignal(initialDealPlayback);
-  const [shownSyncId, setShownSyncId] = createSignal(0);
+
+  const [confirmed, setConfirmed] = createSignal<{
+    room: RoomView | null;
+    syncId: number;
+  }>({ room: null, syncId: 0 });
+
   const [tabHidden, setTabHidden] = createSignal(false);
 
   const playHaptic = turnYieldsToOutcome((cue) => {
@@ -127,7 +132,8 @@ const playback = (
         },
       },
       playerId: () => playerId,
-      syncId: shownSyncId,
+      room: () => confirmed().room,
+      syncId: () => confirmed().syncId,
       tabHidden,
       title: () => "",
       view: table,
@@ -168,7 +174,7 @@ const playback = (
       syncId = 1,
       hapticsVisible = true
     ) => {
-      setShownSyncId(syncId);
+      setConfirmed({ room, syncId });
       setTabHidden(!hapticsVisible);
       flush();
       instance.update({ canAct, hapticsVisible, playerId, room, syncId });

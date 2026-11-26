@@ -129,6 +129,7 @@ const Room = (props: { code: string }) => {
       },
     },
     playerId: connection.playerId,
+    room: connection.room,
     syncId: connection.syncId,
     title: () => {
       let prefix = connection.watching() ? "Watching · " : "";
