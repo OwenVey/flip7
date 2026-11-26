@@ -13,14 +13,13 @@
     "deploy": "vite build && cf deploy --prebuilt",
     "check": "ultracite check",
     "fix": "ultracite fix",
+    "knip": "knip",
     "prepare": "lefthook install"
   },
   "dependencies": {
     "@lucide/solid": "^1.80.0",
     "@nkzw/audio": "^1.1.0",
     "@solid-primitives/clipboard": "^2.0.0",
-    "@solid-primitives/connectivity": "^1.0.0",
-    "@solid-primitives/page-utilities": "^3.0.0",
     "@solid-primitives/storage": "^5.0.0",
     "@solid-primitives/timer": "^1.4.5",
     "@solidjs/meta": "^2.0.0",
@@ -50,6 +49,7 @@
     "filesystem-routing": "0.5.0",
     "fontless": "^1.4.0",
     "jsdom": "^31.0.1",
+    "knip": "^6.48.0",
     "lefthook": "^2.2.3",
     "oxfmt": "^0.80.0",
     "oxlint": "^1.95.0",
