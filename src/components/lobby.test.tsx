@@ -21,7 +21,6 @@ import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
-import { itemAt } from "../test/item-at";
 import { Lobby } from "../test/lobby";
 import { mockMatchMedia } from "../test/match-media";
 
@@ -59,6 +58,18 @@ const spectator = () => ({
   },
   onLeave: vi.fn<() => void>(),
 });
+
+const choose = async (name: string, item: string) => {
+  fireEvent.click(screen.getByRole("button", { name: `Options for ${name}` }));
+  fireEvent.click(
+    within(await screen.findByRole("menu")).getByRole("menuitem", {
+      name: item,
+    })
+  );
+  await vi.waitFor(() => {
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+};
 
 describe("<Lobby />", () => {
   afterEach(cleanup);
@@ -164,7 +175,7 @@ describe("<Lobby />", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("keeps a bot's Remove focusable but ignores presses while actions are paused", () => {
+  it("disables a player's menu items while actions are paused", async () => {
     const send = vi.fn<RoomConnection["send"]>();
     const [paused, setPaused] = createSignal(true);
     render(() => (
@@ -178,16 +189,20 @@ describe("<Lobby />", () => {
       />
     ));
 
-    const bot = itemAt(screen.getAllByRole("button", { name: /^Remove/u }), 1);
+    fireEvent.click(screen.getByRole("button", { name: "Options for Ember" }));
 
-    expect(bot).toBeEnabled();
-    expect(bot).toHaveAttribute("aria-disabled", "true");
-    fireEvent.click(bot);
+    const remove = within(await screen.findByRole("menu")).getByRole(
+      "menuitem",
+      { name: "Remove from room" }
+    );
+
+    expect(remove).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(remove);
     expect(send).not.toHaveBeenCalled();
 
     setPaused(false);
     flush();
-    fireEvent.click(bot);
+    fireEvent.click(remove);
     expect(send).toHaveBeenCalledExactlyOnceWith({
       playerId: "bot",
       type: "kick",
@@ -417,7 +432,7 @@ describe("<Lobby />", () => {
     expect(screen.getByText(`3 / ${MAX_PLAYERS}`)).toBeInTheDocument();
   });
 
-  it("removes a bot in one tap but asks before removing a person", () => {
+  it("removes a bot in one tap but asks before removing a person", async () => {
     const send = vi.fn<RoomConnection["send"]>();
     render(() => (
       <Lobby
@@ -428,16 +443,58 @@ describe("<Lobby />", () => {
         send={send}
       />
     ));
-    const removes = screen.getAllByRole("button", { name: /^Remove/u });
-    const [guest, bot] = [itemAt(removes, 0), itemAt(removes, 1)];
 
-    fireEvent.click(bot);
-    fireEvent.click(guest);
+    await choose("Ember", "Remove from room");
+    await choose("Guest", "Remove from room");
 
+    await expect(
+      screen.findByRole("alertdialog", { name: "Remove Guest?" })
+    ).resolves.toBeVisible();
     expect(send).toHaveBeenCalledExactlyOnceWith({
       playerId: "bot",
       type: "kick",
     });
+  });
+
+  it("gives the host a player menu on everyone but themselves", async () => {
+    const send = vi.fn<RoomConnection["send"]>();
+    render(() => (
+      <Lobby
+        chat={chatControls()}
+        typing={[]}
+        room={roomWithBot()}
+        playerId="p0"
+        send={send}
+      />
+    ));
+
+    expect(
+      screen.queryByRole("button", { name: "Options for Host" })
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Options for Guest" }));
+    fireEvent.click(
+      within(await screen.findByRole("menu")).getByRole("menuitem", {
+        name: "Make host",
+      })
+    );
+    expect(send).toHaveBeenCalledExactlyOnceWith({
+      playerId: "p1",
+      type: "makeHost",
+    });
+  });
+
+  it("shows guests plain avatars", () => {
+    render(() => (
+      <Lobby
+        chat={chatControls()}
+        typing={[]}
+        room={roomWithBot()}
+        playerId="p1"
+        send={vi.fn<RoomConnection["send"]>()}
+      />
+    ));
+
+    expect(screen.queryByRole("button", { name: /Options for/u })).toBeNull();
   });
 
   it("offers the invite only in the Invite friends card", () => {

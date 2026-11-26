@@ -40,7 +40,19 @@ export type GameEvent =
       player: LogPlayer;
       how: "kicked" | "left" | "leftToWatch";
     }
-  | { type: "hostChanged"; player: LogPlayer }
+  | {
+      type: "hostChanged";
+      player: LogPlayer;
+      /** The room handed hosting over after the host went offline. */
+      how: "auto";
+    }
+  | {
+      type: "hostChanged";
+      player: LogPlayer;
+      /** The former host who handed hosting over. */
+      by: LogPlayer;
+      how: "given";
+    }
   | { type: "targetScoreSet"; targetScore: TargetScore }
   | { type: "botSpeedSet"; botSpeed: BotSpeed }
   | { type: "lockSet"; locked: boolean }

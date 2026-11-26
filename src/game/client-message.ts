@@ -49,6 +49,11 @@ const ClientMessageSchema = v.variant("type", [
     requestId: RequestIdSchema,
     type: v.literal("kick"),
   }),
+  v.object({
+    playerId: IdSchema,
+    requestId: RequestIdSchema,
+    type: v.literal("makeHost"),
+  }),
   v.object({ requestId: RequestIdSchema, type: v.literal("leave") }),
   v.object({
     text: v.pipe(v.string(), v.maxLength(CHAT_TEXT_LIMIT.units)),
@@ -87,6 +92,7 @@ export type GameCommand = Exclude<
 export const isRoomCommand = (command: GameCommand) =>
   command.type === "configure" ||
   command.type === "kick" ||
+  command.type === "makeHost" ||
   command.type === "react" ||
   command.type === "leave";
 

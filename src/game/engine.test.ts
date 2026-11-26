@@ -14,6 +14,7 @@ import {
   isChat,
   hit,
   kick,
+  makeHost,
   leave,
   nextRound,
   playFor,
@@ -543,6 +544,27 @@ describe("evicting a player", () => {
     expect(state.log.at(-1)).toMatchObject({
       event: { how: "left", player: { id: "a", name: "a" }, type: "evicted" },
     });
+  });
+});
+
+describe("handing over hosting", () => {
+  it("lets the host hand hosting to another online player and says so", () => {
+    const state = setup(["a", "b", "c"], [num(1), num(2), num(3)]);
+
+    makeHost(state, "a", "c");
+
+    expect(state.hostId).toBe("c");
+    expect(state.log.at(-1)).toMatchObject({
+      event: {
+        by: { id: "a", name: "a" },
+        how: "given",
+        player: { id: "c", name: "c" },
+        type: "hostChanged",
+      },
+    });
+    expect(() => {
+      makeHost(state, "a", "b");
+    }).toThrow("Only the host can hand over hosting.");
   });
 });
 

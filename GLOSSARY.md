@@ -10,7 +10,7 @@ A multiplayer push-your-luck card game played in shared rooms, where players joi
 
 **Spectator**: A person watching a room's live table without a seat or a role in play.
 
-**Host**: The player who can start games, move the table on, remove players and move for offline players.
+**Host**: The player who can start games, move the table on, remove players, move for offline players and hand hosting to another online player. If the host stays offline while someone else is online, hosting passes to a connected player on its own.
 
 **Bot**: A player the room plays itself. Always present, never host, never stalls. The host adds bots in the lobby. _Avoid_: AI, CPU, computer player
 

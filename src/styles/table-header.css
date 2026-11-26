@@ -60,34 +60,6 @@
   display: none;
 }
 
-.table-more-menu {
-  & [data-slot="menu-item"] {
-    min-height: 2.25rem;
-    font-weight: 600;
-
-    &[data-highlighted] {
-      background: color-mix(in oklab, var(--ink) 12%, var(--paper));
-    }
-
-    @media (pointer: coarse) {
-      min-height: var(--control-height-lg);
-    }
-  }
-
-  & [data-slot="menu-separator"] {
-    margin-block: 0.375rem;
-  }
-
-  & [data-slot="menu-item"][data-tone="danger"]:not([data-disabled]) {
-    color: var(--danger);
-
-    &[data-highlighted] {
-      background: color-mix(in oklab, var(--danger) 14%, var(--paper));
-      color: var(--danger-ink);
-    }
-  }
-}
-
 @container table-header (width < 50rem) {
   .table-header [data-collapsible] {
     display: none;

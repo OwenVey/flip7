@@ -30,7 +30,8 @@ export type Move =
   | { type: "lobby" }
   | { type: "addBot" }
   | { type: "configure"; targetScore?: number }
-  | { type: "kick"; playerId: string };
+  | { type: "kick"; playerId: string }
+  | { type: "makeHost"; playerId: string };
 
 export const MAX_SPECTATORS = 32;
 
@@ -176,6 +177,46 @@ const rejectMoveFor = (
     : `${player.name} needs a card in front of them before they can stay.`;
 };
 
+const rejectKick = (view: MovesView, viewerId: string, playerId: string) => {
+  if (view.hostId !== viewerId) {
+    return "Only the host can remove players.";
+  }
+
+  if (playerId === viewerId) {
+    return "Use Leave to leave the room.";
+  }
+
+  return findPlayer(view, playerId) ? null : "That player already left.";
+};
+
+const rejectMakeHost = (
+  view: MovesView,
+  viewerId: string,
+  playerId: string
+) => {
+  if (view.hostId !== viewerId) {
+    return "Only the host can hand over hosting.";
+  }
+
+  if (playerId === viewerId) {
+    return "You're already the host.";
+  }
+
+  const player = findPlayer(view, playerId);
+
+  if (!player) {
+    return "That player already left.";
+  }
+
+  if (player.bot) {
+    return "Bots can't be the host.";
+  }
+
+  return player.connected
+    ? null
+    : `${player.name} is offline. Only an online player can be the host.`;
+};
+
 const rejectHostMove = (
   view: MovesView,
   viewerId: string | null,
@@ -186,15 +227,11 @@ const rejectHostMove = (
   }
 
   if (move.type === "kick") {
-    if (view.hostId !== viewerId) {
-      return "Only the host can remove players.";
-    }
+    return rejectKick(view, viewerId, move.playerId);
+  }
 
-    if (move.playerId === viewerId) {
-      return "Use Leave to leave the room.";
-    }
-
-    return findPlayer(view, move.playerId) ? null : "That player already left.";
+  if (move.type === "makeHost") {
+    return rejectMakeHost(view, viewerId, move.playerId);
   }
 
   if (view.hostId !== viewerId) {
@@ -250,7 +287,8 @@ export const rejectMove = (view: MovesView, viewerId: string, move: Move) => {
     case "lobby":
     case "addBot":
     case "configure":
-    case "kick": {
+    case "kick":
+    case "makeHost": {
       return rejectHostMove(view, viewerId, move);
     }
 
@@ -292,6 +330,14 @@ export const availableMoves = (view: MovesView, viewerId: string | null) => {
         )
       : [],
     lobby: rejectHostMove(view, viewerId, { type: "lobby" }) === null,
+    makeHost:
+      viewerId === null
+        ? []
+        : view.players.flatMap((player) =>
+            rejectMakeHost(view, viewerId, player.id) === null
+              ? [player.id]
+              : []
+          ),
     nextRound: rejectHostMove(view, viewerId, { type: "nextRound" }) === null,
     start: rejectHostMove(view, viewerId, { type: "start" }) === null,
   };

@@ -26,8 +26,7 @@ import ChatLogPanel from "./game-log";
 import InviteButton from "./invite-button";
 import LeaveRoom from "./leave-room";
 import OfflineBadge from "./offline-badge";
-import PlayerAvatar from "./player-avatar";
-import RemovePlayer from "./remove-player";
+import PlayerMenu from "./player-menu";
 import RoomSettingsForm, { settingsSummary } from "./room-settings";
 import {
   SpectatorActions,
@@ -252,7 +251,17 @@ export default function Lobby(props: {
                   data-arrived={rendered ? "" : undefined}
                   data-offline={player().connected ? undefined : ""}
                 >
-                  <PlayerAvatar player={player()} />
+                  <PlayerMenu
+                    player={player()}
+                    host={moves().host}
+                    disabled={props.actionsDisabled}
+                    onRemove={(playerId) => {
+                      void props.send({ playerId, type: "kick" });
+                    }}
+                    onMakeHost={(playerId) => {
+                      void props.send({ playerId, type: "makeHost" });
+                    }}
+                  />
                   <span class="roster-name" dir="auto" title={player().name}>
                     {player().name}
                   </span>
@@ -272,20 +281,6 @@ export default function Lobby(props: {
                   </Show>
                   <Show when={!player().connected}>
                     <OfflineBadge />
-                  </Show>
-                  <Show when={moves().host.kick.includes(player().id)}>
-                    <RemovePlayer
-                      bot={player().bot}
-                      confirm={!player().bot}
-                      disabled={props.actionsDisabled}
-                      name={player().name}
-                      onRemove={() => {
-                        void props.send({
-                          playerId: player().id,
-                          type: "kick",
-                        });
-                      }}
-                    />
                   </Show>
                 </li>
               )}
