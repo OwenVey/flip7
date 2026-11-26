@@ -204,7 +204,27 @@ const gameOverPrompt = (room: RoomView, moves: AvailableMoves) =>
     winner: true,
   }) satisfies Prompt;
 
-const roundOverPrompt = (room: RoomView, moves: AvailableMoves) => {
+const ownRoundNote = (room: RoomView, playerId: string | null) => {
+  const me = room.players.find((player) => player.id === playerId);
+
+  if (me === undefined || me.lastRound === null) {
+    return null;
+  }
+
+  if (me.status === "busted") {
+    return "You busted — no points";
+  }
+
+  const { total } = me.lastRound;
+
+  return `You banked ${total} ${total === 1 ? "point" : "points"}`;
+};
+
+const roundOverPrompt = (
+  room: RoomView,
+  playerId: string | null,
+  moves: AvailableMoves
+) => {
   const over = room.log
     .flatMap((entry) =>
       isChat(entry) || entry.round !== room.round ? [] : [entry.event]
@@ -212,6 +232,11 @@ const roundOverPrompt = (room: RoomView, moves: AvailableMoves) => {
     .findLast((event) => event.type === "roundOver");
 
   const tiedAt = over?.tiedAt ?? null;
+
+  const note =
+    tiedAt === null
+      ? ownRoundNote(room, playerId)
+      : `Tied at ${tiedAt} — play another round`;
 
   return {
     controls: moves.host.nextRound
@@ -221,9 +246,7 @@ const roundOverPrompt = (room: RoomView, moves: AvailableMoves) => {
           text: `Waiting for ${hostName(room)} to start the next round.`,
         },
     headline: roundEndHeadline(room),
-    ...(tiedAt !== null && {
-      note: `Tied at ${tiedAt} — play another round`,
-    }),
+    ...(note !== null && { note }),
   } satisfies Prompt;
 };
 
@@ -420,7 +443,7 @@ const promptFor = (
   }
 
   if (room.phase === "roundOver") {
-    return roundOverPrompt(room, moves);
+    return roundOverPrompt(room, playerId, moves);
   }
 
   if (room.choice) {
