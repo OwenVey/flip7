@@ -1,3 +1,4 @@
+import type { ReactionEmoji } from "../game/chat-reactions";
 import { isRoomCommand } from "../game/client-message";
 import type { ClientMessage, GameCommand } from "../game/client-message";
 import {
@@ -536,6 +537,55 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     });
   };
 
+  const sendCommand = async (command: GameCommand, quiet: boolean) => {
+    const roomCommand = isRoomCommand(command);
+
+    if (stopped || (pendingMove && !roomCommand)) {
+      return false;
+    }
+
+    if (!state.online || !state.ready || !socket.isOpen()) {
+      if (!quiet) {
+        notify(TRY_AGAIN);
+      }
+
+      return false;
+    }
+
+    const requestId = deps.newId();
+
+    if (roomCommand) {
+      const { promise, resolve } = Promise.withResolvers<boolean>();
+
+      const timeout = setTimeout(() => {
+        settleRoomCommand(requestId, false);
+
+        if (!quiet) {
+          notify("The room couldn't confirm your request.");
+        }
+      }, REPLY_TIMEOUT_MS);
+
+      roomCommands.set(requestId, { quiet, resolve, timeout });
+
+      if (!raw({ ...command, requestId })) {
+        settleRoomCommand(requestId, false);
+      }
+
+      return await promise;
+    }
+
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const timeout = setTimeout(startOver, REPLY_TIMEOUT_MS);
+    pendingMove = { requestId, resolve, timeout };
+    update({ sending: true });
+
+    if (!raw({ ...command, requestId })) {
+      settleMove(false);
+    }
+
+    return await promise;
+  };
+
   return {
     browserStateChanged: ({ online, visible }: BrowserState) => {
       if (stopped) {
@@ -570,6 +620,9 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
       return sent;
     },
+
+    react: async (messageId: number, emoji: ReactionEmoji | null) =>
+      await sendCommand({ emoji, messageId, type: "react" }, true),
 
     typing: (active: boolean) => {
       if (!state.online || !state.ready) {
@@ -703,54 +756,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       }
     },
 
-    send: async (command: GameCommand, { quiet = false } = {}) => {
-      const roomCommand = isRoomCommand(command);
-
-      if (stopped || (pendingMove && !roomCommand)) {
-        return false;
-      }
-
-      if (!state.online || !state.ready || !socket.isOpen()) {
-        if (!quiet) {
-          notify(TRY_AGAIN);
-        }
-
-        return false;
-      }
-
-      const requestId = deps.newId();
-
-      if (roomCommand) {
-        const { promise, resolve } = Promise.withResolvers<boolean>();
-
-        const timeout = setTimeout(() => {
-          settleRoomCommand(requestId, false);
-
-          if (!quiet) {
-            notify("The room couldn't confirm your request.");
-          }
-        }, REPLY_TIMEOUT_MS);
-
-        roomCommands.set(requestId, { quiet, resolve, timeout });
-
-        if (!raw({ ...command, requestId })) {
-          settleRoomCommand(requestId, false);
-        }
-
-        return await promise;
-      }
-
-      const { promise, resolve } = Promise.withResolvers<boolean>();
-      const timeout = setTimeout(startOver, REPLY_TIMEOUT_MS);
-      pendingMove = { requestId, resolve, timeout };
-      update({ sending: true });
-
-      if (!raw({ ...command, requestId })) {
-        settleMove(false);
-      }
-
-      return await promise;
-    },
+    send: async (command: GameCommand) => await sendCommand(command, false),
 
     watch: () => {
       if (

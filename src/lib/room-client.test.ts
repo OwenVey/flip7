@@ -464,7 +464,7 @@ describe("the log through the room client", () => {
     const { logSeq: messageId } = net.stored.game;
     const before = ben.client.state.room?.log;
 
-    const first = ana.client.send({ emoji: "👍", messageId, type: "react" });
+    const first = ana.client.react(messageId, "👍");
     net.flush();
     await expect(first).resolves.toBeTruthy();
     expect(ben.client.state.room?.log).toBe(before);
@@ -477,11 +477,7 @@ describe("the log through the room client", () => {
       Array.from({ length: 3 }, () => ({ [messageId]: { [anaId]: "👍" } }))
     );
 
-    const replacement = otherSeat.client.send({
-      emoji: "❤️",
-      messageId,
-      type: "react",
-    });
+    const replacement = otherSeat.client.react(messageId, "❤️");
 
     net.flush();
     await replacement;
@@ -497,17 +493,12 @@ describe("the log through the room client", () => {
     ben.client.chat("hello");
     net.flush();
     const { logSeq: messageId } = net.stored.game;
-    const initial = ana.client.send({ emoji: "❤️", messageId, type: "react" });
+    const initial = ana.client.react(messageId, "❤️");
     net.flush();
     await initial;
 
     net.drop(ana);
-    await expect(
-      ana.client.send(
-        { emoji: "🎉", messageId, type: "react" },
-        { quiet: true }
-      )
-    ).resolves.toBeFalsy();
+    await expect(ana.client.react(messageId, "🎉")).resolves.toBeFalsy();
     net.connect(ana);
     net.flush();
     expect(ana.client.state).toMatchObject({
@@ -517,7 +508,7 @@ describe("the log through the room client", () => {
       },
     });
 
-    const removal = ana.client.send({ emoji: null, messageId, type: "react" });
+    const removal = ana.client.react(messageId, null);
     net.flush();
     await expect(removal).resolves.toBeTruthy();
     expect(ben.client.state.room?.reactions).toStrictEqual({});

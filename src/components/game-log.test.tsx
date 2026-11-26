@@ -145,7 +145,7 @@ const stayed = (index: number) =>
 describe("<GameLog />", () => {
   afterEach(cleanup);
 
-  it("offers reactions only on chat, returns focus, and keeps the confirmed selection on failure", async () => {
+  it("shows a reaction at once, returns focus, and drops it if the Room rejects it", async () => {
     const chat = chatControls(() => true, false);
 
     const message = {
@@ -168,20 +168,23 @@ describe("<GameLog />", () => {
       />
     ));
 
-    const trigger = screen.getByRole("button", { name: "Add reaction" });
+    const trigger = await screen.findByRole("button", {
+      expanded: false,
+      name: "Add reaction",
+    });
+
     fireEvent.click(trigger);
     const choice = await screen.findByRole("button", { name: "Thumbs up" });
     choice.focus();
     fireEvent.click(choice);
+    flush();
 
     expect(chat.reactions).toStrictEqual([[message.id, null]]);
+    expect(screen.queryByRole("button", { name: "Thumbs up: 1" })).toBeNull();
     await expect(
-      screen.findByText("Reaction not saved. Try again.")
+      screen.findByRole("button", { name: "Thumbs up: 1", pressed: true })
     ).resolves.toBeInTheDocument();
     expect(trigger).toHaveFocus();
-    expect(
-      screen.getByRole("button", { name: "Thumbs up: 1", pressed: true })
-    ).toBeInTheDocument();
   });
 
   it("shows totals to spectators without offering interactive reactions", () => {

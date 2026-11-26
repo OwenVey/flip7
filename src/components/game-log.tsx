@@ -23,6 +23,7 @@ import {
   CollapsibleTrigger,
 } from "@ui-sdk/solid/collapsible";
 import { Input } from "@ui-sdk/solid/input";
+import { createPopoverController } from "@ui-sdk/solid/popover";
 import {
   createScrollAreaController,
   ScrollArea,
@@ -86,7 +87,8 @@ import type {
 import type { RoomChatLog } from "../lib/room-chat-log";
 import type { ChatControls } from "../lib/room-connection";
 import { eventCue } from "../lib/room-cues";
-import { ChatReactions } from "./chat-reactions";
+import { ChatReactions, ReactionPicker } from "./chat-reactions";
+import type { ReactionPickerController } from "./chat-reactions";
 import PlayerAvatar from "./player-avatar";
 import Tooltip from "./tooltip";
 
@@ -419,8 +421,7 @@ const LogRound = (props: {
   now: number;
   onUnfold: () => void;
   chatLog: RoomChatLog;
-  openPicker: number | null;
-  setOpenPicker: (messageId: number | null) => void;
+  picker: ReactionPickerController;
 }) => {
   const spotlight = useContext(SpotlightContext);
   const [chosen, setChosen] = createSignal<boolean>();
@@ -498,11 +499,14 @@ const LogRound = (props: {
                       />
                       <ChatReactions
                         messageId={chat().id}
-                        reactions={props.chatLog.reactions()[chat().id]}
-                        playerId={props.playerId}
-                        chat={props.chatLog.chat()}
-                        openPicker={props.openPicker}
-                        setOpenPicker={props.setOpenPicker}
+                        reactions={props.chatLog.reactions.of(chat().id)}
+                        mine={props.chatLog.reactions.mine(chat().id)}
+                        picker={
+                          props.chatLog.chat() === undefined
+                            ? undefined
+                            : props.picker
+                        }
+                        toggle={props.chatLog.reactions.toggle}
                       />
                     </>
                   )}
@@ -595,7 +599,7 @@ const typingLabel = (names: readonly string[]) => {
 export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
   const now = createPolled(Date.now, SECOND_MS);
   const reads = () => props.chatLog.reads;
-  const [openPicker, setOpenPicker] = createSignal<number | null>(null);
+  const picker: ReactionPickerController = createPopoverController();
 
   createEffect(
     () =>
@@ -603,7 +607,7 @@ export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
       (props.inSheet !== true || props.chatLog.sheetOpen()),
     (visible) => {
       if (!visible) {
-        setOpenPicker(null);
+        picker.close();
       }
     }
   );
@@ -776,10 +780,7 @@ export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
                           <LogRound
                             group={group()}
                             chatLog={props.chatLog}
-                            openPicker={openPicker()}
-                            setOpenPicker={(messageId) => {
-                              setOpenPicker(messageId);
-                            }}
+                            picker={picker}
                             continuations={continuations()}
                             collapsible={
                               reads().filter() !== "Chat" &&
@@ -850,13 +851,20 @@ export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
             fallback={<p class="muted chat-hint">Join as a player to chat.</p>}
           >
             {(chat) => (
-              <ChatForm
-                chat={chat()}
-                draft={props.chatLog.draft}
-                onSent={() => {
-                  reads().clearNewFrom();
-                }}
-              />
+              <>
+                <ChatForm
+                  chat={chat()}
+                  draft={props.chatLog.draft}
+                  onSent={() => {
+                    reads().clearNewFrom();
+                  }}
+                />
+                <ReactionPicker
+                  controller={picker}
+                  mine={props.chatLog.reactions.mine}
+                  toggle={props.chatLog.reactions.toggle}
+                />
+              </>
             )}
           </Show>
         </div>
