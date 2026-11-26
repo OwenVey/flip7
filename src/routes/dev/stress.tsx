@@ -6,8 +6,10 @@ import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import Lobby from "../../components/lobby";
 import SiteNav from "../../components/site-nav";
 import Table from "../../components/table";
+import { createSheetTable } from "../../components/table-common";
 import { DATASETS, PHASES, stressRoom, VIEWERS } from "../../dev/stress-rooms";
 import { roundPointsFor } from "../../lib/deal-playback";
+import { createRoomChatLog } from "../../lib/room-chat-log";
 import type { RoomConnection } from "../../lib/room-connection";
 import NotFound from "../[...404]";
 
@@ -98,31 +100,42 @@ const StressPage = () => {
       <SiteNav />
       <main class="room-page">
         <Show when={view()} keyed>
-          {(current) => (
-            <Show
-              when={current.room.phase === "lobby"}
-              fallback={
-                <Table
+          {(current) => {
+            const chatLog = createRoomChatLog({
+              chat,
+              inSheet: createSheetTable(),
+              log: () => current.room.log,
+              playerId: () => current.playerId,
+              players: () => current.room.players,
+              resultsRound: () =>
+                current.room.phase === "roundOver" ? current.room.round : null,
+              typing: () => current.typing,
+            });
+
+            return (
+              <Show
+                when={current.room.phase === "lobby"}
+                fallback={
+                  <Table
+                    room={current.room}
+                    playerId={current.playerId}
+                    send={send}
+                    chatLog={chatLog}
+                    roundPoints={roundPointsFor(current.room)}
+                  />
+                }
+              >
+                <Lobby
                   room={current.room}
                   playerId={current.playerId}
                   send={send}
-                  chat={chat}
-                  typing={current.typing}
-                  roundPoints={roundPointsFor(current.room)}
+                  chatLog={chatLog}
+                  onWatchInstead={ignore}
+                  watchInsteadPending={false}
                 />
-              }
-            >
-              <Lobby
-                room={current.room}
-                playerId={current.playerId}
-                send={send}
-                chat={chat}
-                typing={current.typing}
-                onWatchInstead={ignore}
-                watchInsteadPending={false}
-              />
-            </Show>
-          )}
+              </Show>
+            );
+          }}
         </Show>
       </main>
       <div data-stress-toggle="">

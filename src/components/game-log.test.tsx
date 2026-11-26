@@ -4,13 +4,39 @@ import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { parseClientMessage } from "../game/client-message";
-import type { ChatEntry, EventEntry, LogEntry } from "../game/engine";
+import type {
+  ChatEntry,
+  EventEntry,
+  LogEntry,
+  LogPlayer,
+} from "../game/engine";
 import { CHAT_TEXT_LIMIT } from "../game/text";
-import { createChatLogReads } from "../lib/chat-log-reads";
+import { createRoomChatLog } from "../lib/room-chat-log";
+import type { ChatControls } from "../lib/room-connection";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
 import { itemAt } from "../test/item-at";
-import GameLog, { ChatLog } from "./game-log";
+import ChatLogPanel, { ChatLog } from "./game-log";
+
+const GameLog = (props: {
+  log: LogEntry[];
+  playerId: string | null;
+  players: readonly LogPlayer[];
+  typing: readonly string[];
+  chat?: ChatControls;
+}) => {
+  const chatLog = createRoomChatLog({
+    chat: props.chat ?? chatControls(),
+    inSheet: () => false,
+    log: () => props.log,
+    playerId: () => props.playerId,
+    players: () => props.players,
+    resultsRound: () => null,
+    typing: () => props.typing,
+  });
+
+  return <ChatLogPanel chatLog={chatLog} />;
+};
 
 const entries = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
@@ -481,13 +507,17 @@ describe("<GameLog />", () => {
       const [log, setLog] = createSignal<LogEntry[]>([entry]);
 
       render(() => {
-        const reads = createChatLogReads({
+        const chatLog = createRoomChatLog({
+          chat: chatControls(),
+          inSheet: () => false,
           log,
           playerId: () => "a",
-          shown: () => true,
+          players: () => players,
+          resultsRound: () => null,
+          typing: () => [],
         });
 
-        return <ChatLog inSheet reads={reads} players={players} typing={[]} />;
+        return <ChatLog inSheet chatLog={chatLog} />;
       });
       const viewport = screen.getByRole("log");
       Object.defineProperties(viewport, {

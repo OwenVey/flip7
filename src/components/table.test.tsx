@@ -1408,6 +1408,7 @@ describe("<Table />", () => {
   it.each([9, 10])(
     "counts replacement chat after restoring the log to entry %i",
     (id) => {
+      mockMatchMedia(true);
       const retained = benChat(id - 1, "retained");
       const original = [retained, benChat(id, "original")];
 

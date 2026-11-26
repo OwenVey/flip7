@@ -22,8 +22,8 @@ import type { RoomConnection } from "../lib/room-connection";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
 import { itemAt } from "../test/item-at";
+import { Lobby } from "../test/lobby";
 import { mockMatchMedia } from "../test/match-media";
-import Lobby from "./lobby";
 
 const roomOf = (size: number) => {
   const state = createGame();

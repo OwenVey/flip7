@@ -1,7 +1,7 @@
 import { Title } from "@solidjs/meta";
 import type { RouteSectionProps } from "@solidjs/router";
 import { createRouter, memoryHistory } from "@solidjs/router";
-import { cleanup, render } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -49,6 +49,23 @@ const advanceTime = async (ms: number) => {
   flush();
 };
 
+const renderRoom = (history: ReturnType<typeof memoryHistory>) => {
+  const Router = createRouter({
+    history,
+    routes: [
+      {
+        component: (props: Omit<RouteSectionProps, "children">) => (
+          <RoomPage {...props} params={{ code: props.params.code ?? "" }} />
+        ),
+        path: "/room/:code",
+      },
+      { component: () => <Title>Home</Title>, path: "/" },
+    ],
+  });
+
+  render(() => <Router>{(props) => props.children}</Router>);
+};
+
 describe(RoomPage, () => {
   afterEach(() => {
     cleanup();
@@ -91,21 +108,7 @@ describe(RoomPage, () => {
     };
 
     const history = memoryHistory(`/room/${roomCode}`);
-
-    const Router = createRouter({
-      history,
-      routes: [
-        {
-          component: (props: Omit<RouteSectionProps, "children">) => (
-            <RoomPage {...props} params={{ code: props.params.code ?? "" }} />
-          ),
-          path: "/room/:code",
-        },
-        { component: () => <Title>Home</Title>, path: "/" },
-      ],
-    });
-
-    render(() => <Router>{(props) => props.children}</Router>);
+    renderRoom(history);
     flush();
 
     await advanceTime(0);
@@ -149,5 +152,49 @@ describe(RoomPage, () => {
     await advanceTime(1000);
     expect(document.title).toBe("Home");
     expect(icon?.getAttribute("href")).toBe(faviconUrl);
+  });
+
+  it("keeps the chat draft when the host starts the game", async () => {
+    vi.useFakeTimers();
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+    vi.stubGlobal("matchMedia", () =>
+      Object.assign(new EventTarget(), { matches: false })
+    );
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Supply Worker frames at the browser transport boundary in jsdom.
+    vi.stubGlobal("WebSocket", TestSocket);
+
+    renderRoom(memoryHistory(`/room/${roomCode}`));
+    flush();
+    await advanceTime(0);
+    const socket = TestSocket.current;
+
+    if (socket === undefined) {
+      throw new Error("Expected the room to connect");
+    }
+
+    socket.dispatchEvent(new Event("open"));
+
+    const game = createGame();
+    addPlayer(game, "ada", "Ada", 1);
+    addPlayer(game, "ben", "Ben", 2);
+    receive(socket, { playerId: "ada", token: "test-token", type: "welcome" });
+    receive(socket, toStateMessage(roomCode, game));
+    await advanceTime(0);
+
+    fireEvent.input(screen.getByPlaceholderText("Say something…"), {
+      target: { value: "good luck" },
+    });
+    flush();
+    expect(screen.getByPlaceholderText("Say something…")).toHaveValue(
+      "good luck"
+    );
+
+    startGame(game, "ada", () => 0.5);
+    receive(socket, toStateMessage(roomCode, game));
+    await advanceTime(0);
+
+    expect(screen.getByPlaceholderText("Say something…")).toHaveValue(
+      "good luck"
+    );
   });
 });
