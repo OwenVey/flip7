@@ -18,6 +18,30 @@ const PATTERNS: Record<RoomHapticCue, number | number[]> = {
   turn: [24, 55, 24],
 };
 
+/**
+ * Wraps haptic playback so the Move alert's vibration never cuts off an
+ * outcome that vibrated in the same task, such as a Second Chance save on the
+ * frame that also hands you the Move.
+ */
+export const turnYieldsToOutcome = (play: (cue: RoomHapticCue) => void) => {
+  let outcomePlayed = false;
+
+  return (cue: RoomHapticCue) => {
+    if (cue === "turn" && outcomePlayed) {
+      return;
+    }
+
+    if (cue !== "turn" && !outcomePlayed) {
+      outcomePlayed = true;
+      queueMicrotask(() => {
+        outcomePlayed = false;
+      });
+    }
+
+    play(cue);
+  };
+};
+
 // WARNING: Desktop Chromium exposes a no-op `navigator.vibrate`, so also require a touch screen.
 const TOUCH_QUERY = "(any-pointer: coarse)";
 
@@ -34,7 +58,7 @@ export const createRoomHaptics = (canPlay: () => boolean) => {
   const state = usePreference(preference);
   const enabled = createMemo(() => state().value === "true");
 
-  const play = (cue: RoomHapticCue) => {
+  const play = turnYieldsToOutcome((cue: RoomHapticCue) => {
     if (
       supported() &&
       enabled() &&
@@ -44,7 +68,7 @@ export const createRoomHaptics = (canPlay: () => boolean) => {
     ) {
       navigator.vibrate(PATTERNS[cue]);
     }
-  };
+  });
 
   // WARNING: Script `click()` calls report an empty pointer type, so keep the touch check.
   const tap = (event: MouseEvent) => {

@@ -440,6 +440,32 @@ const promptFor = (
   return turnPrompt(room, playerId, moves, roundPoints);
 };
 
+/**
+ * The Move this viewer owes right now, as a key that changes with each new
+ * Move, or null. Null during Deal playback, for a Spectator, and for a host who
+ * could move for an offline player. The action bar says "Your move" exactly
+ * when this is set, and the Move alert keys on it.
+ */
+export const yourMove = (
+  room: RoomView,
+  playerId: string | null,
+  playback: Pick<PromptPlayback, "dealing">
+) => {
+  if (playback.dealing) {
+    return null;
+  }
+
+  const { choice, turn } = availableMoves(room, playerId);
+
+  if (choice !== null && choice.forId === undefined && room.choice) {
+    return `${room.round}:choice:${room.choice.card.id}`;
+  }
+
+  return turn !== null && turn.forId === undefined
+    ? `${room.round}:turn:${room.drawSeq}`
+    : null;
+};
+
 /** The round whose results may show, once Deal playback has dealt them. */
 export const resultsRound = (
   room: RoomView,
@@ -483,16 +509,12 @@ export const tablePrompt = (
   playback: PromptPlayback
 ) => {
   const moves = availableMoves(room, playerId);
-
-  const asked = (move: { forId?: string } | null) =>
-    move !== null && move.forId === undefined && !playback.dealing;
-
   const gameOver = room.phase === "gameOver" && !playback.dealing;
 
   const prompt: TablePrompt = {
     bar: {
       ...promptFor(room, playerId, moves, playback),
-      yours: asked(moves.turn) || asked(moves.choice),
+      yours: yourMove(room, playerId, playback) !== null,
     },
     gameOver,
     resultsRound: resultsRound(room, playback),

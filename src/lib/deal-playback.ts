@@ -4,7 +4,7 @@ import { calculateRoundScore, isActionCard } from "../game/cards";
 import { isChat } from "../game/engine";
 import type { Player } from "../game/engine";
 import type { GameEvent } from "../game/game-events";
-import { availableMoves, waitingOn } from "../game/moves";
+import { availableMoves } from "../game/moves";
 import { roundStarted } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 import { dealFrame, planDeal } from "./deal-plan";
@@ -86,7 +86,6 @@ interface Frame {
 
 export interface DealPlaybackView extends Omit<Frame, "incomingCardId"> {
   actionsDisabled: boolean;
-  myMove: boolean;
   roundPoints: ReadonlyMap<string, number>;
 }
 
@@ -147,7 +146,6 @@ const displayOf = ({ incomingCardId, room, ...display }: Frame) => ({
 export const initialDealPlayback: DealPlaybackView = {
   ...displayOf(emptyFrame),
   actionsDisabled: true,
-  myMove: false,
 };
 
 const isDeckToHand = (step: DealStep) =>
@@ -155,18 +153,6 @@ const isDeckToHand = (step: DealStep) =>
 
 const isOrdinaryDealCard = (step: DealStep) =>
   isDeckToHand(step) && !step.flip && !isActionCard(step.card);
-
-const ownMove = ({ room, playerId }: PlaybackInput) => {
-  if (waitingOn(room)?.playerId !== playerId) {
-    return null;
-  }
-
-  if (room.choice) {
-    return `${room.round}:choice:${room.choice.card.id}`;
-  }
-
-  return `${room.round}:turn:${room.drawSeq}`;
-};
 
 const reshuffled = (previous: RoomView, current: RoomView) =>
   current.round === previous.round &&
@@ -250,8 +236,8 @@ const midBatchSettle = ({ step, tracker }: StepContext) => {
 export const createDealPlayback = (
   motion: DealMotion,
   publish: (view: DealPlaybackView) => void,
-  cue: (cue: RoomCue, audible?: boolean) => void,
-  haptic: (cue: HapticOutcome | "turn") => void
+  cue: (cue: RoomCue) => void,
+  haptic: (cue: HapticOutcome) => void
 ) => {
   const queue: QueuedRoom[] = [];
   let latest: PlaybackInput | null = null;
@@ -259,9 +245,6 @@ export const createDealPlayback = (
   let run: AbortController | null = null;
   let pause: { controller: AbortController; kind: PauseKind } | null = null;
   let frame = emptyFrame;
-  let moveCuePending = false;
-  let moveSoundPending = false;
-  let moveHapticPending = false;
 
   const hapticPlayer = (item: QueuedRoom) =>
     latest && item.hapticSyncId === latest.syncId ? latest.playerId : null;
@@ -309,35 +292,18 @@ export const createDealPlayback = (
   ) => {
     frame = { ...frame, ...patch };
 
-    const actionsDisabled = run !== null || latest?.canAct !== true;
-
-    const myMove =
-      !actionsDisabled && latest !== null && ownMove(latest) !== null;
-
-    publish({ ...displayOf(frame), actionsDisabled, myMove });
-
     for (const sound of sounds) {
       cue(sound);
     }
 
-    let alert: "turn" | undefined;
-
-    if (myMove && moveCuePending) {
-      moveCuePending = false;
-      cue("turn", moveSoundPending);
-      moveSoundPending = false;
-
-      if (moveHapticPending) {
-        alert = "turn";
-        moveHapticPending = false;
-      }
+    if (outcome) {
+      haptic(outcome);
     }
 
-    const feedback = outcome ?? alert;
-
-    if (feedback) {
-      haptic(feedback);
-    }
+    publish({
+      ...displayOf(frame),
+      actionsDisabled: run !== null || latest?.canAct !== true,
+    });
   };
 
   const landDiscard = async (
@@ -771,43 +737,11 @@ export const createDealPlayback = (
     latest = null;
     settled = null;
     frame = emptyFrame;
-    moveCuePending = false;
-    moveSoundPending = false;
-    moveHapticPending = false;
-  };
-
-  const updateMoveCue = (
-    previous: PlaybackInput | null,
-    next: PlaybackInput,
-    live: boolean
-  ) => {
-    moveHapticPending &&= live;
-    const move = ownMove(next);
-
-    const previousMove = previous && ownMove(previous);
-
-    if (move === previousMove) {
-      return;
-    }
-
-    const sameMoveContinues =
-      previous !== null &&
-      previousMove !== null &&
-      previous.room.round === next.room.round &&
-      previous.room.choice === null &&
-      (next.room.choice === null || next.room.choice.card.kind === "freeze");
-
-    moveCuePending = move !== null;
-    moveSoundPending =
-      moveCuePending && (moveSoundPending || !sameMoveContinues);
-    moveHapticPending = moveCuePending && live;
   };
 
   return {
     dispose: reset,
-    syncMotion: (visible: boolean) => {
-      moveHapticPending &&= visible;
-
+    syncMotion: () => {
       if (!run || !latest || motion.allowed()) {
         return;
       }
@@ -837,7 +771,6 @@ export const createDealPlayback = (
       const previous = latest;
       latest = next;
       const live = previous?.syncId === next.syncId && next.hapticsVisible;
-      updateMoveCue(previous, next, live);
 
       if (previous?.room === next.room) {
         if (previous.canAct !== next.canAct && run === null) {

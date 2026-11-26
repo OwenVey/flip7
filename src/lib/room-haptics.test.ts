@@ -1,7 +1,8 @@
 import { createRoot, createSignal, flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createRoomHaptics } from "./room-haptics";
+import { createRoomHaptics, turnYieldsToOutcome } from "./room-haptics";
+import type { RoomHapticCue } from "./room-haptics";
 
 // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom has no vibration motor or API.
 const vibrate = vi.fn<(pattern: number | number[]) => boolean>();
@@ -183,5 +184,22 @@ describe(createRoomHaptics, () => {
     expect([first.enabled(), second.enabled()]).toStrictEqual([true, true]);
     first.dispose();
     second.dispose();
+  });
+});
+
+describe(turnYieldsToOutcome, () => {
+  it("drops a Move alert vibration that follows an outcome in the same task", async () => {
+    const played: RoomHapticCue[] = [];
+
+    const play = turnYieldsToOutcome((cue) => {
+      played.push(cue);
+    });
+
+    play("saved");
+    play("turn");
+    await Promise.resolve();
+    play("turn");
+
+    expect(played).toStrictEqual(["saved", "turn"]);
   });
 });

@@ -3,34 +3,96 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import plainSvg from "../assets/favicon.svg?raw";
 import siteIcon from "../assets/favicon.svg?url";
+import type { RoomView } from "../game/protocol";
+import { room } from "../test/room-view";
 import { createMoveAlert } from "./move-alert";
 
 const ROOM_TITLE = "Your move · Room ABCDE · Flip 7";
 const ALERT_TITLE = "⚡ Your move!";
 
-const setup = (initiallyAlerting: boolean) =>
+interface Shown {
+  room: RoomView | null;
+  dealing: boolean;
+  actionsDisabled: boolean;
+}
+
+const settled = (shown: RoomView | null) =>
+  ({
+    actionsDisabled: false,
+    dealing: false,
+    room: shown,
+  }) satisfies Shown;
+
+const ownTurn = room({ turnId: "a" });
+
+const createAlert = (
+  initial: Shown,
+  options: { playerId?: string | null } = {}
+) =>
   createRoot((dispose) => {
-    const [alerting, setAlerting] = createSignal(initiallyAlerting);
+    const playerId = options.playerId === undefined ? "a" : options.playerId;
+    const [view, setView] = createSignal(initial);
+    const [syncId, setSyncId] = createSignal(1);
     const [hidden, setHidden] = createSignal(false);
-    const title = createMoveAlert(alerting, () => ROOM_TITLE, hidden);
+    const played: string[] = [];
+
+    const alert = createMoveAlert({
+      play: {
+        haptic: () => {
+          played.push("haptic");
+        },
+        nudge: () => {
+          played.push("nudge");
+        },
+        sound: () => {
+          played.push("sound");
+        },
+      },
+      playerId: () => playerId,
+      syncId,
+      tabHidden: hidden,
+      title: () => ROOM_TITLE,
+      view,
+    });
+
     flush();
 
     return {
+      alerting: alert.alerting,
       dispose: () => {
         dispose();
         flush();
       },
-      setAlerting: (next: boolean) => {
-        setAlerting(next);
-        flush();
-      },
+      played,
       setHidden: (next: boolean) => {
         setHidden(next);
         flush();
       },
-      title,
+      setSyncId: (next: number) => {
+        setSyncId(next);
+        flush();
+      },
+      show: (next: Shown) => {
+        setView(next);
+        flush();
+      },
+      title: alert.title,
     };
   });
+
+const setup = (initiallyAlerting: boolean) => {
+  const alert = createAlert({
+    ...settled(ownTurn),
+    actionsDisabled: !initiallyAlerting,
+  });
+
+  return {
+    ...alert,
+    setAlerting: (next: boolean) => {
+      alert.show({ ...settled(ownTurn), actionsDisabled: !next });
+    },
+  };
+};
 
 const tick = () => {
   vi.advanceTimersByTime(1000);
@@ -152,5 +214,107 @@ describe(createMoveAlert, () => {
     expect(() => {
       setup(true).dispose();
     }).not.toThrow();
+  });
+});
+
+describe("createMoveAlert rules", () => {
+  const freezeChoice = room({
+    choice: {
+      card: { id: 20, kind: "freeze" },
+      chooserId: "a",
+      options: ["a", "b"],
+    },
+    drawSeq: 1,
+    turnId: "a",
+  });
+
+  it("never alerts a Spectator or a host who could move for an offline player", () => {
+    const spectator = createAlert(settled(ownTurn), { playerId: null });
+
+    const offlineBen = room({
+      players: ownTurn.players.map((player) =>
+        player.id === "b" ? { ...player, connected: false } : player
+      ),
+      turnId: "b",
+    });
+
+    const host = createAlert(settled(offlineBen));
+
+    expect({
+      host: [host.alerting(), host.played],
+      spectator: [spectator.alerting(), spectator.played],
+    }).toStrictEqual({ host: [false, []], spectator: [false, []] });
+    spectator.dispose();
+    host.dispose();
+  });
+
+  it("waits for Deal playback to finish and for the viewer to be able to act", () => {
+    const alert = createAlert(settled(room({ turnId: "b" })));
+
+    alert.show({ ...settled(ownTurn), dealing: true });
+    expect(alert.played).toStrictEqual([]);
+
+    alert.show({ ...settled(ownTurn), actionsDisabled: true });
+    expect(alert.played).toStrictEqual([]);
+
+    alert.show(settled(ownTurn));
+    expect(alert.played).toStrictEqual(["sound", "haptic", "nudge"]);
+    alert.dispose();
+  });
+
+  it("stays silent on the first room it sees and after a resync", () => {
+    const alert = createAlert(settled(ownTurn));
+    expect(alert.played).toStrictEqual(["sound", "nudge"]);
+
+    alert.show(settled(room({ turnId: "b" })));
+    alert.setSyncId(2);
+    alert.show(settled(ownTurn));
+    expect(alert.played).toStrictEqual(["sound", "nudge", "sound", "nudge"]);
+    alert.dispose();
+  });
+
+  it("vibrates only while the tab stays visible", () => {
+    const alert = createAlert(settled(room({ turnId: "b" })));
+
+    alert.show({ ...settled(ownTurn), dealing: true });
+    alert.setHidden(true);
+    alert.setHidden(false);
+    alert.show(settled(ownTurn));
+    expect(alert.played).toStrictEqual(["sound", "nudge"]);
+    alert.dispose();
+  });
+
+  it("carries your Move on into a Freeze choice from your own hit without a second sound", () => {
+    const alert = createAlert(settled(room({ turnId: "b" })));
+
+    alert.show(settled(ownTurn));
+    alert.show({ ...settled(ownTurn), actionsDisabled: true });
+    alert.show({ ...settled(freezeChoice), dealing: true });
+    alert.show(settled(freezeChoice));
+    expect(alert.played).toStrictEqual([
+      "sound",
+      "haptic",
+      "nudge",
+      "haptic",
+      "nudge",
+    ]);
+    alert.dispose();
+  });
+
+  it("sounds again when the same player's turn comes back round", () => {
+    const alert = createAlert(settled(room({ turnId: "b" })));
+
+    alert.show(settled(ownTurn));
+    alert.show(settled(room({ drawSeq: 1, turnId: "b" })));
+    alert.show(settled(room({ drawSeq: 2, turnId: "a" })));
+    expect(alert.played).toStrictEqual([
+      "sound",
+      "haptic",
+      "nudge",
+      "sound",
+      "haptic",
+      "nudge",
+    ]);
+    alert.dispose();
   });
 });
