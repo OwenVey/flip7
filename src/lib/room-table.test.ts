@@ -1,6 +1,6 @@
 /* oxlint-disable eslint/no-await-in-loop -- Room updates reach playback one at a time, in order. */
 
-import { createRoot, createSignal, flush } from "solid-js";
+import { createMemo, createRoot, createSignal, flush, untrack } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -24,12 +24,13 @@ import {
 import type { ListSeqs, RoomView, StateMessage } from "../game/protocol";
 import { gameAtFirstTurn, random, view } from "../test/deal-game";
 import type { DealStep } from "./deal-plan";
-import { createDealPlayback, initialDealPlayback } from "./deal-playback";
+import { initialDealPlayback } from "./deal-playback";
 import type { DealMotion } from "./deal-playback";
-import { createMoveAlert } from "./move-alert";
 import type { RoomCue } from "./room-cues";
 import { turnYieldsToOutcome } from "./room-haptics";
 import type { RoomHapticCue } from "./room-haptics";
+import { createRoomTable } from "./room-table";
+import type { RoomTablePage } from "./room-table";
 
 const freeze = { id: 1003, kind: "freeze" } as const;
 const number = { id: 1004, kind: "number", value: 7 } as const;
@@ -57,7 +58,6 @@ const playback = (
   playerId = "a",
   delays: { landMs?: number; reshuffleMs?: number } = {}
 ) => {
-  let shown = { ...initialDealPlayback, myMove: false };
   let motionEnabled = animate;
   let reshuffles = 0;
   const cues: RoomCue[] = [];
@@ -85,57 +85,67 @@ const playback = (
     sweep: async () => {},
   };
 
-  const [table, setTable] = createSignal(initialDealPlayback);
-
   const [confirmed, setConfirmed] = createSignal<{
+    canAct: boolean;
     room: RoomView | null;
     syncId: number;
-  }>({ room: null, syncId: 0 });
+  }>({ canAct: false, room: null, syncId: 0 });
 
   const [tabHidden, setTabHidden] = createSignal(false);
+  let motionChanged: (() => void) | null = null;
 
   const playHaptic = turnYieldsToOutcome((cue) => {
     haptics.push(cue);
   });
 
-  const alert = createRoot(() =>
-    createMoveAlert({
-      play: {
-        haptic: () => {
-          playHaptic("turn");
-        },
-        nudge: () => {
-          readinessAtTurnCue.push(alert.alerting() && !shown.actionsDisabled);
-        },
-        sound: () => {
-          cues.push("turn");
-        },
-      },
-      playerId: () => playerId,
-      room: () => confirmed().room,
-      syncId: () => confirmed().syncId,
-      tabHidden,
-      title: () => "",
-      view: table,
-    })
-  );
-
-  const instance = createDealPlayback(
+  const page: RoomTablePage = {
     motion,
-    (frame) => {
-      shown = { ...frame, myMove: false };
-      setTable(frame);
-      flush();
-      shown = { ...frame, myMove: alert.alerting() };
+    nudge: () => {
+      readinessAtTurnCue.push(
+        untrack(() => roomTable.alerting() && !roomTable.view().actionsDisabled)
+      );
     },
-    (cue) => {
-      cues.push(cue);
+    onMotionChange: (listener) => {
+      motionChanged = listener;
+
+      return () => {
+        motionChanged = null;
+      };
     },
-    playHaptic
-  );
+    rendered: () => {},
+    tabHidden,
+  };
+
+  const { roomTable, shown } = createRoot(() => {
+    const table = createRoomTable({
+      code: "ABCDE",
+      haptic: playHaptic,
+      page,
+      sound: (cue) => {
+        cues.push(cue);
+      },
+      source: {
+        canAct: () => confirmed().canAct,
+        playerId: () => playerId,
+        room: () => confirmed().room,
+        status: () => "open",
+        syncId: () => confirmed().syncId,
+        watching: () => false,
+      },
+    });
+
+    return {
+      roomTable: table,
+      shown: createMemo(() => ({
+        ...table.view(),
+        myMove: table.alerting(),
+      })),
+    };
+  });
+
+  flush();
 
   return {
-    ...instance,
     cues,
     flights,
     haptics,
@@ -146,27 +156,32 @@ const playback = (
     },
     setMotion: (enabled: boolean) => {
       motionEnabled = enabled;
-      instance.syncMotion();
+      motionChanged?.();
     },
-    show: (
+    show: async (
       room: RoomView,
       canAct = true,
       syncId = 1,
       hapticsVisible = true
     ) => {
-      setConfirmed({ room, syncId });
       setTabHidden(!hapticsVisible);
+      setConfirmed({ canAct, room, syncId });
       flush();
-      instance.update({ canAct, hapticsVisible, playerId, room, syncId });
+      await Promise.resolve();
+    },
+    leave: async () => {
+      setConfirmed({ canAct: false, room: null, syncId: 1 });
+      flush();
+      await Promise.resolve();
     },
     steps,
     get shown() {
-      return shown;
+      return shown();
     },
   };
 };
 
-describe(createDealPlayback, () => {
+describe(createRoomTable, () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -186,14 +201,14 @@ describe(createDealPlayback, () => {
     const otherTable = playback(true, "b");
     const reducedTable = playback(false);
 
-    ownTable.show(view(game));
-    otherTable.show(view(game));
-    reducedTable.show(view(game));
+    await ownTable.show(view(game));
+    await otherTable.show(view(game));
+    await reducedTable.show(view(game));
     choose(game, "a", "a", random);
     const afterFlip = view(game);
-    ownTable.show(afterFlip);
-    otherTable.show(afterFlip);
-    reducedTable.show(afterFlip);
+    await ownTable.show(afterFlip);
+    await otherTable.show(afterFlip);
+    await reducedTable.show(afterFlip);
 
     expect(ownTable.haptics).toStrictEqual([]);
     expect(reducedTable.haptics).toStrictEqual(["bust"]);
@@ -204,7 +219,7 @@ describe(createDealPlayback, () => {
     expect(otherTable.haptics).toStrictEqual(["turn"]);
   });
 
-  it("gives a Second Chance save priority over a move alert in the same frame", () => {
+  it("gives a Second Chance save priority over a move alert in the same frame", async () => {
     const game = gameAtFirstTurn();
     game.deck = [freeze];
     hit(game, "a", random);
@@ -218,10 +233,10 @@ describe(createDealPlayback, () => {
     player.hand = [number, { id: 1005, kind: "secondChance" }];
 
     const table = playback(false);
-    table.show(view(game));
+    await table.show(view(game));
     game.deck = [{ ...number, id: 1006 }];
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
 
     expect(table.shown.myMove).toBeTruthy();
     expect(table.haptics).toStrictEqual(["saved"]);
@@ -232,11 +247,11 @@ describe(createDealPlayback, () => {
     game.deck = [freeze];
     hit(game, "a", random);
     const table = playback(true, "b");
-    table.show(view(game));
+    await table.show(view(game));
 
     choose(game, "a", "a", random);
     const frozen = view(game);
-    table.show(frozen);
+    await table.show(frozen);
     await vi.advanceTimersByTimeAsync(320);
 
     expect(table.shown).toMatchObject({
@@ -249,7 +264,7 @@ describe(createDealPlayback, () => {
       haptics: [],
     });
 
-    table.show({ ...frozen, spectatorCount: 1 });
+    await table.show({ ...frozen, spectatorCount: 1 });
     await vi.advanceTimersByTimeAsync(519);
     expect(table.cues).toStrictEqual(["reveal", "freeze"]);
 
@@ -265,7 +280,7 @@ describe(createDealPlayback, () => {
     });
   });
 
-  it("celebrates once when the same Flip 7 also wins the game", () => {
+  it("celebrates once when the same Flip 7 also wins the game", async () => {
     const game = gameAtFirstTurn();
     const [player] = game.players;
 
@@ -282,22 +297,22 @@ describe(createDealPlayback, () => {
 
     const table = playback(false);
     const otherTable = playback(false, "b");
-    table.show(view(game));
-    otherTable.show(view(game));
+    await table.show(view(game));
+    await otherTable.show(view(game));
     game.deck = [number];
     hit(game, "a", random);
-    table.show(view(game));
-    otherTable.show(view(game));
+    await table.show(view(game));
+    await otherTable.show(view(game));
 
     expect(table.shown.room?.winnerIds).toStrictEqual(["a"]);
     expect(table.haptics).toStrictEqual(["celebrate"]);
     expect(otherTable.haptics).toStrictEqual([]);
   });
 
-  it("keeps initial, reconnecting and hidden move alerts quiet", () => {
+  it("keeps initial, reconnecting and hidden move alerts quiet", async () => {
     const game = gameAtFirstTurn();
     const table = playback(false);
-    table.show(view(game));
+    await table.show(view(game));
     expect({
       haptics: table.haptics,
       myMove: table.shown.myMove,
@@ -305,13 +320,13 @@ describe(createDealPlayback, () => {
 
     game.deck = [freeze];
     hit(game, "a", random);
-    table.show(view(game), true, 2);
+    await table.show(view(game), true, 2);
     expect(table.shown.myMove).toBeTruthy();
     expect(table.haptics).toStrictEqual([]);
 
     choose(game, "a", "b", random);
-    table.show(view(game), true, 2, false);
-    table.show(view(game), true, 2);
+    await table.show(view(game), true, 2, false);
+    await table.show(view(game), true, 2);
     expect({
       haptics: table.haptics,
       myMove: table.shown.myMove,
@@ -319,7 +334,7 @@ describe(createDealPlayback, () => {
 
     game.deck = [number];
     hit(game, "a", random);
-    table.show(view(game), true, 2);
+    await table.show(view(game), true, 2);
     expect(table.haptics).toStrictEqual(["turn"]);
   });
 
@@ -328,10 +343,10 @@ describe(createDealPlayback, () => {
     async (animate) => {
       const game = gameAtFirstTurn();
       const table = playback(animate, "b");
-      table.show(view(game));
+      await table.show(view(game));
       game.deck = [{ id: 1006, kind: "secondChance" }];
       hit(game, "a", random);
-      table.show(view(game));
+      await table.show(view(game));
       await vi.runAllTimersAsync();
 
       expect(table.cues).toStrictEqual(["reveal", "turn"]);
@@ -341,11 +356,11 @@ describe(createDealPlayback, () => {
   it("reveals a landed choice before cueing its usable move", async () => {
     const game = gameAtFirstTurn();
     const table = playback();
-    table.show(view(game), false);
+    await table.show(view(game), false);
     game.deck = [freeze];
     hit(game, "a", random);
     const choice = view(game);
-    table.show(choice);
+    await table.show(choice);
 
     expect({ frame: table.shown, cues: table.cues }).toMatchObject({
       frame: {
@@ -381,10 +396,10 @@ describe(createDealPlayback, () => {
   it("counts an incoming card only after its flight finishes", async () => {
     const game = gameAtFirstTurn();
     const table = playback();
-    table.show(view(game));
+    await table.show(view(game));
     game.deck = [number];
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
 
     const player = () => table.shown.room?.players.find(({ id }) => id === "a");
 
@@ -407,13 +422,13 @@ describe(createDealPlayback, () => {
     game.deck = [number];
     hit(game, "a", random);
     stay(game, "b", random);
-    table.show(view(game));
+    await table.show(view(game));
     await vi.runAllTimersAsync();
 
     game.deck = [{ ...number, id: 1005 }];
     hit(game, "a", random);
     expect(game.phase).toBe("roundOver");
-    table.show(view(game));
+    await table.show(view(game));
 
     expect(table.shown.room?.phase).toBe("playing");
     expect(table.shown.roundPoints.get("a")).toBe(12);
@@ -442,8 +457,8 @@ describe(createDealPlayback, () => {
     nextRound(game, "a", random);
     const after = view(game);
     const table = playback();
-    table.show(before);
-    table.show(after);
+    await table.show(before);
+    await table.show(after);
 
     await vi.advanceTimersByTimeAsync(2379);
     expect(table.shown.actionsDisabled).toBeTruthy();
@@ -460,16 +475,16 @@ describe(createDealPlayback, () => {
     const game = gameAtFirstTurn();
     const table = playback(true, "b");
     const second = { id: 1005, kind: "number", value: 4 } as const;
-    table.show(view(game));
+    await table.show(view(game));
     game.deck = [second, number];
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
 
     await vi.advanceTimersToNextTimerAsync();
     expect(table.cues).toStrictEqual(["reveal"]);
 
     hit(game, "b", random);
-    table.show(view(game));
+    await table.show(view(game));
     await vi.advanceTimersByTimeAsync(1);
 
     expect(table.flights.map(({ cardId }) => cardId)).toStrictEqual([
@@ -481,11 +496,11 @@ describe(createDealPlayback, () => {
   it("keeps the pause after a reveal when an update without cards queues", async () => {
     const game = gameAtFirstTurn();
     const table = playback(true, "b");
-    table.show(view(game));
+    await table.show(view(game));
     game.deck = [number];
     hit(game, "a", random);
     const afterHit = view(game);
-    table.show(afterHit);
+    await table.show(afterHit);
 
     await vi.advanceTimersToNextTimerAsync();
     expect(table.cues).toStrictEqual(["reveal"]);
@@ -496,7 +511,7 @@ describe(createDealPlayback, () => {
       settings: { ...afterHit.settings, botSpeed: "fast" },
     } satisfies RoomView;
 
-    table.show(latest);
+    await table.show(latest);
     await vi.advanceTimersByTimeAsync(1);
     expect(table.shown.actionsDisabled).toBeTruthy();
 
@@ -512,20 +527,20 @@ describe(createDealPlayback, () => {
   it("hurries a deal only while updates with cards wait behind it", async () => {
     const game = gameAtFirstTurn();
     const table = playback();
-    table.show(view(game), false);
+    await table.show(view(game), false);
     game.deck = [number, freeze];
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
     choose(game, "a", "a", random);
-    table.show(view(game));
-    table.show({
+    await table.show(view(game));
+    await table.show({
       ...view(game),
       settings: { ...game.settings, locked: true },
     });
     hit(game, "b", random);
 
     const finalRoom = view(game);
-    table.show(finalRoom);
+    await table.show(finalRoom);
 
     await vi.runAllTimersAsync();
 
@@ -545,13 +560,13 @@ describe(createDealPlayback, () => {
   it("doesn't hurry a deal for an update without cards", async () => {
     const game = gameAtFirstTurn();
     const table = playback();
-    table.show(view(game), false);
+    await table.show(view(game), false);
     game.deck = [freeze];
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
     choose(game, "a", "a", random);
-    table.show(view(game));
-    table.show({
+    await table.show(view(game));
+    await table.show({
       ...view(game),
       settings: { ...game.settings, botSpeed: "fast" },
     });
@@ -567,13 +582,13 @@ describe(createDealPlayback, () => {
   it("catches up to a queued choice when motion is disabled mid-flight", async () => {
     const game = gameAtFirstTurn();
     const table = playback(true, "b");
-    table.show(view(game));
+    await table.show(view(game));
     game.deck = [freeze, number];
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
     hit(game, "b", random);
     const latest = view(game);
-    table.show(latest);
+    await table.show(latest);
     expect(table.shown.roundPoints.get("a")).toBe(5);
 
     table.setMotion(false);
@@ -606,23 +621,23 @@ describe(createDealPlayback, () => {
   it("resumes playback for a new update without reviving the canceled run", async () => {
     const game = gameAtFirstTurn();
     const table = playback(true, "b");
-    table.show(view(game));
+    await table.show(view(game));
     game.deck = [freeze, number];
     hit(game, "a", random);
     const afterHit = view(game);
-    table.show(afterHit, false);
+    await table.show(afterHit, false);
     table.setMotion(false);
     expect({ frame: table.shown, cues: table.cues }).toMatchObject({
       frame: { actionsDisabled: true, dealing: false, room: afterHit },
       cues: [],
     });
 
-    table.show(afterHit);
+    await table.show(afterHit);
     expect(table.cues).toStrictEqual(["turn"]);
     table.setMotion(true);
     hit(game, "b", random);
     const choice = view(game);
-    table.show(choice);
+    await table.show(choice);
 
     await vi.advanceTimersByTimeAsync(1);
     expect(table.shown).toMatchObject({
@@ -640,27 +655,27 @@ describe(createDealPlayback, () => {
     expect(table.cues).toStrictEqual(["turn", "reveal"]);
   });
 
-  it("keeps the Freeze choice quiet across retries, rejoin and target changes", () => {
+  it("keeps the Freeze choice quiet across retries, rejoin and target changes", async () => {
     const game = gameAtFirstTurn();
     const table = playback(false);
     const first = view(game);
-    table.show(first, false);
-    table.show(first);
-    table.show(first, false);
-    table.show({ ...first }, true);
+    await table.show(first, false);
+    await table.show(first);
+    await table.show(first, false);
+    await table.show({ ...first }, true);
     expect(table.cues).toStrictEqual(["turn"]);
 
     game.deck = [freeze];
     hit(game, "a", random);
     const choice = view(game);
-    table.show(choice);
+    await table.show(choice);
     const prompt = choice.choice;
 
     if (!prompt) {
       throw new Error("Expected a choice after drawing Freeze");
     }
 
-    table.show({ ...choice, choice: { ...prompt, options: ["b"] } });
+    await table.show({ ...choice, choice: { ...prompt, options: ["b"] } });
 
     expect(table.shown.myMove).toBeTruthy();
     expect(table.readinessAtTurnCue).toStrictEqual([true, true]);
@@ -671,12 +686,12 @@ describe(createDealPlayback, () => {
   it("finishes a deal during a disconnect and cues the new move when ready", async () => {
     const game = gameAtFirstTurn();
     const table = playback(true, "b");
-    table.show(view(game));
+    await table.show(view(game));
     game.deck = [number];
     hit(game, "a", random);
     const afterHit = view(game);
-    table.show(afterHit);
-    table.show(afterHit, false);
+    await table.show(afterHit);
+    await table.show(afterHit, false);
     await vi.runAllTimersAsync();
 
     expect(table.shown).toMatchObject({
@@ -687,32 +702,32 @@ describe(createDealPlayback, () => {
     });
     expect(table.cues).toStrictEqual(["reveal"]);
 
-    table.show({ ...afterHit });
+    await table.show({ ...afterHit });
 
     expect(table.cues).toStrictEqual(["reveal", "turn"]);
     expect(table.shown.myMove).toBeTruthy();
   });
 
-  it("keeps successive Hits quiet when the same player remains active", () => {
+  it("keeps successive Hits quiet when the same player remains active", async () => {
     const game = gameAtFirstTurn();
     game.deck = [freeze];
     hit(game, "a", random);
     choose(game, "a", "b", random);
     const table = playback(false);
-    table.show(view(game));
+    await table.show(view(game));
 
     game.deck = [number];
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
     game.deck = [{ id: 1005, kind: "number", value: 8 }];
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
 
     expect(table.shown.myMove).toBeTruthy();
     expect(table.cues).toStrictEqual(["turn", "reveal", "reveal"]);
   });
 
-  it("allows the host to move for an offline player without a personal cue", () => {
+  it("allows the host to move for an offline player without a personal cue", async () => {
     const game = gameAtFirstTurn();
     game.deck = [number];
     hit(game, "a", random);
@@ -725,7 +740,7 @@ describe(createDealPlayback, () => {
 
     offlinePlayer.connected = false;
     const table = playback(false);
-    table.show(room);
+    await table.show(room);
 
     expect(table.shown).toMatchObject({
       actionsDisabled: false,
@@ -734,14 +749,14 @@ describe(createDealPlayback, () => {
     expect(table.cues).toStrictEqual([]);
   });
 
-  it("shows a result immediately when the draw history is incomplete", () => {
+  it("shows a result immediately when the draw history is incomplete", async () => {
     const game = gameAtFirstTurn();
     const table = playback(true, "b");
-    table.show(view(game));
+    await table.show(view(game));
     game.deck = [number];
     hit(game, "a", random);
     const afterHit = { ...view(game), dealHistory: [] };
-    table.show(afterHit);
+    await table.show(afterHit);
 
     expect(table.shown).toMatchObject({
       actionsDisabled: false,
@@ -756,7 +771,7 @@ describe(createDealPlayback, () => {
   it("cancels a Flip Three lead-in and queued frames when the player leaves", async () => {
     const game = gameAtFirstTurn();
     const table = playback();
-    table.show(view(game), false);
+    await table.show(view(game), false);
     game.deck = [number];
     hit(game, "a", random);
     const afterHit = view(game);
@@ -770,12 +785,12 @@ describe(createDealPlayback, () => {
       ),
     };
 
-    table.show(flip);
-    table.show({ ...flip });
+    await table.show(flip);
+    await table.show({ ...flip });
 
     expect(table.shown.step?.flip?.index).toBe(0);
 
-    table.update(null);
+    await table.leave();
     await vi.runAllTimersAsync();
 
     expect(table.shown).toStrictEqual({
@@ -789,14 +804,14 @@ describe(createDealPlayback, () => {
   it("cancels an airborne card and starts a new Room without old cues", async () => {
     const game = gameAtFirstTurn();
     const table = playback();
-    table.show(view(game), false);
+    await table.show(view(game), false);
     game.deck = [freeze];
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
     expect(table.flights).toMatchObject([{ cardId: freeze.id }]);
 
     const newRoom = { ...view(gameAtFirstTurn()), code: "FGHJK" };
-    table.show(newRoom);
+    await table.show(newRoom);
     await vi.runAllTimersAsync();
 
     expect(table.shown).toMatchObject({
@@ -824,15 +839,15 @@ describe(createDealPlayback, () => {
 
     const winner = playback();
     const loser = playback(true, "b");
-    winner.show(view(game));
-    loser.show(view(game));
+    await winner.show(view(game));
+    await loser.show(view(game));
     winner.cues.length = 0;
 
     game.deck = [number];
     hit(game, "a", random);
     const over = view(game);
-    winner.show(over);
-    loser.show(over);
+    await winner.show(over);
+    await loser.show(over);
 
     await vi.advanceTimersByTimeAsync(320);
     expect({
@@ -871,11 +886,11 @@ describe(createDealPlayback, () => {
   it("lets Bust settle before alerting the next player", async () => {
     const game = gameAtFirstTurn();
     const table = playback(true, "b");
-    table.show(view(game));
+    await table.show(view(game));
 
     game.deck = [{ id: 1005, kind: "number", value: 5 }];
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
 
     await vi.advanceTimersByTimeAsync(320);
     expect({
@@ -921,12 +936,12 @@ describe(createDealPlayback, () => {
     nextRound(game, "a", random);
 
     const table = playback(true, "c");
-    table.show(view(game));
+    await table.show(view(game));
 
     stay(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
     stay(game, "b", random);
-    table.show(view(game));
+    await table.show(view(game));
 
     expect({
       cues: table.cues,
@@ -979,14 +994,14 @@ describe(createDealPlayback, () => {
     nextRound(game, "a", random);
 
     const table = playback(true, "d");
-    table.show(view(game));
+    await table.show(view(game));
 
     stay(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
     stay(game, "b", random);
-    table.show(view(game));
+    await table.show(view(game));
     stay(game, "c", random);
-    table.show(view(game));
+    await table.show(view(game));
     await vi.advanceTimersByTimeAsync(0);
 
     expect({
@@ -1026,11 +1041,11 @@ describe(createDealPlayback, () => {
 
     player.hand.push({ id: 1005, kind: "secondChance" });
     const table = playback(true, "b");
-    table.show(view(game));
+    await table.show(view(game));
 
     game.deck = [{ id: 1006, kind: "number", value: 5 }];
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
 
     await vi.advanceTimersByTimeAsync(280);
     expect({ cues: table.cues, lands: table.lands }).toStrictEqual({
@@ -1058,7 +1073,7 @@ describe(createDealPlayback, () => {
     flipGame.deck = [{ id: 2006, kind: "flipThree" }];
     hit(flipGame, "a", random);
     const flipTable = playback(true, "b");
-    flipTable.show(view(flipGame));
+    await flipTable.show(view(flipGame));
 
     flipGame.deck = [
       { id: 2009, kind: "number", value: 4 },
@@ -1066,7 +1081,7 @@ describe(createDealPlayback, () => {
       { id: 2007, kind: "number", value: 5 },
     ];
     choose(flipGame, "a", "a", random);
-    flipTable.show(view(flipGame));
+    await flipTable.show(view(flipGame));
 
     await vi.runAllTimersAsync();
     expect(flipTable.cues).toStrictEqual([
@@ -1085,10 +1100,10 @@ describe(createDealPlayback, () => {
     game.discard = [number];
     game.deck = [];
     const table = playback(true, "b", { reshuffleMs: 480 });
-    table.show(view(game));
+    await table.show(view(game));
 
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
 
     expect({
       cues: table.cues,
@@ -1125,7 +1140,7 @@ describe(createDealPlayback, () => {
     hit(game, "a", random);
 
     const table = playback(true, "b");
-    table.show(view(game));
+    await table.show(view(game));
 
     game.deck = [
       { id: 1008, kind: "number", value: 8 },
@@ -1133,7 +1148,7 @@ describe(createDealPlayback, () => {
       { id: 1006, kind: "number", value: 4 },
     ];
     choose(game, "a", "b", random);
-    table.show(view(game));
+    await table.show(view(game));
 
     await vi.advanceTimersByTimeAsync(280);
     expect({ cues: table.cues, flights: table.flights }).toStrictEqual({
@@ -1160,15 +1175,15 @@ describe(createDealPlayback, () => {
   it("holds a non-local action card choice visible before a queued target flies", async () => {
     const game = gameAtFirstTurn();
     const table = playback(true, "b");
-    table.show(view(game));
+    await table.show(view(game));
 
     game.deck = [freeze];
     hit(game, "a", random);
     const choiceRoom = view(game);
-    table.show(choiceRoom);
+    await table.show(choiceRoom);
 
     choose(game, "a", "b", random);
-    table.show(view(game));
+    await table.show(view(game));
 
     await vi.advanceTimersByTimeAsync(280);
     expect({
@@ -1216,10 +1231,10 @@ describe(createDealPlayback, () => {
     choose(game, "c", "b", random);
 
     const table = playback(true, "a");
-    table.show(view(game));
+    await table.show(view(game));
 
     choose(game, "c", "b", random);
-    table.show(view(game));
+    await table.show(view(game));
 
     await vi.advanceTimersByTimeAsync(320);
     expect({
@@ -1261,10 +1276,10 @@ describe(createDealPlayback, () => {
     ben.hand.push({ id: 1006, kind: "secondChance" });
 
     const table = playback(true, "b");
-    table.show(view(game));
+    await table.show(view(game));
     game.deck = [{ id: 1007, kind: "secondChance" }];
     hit(game, "a", random);
-    table.show(view(game));
+    await table.show(view(game));
 
     await vi.advanceTimersByTimeAsync(280);
     expect({ cues: table.cues, lands: table.lands }).toStrictEqual({
@@ -1284,10 +1299,10 @@ describe(createDealPlayback, () => {
 
     giftAda.hand.push({ id: 2005, kind: "secondChance" });
     const giftTable = playback(true, "b");
-    giftTable.show(view(giftGame));
+    await giftTable.show(view(giftGame));
     giftGame.deck = [{ id: 2006, kind: "secondChance" }];
     hit(giftGame, "a", random);
-    giftTable.show(view(giftGame));
+    await giftTable.show(view(giftGame));
 
     await vi.advanceTimersByTimeAsync(320);
     expect({
@@ -1315,15 +1330,15 @@ describe(createDealPlayback, () => {
 
     const winner = playback(true, "a");
     const loser = playback(true, "b");
-    winner.show(view(game));
-    loser.show(view(game));
+    await winner.show(view(game));
+    await loser.show(view(game));
     loser.cues.length = 0;
 
     game.deck = [freeze];
     hit(game, "b", random);
     const over = view(game);
-    winner.show(over);
-    loser.show(over);
+    await winner.show(over);
+    await loser.show(over);
 
     await vi.advanceTimersByTimeAsync(320);
     expect({
@@ -1420,21 +1435,21 @@ describe("Deal playback from history sent as new entries", () => {
         return;
       }
 
-      full.show(view(game));
-      sent.show(browser.receive(message));
+      await full.show(view(game));
+      await sent.show(browser.receive(message));
       await vi.runAllTimersAsync();
     };
 
     const reconnect = async () => {
       online = true;
       browser.reconnect();
-      full.show(view(game));
-      sent.show(browser.receive(toStateMessage("ABCDE", game)));
+      await full.show(view(game));
+      await sent.show(browser.receive(toStateMessage("ABCDE", game)));
       await vi.runAllTimersAsync();
     };
 
-    full.show(view(game));
-    sent.show(browser.receive(toStateMessage("ABCDE", game)));
+    await full.show(view(game));
+    await sent.show(browser.receive(toStateMessage("ABCDE", game)));
     startGame(game, "a", random);
     await broadcast();
 

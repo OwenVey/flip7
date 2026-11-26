@@ -8,9 +8,6 @@ import {
 } from "@ui-sdk/solid/toast";
 import {
   createEffect,
-  createMemo,
-  createSignal,
-  flush,
   Match,
   onSettled,
   Show,
@@ -30,22 +27,11 @@ import Table from "../../components/table";
 import { createSheetTable } from "../../components/table-common";
 import { normalizeCode } from "../../game/protocol";
 import { DEFAULT_SETTINGS } from "../../game/settings";
-import { createDealMotion } from "../../lib/deal-motion";
-import {
-  createDealPlayback,
-  initialDealPlayback,
-} from "../../lib/deal-playback";
-import { MOTION_PREFERENCE_QUERY } from "../../lib/motion";
-import { createMoveAlert } from "../../lib/move-alert";
 import { createRoomChatLog } from "../../lib/room-chat-log";
 import { createRoomConnection } from "../../lib/room-connection";
 import { createRoomHaptics } from "../../lib/room-haptics";
 import { createRoomSounds } from "../../lib/room-sounds";
-import {
-  createTableOpening,
-  nudge,
-  revealOwnSeat,
-} from "../../lib/table-motion";
+import { createRoomTable, createRoomTablePage } from "../../lib/room-table";
 import { resultsRound } from "../../lib/table-prompt";
 import { paths } from "../../router";
 
@@ -62,86 +48,21 @@ const Room = (props: { code: string }) => {
   );
 
   let roomPage: HTMLElement | undefined;
-  let disposed = false;
-  const [table, setTable] = createSignal(initialDealPlayback);
 
-  const openTable = createTableOpening(() => roomPage);
+  const roomTable = createRoomTable({
+    code: untrack(() => props.code),
+    haptic: haptics.play,
+    page: createRoomTablePage(() => roomPage),
+    sound: sounds.play,
+    source: connection,
+  });
 
-  const playback = createDealPlayback(
-    createDealMotion(() => roomPage),
-    (view) => {
-      setTable(view);
-      flush();
-      openTable(view.room?.phase ?? null);
-    },
-    sounds.play,
-    haptics.play
-  );
-
-  createEffect(
-    () => {
-      const status = connection.status();
-      const playerId = connection.playerId();
-      const room = connection.room();
-
-      return room &&
-        (playerId !== null || connection.watching()) &&
-        status !== "missing" &&
-        status !== "removed"
-        ? {
-            canAct: connection.canAct(),
-            playerId,
-            room,
-            syncId: connection.syncId(),
-          }
-        : null;
-    },
-    (next) => {
-      queueMicrotask(() => {
-        if (!disposed) {
-          playback.update(
-            next && {
-              ...next,
-              hapticsVisible: document.visibilityState === "visible",
-            }
-          );
-        }
-      });
-    }
-  );
+  const { view: table } = roomTable;
 
   const toast = createToaster();
 
   const unavailable = () =>
     !connection.online() || connection.status() !== "open";
-
-  const moveAlert = createMoveAlert({
-    play: {
-      haptic: () => {
-        haptics.play("turn");
-      },
-      nudge: () => {
-        nudge(roomPage?.querySelector("[data-action-bar]") ?? null);
-        revealOwnSeat(roomPage);
-      },
-      sound: () => {
-        sounds.play("turn");
-      },
-    },
-    playerId: connection.playerId,
-    room: connection.room,
-    syncId: connection.syncId,
-    title: () => {
-      let prefix = connection.watching() ? "Watching · " : "";
-
-      if (moveAlert.alerting()) {
-        prefix = "Your move · ";
-      }
-
-      return `${prefix}Room ${props.code} · Flip 7`;
-    },
-    view: table,
-  });
 
   const spectator = () => ({
     join: {
@@ -189,22 +110,8 @@ const Room = (props: { code: string }) => {
     }
   );
 
-  const syncVisibility = () => {
-    playback.syncMotion();
-  };
-
-  onSettled(() => {
-    const motionPreference = globalThis.matchMedia?.(MOTION_PREFERENCE_QUERY);
-    motionPreference?.addEventListener("change", syncVisibility);
-    document.addEventListener("visibilitychange", syncVisibility);
-
-    return () => {
-      disposed = true;
-      motionPreference?.removeEventListener("change", syncVisibility);
-      document.removeEventListener("visibilitychange", syncVisibility);
-      playback.dispose();
-      toast.dismiss();
-    };
+  onSettled(() => () => {
+    toast.dismiss();
   });
 
   const connectionProblem = () => {
@@ -223,23 +130,9 @@ const Room = (props: { code: string }) => {
     return "";
   };
 
-  const tableView = createMemo(
-    () => {
-      const { room } = table();
-      const playerId = connection.playerId();
-
-      return room && (playerId !== null || connection.watching())
-        ? { playerId, room }
-        : null;
-    },
-    {
-      equals: (a, b) => a?.room === b?.room && a?.playerId === b?.playerId,
-    }
-  );
-
   return (
     <>
-      <Title>{moveAlert.title()}</Title>
+      <Title>{roomTable.title()}</Title>
       <PageMeta
         title={`Join room ${props.code} · Flip 7`}
         description={`You're invited to a game of Flip 7. Open the link to join room ${props.code}, pick a name and play. No accounts needed.`}
@@ -315,7 +208,7 @@ const Room = (props: { code: string }) => {
               />
             )}
           </Match>
-          <Match when={tableView()}>
+          <Match when={roomTable.shown()}>
             {(view) => {
               const chatLog = createRoomChatLog({
                 chat: connection.chat,

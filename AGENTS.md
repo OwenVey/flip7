@@ -13,7 +13,7 @@ Use the [README](README.md) for setup, game rules, and deployment. Before explor
 | Cloudflare routing, WebSocket transport, and persistence | `worker/index.ts`, `worker/room.ts`, `cloudflare.config.ts` |
 | Room creation and existence checks | `src/lib/room-functions.ts` |
 | Browser identity, reconnects, and pending moves | `src/lib/room-connection.ts`, `src/lib/room-client.ts` |
-| Lobby, table, and deal playback | `src/routes/room/[code].tsx`, `src/components/table.tsx`, `src/lib/deal-playback.ts` (pacing), `src/lib/deal-beats.ts` (what each Room update shows, sounds and vibrates), `src/lib/deal-plan.ts` |
+| Lobby, table, and deal playback | `src/routes/room/[code].tsx`, `src/components/table.tsx`, `src/lib/room-table.ts` (feeds confirmed Room updates to Deal playback and the Move alert; its tests cover them together), `src/lib/deal-playback.ts` (pacing), `src/lib/deal-beats.ts` (what each Room update shows, sounds and vibrates), `src/lib/deal-plan.ts` |
 | Move alert and Chat & Log | `src/lib/move-alert.ts`, `src/lib/room-chat-log.ts` |
 | What the action bar says and offers (Table prompt) | `src/lib/table-prompt.ts`, `src/components/action-bar.tsx` |
 | Styles | `src/styles/index.css` imports the area files in cascade order. `src/styles/tokens.css` defines the shared tokens; a variable one area reads stays in that file. `src/app.css` holds only `@layer ui-sdk;` |
