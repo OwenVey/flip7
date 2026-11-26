@@ -56,37 +56,17 @@ const Segments = <T extends keyof typeof LABELS>(props: {
   value: T;
   onPick: (value: T) => void;
 }) => (
-  <fieldset
-    aria-label={props.name}
-    style={{
-      background: "#e5e5e5",
-      border: "none",
-      "border-radius": "999px",
-      display: "flex",
-      margin: "0",
-      gap: "2px",
-      padding: "2px",
-    }}
-  >
+  <fieldset aria-label={props.name}>
     <For each={props.options}>
       {(option) => (
         <button
           type="button"
+          data-slot="button"
+          data-size="sm"
+          data-variant={props.value === option ? "solid" : undefined}
           aria-pressed={props.value === option ? "true" : "false"}
           onClick={() => {
             props.onPick(option);
-          }}
-          style={{
-            background: props.value === option ? "#fff" : "transparent",
-            border: "none",
-            "border-radius": "999px",
-            "box-shadow":
-              props.value === option ? "0 1px 2px rgb(0 0 0 / 0.2)" : "none",
-            color: "#111",
-            cursor: "pointer",
-            font: "inherit",
-            padding: "4px 10px",
-            "white-space": "nowrap",
           }}
         >
           {LABELS[option]}
@@ -145,38 +125,14 @@ const StressPage = () => {
           )}
         </Show>
       </main>
-      <div
-        data-stress-toggle=""
-        style={{
-          "align-items": "center",
-          bottom: "8px",
-          "flex-wrap": "wrap",
-          display: "flex",
-          "font-family": "system-ui, sans-serif",
-          "font-size": "12px",
-          gap: "6px",
-          "justify-content": "center",
-          left: "50%",
-          "max-width": "calc(100vw - 16px)",
-          position: "fixed",
-          transform: "translateX(-50%)",
-          "z-index": "2147483647",
-        }}
-      >
+      <div data-stress-toggle="">
         <button
           type="button"
+          data-slot="button"
+          data-size="sm"
           aria-expanded={open() ? "true" : "false"}
           onClick={() => {
             setOpen(!open());
-          }}
-          style={{
-            background: "#e5e5e5",
-            border: "none",
-            "border-radius": "999px",
-            color: "#111",
-            cursor: "pointer",
-            font: "inherit",
-            padding: "6px 10px",
           }}
         >
           {open() ? "Hide" : "Stress data"}

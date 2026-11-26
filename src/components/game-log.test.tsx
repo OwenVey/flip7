@@ -3,7 +3,9 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { parseClientMessage } from "../game/client-message";
 import type { ChatEntry, EventEntry, LogEntry } from "../game/engine";
+import { CHAT_TEXT_LIMIT } from "../game/text";
 import { createChatLogReads } from "../lib/chat-log-reads";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
@@ -665,23 +667,42 @@ describe("<GameLog />", () => {
   });
 
   it("counts and caps chat drafts by whole characters so emoji are not cut short", () => {
+    const chat = chatControls(
+      (text) =>
+        parseClientMessage(JSON.stringify({ text, type: "chat" })) !== null
+    );
+
     render(() => (
       <GameLog
         log={[]}
         playerId="a"
         players={players}
         typing={[]}
-        chat={chatControls()}
+        chat={chat}
       />
     ));
 
     const draft = screen.getByRole("textbox", { name: "Chat message" });
+    const family = "👨🏽‍👩🏽‍👧🏽‍👦🏽";
 
-    fireEvent.input(draft, { target: { value: "👍🏽".repeat(201) } });
+    fireEvent.input(draft, { target: { value: family.repeat(201) } });
     flush();
 
-    expect(draft).toHaveValue("👍🏽".repeat(200));
+    expect(draft).toHaveValue(family.repeat(200));
     expect(charCount()).toHaveTextContent("200/200");
+
+    fireEvent.input(draft, { target: { value: `${family.repeat(200)}x` } });
+    flush();
+    expect(draft).toHaveValue(family.repeat(200));
+
+    screen.getByRole("button", { name: "Send" }).click();
+    flush();
+    expect(chat.sent).toStrictEqual([family.repeat(200)]);
+
+    const oversized = `Hi x${"\u0301".repeat(CHAT_TEXT_LIMIT.units)}`;
+    fireEvent.input(draft, { target: { value: oversized } });
+    flush();
+    expect(draft).toHaveValue("Hi ");
   });
 
   it("keeps existing events quiet when a new snapshot repeats them", async () => {

@@ -57,6 +57,7 @@ export const room = (overrides: Partial<RoomView> = {}) => {
     settings: { botSpeed: "normal", locked: false, targetScore: 200 },
     spectatorCount: 0,
     turnId: "a",
+    winner: null,
     winnerIds: [],
     ...overrides,
   };

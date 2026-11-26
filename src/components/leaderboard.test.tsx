@@ -167,21 +167,8 @@ describe("<Leaderboard />", () => {
 
     const view: RoomView = {
       ...base,
-      log: [
-        {
-          at: 0,
-          event: {
-            player: { id: "b", name: "Ben" },
-            points: 212,
-            scores: [],
-            type: "gameWon",
-          },
-          game: 1,
-          id: 1,
-          round: 6,
-        },
-      ],
       players: base.players.filter(({ id }) => id !== "b"),
+      winner: { id: "b", name: "Ben", points: 212 },
     };
 
     render(() => <Scores room={view} playerId="a" />);

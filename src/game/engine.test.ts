@@ -381,6 +381,23 @@ describe("winning and leaving", () => {
     expect(state.winnerIds).toStrictEqual(["a"]);
   });
 
+  it("retains a departed winner in the room view after chat rolls the log over", () => {
+    const state = setup(["a", "b"], [num(10), num(3)]);
+    player(state, "a").score = 195;
+    stay(state, "a", random);
+    stay(state, "b", random);
+    leave(state, "a", random);
+
+    for (let count = 0; count < LOG_LIMIT; count += 1) {
+      chat(state, "b", `message ${count}`);
+    }
+
+    const view = toRoomView("ABCDE", state);
+    expect(view.log.every(isChat)).toBeTruthy();
+    expect(view.players.map((entry) => entry.id)).toStrictEqual(["b"]);
+    expect(view.winner).toMatchObject({ id: "a", name: "a", points: 205 });
+  });
+
   it("keeps playing when the leaders are tied", () => {
     const state = setup(["a", "b"], [num(10), num(10)]);
     player(state, "a").score = DEFAULT_SETTINGS.targetScore;
@@ -732,6 +749,7 @@ describe("playing again", () => {
     stay(state, "b", random);
     state.phase = "gameOver";
     state.winnerIds = ["a"];
+    state.winner = { id: "a", name: "a", points: 250 };
 
     player(state, "a").score = 250;
     player(state, "b").score = 210;
@@ -740,7 +758,7 @@ describe("playing again", () => {
 
     expect(state.phase).toBe("playing");
     expect(state.round).toBe(1);
-    expect(state.winnerIds).toStrictEqual([]);
+    expect(state).toMatchObject({ winner: null, winnerIds: [] });
     expect(state.players.map(({ score }) => score)).toStrictEqual([0, 0]);
     expect(state.log.at(-1)?.game).toBe(2);
   });

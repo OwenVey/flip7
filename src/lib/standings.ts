@@ -27,34 +27,25 @@ export type FinalPlayer = Pick<
  * Everyone who finished the game, ranked. A winner who has since left keeps
  * their place, with the name and total the game recorded when they won.
  */
-export const finalStandings = (
-  room: Pick<RoomView, "log" | "players" | "winnerIds">
-) => {
+export const finalStandings = (room: Pick<RoomView, "players" | "winner">) => {
   const players: FinalPlayer[] = room.players.map((player) => ({
     ...player,
     left: false,
   }));
 
-  const won = room.log.findLast(
-    (entry) => "event" in entry && entry.event.type === "gameWon"
-  );
+  const { winner } = room;
 
-  if (won !== undefined && "event" in won && won.event.type === "gameWon") {
-    const { player, points } = won.event;
-    const winner = room.winnerIds.includes(player.id);
-
-    if (winner && !players.some(({ id }) => id === player.id)) {
-      players.push({
-        avatar: null,
-        bot: false,
-        id: player.id,
-        lastRound: null,
-        left: true,
-        name: player.name,
-        score: points,
-        status: "out",
-      });
-    }
+  if (winner !== null && !players.some(({ id }) => id === winner.id)) {
+    players.push({
+      avatar: null,
+      bot: false,
+      id: winner.id,
+      lastRound: null,
+      left: true,
+      name: winner.name,
+      score: winner.points,
+      status: "out",
+    });
   }
 
   return rankPlayers(players);
@@ -62,7 +53,7 @@ export const finalStandings = (
 
 /** The winners' names, for a headline. */
 export const winnerNames = (
-  room: Pick<RoomView, "log" | "players" | "winnerIds">
+  room: Pick<RoomView, "players" | "winner" | "winnerIds">
 ) => {
   const winnerIds = new Set(room.winnerIds);
   const names: string[] = [];

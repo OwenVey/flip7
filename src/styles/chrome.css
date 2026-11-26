@@ -461,3 +461,27 @@ main {
   font-weight: 700;
   text-align: center;
 }
+[data-stress-toggle] {
+  position: fixed;
+  inset-inline: 0.5rem;
+  inset-block-end: 0.5rem;
+  z-index: 2147483647;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  margin-inline: auto;
+  gap: 0.5rem;
+
+  fieldset {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    gap: 0.25rem;
+  }
+}

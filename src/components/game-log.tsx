@@ -50,6 +50,7 @@ import {
   Switch,
   useContext,
 } from "solid-js";
+import type { Signal } from "solid-js";
 
 import { CHAT_MAX_LENGTH, isChat } from "../game/engine";
 import type {
@@ -59,7 +60,7 @@ import type {
   LogPlayer,
 } from "../game/engine";
 import { settlesRound } from "../game/game-events";
-import { clipText, textLength } from "../game/text";
+import { CHAT_TEXT_LIMIT, clipText, textLength } from "../game/text";
 import { createChatLogReads, LOG_FILTERS } from "../lib/chat-log-reads";
 import type { ChatLogReads } from "../lib/chat-log-reads";
 import {
@@ -318,8 +319,12 @@ const ChatMessage = (props: {
 
 const CHAT_COUNT_FROM = CHAT_MAX_LENGTH - 40;
 
-const ChatForm = (props: { chat: ChatControls; onSent: () => void }) => {
-  const [text, setText] = createSignal("");
+const ChatForm = (props: {
+  chat: ChatControls;
+  draft: Signal<string>;
+  onSent: () => void;
+}) => {
+  const text = () => props.draft[0]();
   const [failed, setFailed] = createSignal(false);
   const message = createMemo(() => text().trim());
   const length = createMemo(() => textLength(text()));
@@ -336,7 +341,7 @@ const ChatForm = (props: { chat: ChatControls; onSent: () => void }) => {
     setFailed(!sent);
 
     if (sent) {
-      setText("");
+      props.draft[1]("");
       props.onSent();
     }
   };
@@ -354,9 +359,16 @@ const ChatForm = (props: { chat: ChatControls; onSent: () => void }) => {
         aria-label="Chat message"
         placeholder="Say something…"
         value={text()}
-        onValueChange={(value) => {
-          const next = clipText(value, CHAT_MAX_LENGTH);
-          setText(next);
+        onValueChange={(value, details) => {
+          const next = clipText(value, CHAT_TEXT_LIMIT);
+
+          if (next !== value && next === text()) {
+            details.cancel();
+
+            return;
+          }
+
+          props.draft[1](next);
           props.chat.typing(next.trim() !== "");
         }}
         aria-describedby={countId}
@@ -568,6 +580,7 @@ const typingLabel = (names: readonly string[]) => {
 interface ChatLogContentProps {
   /** Missing for a spectator, who can read the chat but not send to it. */
   chat?: ChatControls | undefined;
+  draft?: Signal<string> | undefined;
   players: readonly LogPlayer[];
   /** Other players typing a chat message, by player ID. */
   typing: readonly string[];
@@ -582,6 +595,7 @@ export const ChatLog = (
   props: ChatLogContentProps & { reads: ChatLogReads; inSheet?: boolean }
 ) => {
   const now = createPolled(Date.now, SECOND_MS);
+  const localDraft = createSignal("");
 
   const continuations = createMemo(() => {
     const log = props.reads.log();
@@ -819,6 +833,7 @@ export const ChatLog = (
             {(chat) => (
               <ChatForm
                 chat={chat()}
+                draft={props.draft ?? localDraft}
                 onSent={() => {
                   props.reads.clearNewFrom();
                 }}
@@ -842,6 +857,7 @@ export default function GameLog(props: ChatLogProps) {
     <ChatLog
       reads={reads}
       chat={props.chat}
+      draft={props.draft}
       players={props.players}
       typing={props.typing}
     />

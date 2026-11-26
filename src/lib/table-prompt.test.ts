@@ -313,22 +313,9 @@ describe(tablePrompt, () => {
       name: "names a winner who has left the room",
       play: playback(),
       view: room({
-        log: [
-          {
-            at: 0,
-            event: {
-              player: { id: "c", name: "Cleo" },
-              points: 205,
-              scores: [],
-              type: "gameWon",
-            },
-            game: 1,
-            id: 2,
-            round: 1,
-          },
-        ],
         phase: "gameOver",
         turnId: null,
+        winner: { id: "c", name: "Cleo", points: 205 },
         winnerIds: ["c"],
       }),
       viewer: "a",

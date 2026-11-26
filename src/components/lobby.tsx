@@ -6,6 +6,7 @@ import { Button } from "@ui-sdk/solid/button";
 import {
   createEffect,
   createMemo,
+  createSignal,
   createUniqueId,
   For,
   onSettled,
@@ -117,6 +118,7 @@ export default function Lobby(props: {
 
   const count = () => `${props.room.players.length} / ${MAX_PLAYERS}`;
   const sheetTable = createSheetTable();
+  const chatDraft = createSignal("");
 
   return (
     <div class="lobby-page">
@@ -131,6 +133,7 @@ export default function Lobby(props: {
             log={props.room.log}
             playerId={props.playerId}
             chat={chat()}
+            draft={chatDraft}
             players={props.room.players}
             typing={props.typing}
             logInSheet={sheetTable()}
@@ -316,6 +319,7 @@ export default function Lobby(props: {
             log={props.room.log}
             playerId={props.playerId}
             chat={chat()}
+            draft={chatDraft}
             players={props.room.players}
             typing={props.typing}
           />

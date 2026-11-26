@@ -9,6 +9,7 @@ import {
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { parseClientMessage } from "../game/client-message";
 import { MAX_PLAYERS } from "../game/engine";
 import type { RoomPreview } from "../game/protocol";
 import JoinForm from "./join-form";
@@ -288,14 +289,28 @@ describe("<JoinForm />", () => {
     ));
 
     const input = screen.getByRole("textbox", { name: "Your name" });
-    const full = `Kasia ${"🏳️\u200D🌈".repeat(14)}`;
+    const family = "👨🏽‍👩🏽‍👧🏽‍👦🏽";
+    const full = family.repeat(20);
 
-    fireEvent.input(input, { target: { value: `${full}🏳️\u200D🌈` } });
+    fireEvent.input(input, { target: { value: `${full}${family}` } });
     flush();
 
     expect(input).toHaveValue(full);
 
+    fireEvent.input(input, { target: { value: `${full}x` } });
+    flush();
+    expect(input).toHaveValue(full);
+
     screen.getByRole("button", { name: "Join room" }).click();
     expect(onJoin).toHaveBeenCalledWith(full, 1);
+
+    const join = {
+      avatar: 1,
+      name: onJoin.mock.calls[0]?.[0],
+      token: null,
+      type: "join",
+    };
+
+    expect(parseClientMessage(JSON.stringify(join))).toStrictEqual(join);
   });
 });

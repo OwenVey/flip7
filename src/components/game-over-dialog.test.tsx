@@ -48,6 +48,7 @@ const room = () => {
     settings: { botSpeed: "normal", locked: false, targetScore: 200 },
     spectatorCount: 0,
     turnId: null,
+    winner: { id: "b", name: "Ben", points: 212 },
     winnerIds: ["b"],
   };
 
@@ -104,20 +105,6 @@ describe("<GameOverDialog />", () => {
   it("keeps a winner who has left in the standings, under the name they won with", () => {
     const view = room();
     view.players = view.players.filter(({ id }) => id !== "b");
-    view.log = [
-      {
-        at: 0,
-        event: {
-          player: { id: "b", name: "Ben" },
-          points: 212,
-          scores: [],
-          type: "gameWon",
-        },
-        game: 1,
-        id: 1,
-        round: 6,
-      },
-    ];
 
     render(() => (
       <GameOverDialog

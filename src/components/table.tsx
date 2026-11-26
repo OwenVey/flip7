@@ -91,6 +91,7 @@ export default function Table(
   );
 
   const sheetTable = createSheetTable();
+  const chatDraft = createSignal("");
 
   const [scoresOpen, setScoresOpen] = createSignal(false);
   const [logOpenedAt, setLogOpenedAt] = createSignal<number | null>();
@@ -157,6 +158,7 @@ export default function Table(
               log={props.room.log}
               playerId={props.playerId}
               chat={chat()}
+              draft={chatDraft}
               players={props.room.players}
               typing={props.typing}
               logInSheet={sheetTable()}
@@ -262,6 +264,7 @@ export default function Table(
                 log={props.room.log}
                 playerId={props.playerId}
                 chat={chat()}
+                draft={chatDraft}
                 players={props.room.players}
                 typing={props.typing}
               />

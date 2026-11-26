@@ -9,9 +9,9 @@ import { MAX_SPECTATORS } from "./moves";
 import { applyListUpdate, listUpdateSince } from "./sequenced-list";
 import type { ListSpec, ListUpdate, ReceivedList } from "./sequenced-list";
 import { BOT_SPEEDS, TARGET_SCORES } from "./settings";
-import { clipText } from "./text";
+import { clipText, NAME_TEXT_LIMIT } from "./text";
 
-export const NAME_MAX_LENGTH = 20;
+export const NAME_MAX_LENGTH = NAME_TEXT_LIMIT.graphemes;
 export const HEARTBEAT_PING = "ping";
 export const HEARTBEAT_PONG = "pong";
 
@@ -83,7 +83,7 @@ const visibleCharacters = (raw: string) => {
 export const cleanName = (raw: string) =>
   clipText(
     visibleCharacters(raw).replaceAll(/\s+/gu, " ").trim(),
-    NAME_MAX_LENGTH
+    NAME_TEXT_LIMIT
   ).trim();
 
 export interface RoomView extends Pick<
@@ -99,6 +99,7 @@ export interface RoomView extends Pick<
   | "round"
   | "settings"
   | "turnId"
+  | "winner"
   | "winnerIds"
 > {
   code: string;
@@ -249,6 +250,10 @@ const logPlayerFields = {
 
 const LogPlayerSchema = v.object(logPlayerFields);
 
+export const WinnerSchema = v.nullable(
+  v.object({ ...logPlayerFields, points: nonNegativeInteger })
+);
+
 const OptionalLogPlayerSchema = v.nullable(LogPlayerSchema);
 
 const LoggedScoresSchema = v.array(
@@ -377,6 +382,7 @@ const StateMessageSchema = v.looseObject({
     log: LogUpdateSchema,
   }),
   room: v.looseObject({
+    winner: WinnerSchema,
     code: v.string(),
     dealSeq: nonNegativeInteger,
     drawSeq: nonNegativeInteger,
@@ -474,6 +480,7 @@ export const toRoomView = (
     settings: state.settings,
     spectatorCount,
     turnId: state.turnId,
+    winner: state.winner,
     winnerIds: state.winnerIds,
   };
 

@@ -15,6 +15,7 @@ import type { RoomView } from "../game/protocol";
 import type { RoomConnection } from "../lib/room-connection";
 import { chatControls } from "../test/chat";
 import { itemAt } from "../test/item-at";
+import { mockMatchMedia } from "../test/match-media";
 import { LOGGED_AT, room } from "../test/room-view";
 import { agent, Table } from "../test/table";
 
@@ -1275,6 +1276,8 @@ describe("<Table />", () => {
   });
 
   it("clears the unread count when the chat sheet opens and returns focus on close", async () => {
+    mockMatchMedia(true);
+
     const [view, setView] = createSignal(room());
 
     render(() => (
@@ -1438,6 +1441,8 @@ describe("<Table />", () => {
   );
 
   it("keeps chat unread when the sheet closes during a jump to latest", async () => {
+    mockMatchMedia(true);
+
     vi.useFakeTimers({
       toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
     });
@@ -1542,6 +1547,43 @@ describe("<Table />", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it("closes the chat sheet on resize and keeps one log with the same draft", async () => {
+    const resize = mockMatchMedia(true);
+    render(() => (
+      <Table
+        room={room()}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={chatControls()}
+        typing={[]}
+      />
+    ));
+    screen.getByRole("button", { name: "Chat & Log" }).click();
+    flush();
+
+    const sheet = await screen.findByRole("dialog", { name: "Chat & Log" });
+    fireEvent.input(
+      within(sheet).getByRole("textbox", { name: "Chat message" }),
+      {
+        target: { value: "Good game" },
+      }
+    );
+    flush();
+
+    resize(false);
+    flush();
+
+    expect(screen.queryByRole("dialog", { name: "Chat & Log" })).toBeNull();
+    expect(document.querySelectorAll(".log-scroll")).toHaveLength(1);
+    expect(screen.getByRole("textbox", { name: "Chat message" })).toHaveValue(
+      "Good game"
+    );
+
+    resize(true);
+    flush();
+    expect(screen.queryByRole("dialog", { name: "Chat & Log" })).toBeNull();
   });
 
   it("other players see whose turn it is, not the Hit button", () => {

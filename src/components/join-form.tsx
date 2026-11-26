@@ -14,9 +14,8 @@ import { pickAvatar, takenAvatars } from "../game/avatars";
 import { MAX_PLAYERS } from "../game/engine";
 import { MAX_SPECTATORS } from "../game/moves";
 import { sameName } from "../game/names";
-import { NAME_MAX_LENGTH } from "../game/protocol";
 import type { RoomPreview } from "../game/protocol";
-import { clipText } from "../game/text";
+import { clipText, NAME_TEXT_LIMIT } from "../game/text";
 import { paths } from "../router";
 import AvatarPicker from "./avatar-picker";
 
@@ -154,7 +153,7 @@ export default function JoinForm(props: {
               return;
             }
 
-            const trimmed = name().trim();
+            const trimmed = clipText(name().trim(), NAME_TEXT_LIMIT).trim();
 
             if (!trimmed) {
               setEmptyName(true);
@@ -188,8 +187,16 @@ export default function JoinForm(props: {
                   nameInput = element;
                 }}
                 value={name()}
-                onValueChange={(value) => {
-                  setTyped(clipText(value, NAME_MAX_LENGTH));
+                onValueChange={(value, details) => {
+                  const next = clipText(value, NAME_TEXT_LIMIT);
+
+                  if (next !== value && next === name()) {
+                    details.cancel();
+
+                    return;
+                  }
+
+                  setTyped(next);
                   setEmptyName(false);
                   props.onEdit?.();
                 }}

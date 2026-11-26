@@ -10,7 +10,7 @@ import {
   DrawerTrigger,
 } from "@ui-sdk/solid/drawer";
 import type { SnapPoint } from "@ui-sdk/solid/drawer";
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 
 import { createChatLogReads } from "../lib/chat-log-reads";
 import { CHAT_AND_GAME_LOG_TITLE, ChatLog } from "./game-log";
@@ -31,15 +31,25 @@ export default function ChatSheet(
     /** Set with `onOpenChange` when the page also needs to close the sheet. */
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
-    /**
-     * False while the page shows the log elsewhere, so a long log isn't
-     * rendered twice. The sheet still mounts it whenever it is open.
-     */
-    logInSheet?: boolean;
+    logInSheet: boolean;
   }
 ) {
   const [ownOpen, setOwnOpen] = createSignal(false);
-  const open = () => props.open ?? ownOpen();
+  const open = () => props.logInSheet && (props.open ?? ownOpen());
+
+  const changeOpen = (next: boolean) => {
+    setOwnOpen(next);
+    props.onOpenChange?.(next);
+  };
+
+  createEffect(
+    () => props.logInSheet,
+    (inSheet, wasInSheet) => {
+      if (!inSheet && wasInSheet === true) {
+        changeOpen(false);
+      }
+    }
+  );
 
   const reads = createChatLogReads({
     log: () => props.log,
@@ -58,9 +68,14 @@ export default function ChatSheet(
   return (
     <Drawer
       open={open()}
-      onOpenChange={(next) => {
-        setOwnOpen(next);
-        props.onOpenChange?.(next);
+      onOpenChange={(next, details) => {
+        if (next && !props.logInSheet) {
+          details.cancel();
+
+          return;
+        }
+
+        changeOpen(next);
       }}
       snapPoints={SNAP_POINTS}
       defaultSnapPoint="content"
@@ -117,11 +132,12 @@ export default function ChatSheet(
           class="chat-sheet-body"
           data-agent-hidden={open() ? undefined : ""}
         >
-          <Show when={props.logInSheet !== false || open()}>
+          <Show when={props.logInSheet}>
             <ChatLog
               reads={reads}
               inSheet
               chat={props.chat}
+              draft={props.draft}
               players={props.players}
               typing={props.typing}
             />
