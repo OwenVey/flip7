@@ -10,13 +10,15 @@ import "./styles/index.css";
 
 export default function App() {
   onSettled(() => {
-    listenForInstallPrompt();
+    const stopListening = listenForInstallPrompt();
 
     if (import.meta.env.PROD) {
       void import("virtual:pwa-register").then(({ registerSW }) =>
         registerSW({ immediate: true })
       );
     }
+
+    return stopListening;
   });
 
   return (

@@ -10,6 +10,8 @@ const settle = async () => {
   }
 };
 
+const held: { released: boolean }[] = [];
+
 const installWakeLock = () => {
   const log: string[] = [];
 
@@ -26,6 +28,8 @@ const installWakeLock = () => {
       released: false,
     };
 
+    held.push(lock);
+
     return lock;
   };
 
@@ -40,6 +44,15 @@ const setVisibility = (state: DocumentVisibilityState) => {
     configurable: true,
     value: state,
   });
+
+  const browserDropsLocks = state === "hidden";
+
+  if (browserDropsLocks) {
+    for (const lock of held) {
+      lock.released = true;
+    }
+  }
+
   document.dispatchEvent(new Event("visibilitychange"));
 };
 
@@ -63,6 +76,7 @@ const render = (initial: boolean) =>
 
 describe(createWakeLock, () => {
   afterEach(() => {
+    held.length = 0;
     Reflect.deleteProperty(navigator, "wakeLock");
     // oxlint-disable-next-line landmines-testing/no-test-doubles -- removes the visibility override above.
     Reflect.deleteProperty(document, "visibilityState");
@@ -96,11 +110,11 @@ describe(createWakeLock, () => {
 
     setVisibility("visible");
     await settle();
-    expect(log).toStrictEqual(["request"]);
+    expect(log).toStrictEqual(["request", "request"]);
 
     lock.dispose();
     await settle();
-    expect(log).toStrictEqual(["request", "release"]);
+    expect(log).toStrictEqual(["request", "request", "release"]);
   });
 
   it("does nothing where the browser has no wake lock", () => {

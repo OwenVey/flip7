@@ -78,20 +78,36 @@ const notify = () => {
 /**
  * Catches the browser's install prompt so the home page can offer it later.
  * Call once, as early as the app runs in the browser: Chromium fires
- * `beforeinstallprompt` only once per page load.
+ * `beforeinstallprompt` only once per page load. Returns a function that
+ * stops listening.
  */
 export const listenForInstallPrompt = () => {
-  addEventListener("beforeinstallprompt", (event) => {
-    event.preventDefault();
-    deferredPrompt = event;
-    notify();
-  });
+  const controller = new AbortController();
+  const { signal } = controller;
 
-  addEventListener("appinstalled", () => {
-    deferredPrompt = null;
-    installed = true;
-    notify();
-  });
+  addEventListener(
+    "beforeinstallprompt",
+    (event) => {
+      event.preventDefault();
+      deferredPrompt = event;
+      notify();
+    },
+    { signal }
+  );
+
+  addEventListener(
+    "appinstalled",
+    () => {
+      deferredPrompt = null;
+      installed = true;
+      notify();
+    },
+    { signal }
+  );
+
+  return () => {
+    controller.abort();
+  };
 };
 
 const currentOffer = () =>

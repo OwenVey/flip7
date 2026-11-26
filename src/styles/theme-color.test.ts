@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { pwaOptions } from "../../pwa.config";
+import { pwaOptions, tokenColor } from "../../pwa.config";
 
 const root = path.resolve(import.meta.dirname, "../..");
 
@@ -20,15 +20,11 @@ const match = (source: string, pattern: RegExp) => {
   return value.toLowerCase();
 };
 
-const token = async (name: string) =>
-  match(
-    await read("src/styles/tokens.css"),
-    new RegExp(`--${name}:\\s*(?<color>#[0-9a-f]{6});`, "iu")
-  );
+const token = (name: string) => tokenColor(name).toLowerCase();
 
 describe("the browser chrome color", () => {
   it("matches --felt-deep, so Safari's bars meet the felt without a seam", async () => {
-    const feltDeep = await token("felt-deep");
+    const feltDeep = token("felt-deep");
 
     const metaThemeColor = match(
       await read("src/document.tsx"),
@@ -57,7 +53,7 @@ describe("the offline page", () => {
       const { color = "", name = "" } = copy.groups ?? {};
 
       // oxlint-disable-next-line no-await-in-loop -- a handful of reads, and a failure names the first stale copy.
-      expect(color.toLowerCase(), `--${name}`).toBe(await token(name));
+      expect(color.toLowerCase(), `--${name}`).toBe(token(name));
     }
 
     expect(
@@ -65,6 +61,6 @@ describe("the offline page", () => {
         offline,
         /<meta name="theme-color" content="(?<color>#[0-9a-f]{6})"/iu
       )
-    ).toBe(await token("felt-deep"));
+    ).toBe(token("felt-deep"));
   });
 });

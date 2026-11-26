@@ -372,7 +372,7 @@
     display: flex;
     flex-direction: column;
     position: sticky;
-    inset-block-start: calc(0.5rem + var(--safe-top));
+    inset-block-start: var(--sticky-top);
     align-self: start;
     /* Let the table rows set the available height without the sidebar growing them. */
     contain: size;

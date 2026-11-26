@@ -3,9 +3,9 @@ import path from "node:path";
 
 import {
   createAppleSplashScreens,
-  defineConfig as defineAssetsConfig,
   minimal2023Preset,
 } from "@vite-pwa/assets-generator/config";
+import type { Preset } from "@vite-pwa/assets-generator/config";
 import type { VitePWAOptions } from "vite-plugin-pwa";
 
 import { shortcutUrl } from "./src/lib/home-shortcuts.ts";
@@ -30,35 +30,21 @@ export const tokenColor = (name: string) => {
   return color;
 };
 
-const FELT = tokenColor("felt");
 const FELT_DEEP = tokenColor("felt-deep");
 
-/**
- * Icons and iOS startup images, generated at build time by
- * `@vite-pwa/assets-generator`. `Document` renders their links from
- * `virtual:pwa-assets/head`, because the app has no `index.html` for the
- * plugin to inject into.
- */
-export const pwaAssetsConfig = defineAssetsConfig({
-  headLinkOptions: { preset: "2023" },
-  images: [ICON_SOURCE],
-  preset: {
-    ...minimal2023Preset,
-    apple: {
-      ...minimal2023Preset.apple,
-      resizeOptions: { background: FELT, fit: "contain" },
-    },
-    appleSplashScreens: createAppleSplashScreens({
-      linkMediaOptions: { addMediaScreen: true, basePath: "/", log: false },
-      padding: 0.6,
-      resizeOptions: { background: FELT_DEEP, fit: "contain" },
-    }),
-    maskable: {
-      ...minimal2023Preset.maskable,
-      resizeOptions: { background: FELT, fit: "contain" },
-    },
-  },
-});
+const onFelt = { background: FELT_DEEP, fit: "contain" } as const;
+
+// WARNING: there is no index.html, so `Document` renders these assets' links from `virtual:pwa-assets/head`.
+const assetsPreset: Preset = {
+  ...minimal2023Preset,
+  apple: { ...minimal2023Preset.apple, resizeOptions: onFelt },
+  appleSplashScreens: createAppleSplashScreens({
+    linkMediaOptions: { addMediaScreen: true, basePath: "/", log: false },
+    padding: 0.6,
+    resizeOptions: onFelt,
+  }),
+  maskable: { ...minimal2023Preset.maskable, resizeOptions: onFelt },
+};
 
 /** Workbox and manifest settings for `VitePWA`. */
 export const pwaOptions = {
@@ -124,7 +110,7 @@ export const pwaOptions = {
     image: ICON_SOURCE,
     integration: { publicDir: path.resolve(path.dirname(ICON_SOURCE)) },
     overrideManifestIcons: true,
-    preset: pwaAssetsConfig.preset,
+    preset: assetsPreset,
   },
   registerType: "autoUpdate",
   workbox: {

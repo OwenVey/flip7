@@ -130,6 +130,8 @@
   --safe-top: calc(
     env(safe-area-inset-top) + min(1.5rem, env(safe-area-inset-top))
   );
+  /* Where sticky surfaces pin: just below --safe-top. */
+  --sticky-top: calc(0.5rem + var(--safe-top));
 
   /* Corners: small inner parts, controls and cards, felt wells, panels, pills. */
   --radius-sm: 0.375rem;
