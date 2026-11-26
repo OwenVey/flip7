@@ -244,20 +244,20 @@ main {
 }
 
 /* A ruled "or" between joining and watching. */
+/* Matches the home page's "or join a room" divider. */
 .join-divider {
   display: flex;
   gap: 0.75rem;
   align-items: center;
   color: var(--ink-soft);
   font-size: var(--text-sm);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
+  font-weight: 600;
 
   &::before,
   &::after {
     flex: 1;
-    border-top: 1.5px dashed var(--gold-deep);
+    height: 1px;
+    background: var(--gold-deep);
     content: "";
   }
 }

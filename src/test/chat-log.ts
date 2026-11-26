@@ -24,5 +24,6 @@ export const chatLogFor = (props: ChatLogTestProps) =>
       props.room.phase === "roundOver" && props.dealing !== true
         ? props.room.round
         : null,
+    round: () => props.room.round,
     typing: () => props.typing,
   });

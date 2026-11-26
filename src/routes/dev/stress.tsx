@@ -110,6 +110,7 @@ const StressPage = () => {
               players: () => current.room.players,
               resultsRound: () =>
                 resultsRound(current.room, { dealing: false }),
+              round: () => current.room.round,
               typing: () => current.typing,
             });
 

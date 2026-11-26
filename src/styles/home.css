@@ -158,6 +158,8 @@
   gap: clamp(1rem, 3vw, 2rem);
   justify-items: center;
   align-items: start;
+  /* The guide moves left of Play with `order`, so Tab follows the panels as they're shown. */
+  reading-flow: grid-order;
 
   @media (--lg) {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

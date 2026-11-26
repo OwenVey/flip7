@@ -194,7 +194,7 @@ describe("<Lobby />", () => {
     });
   });
 
-  it("keeps a placeholder for every vacancy and labels only the next", () => {
+  it("draws a few open seats that finish the row and labels only the next", () => {
     const [room, setRoom] = createSignal<RoomView>(roomOf(1));
 
     const { container } = render(() => (
@@ -209,8 +209,12 @@ describe("<Lobby />", () => {
 
     const vacancies = () => container.querySelectorAll(".roster .open-seat");
 
-    expect(vacancies()).toHaveLength(MAX_PLAYERS - 1);
+    expect(vacancies()).toHaveLength(3);
     expect(screen.getAllByText("Waiting for players…")).toHaveLength(1);
+
+    setRoom(roomOf(5));
+    flush();
+    expect(vacancies()).toHaveLength(1);
 
     setRoom(roomOf(MAX_PLAYERS - 1));
     flush();
@@ -504,7 +508,7 @@ describe("<Lobby />", () => {
     expect(screen.queryByText("Locked")).toBeNull();
     expect(
       document.querySelectorAll(".roster .open-seat[data-locked] svg")
-    ).toHaveLength(MAX_PLAYERS - 3);
+    ).toHaveLength(1);
     expect(screen.queryByText("Waiting for players…")).toBeNull();
   });
 

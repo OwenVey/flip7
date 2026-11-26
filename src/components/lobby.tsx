@@ -56,6 +56,14 @@ const RoomCode = (props: { code: string }) => {
   );
 };
 
+const FIRST_SEATS = 4;
+
+const shownOpenSeats = (players: number) => {
+  const seats = Math.max(FIRST_SEATS, players + 1 + ((players + 1) % 2));
+
+  return Math.min(MAX_PLAYERS, seats) - players;
+};
+
 const OpenSeat = (props: { next: boolean; locked: boolean }) => (
   <li
     class="open-seat"
@@ -91,7 +99,7 @@ export default function Lobby(props: {
 
   const missing = () => Math.max(0, MIN_PLAYERS - props.room.players.length);
 
-  const openSeats = createMemo(() => MAX_PLAYERS - props.room.players.length);
+  const openSeats = createMemo(() => shownOpenSeats(props.room.players.length));
 
   const startHintId = createUniqueId();
 

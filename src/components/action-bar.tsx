@@ -198,7 +198,9 @@ const ActionBar = (
                     <>
                       {" "}
                       <span class="muted">
-                        <span aria-hidden="true">· </span>
+                        <span class="note-separator" aria-hidden="true">
+                          ·{" "}
+                        </span>
                         {note()}
                       </span>
                     </>
