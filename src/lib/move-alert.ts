@@ -42,25 +42,6 @@ const setSvgIcon = (href: string) => {
   }
 };
 
-const createTabHidden = () => {
-  const [hidden, setHidden] = createSignal(false);
-
-  const sync = () => {
-    setHidden(document.visibilityState === "hidden");
-  };
-
-  onSettled(() => {
-    sync();
-    document.addEventListener("visibilitychange", sync);
-
-    return () => {
-      document.removeEventListener("visibilitychange", sync);
-    };
-  });
-
-  return hidden;
-};
-
 const createTabAlert = (
   alerting: () => boolean,
   title: () => string,
@@ -136,7 +117,8 @@ interface MoveAlertOptions {
   /** The page title while the tab isn't blinking. */
   title: () => string;
   play: MoveAlertOutputs;
-  tabHidden?: () => boolean;
+  /** True while the browser tab is hidden. */
+  tabHidden: () => boolean;
 }
 
 interface MoveSeen {
@@ -165,7 +147,7 @@ const carriesOn = (previous: MoveSeen, next: MoveSeen) =>
  * title to use.
  */
 export const createMoveAlert = (options: MoveAlertOptions) => {
-  const tabHidden = options.tabHidden ?? createTabHidden();
+  const { tabHidden } = options;
 
   const moveIn = (room: RoomView | null) =>
     room === null
