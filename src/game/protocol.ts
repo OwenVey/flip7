@@ -46,6 +46,18 @@ export const normalizeCode = (raw: string) => {
   return CODE_PATTERN.test(code) ? code : null;
 };
 
+const ROOM_LINK_PATTERN = new RegExp(
+  `/room/([${CODE_ALPHABET}]{${CODE_LENGTH}})(?=[/?#\\s]|$)`,
+  "iu"
+);
+
+/** The room code in a pasted room link, like `https://…/room/ABCDE`. */
+export const codeFromRoomLink = (text: string) => {
+  const match = ROOM_LINK_PATTERN.exec(text);
+
+  return match?.[1] === undefined ? null : normalizeCode(match[1]);
+};
+
 const INVISIBLE_CHARACTERS = /\p{Cf}|(?!\s)\p{Cc}/u;
 const EXTENDED_PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
 const JOINS_EMOJI = /[\p{Extended_Pictographic}\p{Emoji_Modifier}\uFE0F]/u;

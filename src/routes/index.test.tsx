@@ -88,6 +88,33 @@ describe(Home, () => {
     });
   });
 
+  it("fills the slots from a pasted room link", async () => {
+    configureServerFunctionsClient({
+      fetch: (_, request) => rpcResponse(request.body === "FGHJK"),
+    });
+    const history = renderHome();
+    const code = screen.getByRole("textbox", { name: "Room code" });
+
+    code.focus();
+    flush();
+
+    const pasted = fireEvent.paste(code, {
+      clipboardData: {
+        getData: () => "https://flip7.example/room/fghjk",
+      },
+    });
+
+    flush();
+
+    expect(pasted).toBeFalsy();
+    expect(code).toHaveValue("FGHJK");
+    expect(code).toBeValid();
+    screen.getByRole("button", { name: "Join room" }).click();
+    await waitFor(() => {
+      expect(history.get()).toBe("/room/FGHJK");
+    });
+  });
+
   it("shows an inline error for a missing room and allows correction", async () => {
     const history = renderHome();
     const reply = Promise.withResolvers<Response>();
