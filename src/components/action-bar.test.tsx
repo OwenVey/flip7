@@ -39,6 +39,7 @@ const Bar = (props: {
       actionsDisabled={props.actionsDisabled}
       prompt={prompt().bar}
       gameOver={prompt().gameOver}
+      roundResults={prompt().resultsRound !== null}
     />
   );
 };
@@ -92,7 +93,9 @@ describe("<ActionBar />", () => {
     const hit = actionBar.getByRole("button", { name: "Hit" });
     const stay = actionBar.getByRole("button", { name: "Stay" });
 
-    expect(actionBar.getByText("7 points this round")).toBeVisible();
+    const liveNote = actionBar.getByText("7 points this round");
+    expect(liveNote).toBeVisible();
+    expect(liveNote.closest("[data-round-results]")).toBeNull();
 
     setPoints(9);
     flush();
@@ -179,6 +182,30 @@ describe("<ActionBar />", () => {
       cleanup();
       vi.useRealTimers();
     }
+  });
+
+  it("marks the headline for results styling only after Deal playback", () => {
+    const [dealing, setDealing] = createSignal(true);
+
+    render(() => (
+      <Table
+        room={room({ phase: "roundOver", round: 1 })}
+        playerId="a"
+        send={vi.fn<RoomConnection["send"]>()}
+        chat={chatControls()}
+        typing={[]}
+        playback={{ dealing: dealing() }}
+      />
+    ));
+
+    expect(screen.getByText("End of round 1")).not.toHaveAttribute(
+      "data-round-results"
+    );
+    setDealing(false);
+    flush();
+    expect(screen.getByText("End of round 1")).toHaveAttribute(
+      "data-round-results"
+    );
   });
 
   it("lets the host play again from the action bar once the game is over", () => {

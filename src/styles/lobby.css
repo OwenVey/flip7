@@ -257,7 +257,7 @@ button.room-code {
 
 /* Phones stack the roster in one column, so only the first open seat, "Waiting for players…", shows. The count beside the heading keeps the room's size. */
 @media not (--sm) {
-  .roster .open-seat ~ .open-seat {
+  .roster .open-seat:not([data-next]) {
     display: none;
   }
 }

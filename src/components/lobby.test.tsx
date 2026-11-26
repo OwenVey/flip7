@@ -210,7 +210,9 @@ describe("<Lobby />", () => {
     const vacancies = () => container.querySelectorAll(".roster .open-seat");
 
     expect(vacancies()).toHaveLength(MAX_PLAYERS - 1);
-    expect(screen.getAllByText("Waiting for players…")).toHaveLength(1);
+    expect([
+      ...container.querySelectorAll(".open-seat[data-next]"),
+    ]).toStrictEqual([screen.getByText("Waiting for players…")]);
 
     setRoom(roomOf(MAX_PLAYERS - 1));
     flush();

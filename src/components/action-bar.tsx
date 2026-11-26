@@ -122,6 +122,7 @@ const ActionBar = (
     prompt: BarPrompt;
     /** The game is over and Deal playback has finished. */
     gameOver: boolean;
+    roundResults: boolean;
   }
 ) => {
   const prompt = createMemo(() => props.prompt, { equals: samePrompt });
@@ -190,6 +191,7 @@ const ActionBar = (
             {(headline) => (
               <p
                 class="headline"
+                data-round-results={props.roundResults ? "" : undefined}
                 data-winner-headline={prompt().winner ? "" : undefined}
               >
                 {headline()}

@@ -190,9 +190,12 @@
       }
     }
 
-    /* The message shares the deck's row; only the buttons take a row of their own. The note starts a line of its own instead of breaking wherever the message ends. */
+    /* The message shares the deck's row; only the buttons take a row of their own. */
     & .headline {
       flex: 1 1 0;
+    }
+
+    & .headline[data-round-results] {
       -webkit-line-clamp: 3;
 
       & .muted {

@@ -176,6 +176,7 @@ export default function Table(
           actionsDisabled={props.actionsDisabled}
           prompt={prompt().bar}
           gameOver={prompt().gameOver}
+          roundResults={prompt().resultsRound !== null}
         />
 
         <div class="table-body">
