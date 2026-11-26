@@ -1,11 +1,13 @@
 import { createEffect, createMemo, createSignal } from "solid-js";
 
 import type { LogEntry, LogPlayer } from "../game/engine";
+import type { RoomView } from "../game/protocol";
 import { createChatLogReads } from "./chat-log-reads";
 import type { ChatControls } from "./room-connection";
 
 interface RoomChatLogSource {
   log: () => LogEntry[];
+  reactions: () => Pick<RoomView, "myReactions" | "reactionCounts">;
   players: () => readonly LogPlayer[];
   playerId: () => string | null;
   chat: ChatControls;
@@ -63,6 +65,7 @@ export const createRoomChatLog = (source: RoomChatLogSource) => {
     inSheet: source.inSheet,
     players: source.players,
     reads,
+    reactions: source.reactions,
     round: source.round,
     setSheetOpen: (next: boolean) => {
       setOpenedAt(next && source.inSheet() ? sheetResultsRound() : undefined);

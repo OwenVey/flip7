@@ -11,6 +11,7 @@ import {
   HeldActionCardSchema,
   LogEntrySchema,
   normalizeCode,
+  ReactionEmojiSchema,
   WinnerSchema,
 } from "../src/game/protocol";
 import type { StoredRoom } from "../src/game/room";
@@ -38,6 +39,10 @@ const GameStateSchema: v.GenericSchema<unknown, GameState> = v.object({
     })
   ),
   atOpeningSlot: v.boolean(),
+  chatReactions: v.map(
+    v.pipe(integer, v.minValue(1)),
+    v.array(v.object({ emoji: ReactionEmojiSchema, playerId: v.string() }))
+  ),
   choice: v.nullable(
     v.object({ card: ActionCardSchema, chooserId: v.string(), options: idList })
   ),

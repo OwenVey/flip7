@@ -447,6 +447,75 @@ describe("the log through the room client", () => {
     vi.useRealTimers();
   });
 
+  it("updates totals in place and shares a player's selection with their other Seats", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    const otherSeat = net.testPlayer();
+    otherSeat.token = ana.token;
+    const spectator = net.testPlayer();
+    net.connect(otherSeat);
+    net.connect(spectator);
+    net.flush();
+    spectator.client.watch();
+    net.flush();
+    ana.client.chat("hello");
+    net.flush();
+    const { logSeq: messageId } = net.stored.game;
+    const before = ben.client.state.room?.log;
+
+    const first = ana.client.send({ emoji: "👍", messageId, type: "react" });
+    net.flush();
+    await expect(first).resolves.toBeTruthy();
+    expect(ben.client.state.room?.log).toBe(before);
+    expect(
+      [ben, spectator].map(({ client }) => client.state.room?.myReactions)
+    ).toStrictEqual([{}, {}]);
+    expect(otherSeat.client.state.room?.myReactions).toStrictEqual({
+      [messageId]: "👍",
+    });
+
+    const replacement = otherSeat.client.send({
+      emoji: "❤️",
+      messageId,
+      type: "react",
+    });
+
+    net.flush();
+    await replacement;
+    expect(spectator.client.state.room).toMatchObject({
+      reactionCounts: { [messageId]: { "❤️": 1 } },
+    });
+  });
+
+  it("restores confirmed reactions after reconnecting without replaying offline taps", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    ben.client.chat("hello");
+    net.flush();
+    const { logSeq: messageId } = net.stored.game;
+    const initial = ana.client.send({ emoji: "❤️", messageId, type: "react" });
+    net.flush();
+    await initial;
+
+    net.drop(ana);
+    await expect(
+      ana.client.send({ emoji: "🎉", messageId, type: "react" })
+    ).resolves.toBeFalsy();
+    net.connect(ana);
+    net.flush();
+    expect(ana.client.state).toMatchObject({
+      notice: null,
+      room: { myReactions: { [messageId]: "❤️" } },
+    });
+
+    const removal = ana.client.send({ emoji: null, messageId, type: "react" });
+    net.flush();
+    await expect(removal).resolves.toBeTruthy();
+    expect(ben.client.state.room?.reactionCounts).toStrictEqual({});
+  });
+
   it("adds each broadcast's new entries to the log it has", () => {
     const net = network();
     const ana = net.join("Ana");

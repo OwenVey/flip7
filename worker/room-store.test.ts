@@ -1,7 +1,7 @@
 // oxlint-disable landmines-structure/colocated-tests -- This tests the Worker store; src/game only supplies the room fixture.
 import { describe, expect, it, vi } from "vitest";
 
-import { addPlayer, startGame } from "../src/game/engine";
+import { addPlayer, chat, reactToChat, startGame } from "../src/game/engine";
 import { newStoredRoom } from "../src/game/room";
 import { createRoomStore } from "./room-store";
 import type { RoomStorage } from "./room-store";
@@ -123,11 +123,13 @@ describe(createRoomStore, () => {
     });
   });
 
-  it("restores an in-progress room with deal history and structured log entries", async () => {
+  it("restores an in-progress room with deal history, log entries, and reactions", async () => {
     const room = newStoredRoom("ABCDE", NOW);
     addPlayer(room.game, "host", "Host", 1);
     addPlayer(room.game, "guest", "Guest", 2);
     startGame(room.game, "host", () => 0.5);
+    chat(room.game, "guest", "Good luck!");
+    reactToChat(room.game, "host", room.game.logSeq, "👍");
 
     const { storage } = fakeStorage({ room });
 

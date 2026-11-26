@@ -6,6 +6,28 @@ import { CHAT_TEXT_LIMIT, NAME_TEXT_LIMIT } from "./text";
 const singleGrapheme = (units: number) => `a${"\u0301".repeat(units - 1)}`;
 
 describe(parseClientMessage, () => {
+  it("validates the fixed reaction palette and the message ID", () => {
+    const reaction = { emoji: "❤️", messageId: 15, type: "react" };
+    expect(parseClientMessage(JSON.stringify(reaction))).toStrictEqual(
+      reaction
+    );
+    expect(
+      parseClientMessage(JSON.stringify({ ...reaction, emoji: null }))
+    ).toStrictEqual({
+      ...reaction,
+      emoji: null,
+    });
+    expect(
+      parseClientMessage(JSON.stringify({ ...reaction, emoji: "💯" }))
+    ).toBeNull();
+    expect(
+      parseClientMessage(JSON.stringify({ ...reaction, messageId: 0 }))
+    ).toBeNull();
+    expect(
+      parseClientMessage(JSON.stringify({ ...reaction, messageId: 1.5 }))
+    ).toBeNull();
+  });
+
   it("bounds join and chat payloads even when they consist of one grapheme", () => {
     const join = {
       name: singleGrapheme(NAME_TEXT_LIMIT.units),

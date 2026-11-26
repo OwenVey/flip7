@@ -794,6 +794,49 @@ describe("room settings", () => {
 });
 
 describe("sending the log", () => {
+  it("rejects reactions from Spectators and on game-log entries", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    const joinedId = h.stored.game.logSeq;
+    h.room.chat("ana-tab", "hello");
+    h.connect("spectator-tab");
+    h.room.watch("spectator-tab");
+
+    const react = (connection: string, messageId: number) =>
+      h.room.receive(connection, {
+        emoji: "👍",
+        messageId,
+        requestId: crypto.randomUUID(),
+        type: "react",
+      });
+
+    expect(replies(react("spectator-tab", h.stored.game.logSeq))).toMatchObject(
+      [{ type: "rejected" }]
+    );
+    expect(replies(react("ana-tab", joinedId))).toMatchObject([
+      { type: "rejected" },
+    ]);
+    expect(h.stored.game.chatReactions.size).toBe(0);
+  });
+
+  it("keeps a reaction when the Host kicks its author", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    const ben = joinAs(h, "ben-tab", "Ben");
+    h.room.chat("ana-tab", "hello");
+    const messageId = h.stored.game.logSeq;
+    h.room.receive("ben-tab", { emoji: "🎉", messageId, type: "react" });
+
+    const kicked = h.room.command("ana-tab", {
+      playerId: ben.playerId,
+      type: "kick",
+    });
+
+    expect(broadcastOf(kicked).room.reactionCounts).toStrictEqual({
+      [messageId]: { "🎉": 1 },
+    });
+  });
+
   it("sends the whole log to a tab that opens, and to one that rejoins", () => {
     const h = harness();
     const ana = joinAs(h, "ana-tab", "Ana");

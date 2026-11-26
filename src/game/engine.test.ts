@@ -18,6 +18,7 @@ import {
   nextRound,
   playFor,
   playForAbsent,
+  reactToChat,
   removePlayer,
   startGame,
   stay,
@@ -730,15 +731,21 @@ describe("the game log", () => {
   it("keeps only the newest entries once it reaches the cap", () => {
     const state = createGame();
     addPlayer(state, "a", "a", 1);
+    chat(state, "a", "old message");
+    const messageId = state.logSeq;
+    reactToChat(state, "a", messageId, "🎉");
 
     for (let count = 0; count < LOG_LIMIT + 5; count += 1) {
       chat(state, "a", `message ${count}`);
     }
 
-    expect(LOG_LIMIT).toBe(1000);
     expect(state.log).toHaveLength(LOG_LIMIT);
     expect(state.log.at(-1)?.id).toBe(state.logSeq);
     expect(state.log[0]?.id).toBe(state.logSeq - LOG_LIMIT + 1);
+    expect(state.chatReactions.size).toBe(0);
+    expect(() => {
+      reactToChat(state, "a", messageId, "👍");
+    }).toThrow(GameError);
   });
 });
 
@@ -768,12 +775,14 @@ describe("playing again", () => {
     state.phase = "gameOver";
     chat(state, "b", "again!");
     const lastSeq = state.logSeq;
+    reactToChat(state, "a", lastSeq, "👍");
 
     startGame(state, "a", random);
 
     expect(state.logClearedAt).toBe(lastSeq);
     expect(state.log.every((entry) => entry.game === 2)).toBeTruthy();
     expect(state.log[0]?.id).toBe(lastSeq + 1);
+    expect(state.chatReactions.size).toBe(0);
   });
 });
 

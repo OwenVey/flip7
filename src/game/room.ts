@@ -1,5 +1,7 @@
 import { isAvatar, pickAvatar, takenAvatars } from "./avatars";
 import type { Random } from "./cards";
+import { reactionSelections } from "./chat-reactions";
+import type { ReactionSelections } from "./chat-reactions";
 import { isRoomCommand } from "./client-message";
 import type { ClientMessage, GameCommand } from "./client-message";
 import {
@@ -19,6 +21,7 @@ import {
   leaveToWatch,
   nextRound,
   playFor,
+  reactToChat,
   startGame,
   stay,
 } from "./engine";
@@ -33,7 +36,12 @@ import {
   TYPING_SHOWN_MS,
   toStateMessage,
 } from "./protocol";
-import type { ListSeqs, PreviewMessage, ServerMessage } from "./protocol";
+import type {
+  ListSeqs,
+  PreviewMessage,
+  ServerMessage,
+  StateMessage,
+} from "./protocol";
 import {
   heartbeatDeadline,
   nextAlarmAt,
@@ -106,7 +114,12 @@ export interface RoomDeps {
  */
 export type RoomEffect =
   | { type: "reply"; message: ServerMessage }
-  | { type: "broadcast"; message: ServerMessage; preview: PreviewMessage }
+  | {
+      type: "broadcast";
+      message: StateMessage;
+      preview: PreviewMessage;
+      selections: ReadonlyMap<string, ReactionSelections>;
+    }
   | { type: "relay"; message: ServerMessage; except: string[] }
   | { type: "close"; connectionId: string; code: number; reason: string };
 
@@ -147,11 +160,23 @@ interface Delivery {
 
 const broadcastTo = (
   { seats, transport }: Delivery,
-  message: ServerMessage,
-  preview: PreviewMessage
+  { message, preview, selections }: Extract<RoomEffect, { type: "broadcast" }>
 ) => {
   for (const { admission, id } of seats.connections()) {
-    transport.send(id, admission ? message : preview);
+    if (!admission) {
+      transport.send(id, preview);
+      continue;
+    }
+
+    const seat = playerSeat(admission);
+    const mine = seat && selections.get(seat.playerId);
+
+    transport.send(
+      id,
+      mine
+        ? { ...message, room: { ...message.room, myReactions: mine } }
+        : message
+    );
   }
 };
 
@@ -192,7 +217,7 @@ export const deliver = (
 
       case "broadcast": {
         if (!expired) {
-          broadcastTo(delivery, effect.message, effect.preview);
+          broadcastTo(delivery, effect);
         }
 
         break;
@@ -373,8 +398,15 @@ export const createRoom = (
       type: "welcome",
     });
 
-  const snapshot = () =>
-    toStateMessage(stored.code, game, {}, spectatorCount());
+  const snapshot = (connectionId?: string) => {
+    const viewer = connectionId === undefined ? null : seatOf(connectionId);
+
+    const mine = viewer
+      ? reactionSelections(game.chatReactions).get(viewer.playerId)
+      : undefined;
+
+    return toStateMessage(stored.code, game, {}, spectatorCount(), mine);
+  };
 
   const preview = () => toRoomPreview(stored.code, game, spectatorCount());
 
@@ -395,7 +427,7 @@ export const createRoom = (
     const now = deps.now();
     syncTimers(stored, now);
 
-    let broadcast: ServerMessage | undefined;
+    let broadcast: StateMessage | undefined;
 
     const effects = planned.map((effect) => {
       if (effect.type !== "broadcast") {
@@ -407,6 +439,7 @@ export const createRoom = (
       return {
         message: broadcast,
         preview: preview(),
+        selections: reactionSelections(game.chatReactions),
         type: "broadcast",
       } satisfies RoomEffect;
     });
@@ -565,6 +598,12 @@ export const createRoom = (
         kick(game, playerId, command.playerId, random);
 
         return evict(command.playerId, "kicked");
+      }
+
+      case "react": {
+        reactToChat(game, playerId, command.messageId, command.emoji);
+
+        return none;
       }
 
       case "leave": {
@@ -730,7 +769,7 @@ export const createRoom = (
       return finish(
         attempt(() => [
           joinSeat(connectionId, name, token, avatar),
-          reply(snapshot()),
+          reply(snapshot(connectionId)),
           BROADCAST,
         ])
       );
@@ -761,7 +800,7 @@ export const createRoom = (
     snapshot,
 
     viewFor: (connectionId: string) =>
-      admissionOf(connectionId) ? snapshot() : preview(),
+      admissionOf(connectionId) ? snapshot(connectionId) : preview(),
 
     watch: (connectionId: string) => {
       const admission = admissionOf(connectionId);

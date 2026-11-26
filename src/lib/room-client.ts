@@ -138,7 +138,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   let noticeId = 0;
   let lastRequestId: string | undefined;
   let pendingMove: PendingMove | null = null;
-  const roomCommands = new Map<string, PendingReply>();
+  const roomCommands = new Map<string, PendingReply & { quiet: boolean }>();
   let stopped = false;
   let wasVisible = false;
   const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -176,6 +176,18 @@ export const createRoomClient = (deps: RoomClientDeps) => {
   const dropRoomCommands = () => {
     for (const requestId of roomCommands.keys()) {
       settleRoomCommand(requestId, false);
+    }
+  };
+
+  const rejectRoomCommand = (requestId: string, message: string) => {
+    const command = roomCommands.get(requestId);
+
+    if (command) {
+      settleRoomCommand(requestId, false);
+
+      if (!command.quiet) {
+        notify(message);
+      }
     }
   };
 
@@ -441,10 +453,7 @@ export const createRoomClient = (deps: RoomClientDeps) => {
           notify(message.message);
         }
 
-        if (roomCommands.has(message.requestId)) {
-          settleRoomCommand(message.requestId, false);
-          notify(message.message);
-        }
+        rejectRoomCommand(message.requestId, message.message);
 
         return;
       }
@@ -696,13 +705,16 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
     send: async (command: GameCommand) => {
       const roomCommand = isRoomCommand(command);
+      const quiet = command.type === "react";
 
       if (stopped || (pendingMove && !roomCommand)) {
         return false;
       }
 
       if (!state.online || !state.ready || !socket.isOpen()) {
-        notify(TRY_AGAIN);
+        if (!quiet) {
+          notify(TRY_AGAIN);
+        }
 
         return false;
       }
@@ -714,10 +726,13 @@ export const createRoomClient = (deps: RoomClientDeps) => {
 
         const timeout = setTimeout(() => {
           settleRoomCommand(requestId, false);
-          notify("The room couldn't confirm your request.");
+
+          if (!quiet) {
+            notify("The room couldn't confirm your request.");
+          }
         }, REPLY_TIMEOUT_MS);
 
-        roomCommands.set(requestId, { resolve, timeout });
+        roomCommands.set(requestId, { quiet, resolve, timeout });
 
         if (!raw({ ...command, requestId })) {
           settleRoomCommand(requestId, false);

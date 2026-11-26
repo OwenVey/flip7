@@ -10,6 +10,7 @@ import type {
   LogEntry,
   LogPlayer,
 } from "../game/engine";
+import type { RoomView } from "../game/protocol";
 import { CHAT_TEXT_LIMIT } from "../game/text";
 import { createRoomChatLog } from "../lib/room-chat-log";
 import type { ChatControls } from "../lib/room-connection";
@@ -24,12 +25,14 @@ const GameLog = (props: {
   players: readonly LogPlayer[];
   typing: readonly string[];
   chat?: ChatControls;
+  reactions?: Pick<RoomView, "myReactions" | "reactionCounts">;
   round?: number;
 }) => {
   const chatLog = createRoomChatLog({
     chat: props.chat ?? chatControls(),
     inSheet: () => false,
     log: () => props.log,
+    reactions: () => props.reactions ?? { myReactions: {}, reactionCounts: {} },
     playerId: () => props.playerId,
     players: () => props.players,
     resultsRound: () => null,
@@ -141,6 +144,76 @@ const stayed = (index: number) =>
 
 describe("<GameLog />", () => {
   afterEach(cleanup);
+
+  it("offers reactions only on chat, returns focus, and keeps the confirmed selection on failure", async () => {
+    const chat = chatControls(() => true, false);
+
+    const message = {
+      at: 0,
+      from: ben,
+      game: 1,
+      id: 2,
+      round: 1,
+      text: "Nice!",
+    } satisfies ChatEntry;
+
+    const counts = {
+      myReactions: { 2: "👍" },
+      reactionCounts: { 2: { "👍": 1 } },
+    } satisfies NonNullable<Parameters<typeof GameLog>[0]["reactions"]>;
+
+    render(() => (
+      <GameLog
+        chat={chat}
+        log={[...entries(1), message]}
+        playerId="a"
+        players={players}
+        reactions={counts}
+        typing={[]}
+      />
+    ));
+
+    const trigger = screen.getByRole("button", { name: "Add reaction" });
+    fireEvent.click(trigger);
+    const choice = await screen.findByRole("button", { name: "Thumbs up" });
+    choice.focus();
+    fireEvent.click(choice);
+
+    expect(chat.reactions).toStrictEqual([[message.id, null]]);
+    await expect(
+      screen.findByText("Reaction not saved. Try again.")
+    ).resolves.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Thumbs up: 1", pressed: true })
+    ).toBeInTheDocument();
+  });
+
+  it("shows totals to spectators without offering interactive reactions", () => {
+    const message = {
+      at: 0,
+      from: ben,
+      game: 1,
+      id: 2,
+      round: 1,
+      text: "Nice!",
+    } satisfies ChatEntry;
+
+    render(() => (
+      <GameLog
+        log={[message]}
+        playerId={null}
+        players={players}
+        reactions={{ myReactions: {}, reactionCounts: { 2: { "🎉": 2 } } }}
+        typing={[]}
+      />
+    ));
+
+    expect(screen.getByText("Celebrate: 2")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /add reaction|celebrate/iu })
+    ).toBeNull();
+  });
 
   it("tells spectators why they can't chat", () => {
     render(() => (
@@ -564,6 +637,7 @@ describe("<GameLog />", () => {
           chat: chatControls(),
           inSheet: () => false,
           log,
+          reactions: () => ({ myReactions: {}, reactionCounts: {} }),
           playerId: () => "a",
           players: () => players,
           resultsRound: () => null,

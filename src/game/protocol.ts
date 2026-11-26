@@ -3,6 +3,8 @@ import * as v from "valibot";
 import { projectActionCards } from "./action-card-resolution";
 import { isAvatar } from "./avatars";
 import { HELD_ACTION_KINDS, HIGHEST_NUMBER } from "./cards";
+import { countReactions, REACTION_EMOJI } from "./chat-reactions";
+import type { ReactionCounts, ReactionSelections } from "./chat-reactions";
 import { DEAL_HISTORY_LIMIT, DRAW_OUTCOMES, LOG_LIMIT, PHASES } from "./engine";
 import type { DealEvent, GameState, HeldCard, LogEntry } from "./engine";
 import { MAX_SPECTATORS } from "./moves";
@@ -109,6 +111,8 @@ export interface RoomView extends Pick<
   /** Flip Threes still under way, waiting on a choice. */
   flips: { targetId: string; remaining: number }[];
   held: HeldCard[];
+  myReactions: ReactionSelections;
+  reactionCounts: Partial<Record<number, ReactionCounts>>;
   spectatorCount: number;
 }
 
@@ -376,6 +380,9 @@ const LogUpdateSchema = v.object({
   entries: v.array(LogEntrySchema),
 });
 
+const MessageKeySchema = v.pipe(v.string(), v.regex(/^[1-9]\d*$/u));
+export const ReactionEmojiSchema = v.picklist(REACTION_EMOJI);
+
 const StateMessageSchema = v.looseObject({
   lists: v.looseObject({
     dealHistory: DealHistoryUpdateSchema,
@@ -387,6 +394,7 @@ const StateMessageSchema = v.looseObject({
     dealSeq: nonNegativeInteger,
     drawSeq: nonNegativeInteger,
     hostId: v.nullable(v.string()),
+    myReactions: v.record(MessageKeySchema, ReactionEmojiSchema),
     phase: v.picklist(PHASES),
     players: v.array(
       v.looseObject({
@@ -399,6 +407,10 @@ const StateMessageSchema = v.looseObject({
       })
     ),
     round: v.pipe(v.number(), v.integer()),
+    reactionCounts: v.record(
+      MessageKeySchema,
+      v.record(ReactionEmojiSchema, v.pipe(nonNegativeInteger, v.minValue(1)))
+    ),
     settings: v.looseObject({
       botSpeed: v.picklist(BOT_SPEEDS),
       locked: v.boolean(),
@@ -454,7 +466,8 @@ export type StateMessage = Extract<ServerMessage, { type: "state" }>;
 export const toRoomView = (
   code: string,
   state: GameState,
-  spectatorCount = 0
+  spectatorCount = 0,
+  myReactions: ReactionSelections = {}
 ) => {
   const { choice, flips, held } = projectActionCards(state);
 
@@ -474,8 +487,10 @@ export const toRoomView = (
     held,
     hostId: state.hostId,
     log: state.log,
+    myReactions,
     phase: state.phase,
     players: state.players.map((player) => ({ ...player })),
+    reactionCounts: countReactions(state.chatReactions),
     round: state.round,
     settings: state.settings,
     spectatorCount,
@@ -502,9 +517,15 @@ export const toStateMessage = (
   code: string,
   state: GameState,
   since: Partial<ListSeqs> = {},
-  spectatorCount = 0
+  spectatorCount = 0,
+  myReactions: ReactionSelections = {}
 ) => {
-  const { dealHistory, log, ...room } = toRoomView(code, state, spectatorCount);
+  const { dealHistory, log, ...room } = toRoomView(
+    code,
+    state,
+    spectatorCount,
+    myReactions
+  );
 
   const message: ServerMessage = {
     lists: {
