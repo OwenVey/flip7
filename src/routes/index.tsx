@@ -23,6 +23,7 @@ import RecentRooms from "../components/recent-rooms";
 import type { Card } from "../game/cards";
 import { CODE_ALPHABET, CODE_LENGTH, normalizeCode } from "../game/protocol";
 import { createRoom, roomExists } from "../lib/room-functions";
+import { codeFromRoomLink } from "../lib/room-link";
 import { paths } from "../router";
 
 const HERO_CARDS: Card[] = [
@@ -117,6 +118,24 @@ export default function Home() {
     }
   };
 
+  const handleCodePaste = (event: ClipboardEvent) => {
+    if (pending() !== null) {
+      return;
+    }
+
+    const linked = codeFromRoomLink(
+      event.clipboardData?.getData("text/plain") ?? ""
+    );
+
+    if (linked === null) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    codeInput.setValue(linked);
+  };
+
   return (
     <main class="home">
       <Title>{HOME_TITLE}</Title>
@@ -161,6 +180,12 @@ export default function Home() {
           <form
             class="home-join"
             novalidate
+            ref={(form) => {
+              // WARNING: must capture; the code input cancels every paste, even ones it drops.
+              form.addEventListener("paste", handleCodePaste, {
+                capture: true,
+              });
+            }}
             onSubmit={(event) => {
               void handleJoinRoom(event);
             }}
