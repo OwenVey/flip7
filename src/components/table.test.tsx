@@ -210,7 +210,7 @@ describe("<Table />", () => {
         chat={chatControls()}
         typing={[]}
         actionsDisabled
-        dealing
+        playback={{ dealing: true }}
       />
     ));
 
@@ -280,7 +280,7 @@ describe("<Table />", () => {
         chat={chatControls()}
         typing={[]}
         actionsDisabled
-        dealing
+        playback={{ dealing: true }}
       />
     ));
 
@@ -480,12 +480,12 @@ describe("<Table />", () => {
           send={vi.fn<RoomConnection["send"]>()}
           chat={chatControls()}
           typing={[]}
-          roundPoints={
-            new Map([
+          playback={{
+            roundPoints: new Map([
               ["a", points()],
               ["b", 3],
-            ])
-          }
+            ]),
+          }}
         />
       ));
 
@@ -556,7 +556,7 @@ describe("<Table />", () => {
         send={vi.fn<RoomConnection["send"]>()}
         chat={chatControls()}
         typing={[]}
-        dealing={dealing()}
+        playback={{ dealing: dealing() }}
       />
     ));
 
@@ -1197,7 +1197,7 @@ describe("<Table />", () => {
         chat={chatControls()}
         typing={[]}
         actionsDisabled
-        dealing
+        playback={{ dealing: true }}
       />
     ));
     const leave = screen.getByRole("button", { name: "Leave room" });

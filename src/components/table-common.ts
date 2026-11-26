@@ -1,9 +1,7 @@
 import { createSignal, onSettled } from "solid-js";
 
 import type { RoomView } from "../game/protocol";
-import type { DealStep } from "../lib/deal-plan";
 import type { DealPlaybackView } from "../lib/deal-playback";
-import type { PlaybackMoment } from "../lib/playback-moments";
 import type { RoomConnection } from "../lib/room-connection";
 
 export const SCORES_TITLE = "Scores";
@@ -42,15 +40,6 @@ export interface TableProps {
    * open during the deal and while a move waits for the room.
    */
   offline?: boolean;
-}
-
-export interface DealProps {
-  /** True while cards are still flying from the deck. */
-  dealing?: boolean;
-  /** A key moment settling on the table before play moves on. */
-  dealMoment?: PlaybackMoment | null;
-  /** The card being dealt, and where it's going. */
-  dealStep?: DealStep | null;
 }
 
 export type RoundPointsByPlayer = Pick<DealPlaybackView, "roundPoints">;

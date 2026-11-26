@@ -11,6 +11,7 @@ import { DATASETS, PHASES, stressRoom, VIEWERS } from "../../dev/stress-rooms";
 import { roundPointsFor } from "../../lib/deal-playback";
 import { createRoomChatLog } from "../../lib/room-chat-log";
 import type { RoomConnection } from "../../lib/room-connection";
+import { resultsRound } from "../../lib/table-prompt";
 import NotFound from "../[...404]";
 
 const LABELS = {
@@ -108,7 +109,7 @@ const StressPage = () => {
               playerId: () => current.playerId,
               players: () => current.room.players,
               resultsRound: () =>
-                current.room.phase === "roundOver" ? current.room.round : null,
+                resultsRound(current.room, { dealing: false }),
               typing: () => current.typing,
             });
 
@@ -121,7 +122,12 @@ const StressPage = () => {
                     playerId={current.playerId}
                     send={send}
                     chatLog={chatLog}
-                    roundPoints={roundPointsFor(current.room)}
+                    playback={{
+                      dealing: false,
+                      moment: null,
+                      roundPoints: roundPointsFor(current.room),
+                      step: null,
+                    }}
                   />
                 }
               >

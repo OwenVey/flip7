@@ -12,8 +12,8 @@ import type { HeldCard } from "../game/engine";
 import type { RoomView } from "../game/protocol";
 import { nameOf } from "../lib/player-name";
 import { pop } from "../lib/table-motion";
-import { samePrompt, tablePrompt } from "../lib/table-prompt";
-import type { PromptPlayback } from "../lib/table-prompt";
+import { samePrompt } from "../lib/table-prompt";
+import type { BarPrompt } from "../lib/table-prompt";
 import CardBackMark from "./card-back-mark";
 import PlayingCard from "./playing-card";
 import ScrollFade from "./scroll-fade";
@@ -118,14 +118,13 @@ const pointsLabel = (points: number) =>
   points === 1 ? "1 point" : `${points} points`;
 
 const ActionBar = (
-  props: Pick<TableProps, "room" | "playerId" | "send" | "actionsDisabled"> & {
-    playback: PromptPlayback;
+  props: Pick<TableProps, "room" | "send" | "actionsDisabled"> & {
+    prompt: BarPrompt;
+    /** The game is over and Deal playback has finished. */
+    gameOver: boolean;
   }
 ) => {
-  const prompt = createMemo(
-    () => tablePrompt(props.room, props.playerId, props.playback),
-    { equals: samePrompt }
-  );
+  const prompt = createMemo(() => props.prompt, { equals: samePrompt });
 
   const kind = createMemo(() => prompt().controls.kind);
 
@@ -168,7 +167,7 @@ const ActionBar = (
       <ScrollFade viewportClass="action-bar-scroll">
         <div class="action-bar-content">
           <Show
-            when={props.room.phase === "gameOver" && !props.playback.dealing}
+            when={props.gameOver}
             fallback={<Deck count={props.room.deckCount} />}
           >
             <span class="action-bar-trophy" aria-hidden="true">

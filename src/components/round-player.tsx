@@ -6,14 +6,13 @@ import { createEffect, createMemo, For, Show } from "solid-js";
 
 import type { Card } from "../game/cards";
 import type { ActionCardChoice, Player, RoundStatus } from "../game/engine";
-import type { AvailableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
-import type { PlaybackMoment } from "../lib/playback-moments";
 import { nameOf } from "../lib/player-name";
 import { scoreMeter } from "../lib/score-meter";
 import { pop } from "../lib/table-motion";
+import type { PlayerPrompt } from "../lib/table-prompt";
 import FlipTracker, {
   createShownFlip,
   flipProgress,
@@ -81,10 +80,9 @@ interface RoundPlayerProps {
   room: RoomView;
   player: Player;
   playerId: string | null;
-  moves: AvailableMoves;
-  dealing: boolean;
-  dealMoment: PlaybackMoment | null;
-  dealStep?: DealStep | null;
+  prompt: PlayerPrompt;
+  canRemove: boolean;
+  dealStep: DealStep | null;
   roundPoints: number;
   actionsDisabled?: boolean;
   removeDisabled?: boolean;
@@ -139,29 +137,7 @@ const RoundPlayer = (props: RoundPlayerProps) => {
   const isMe = () => props.player.id === props.playerId;
   const isHost = () => props.room.hostId === props.player.id;
 
-  const hasDecision = createMemo(
-    () =>
-      props.dealMoment === null &&
-      props.moves.waitingOn?.playerId === props.player.id
-  );
-
-  const canKick = createMemo(() =>
-    props.moves.host.kick.includes(props.player.id)
-  );
-
   const isFrozen = () => props.player.status === "frozen";
-
-  const isWinner = () =>
-    props.room.phase === "gameOver" &&
-    !props.dealing &&
-    props.room.winnerIds.includes(props.player.id);
-
-  const pickKind = createMemo(() =>
-    !props.dealing &&
-    props.moves.choice?.targets.includes(props.player.id) === true
-      ? props.room.choice?.card.kind
-      : undefined
-  );
 
   const playing = createMemo(() => props.room.phase === "playing");
 
@@ -199,18 +175,16 @@ const RoundPlayer = (props: RoundPlayerProps) => {
       data-status={props.player.status}
       data-seat={props.player.id}
       data-flipping={flip()?.waiting === false ? "" : undefined}
-      data-turn={hasDecision() ? "" : undefined}
+      data-turn={props.prompt.waitingOn ? "" : undefined}
       data-me={isMe() ? "" : undefined}
-      data-winner={isWinner() ? "" : undefined}
+      data-winner={props.prompt.winner ? "" : undefined}
       data-offline={props.player.connected ? undefined : ""}
-      data-pickable={pickKind()}
-      data-unpickable={
-        !props.dealing && props.moves.choice && !pickKind() ? "" : undefined
-      }
+      data-pickable={props.prompt.pick?.kind}
+      data-unpickable={props.prompt.unpickable ? "" : undefined}
       aria-label={`${props.player.name}, ${props.player.score} points`}
     >
-      <Show when={pickKind()}>
-        {(kind) => (
+      <Show when={props.prompt.pick}>
+        {(pick) => (
           <button
             type="button"
             data-game-tap=""
@@ -219,9 +193,9 @@ const RoundPlayer = (props: RoundPlayerProps) => {
             aria-label={pickLabel(
               props.room,
               props.playerId,
-              kind(),
+              pick().kind,
               props.player.id,
-              props.moves.choice?.forId
+              pick().forId
             )}
             onClick={() => {
               props.onPick(props.player.id);
@@ -261,14 +235,14 @@ const RoundPlayer = (props: RoundPlayerProps) => {
           <strong dir="auto" title={props.player.name}>
             {props.player.name}
           </strong>
-          <Show when={isWinner()}>
+          <Show when={props.prompt.winner}>
             <span class="badge" data-tone="winner" title="Winner">
               <Trophy size={12} aria-hidden="true" />
               <span class="badge-label">Winner</span>
             </span>
           </Show>
           <Show when={!props.player.connected}>
-            <OfflineBadge compact={isWinner()} />
+            <OfflineBadge compact={props.prompt.winner} />
           </Show>
         </div>
         <div class="seat-meta">
@@ -281,7 +255,7 @@ const RoundPlayer = (props: RoundPlayerProps) => {
               />
             )}
           </Show>
-          <Show when={hasDecision() && !isMe()}>
+          <Show when={props.prompt.waitingOn && !isMe()}>
             <span class="badge" data-tone="turn">
               {props.room.choice ? "Choosing…" : "Thinking…"}
             </span>
@@ -315,7 +289,7 @@ const RoundPlayer = (props: RoundPlayerProps) => {
             {(card) => <PlayingCard card={card()} size="mini" />}
           </For>
         </ul>
-        <Show when={canKick()}>
+        <Show when={props.canRemove}>
           <RemovePlayer
             bot={props.player.bot}
             disabled={props.removeDisabled}
