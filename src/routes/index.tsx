@@ -21,13 +21,9 @@ import PageMeta, {
 import PlayingCard from "../components/playing-card";
 import RecentRooms from "../components/recent-rooms";
 import type { Card } from "../game/cards";
-import {
-  CODE_ALPHABET,
-  CODE_LENGTH,
-  codeFromRoomLink,
-  normalizeCode,
-} from "../game/protocol";
+import { CODE_ALPHABET, CODE_LENGTH, normalizeCode } from "../game/protocol";
 import { createRoom, roomExists } from "../lib/room-functions";
+import { codeFromRoomLink } from "../lib/room-link";
 import { paths } from "../router";
 
 const HERO_CARDS: Card[] = [
