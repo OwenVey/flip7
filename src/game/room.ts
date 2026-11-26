@@ -1,7 +1,7 @@
 import { isAvatar, pickAvatar, takenAvatars } from "./avatars";
 import type { Random } from "./cards";
 import { isRoomCommand } from "./client-message";
-import type { GameCommand } from "./client-message";
+import type { ClientMessage, GameCommand } from "./client-message";
 import {
   addBot,
   addPlayer,
@@ -123,40 +123,92 @@ export interface RoomOutcome {
   effects: RoomEffect[];
   expired: boolean;
   alarmAt: number;
+  save: true;
 }
 
-/** How a transport delivers replies, audience-specific broadcasts, and closes. */
+/** What the transport does for a message that changes nothing to save: carry out `effects`. */
+export interface RoomPassing {
+  effects: RoomEffect[];
+  save: false;
+}
+
+/** How a transport reaches one connection: send it a message, or close it. */
 export interface RoomTransport {
-  reply: (message: ServerMessage) => void;
-  broadcast: (message: ServerMessage, preview: PreviewMessage) => void;
-  relay: (message: ServerMessage, except: readonly string[]) => void;
+  send: (connectionId: string, message: ServerMessage) => void;
   close: (connectionId: string, code: number, reason: string) => void;
 }
 
-/** Carries out an outcome's effects in order. Save the room before calling this. */
-export const deliver = (
-  outcome: Pick<RoomOutcome, "effects">,
-  transport: RoomTransport
+interface Delivery {
+  seats: Seats;
+  transport: RoomTransport;
+  /** The connection whose message this answers. Replies go nowhere without one. */
+  sender?: string;
+}
+
+const broadcastTo = (
+  { seats, transport }: Delivery,
+  message: ServerMessage,
+  preview: PreviewMessage
 ) => {
-  for (const effect of outcome.effects) {
+  for (const { admission, id } of seats.connections()) {
+    transport.send(id, admission ? message : preview);
+  }
+};
+
+const relayTo = (
+  { seats, transport }: Delivery,
+  message: ServerMessage,
+  except: readonly string[]
+) => {
+  const skipped = new Set(except);
+
+  for (const { admission, id } of seats.connections()) {
+    if (admission && !skipped.has(id)) {
+      transport.send(id, message);
+    }
+  }
+};
+
+/**
+ * Carries out an outcome's effects in order. Admitted connections get the live
+ * table and visitors the join preview; relays reach only admitted connections.
+ * An expired room broadcasts nothing. Save the room before calling this.
+ */
+export const deliver = (
+  result: RoomOutcome | RoomPassing,
+  delivery: Delivery
+) => {
+  const expired = result.save && result.expired;
+
+  for (const effect of result.effects) {
     switch (effect.type) {
       case "reply": {
-        transport.reply(effect.message);
+        if (delivery.sender !== undefined) {
+          delivery.transport.send(delivery.sender, effect.message);
+        }
+
         break;
       }
 
       case "broadcast": {
-        transport.broadcast(effect.message, effect.preview);
+        if (!expired) {
+          broadcastTo(delivery, effect.message, effect.preview);
+        }
+
         break;
       }
 
       case "relay": {
-        transport.relay(effect.message, effect.except);
+        relayTo(delivery, effect.message, effect.except);
         break;
       }
 
       case "close": {
-        transport.close(effect.connectionId, effect.code, effect.reason);
+        delivery.transport.close(
+          effect.connectionId,
+          effect.code,
+          effect.reason
+        );
         break;
       }
 
@@ -190,6 +242,9 @@ const reply = (message: ServerMessage) =>
 
 const BROADCAST = { type: "broadcast" } satisfies PlannedEffect;
 
+const passing = (effects: RoomEffect[]) =>
+  ({ effects, save: false }) satisfies RoomPassing;
+
 const rejection = (message: string, requestId?: string) =>
   reply(
     requestId === undefined
@@ -213,7 +268,8 @@ const attempt = (run: () => PlannedEffect[], requestId?: string) => {
  * The rules of a room around its game: who is seated, rejoining by token,
  * remembering each player's last move, eviction, presence and the clocks.
  * Every call updates the stored room in place and returns what the transport
- * must do.
+ * must do. `receive` takes any message from a connection; typing and sync
+ * change nothing to save, so they come back as `RoomPassing`.
  */
 export const createRoom = (
   stored: StoredRoom,
@@ -367,6 +423,7 @@ export const createRoom = (
       alarmAt: nextAlarmAt(stored, deadlines),
       effects,
       expired,
+      save: true,
     };
 
     return outcome;
@@ -566,7 +623,7 @@ export const createRoom = (
     return { changed, closes };
   };
 
-  return {
+  const methods = {
     alarm: () => {
       const now = deps.now();
       const dropped = dropSilentConnections(now);
@@ -784,4 +841,45 @@ export const createRoom = (
       return finish([BROADCAST]);
     },
   };
+
+  const receive = (connectionId: string, message: ClientMessage) => {
+    const { type } = message;
+
+    if (type === "join") {
+      return methods.join(
+        connectionId,
+        message.name,
+        message.token,
+        message.avatar
+      );
+    }
+
+    if (type === "chat") {
+      return methods.chat(connectionId, message.text);
+    }
+
+    if (type === "typing") {
+      return passing(methods.typing(connectionId, message.active));
+    }
+
+    if (type === "sync") {
+      return passing([reply(methods.viewFor(connectionId))]);
+    }
+
+    if (type === "watch") {
+      return methods.watch(connectionId);
+    }
+
+    if (type === "watchInstead") {
+      return methods.watchInstead(connectionId);
+    }
+
+    if (type === "stopWatching") {
+      return methods.stopWatching(connectionId);
+    }
+
+    return methods.command(connectionId, message);
+  };
+
+  return { ...methods, receive };
 };

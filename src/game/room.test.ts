@@ -17,8 +17,14 @@ import {
   TYPING_RELAY_MS,
 } from "./protocol";
 import type { ServerMessage, StateMessage } from "./protocol";
-import { createRoom, newStoredRoom } from "./room";
-import type { Admission, RoomOutcome, Seats } from "./room";
+import { createRoom, deliver, newStoredRoom } from "./room";
+import type {
+  Admission,
+  RoomOutcome,
+  RoomPassing,
+  RoomTransport,
+  Seats,
+} from "./room";
 import { ABSENT_GRACE_MS, HOST_GRACE_MS, IDLE_EXPIRY_MS } from "./timers";
 
 const START = 1_000_000;
@@ -87,18 +93,19 @@ const harness = () => {
     },
     room,
     seatOf: (connectionId: string) => open.get(connectionId)?.admission ?? null,
+    seats,
     stored,
   };
 };
 
 type Harness = ReturnType<typeof harness>;
 
-const replies = (outcome: RoomOutcome) =>
+const replies = (outcome: Pick<RoomOutcome, "effects">) =>
   outcome.effects.flatMap((effect) =>
     effect.type === "reply" ? [effect.message] : []
   );
 
-const welcomeOf = (outcome: RoomOutcome) => {
+const welcomeOf = (outcome: Pick<RoomOutcome, "effects">) => {
   const welcome = replies(outcome).find(
     (message): message is Extract<ServerMessage, { type: "welcome" }> =>
       message.type === "welcome"
@@ -1310,5 +1317,115 @@ describe("spectating a room", () => {
     h.room.watch("guest");
 
     expect(h.room.command("host", { type: "leave" }).expired).toBeTruthy();
+  });
+});
+
+const deliveredBy = (
+  h: Harness,
+  result: RoomOutcome | RoomPassing,
+  sender?: string
+) => {
+  const sent: Record<string, string[]> = {};
+  const closed: string[] = [];
+
+  const transport: RoomTransport = {
+    close: (connectionId) => {
+      closed.push(connectionId);
+    },
+    send: (connectionId, message) => {
+      sent[connectionId] = [...(sent[connectionId] ?? []), message.type];
+    },
+  };
+
+  deliver(result, { seats: h.seats, sender, transport });
+
+  return { closed, sent };
+};
+
+describe("receiving a message", () => {
+  it("routes each message to its rule and saves only what changes the room", () => {
+    const h = harness();
+    h.connect("ana-tab");
+
+    const joined = h.room.receive("ana-tab", {
+      avatar: 0,
+      name: "Ana",
+      token: null,
+      type: "join",
+    });
+
+    expect(welcomeOf(joined).playerId).toBe(h.stored.game.players[0]?.id);
+
+    const typing = h.room.receive("ana-tab", { active: true, type: "typing" });
+    const sync = h.room.receive("ana-tab", { type: "sync" });
+
+    expect([typing.save, sync.save]).toStrictEqual([false, false]);
+    expect(sync.effects).toMatchObject([
+      { message: { type: "state" }, type: "reply" },
+    ]);
+
+    const chatted = h.room.receive("ana-tab", { text: "hi", type: "chat" });
+
+    expect([joined.save, chatted.save]).toStrictEqual([true, true]);
+    expect(h.stored.game.log.at(-1)).toMatchObject({ text: "hi" });
+  });
+
+  it("sends the live table only to admitted connections and the join preview to visitors", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    h.connect("visitor");
+    h.connect("watcher");
+    h.room.watch("watcher");
+
+    const { sent } = deliveredBy(
+      h,
+      h.room.receive("ana-tab", { text: "hi", type: "chat" }),
+      "ana-tab"
+    );
+
+    expect(sent).toStrictEqual({
+      "ana-tab": ["state"],
+      visitor: ["preview"],
+      watcher: ["state"],
+    });
+  });
+
+  it("relays typing to other admitted connections only and replies only to the sender", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    joinAs(h, "ben-tab", "Ben");
+    h.connect("visitor");
+
+    const typing = deliveredBy(
+      h,
+      h.room.receive("ana-tab", { active: true, type: "typing" }),
+      "ana-tab"
+    );
+
+    const sync = deliveredBy(
+      h,
+      h.room.receive("visitor", { type: "sync" }),
+      "visitor"
+    );
+
+    expect([typing.sent, sync.sent]).toStrictEqual([
+      { "ben-tab": ["typing"] },
+      { visitor: ["preview"] },
+    ]);
+  });
+
+  it("broadcasts nothing from a room that expired", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    h.room.receive("ana-tab", { type: "addBot" });
+    h.connect("visitor");
+
+    const left = h.room.receive("ana-tab", { type: "leave" });
+
+    expect(left.save && left.expired).toBeTruthy();
+    expect(deliveredBy(h, left, "ana-tab")).toStrictEqual({
+      closed: ["ana-tab"],
+      sent: {},
+    });
   });
 });
