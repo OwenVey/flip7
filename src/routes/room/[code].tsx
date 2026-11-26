@@ -222,7 +222,7 @@ const Room = (props: { code: string }) => {
                 chat: connection.chat,
                 inSheet: createSheetTable(),
                 log: () => view().room.log,
-                reactions: () => view().room.reactions,
+                reactions: () => connection.room()?.reactions ?? {},
                 playerId: () => view().playerId,
                 players: () => view().room.players,
                 resultsRound: () => resultsRound(view().room, table()),

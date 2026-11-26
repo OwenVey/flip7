@@ -70,15 +70,15 @@ const ReactionButton = (props: {
   class: string;
   label: string;
   selected: boolean;
-  onClick: () => Promise<void>;
+  onClick: (button: HTMLElement) => Promise<void>;
   children: JSX.Element;
 }) => (
   <Button
     class={props.class}
     aria-label={props.label}
     aria-pressed={props.selected ? "true" : "false"}
-    onClick={async () => {
-      await props.onClick();
+    onClick={async (event) => {
+      await props.onClick(event.currentTarget);
     }}
   >
     <span aria-hidden="true">{props.children}</span>
@@ -89,8 +89,10 @@ const ReactionButton = (props: {
 export const ReactionTrigger = (props: {
   messageId: number;
   picker: ReactionPickerController;
+  triggerRef: (element: HTMLButtonElement) => void;
 }) => (
   <PopoverTrigger
+    ref={props.triggerRef}
     class="chat-react-trigger"
     controller={props.picker.popover}
     payload={props.messageId}
@@ -116,6 +118,7 @@ export const ChatReactions = (props: {
   reactions: MessageReactions | undefined;
   mine: ReactionEmoji | undefined;
   interactive: boolean;
+  focusTrigger: () => void;
   toggle: Toggle;
 }) => {
   const counts = createMemo(() => countReactions(props.reactions));
@@ -146,7 +149,15 @@ export const ChatReactions = (props: {
                     class="chat-reaction-chip"
                     label={label(emoji, count())}
                     selected={props.mine === emoji}
-                    onClick={async () => {
+                    onClick={async (button) => {
+                      if (
+                        props.mine === emoji &&
+                        count() === 1 &&
+                        button.ownerDocument.activeElement === button
+                      ) {
+                        props.focusTrigger();
+                      }
+
                       await props.toggle(props.messageId, emoji);
                     }}
                   >

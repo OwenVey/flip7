@@ -495,6 +495,8 @@ const LogRound = (props: {
               <Switch>
                 <Match when={message()}>
                   {(chat) => {
+                    let trigger: HTMLButtonElement | undefined;
+
                     const picker = () =>
                       props.chatLog.chat() === undefined
                         ? undefined
@@ -515,6 +517,9 @@ const LogRound = (props: {
                               <ReactionTrigger
                                 messageId={chat().id}
                                 picker={controller()}
+                                triggerRef={(element) => {
+                                  trigger = element;
+                                }}
                               />
                             )}
                           </Show>
@@ -524,6 +529,9 @@ const LogRound = (props: {
                           reactions={props.chatLog.reactions.of(chat().id)}
                           mine={props.chatLog.reactions.mine(chat().id)}
                           interactive={picker() !== undefined}
+                          focusTrigger={() => {
+                            trigger?.focus({ preventScroll: true });
+                          }}
                           toggle={props.chatLog.reactions.toggle}
                         />
                       </>

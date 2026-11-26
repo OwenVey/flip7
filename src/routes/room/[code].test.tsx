@@ -6,10 +6,20 @@ import { flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import faviconUrl from "../../assets/favicon.svg?url";
-import { addPlayer, createGame, startGame } from "../../game/engine";
+import { parseClientMessage } from "../../game/client-message";
+import {
+  addPlayer,
+  chat,
+  createGame,
+  hit,
+  reactToChat,
+  startGame,
+} from "../../game/engine";
 import { waitingOn } from "../../game/moves";
 import type { ServerMessage } from "../../game/protocol";
 import { toStateMessage } from "../../game/protocol";
+import { MOTION_PREFERENCE_QUERY } from "../../lib/motion";
+import { gameAtFirstTurn, random } from "../../test/deal-game";
 import RoomPage from "./[code]";
 
 class TestSocket extends EventTarget {
@@ -49,6 +59,18 @@ const advanceTime = async (ms: number) => {
   flush();
 };
 
+const stubRoomBrowser = (animate = false) => {
+  vi.useFakeTimers();
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+  vi.stubGlobal("matchMedia", (query: string) =>
+    Object.assign(new EventTarget(), {
+      matches: animate && query === MOTION_PREFERENCE_QUERY,
+    })
+  );
+  // oxlint-disable-next-line landmines-testing/no-test-doubles -- Supply Worker frames at the browser transport boundary in jsdom.
+  vi.stubGlobal("WebSocket", TestSocket);
+};
+
 const renderRoom = (history: ReturnType<typeof memoryHistory>) => {
   const Router = createRouter({
     history,
@@ -77,13 +99,7 @@ describe(RoomPage, () => {
   });
 
   it("keeps the room title and favicon in sync as the move alert blinks", async () => {
-    vi.useFakeTimers();
-    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
-    vi.stubGlobal("matchMedia", () =>
-      Object.assign(new EventTarget(), { matches: false })
-    );
-    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Supply Worker frames at the browser transport boundary in jsdom.
-    vi.stubGlobal("WebSocket", TestSocket);
+    stubRoomBrowser();
     const visibility = vi.spyOn(document, "visibilityState", "get");
 
     const setVisibility = (state: DocumentVisibilityState) => {
@@ -155,13 +171,7 @@ describe(RoomPage, () => {
   });
 
   it("keeps the chat draft when the host starts the game", async () => {
-    vi.useFakeTimers();
-    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
-    vi.stubGlobal("matchMedia", () =>
-      Object.assign(new EventTarget(), { matches: false })
-    );
-    // oxlint-disable-next-line landmines-testing/no-test-doubles -- Supply Worker frames at the browser transport boundary in jsdom.
-    vi.stubGlobal("WebSocket", TestSocket);
+    stubRoomBrowser();
 
     renderRoom(memoryHistory(`/room/${roomCode}`));
     flush();
@@ -196,5 +206,59 @@ describe(RoomPage, () => {
     expect(screen.getByPlaceholderText("Say something…")).toHaveValue(
       "good luck"
     );
+  });
+
+  it("keeps a confirmed reaction visible during Deal playback", async ({
+    onTestFinished,
+  }) => {
+    stubRoomBrowser(true);
+    Object.defineProperty(Element.prototype, "animate", {
+      configurable: true,
+      value: () => ({ cancel: () => {}, finished: Promise.resolve() }),
+    });
+    onTestFinished(() => {
+      Reflect.deleteProperty(Element.prototype, "animate");
+    });
+
+    renderRoom(memoryHistory(`/room/${roomCode}`));
+    flush();
+    await advanceTime(0);
+    const socket = TestSocket.current;
+
+    if (socket === undefined) {
+      throw new Error("Expected the room to connect");
+    }
+
+    socket.dispatchEvent(new Event("open"));
+    const game = gameAtFirstTurn();
+    chat(game, "a", "Nice!");
+    const messageId = game.logSeq;
+    reactToChat(game, "b", messageId, "👍");
+    receive(socket, { playerId: "b", token: "test-token", type: "welcome" });
+    receive(socket, toStateMessage(roomCode, game));
+    await advanceTime(0);
+
+    game.deck.push({ id: 1003, kind: "number", value: 7 });
+    hit(game, "a", random);
+    receive(socket, toStateMessage(roomCode, game));
+    await advanceTime(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Thumbs up: 1" }));
+    flush();
+    expect(screen.queryByRole("button", { name: "Thumbs up: 1" })).toBeNull();
+
+    const command = parseClientMessage(socket.sent.at(-1) ?? "");
+
+    if (command?.type !== "react" || command.requestId === undefined) {
+      throw new Error("Expected a reaction command with a request ID");
+    }
+
+    reactToChat(game, "b", messageId, null);
+    receive(socket, toStateMessage(roomCode, game));
+    receive(socket, { requestId: command.requestId, type: "accepted" });
+    await advanceTime(0);
+
+    expect(screen.getByText("Ada hits…")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Thumbs up: 1" })).toBeNull();
   });
 });

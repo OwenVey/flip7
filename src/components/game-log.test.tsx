@@ -146,6 +146,31 @@ const stayed = (index: number) =>
 describe("<GameLog />", () => {
   afterEach(cleanup);
 
+  it("returns focus to Add reaction when removing the only tally", () => {
+    const chat = chatControls();
+    const message = { ...fields(2, 0), from: ben, text: "Nice!" };
+
+    render(() => (
+      <GameLog
+        chat={chat}
+        log={[message]}
+        playerId="a"
+        players={players}
+        reactions={{ 2: { a: "👍" } }}
+        typing={[]}
+      />
+    ));
+
+    const chip = screen.getByRole("button", { name: "Thumbs up: 1" });
+    chip.focus();
+    fireEvent.click(chip);
+    flush();
+
+    expect(chat.reactions).toStrictEqual([[message.id, null]]);
+    expect(chip).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add reaction" })).toHaveFocus();
+  });
+
   it("shows a reaction at once, returns focus, and drops it if the Room rejects it", async () => {
     const chat = chatControls(() => true, false);
 
