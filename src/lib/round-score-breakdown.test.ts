@@ -41,13 +41,18 @@ describe(roundScoreRows, () => {
     ]);
   });
 
-  it("keeps the ×2 row when there are no Number cards to double", () => {
+  it("keeps the ×2 row and omits Number cards when there are no Number cards to double", () => {
     expect(rows([DOUBLE, PLUS_TWO, PLUS_SIX])).toStrictEqual([
-      "Number cards 0",
       "×2 0",
       "Score Modifiers +8",
       "Total 8",
     ]);
+  });
+
+  it("handles 0-point hands with and without a Number 0 card", () => {
+    expect(rows(numbers(0))).toStrictEqual(["Number cards 0", "Total 0"]);
+    expect(chips(numbers(0))).toStrictEqual(["Number cards: 0", "Total: "]);
+    expect(rows([])).toStrictEqual(["Total 0"]);
   });
 
   it("adds the Flip 7 bonus last", () => {

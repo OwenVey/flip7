@@ -11,6 +11,7 @@ import { captureScenario } from "../test/diagnostics";
 import { itemAt } from "../test/item-at";
 import { room } from "../test/room-view";
 import Leaderboard from "./leaderboard";
+import { ROUND_COUNT_MS } from "./table-common";
 
 const Scores = (props: { room: RoomView; playerId: string | null }) => (
   <Leaderboard
@@ -314,6 +315,35 @@ describe("<Leaderboard />", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("offers the breakdown for a 0-point banked hand", () => {
+    const { players } = room();
+    const [ana, ben] = [itemAt(players, 0), itemAt(players, 1)];
+    const zeroHand: Card[] = [{ id: 1, kind: "number", value: 0 }];
+
+    render(() => (
+      <Scores
+        room={room({
+          phase: "roundOver",
+          players: [
+            {
+              ...ana,
+              hand: zeroHand,
+              lastRound: calculateRoundScore(zeroHand),
+              status: "frozen",
+            },
+            { ...ben, lastRound: BUSTED_ROUND, status: "busted" },
+          ],
+        })}
+        playerId="a"
+      />
+    ));
+
+    const breakdown = screen.getByRole("button", { name: "0 points, banked" });
+
+    expect(breakdown).toHaveTextContent(/^\+0$/u);
+    expect(breakdown).toHaveAccessibleDescription("Number cards 0, Total 0");
+  });
+
   it("waits for the round points to count up before offering the breakdown", () => {
     // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
     vi.stubGlobal("matchMedia", () => ({ matches: true }));
@@ -331,7 +361,7 @@ describe("<Leaderboard />", () => {
 
       expect(screen.queryByRole("button")).not.toBeInTheDocument();
 
-      vi.advanceTimersByTime(400);
+      vi.advanceTimersByTime(ROUND_COUNT_MS);
       flush();
 
       expect(

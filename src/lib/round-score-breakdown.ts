@@ -26,8 +26,12 @@ export const roundScoreRows = (score: RoundScore, hand: readonly Card[]) => {
   const ofKind = (kind: Card["kind"]) =>
     hand.filter((card) => card.kind === kind);
 
+  const numberCards = ofKind("number");
+
   return [
-    row("Number cards", `${score.numbers}`, ofKind("number")),
+    ...(numberCards.length > 0
+      ? [row("Number cards", `${score.numbers}`, numberCards)]
+      : []),
     ...(score.doubled
       ? [row("×2", `${score.numbers * 2}`, ofKind("double"))]
       : []),
