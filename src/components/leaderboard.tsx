@@ -18,7 +18,7 @@ import type { RoundPointsByPlayer, TableProps } from "./table-common";
 import Tooltip from "./tooltip";
 
 const CountUp = (props: { value: number }) => {
-  const shown = createCountUp(() => props.value);
+  const { shown } = createCountUp(() => props.value);
 
   return <>{shown()}</>;
 };
@@ -103,7 +103,7 @@ const LeaderboardRound = (props: {
     roundPointsState(props.player.status, scored())
   );
 
-  const shownPoints = createCountUp(() => props.points, {
+  const { finished, shown: shownPoints } = createCountUp(() => props.points, {
     durationMs: ROUND_COUNT_MS,
   });
 
@@ -116,7 +116,8 @@ const LeaderboardRound = (props: {
     return scored() &&
       state() === "banked" &&
       score !== null &&
-      shownPoints() === score.total
+      props.points === score.total &&
+      finished()
       ? score
       : null;
   });
@@ -157,6 +158,8 @@ const LeaderboardRound = (props: {
                 {...hint}
                 type="button"
                 class="round-breakdown-trigger"
+                data-variant="disclosure"
+                data-size="sm"
                 aria-label={label()}
               />
             )}

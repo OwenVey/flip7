@@ -1,5 +1,11 @@
 import { expectNoDiagnostics } from "@solidjs/diagnostics";
-import { cleanup, render, screen, within } from "@solidjs/testing-library";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -30,7 +36,7 @@ const SCORED_HAND: Card[] = [
 
 const BUSTED_ROUND = calculateRoundScore([]);
 
-const scoredRoom = (phase: RoomView["phase"]) => {
+const scoredRoom = (phase: RoomView["phase"], hand = SCORED_HAND) => {
   const { players } = room();
   const [ana, ben] = [itemAt(players, 0), itemAt(players, 1)];
 
@@ -39,8 +45,8 @@ const scoredRoom = (phase: RoomView["phase"]) => {
     players: [
       {
         ...ana,
-        hand: SCORED_HAND,
-        lastRound: calculateRoundScore(SCORED_HAND),
+        hand,
+        lastRound: calculateRoundScore(hand),
         status: "stayed",
       },
       { ...ben, lastRound: BUSTED_ROUND, status: "busted" },
@@ -301,6 +307,18 @@ describe("<Leaderboard />", () => {
     ).toStrictEqual(["12", "11", "×2", "+6"]);
   });
 
+  it("opens the score breakdown when the button is pressed", async () => {
+    render(() => <Scores room={scoredRoom("roundOver")} playerId="a" />);
+
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "52 points, banked" }));
+
+    await expect(screen.findByRole("tooltip")).resolves.toHaveTextContent(
+      /Total\s*52/u
+    );
+  });
+
   it("has no breakdown while the round is in play", () => {
     const { players } = room();
     const [ana, ben] = [itemAt(players, 0), itemAt(players, 1)];
@@ -352,20 +370,34 @@ describe("<Leaderboard />", () => {
     });
 
     try {
-      const [view, setView] = createSignal(room());
+      const opening = room();
+
+      const [view, setView] = createSignal(
+        room({
+          players: opening.players.map((player) => ({ ...player, hand: [] })),
+        })
+      );
 
       render(() => <Scores room={view()} playerId="a" />);
 
-      setView(scoredRoom("roundOver"));
+      setView(scoredRoom("roundOver", [{ id: 1, kind: "number", value: 1 }]));
       flush();
 
       expect(screen.queryByRole("button")).not.toBeInTheDocument();
 
-      vi.advanceTimersByTime(ROUND_COUNT_MS);
+      vi.advanceTimersByTime(ROUND_COUNT_MS / 2);
       flush();
 
       expect(
-        screen.getByRole("button", { name: "52 points, banked" })
+        screen.getByRole("cell", { name: "1 point, banked" })
+      ).toHaveTextContent(/^\+1$/u);
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+
+      vi.advanceTimersByTime(ROUND_COUNT_MS / 2);
+      flush();
+
+      expect(
+        screen.getByRole("button", { name: "1 point, banked" })
       ).toBeInTheDocument();
     } finally {
       vi.useRealTimers();

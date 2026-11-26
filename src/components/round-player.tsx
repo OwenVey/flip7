@@ -152,9 +152,9 @@ const RoundPlayer = (props: RoundPlayerProps) => {
 
   const banked = createMemo(() => meter().banked);
   const round = createMemo(() => meter().round);
-  const shownBaseScore = createCountUp(banked);
+  const { shown: shownBaseScore } = createCountUp(banked);
 
-  const shownRoundPoints = createCountUp(round, {
+  const { shown: shownRoundPoints } = createCountUp(round, {
     durationMs: ROUND_COUNT_MS,
   });
 

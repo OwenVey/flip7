@@ -24,7 +24,7 @@ const mount = (
 ) =>
   createRoot((dispose) => ({
     dispose,
-    shown: createCountUp(target, options),
+    ...createCountUp(target, options),
   }));
 
 describe(createCountUp, () => {
@@ -35,15 +35,17 @@ describe(createCountUp, () => {
 
   it("updates synchronously in the same flush when motion is off", () => {
     const [target, setTarget] = createSignal(10);
-    const { dispose, shown } = mount(target, { initial: () => 0 });
+    const { dispose, finished, shown } = mount(target, { initial: () => 0 });
 
     try {
       expect(shown()).toBe(10);
+      expect(finished()).toBeTruthy();
 
       setTarget(42);
       flush();
 
       expect(shown()).toBe(42);
+      expect(finished()).toBeTruthy();
     } finally {
       dispose();
     }

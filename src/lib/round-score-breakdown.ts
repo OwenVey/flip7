@@ -8,12 +8,8 @@ interface RoundScoreRow {
   flipSeven: boolean;
 }
 
-const row = (
-  label: string,
-  value: string,
-  cards: Card[] = [],
-  flipSeven = false
-) => ({ cards, flipSeven, label, value }) satisfies RoundScoreRow;
+const row = (label: string, value: string, cards: Card[] = []) =>
+  ({ cards, flipSeven: false, label, value }) satisfies RoundScoreRow;
 
 /**
  * How a scored round adds up, one row per part the player holds, ending with
@@ -39,7 +35,7 @@ export const roundScoreRows = (score: RoundScore, hand: readonly Card[]) => {
       ? [row("Score Modifiers", `+${score.modifiers}`, ofKind("modifier"))]
       : []),
     ...(score.flipSeven
-      ? [row("Flip 7 bonus", `+${FLIP_SEVEN_BONUS}`, [], true)]
+      ? [{ ...row("Flip 7 bonus", `+${FLIP_SEVEN_BONUS}`), flipSeven: true }]
       : []),
     row("Total", `${score.total}`),
   ];

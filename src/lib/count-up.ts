@@ -27,8 +27,15 @@ export const createCountUp = (
   const destination = createMemo(target);
   const [now, setNow] = createSignal(0);
 
+  const isFinished = (count: Count, time: number) =>
+    count.from === count.to || duration <= 0 || time - count.start >= duration;
+
   const valueAt = (count: Count, time: number) => {
-    const progress = Math.min(1, Math.max(0, (time - count.start) / duration));
+    if (isFinished(count, time)) {
+      return count.to;
+    }
+
+    const progress = Math.max(0, (time - count.start) / duration);
 
     return Math.round(count.from + (count.to - count.from) * easeOut(progress));
   };
@@ -54,11 +61,11 @@ export const createCountUp = (
   createEffect(count, (current) => {
     let frame = 0;
 
-    if (current.from !== current.to) {
+    if (!isFinished(current, untrack(now))) {
       const tick = (time: number) => {
         setNow(time);
 
-        if (time - current.start < duration) {
+        if (!isFinished(current, time)) {
           frame = requestAnimationFrame(tick);
         }
       };
@@ -71,5 +78,8 @@ export const createCountUp = (
     };
   });
 
-  return createMemo(() => valueAt(count(), now()));
+  return {
+    finished: createMemo(() => isFinished(count(), now())),
+    shown: createMemo(() => valueAt(count(), now())),
+  };
 };

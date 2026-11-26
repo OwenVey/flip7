@@ -134,7 +134,8 @@
   [data-slot="drawer-trigger"],
   [data-slot="drawer-close"],
   [data-slot="popover-trigger"],
-  [data-slot="menu-trigger"]
+  [data-slot="menu-trigger"],
+  [data-slot="tooltip-trigger"][data-variant="disclosure"]
 ) {
   --button-height: var(--control-height);
   height: auto;
@@ -157,7 +158,7 @@
   }
 
   &[data-variant="disclosure"] {
-    padding-inline: 0;
+    padding: 0;
     border: 0;
     background: none;
     box-shadow: none;
