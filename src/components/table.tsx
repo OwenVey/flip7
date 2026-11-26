@@ -9,6 +9,8 @@ import { pointsOf } from "../lib/deal-playback";
 import type { RoomChatLog } from "../lib/room-chat-log";
 import { passDealerChip } from "../lib/table-motion";
 import type { ChipSpot } from "../lib/table-motion";
+import { tablePrompt } from "../lib/table-prompt";
+import type { PromptPlayback } from "../lib/table-prompt";
 import ActionBar from "./action-bar";
 import CardTooltips from "./card-tooltips";
 import ChatSheet from "./chat-sheet";
@@ -24,29 +26,29 @@ import ScrollFade from "./scroll-fade";
 import { SpectatorActions, WatcherCount } from "./spectator-controls";
 import type { Spectator } from "./spectator-controls";
 import { samePlayerIds, SCORES_TITLE } from "./table-common";
-import type {
-  DealProps,
-  RoundPointsByPlayer,
-  TableProps,
-} from "./table-common";
+import type { TableProps } from "./table-common";
 import TableMoreMenu from "./table-more-menu";
 import TableSheet from "./table-sheet";
 
 export default function Table(
-  props: TableProps &
-    DealProps &
-    RoundPointsByPlayer & {
-      chatLog: RoomChatLog;
-      /**
-       * The room as last confirmed, ahead of deal playback. Settings read it so
-       * a change shows as soon as the room accepts it, not after the deal.
-       */
-      latestRoom?: RoomView | null;
-      /** A Spectator's Join and Leave, shown where a player's Leave and ⋯ go. */
-      spectator?: Spectator;
-    }
+  props: TableProps & {
+    /** Deal playback, as the room route receives it. */
+    playback: PromptPlayback;
+    chatLog: RoomChatLog;
+    /**
+     * The room as last confirmed, ahead of deal playback. Settings read it so
+     * a change shows as soon as the room accepts it, not after the deal.
+     */
+    latestRoom?: RoomView | null;
+    /** A Spectator's Join and Leave, shown where a player's Leave and ⋯ go. */
+    spectator?: Spectator;
+  }
 ) {
   const moves = createMemo(() => availableMoves(props.room, props.playerId));
+
+  const prompt = createMemo(() =>
+    tablePrompt(props.room, props.playerId, props.playback)
+  );
 
   const playerIds = createMemo(() => props.room.players.map(({ id }) => id), {
     equals: samePlayerIds,
@@ -60,17 +62,13 @@ export default function Table(
   };
 
   const chooseTarget = (targetId: string) => {
-    const { choice } = moves();
+    const pick = prompt().seats.get(targetId)?.pick;
 
-    if (
-      props.actionsDisabled === true ||
-      choice === null ||
-      !choice.targets.includes(targetId)
-    ) {
+    if (props.actionsDisabled === true || pick === null || pick === undefined) {
       return;
     }
 
-    const { forId } = choice;
+    const { forId } = pick;
     void props.send({
       ...(forId !== undefined && { forId }),
       targetId,
@@ -89,14 +87,8 @@ export default function Table(
 
   const [scoresOpen, setScoresOpen] = createSignal(false);
 
-  const resultsRound = createMemo(() =>
-    props.room.phase === "roundOver" && props.dealing !== true
-      ? props.room.round
-      : null
-  );
-
   const sheetResultsRound = createMemo(() => {
-    const round = resultsRound();
+    const round = prompt().resultsRound;
 
     return round !== null && props.chatLog.inSheet() ? round : null;
   });
@@ -132,7 +124,7 @@ export default function Table(
               <Leaderboard
                 room={props.room}
                 playerId={props.playerId}
-                roundPoints={props.roundPoints}
+                roundPoints={props.playback.roundPoints}
               />
             </TableSheet>
             <ChatSheet chatLog={props.chatLog} />
@@ -180,15 +172,10 @@ export default function Table(
 
         <ActionBar
           room={props.room}
-          playerId={props.playerId}
           send={props.send}
           actionsDisabled={props.actionsDisabled}
-          playback={{
-            dealing: props.dealing === true,
-            moment: props.dealMoment ?? null,
-            roundPoints: props.roundPoints,
-            step: props.dealStep ?? null,
-          }}
+          prompt={prompt().bar}
+          gameOver={prompt().gameOver}
         />
 
         <div class="table-body">
@@ -197,20 +184,23 @@ export default function Table(
               {(id, index) => (
                 <Show when={props.room.players[index()]}>
                   {(player) => (
-                    <RoundPlayer
-                      player={player()}
-                      room={props.room}
-                      playerId={props.playerId}
-                      actionsDisabled={props.actionsDisabled}
-                      removeDisabled={props.offline}
-                      roundPoints={pointsOf(props.roundPoints, id)}
-                      dealing={props.dealing === true}
-                      dealMoment={props.dealMoment ?? null}
-                      dealStep={props.dealStep}
-                      moves={moves()}
-                      onPick={chooseTarget}
-                      onRemove={removePlayer}
-                    />
+                    <Show when={prompt().seats.get(id)}>
+                      {(seat) => (
+                        <RoundPlayer
+                          player={player()}
+                          room={props.room}
+                          playerId={props.playerId}
+                          actionsDisabled={props.actionsDisabled}
+                          removeDisabled={props.offline}
+                          roundPoints={pointsOf(props.playback.roundPoints, id)}
+                          seat={seat()}
+                          canRemove={moves().host.kick.includes(id)}
+                          dealStep={props.playback.step}
+                          onPick={chooseTarget}
+                          onRemove={removePlayer}
+                        />
+                      )}
+                    </Show>
                   )}
                 </Show>
               )}
@@ -228,7 +218,7 @@ export default function Table(
                 <Leaderboard
                   room={props.room}
                   playerId={props.playerId}
-                  roundPoints={props.roundPoints}
+                  roundPoints={props.playback.roundPoints}
                 />
               </ScrollFade>
             </section>
@@ -237,7 +227,7 @@ export default function Table(
         </div>
         <div class="flight-layer" data-flight-layer="" aria-hidden="true" />
         <div class="flight-layer" data-chip-layer="" aria-hidden="true" />
-        <Show when={props.room.phase === "gameOver" && props.dealing !== true}>
+        <Show when={prompt().gameOver}>
           <Confetti />
           <GameOverDialog
             room={props.room}

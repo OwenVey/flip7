@@ -46,6 +46,7 @@ import {
   nudge,
   revealOwnSeat,
 } from "../../lib/table-motion";
+import { resultsRound } from "../../lib/table-prompt";
 import { paths } from "../../router";
 
 const Room = (props: { code: string }) => {
@@ -316,10 +317,7 @@ const Room = (props: { code: string }) => {
                 log: () => view().room.log,
                 playerId: () => view().playerId,
                 players: () => view().room.players,
-                resultsRound: () =>
-                  view().room.phase === "roundOver" && !table().dealing
-                    ? view().room.round
-                    : null,
+                resultsRound: () => resultsRound(view().room, table()),
                 typing: connection.typing,
               });
 
@@ -335,10 +333,7 @@ const Room = (props: { code: string }) => {
                       actionsDisabled={table().actionsDisabled}
                       offline={unavailable()}
                       latestRoom={connection.room()}
-                      dealing={table().dealing}
-                      dealMoment={table().moment}
-                      dealStep={table().step}
-                      roundPoints={table().roundPoints}
+                      playback={table()}
                       spectator={spectator()}
                     />
                   }

@@ -32,8 +32,8 @@ export type PromptControls =
   | { kind: "gameOver"; canStart: boolean }
   | { kind: "waitForHost"; text: string };
 
-/** What the action bar tells this viewer right now. See GLOSSARY.md. */
-export interface TablePrompt {
+/** What the action bar tells this viewer right now. */
+export interface BarPrompt {
   /** Missing only in the gap between turns, when nothing is waiting. */
   headline?: string;
   /** Secondary text after the headline. */
@@ -47,12 +47,38 @@ export interface TablePrompt {
   controls: PromptControls;
 }
 
+/** The parts of Deal playback the Table prompt reads. A whole `DealPlaybackView` fits. */
 export type PromptPlayback = Pick<
   DealPlaybackView,
-  "dealing" | "step" | "roundPoints"
-> & {
-  moment?: PlaybackMoment | null;
-};
+  "dealing" | "moment" | "step" | "roundPoints"
+>;
+
+/** What one player's seat offers and shows this viewer. */
+export interface SeatPrompt {
+  /** The seat is the one the game is waiting on, once no moment is settling. */
+  waitingOn: boolean;
+  /** The viewer can give this player the action card, choosing for `forId` when set. */
+  pick: { kind: ActionCardKind; forId?: string } | null;
+  /** The viewer is choosing and this player can't receive the card. */
+  unpickable: boolean;
+  /** The player won the game, shown once Deal playback has finished. */
+  winner: boolean;
+}
+
+/**
+ * Everything the table offers this viewer right now: the action bar, each
+ * seat, and which results Deal playback lets them see. See GLOSSARY.md.
+ */
+export interface TablePrompt {
+  bar: BarPrompt;
+  seats: ReadonlyMap<string, SeatPrompt>;
+  /** The round whose results may show, or null while play or playback goes on. */
+  resultsRound: number | null;
+  /** The game is over and Deal playback has finished, so the result may show. */
+  gameOver: boolean;
+}
+
+type ActionCardKind = NonNullable<RoomView["choice"]>["card"]["kind"];
 
 const NONE: PromptControls = { kind: "none" };
 const RECONNECT_NOTE = "Play resumes when a player reconnects.";
@@ -161,9 +187,9 @@ const roundEndHeadline = (room: RoomView) => {
   return `End of round ${room.round}`;
 };
 
-type Prompt = Omit<TablePrompt, "yours">;
+type Prompt = Omit<BarPrompt, "yours">;
 
-type PromptLines = Pick<TablePrompt, "headline" | "note">;
+type PromptLines = Pick<BarPrompt, "headline" | "note">;
 
 const gameOverPrompt = (room: RoomView, moves: AvailableMoves) =>
   ({
@@ -413,9 +439,42 @@ const promptFor = (
   return turnPrompt(room, playerId, moves, roundPoints);
 };
 
+/** The round whose results may show, once Deal playback has dealt them. */
+export const resultsRound = (
+  room: RoomView,
+  playback: Pick<PromptPlayback, "dealing">
+) => (room.phase === "roundOver" && !playback.dealing ? room.round : null);
+
+const seatPrompt = (
+  room: RoomView,
+  moves: AvailableMoves,
+  playback: PromptPlayback,
+  gameOver: boolean,
+  id: string
+) => {
+  const { choice } = moves;
+  const choosing = choice !== null && !playback.dealing;
+
+  const pick =
+    choosing && room.choice !== null && choice.targets.includes(id)
+      ? {
+          kind: room.choice.card.kind,
+          ...(choice.forId !== undefined && { forId: choice.forId }),
+        }
+      : null;
+
+  return {
+    pick,
+    unpickable: choosing && pick === null,
+    waitingOn: playback.moment === null && moves.waitingOn?.playerId === id,
+    winner: gameOver && room.winnerIds.includes(id),
+  } satisfies SeatPrompt;
+};
+
 /**
- * What the action bar shows `playerId` (null for a Spectator): one prompt,
- * chosen from the phase, the Move being waited on and Deal playback.
+ * What the table offers `playerId` (null for a Spectator): one action bar
+ * prompt, chosen from the phase, the Move being waited on and Deal playback,
+ * plus what each seat offers and whether results may show yet.
  */
 export const tablePrompt = (
   room: RoomView,
@@ -427,16 +486,28 @@ export const tablePrompt = (
   const asked = (move: { forId?: string } | null) =>
     move !== null && move.forId === undefined && !playback.dealing;
 
+  const gameOver = room.phase === "gameOver" && !playback.dealing;
+
   const prompt: TablePrompt = {
-    ...promptFor(room, playerId, moves, playback),
-    yours: asked(moves.turn) || asked(moves.choice),
+    bar: {
+      ...promptFor(room, playerId, moves, playback),
+      yours: asked(moves.turn) || asked(moves.choice),
+    },
+    gameOver,
+    resultsRound: resultsRound(room, playback),
+    seats: new Map(
+      room.players.map(({ id }) => [
+        id,
+        seatPrompt(room, moves, playback, gameOver, id),
+      ])
+    ),
   };
 
   return prompt;
 };
 
 /** Equal prompts render the same, so a memo can skip unchanged updates. */
-export const samePrompt = (a: TablePrompt, b: TablePrompt) =>
+export const samePrompt = (a: BarPrompt, b: BarPrompt) =>
   a.headline === b.headline &&
   a.note === b.note &&
   a.card?.id === b.card?.id &&

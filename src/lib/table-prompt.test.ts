@@ -21,6 +21,9 @@ const playback = (overrides: Partial<PromptPlayback> = {}) =>
     ...overrides,
   }) satisfies PromptPlayback;
 
+const barPrompt = (...args: Parameters<typeof tablePrompt>) =>
+  tablePrompt(...args).bar;
+
 const dealing = (step: DealStep | null) => playback({ dealing: true, step });
 
 const step = (overrides: Partial<DealStep> = {}) =>
@@ -328,7 +331,7 @@ describe(tablePrompt, () => {
       viewer: "a",
     },
   ])("$name", ({ expected, play, view, viewer }) => {
-    expect(tablePrompt(view, viewer, play)).toStrictEqual(expected);
+    expect(barPrompt(view, viewer, play)).toStrictEqual(expected);
   });
 
   it.each([
@@ -393,11 +396,11 @@ describe(tablePrompt, () => {
       }),
     },
   ])("narrates the deal: $expected", ({ expected, step: dealt }) => {
-    expect(tablePrompt(room(), "a", dealing(dealt)).headline).toBe(expected);
+    expect(barPrompt(room(), "a", dealing(dealt)).headline).toBe(expected);
   });
 
   it("names the chooser when a card is dealt to the action card prompt", () => {
-    const prompt = tablePrompt(
+    const prompt = barPrompt(
       choosing("b"),
       "a",
       dealing(step({ card: FREEZE, to: { kind: "choice" } }))
@@ -437,7 +440,7 @@ describe(tablePrompt, () => {
       players
     );
 
-    expect(tablePrompt(view, "b", playback()).headline).toBe(expected);
+    expect(barPrompt(view, "b", playback()).headline).toBe(expected);
   });
 
   it("shows the tied score on a tie-break roundOver prompt", () => {
@@ -455,7 +458,7 @@ describe(tablePrompt, () => {
       turnId: null,
     });
 
-    expect(tablePrompt(view, "b", playback())).toMatchObject({
+    expect(barPrompt(view, "b", playback())).toMatchObject({
       headline: "End of round 1",
       note: "Tied at 205 — play another round",
     });
@@ -559,7 +562,7 @@ describe(tablePrompt, () => {
       viewer: "a",
     },
   ] satisfies {
-    expected: Partial<ReturnType<typeof tablePrompt>>;
+    expected: Partial<ReturnType<typeof barPrompt>>;
     moment: PlaybackMoment;
     name: string;
     viewer: string;
@@ -567,7 +570,7 @@ describe(tablePrompt, () => {
     const view = room({ phase: "gameOver", turnId: null, winnerIds: ["b"] });
 
     expect(
-      tablePrompt(view, viewer, playback({ dealing: true, moment }))
+      barPrompt(view, viewer, playback({ dealing: true, moment }))
     ).toStrictEqual({
       controls: { kind: "none" },
       yours: false,
@@ -579,7 +582,7 @@ describe(tablePrompt, () => {
 describe(samePrompt, () => {
   it("matches prompts that render the same and tells changed ones apart", () => {
     const points = (value: number) =>
-      tablePrompt(
+      barPrompt(
         room(),
         "a",
         playback({ roundPoints: new Map([["a", value]]) })
@@ -587,8 +590,101 @@ describe(samePrompt, () => {
 
     expect(samePrompt(points(7), points(7))).toBeTruthy();
     expect(samePrompt(points(7), points(8))).toBeFalsy();
-    const theirs = tablePrompt(room(), "b", playback());
+    const theirs = barPrompt(room(), "b", playback());
 
     expect(samePrompt(points(7), theirs)).toBeFalsy();
+  });
+});
+
+const seat = (prompt: ReturnType<typeof tablePrompt>, id: string) =>
+  prompt.seats.get(id);
+
+describe("tablePrompt seats and results", () => {
+  it("rings the seat being waited on, except while a moment settles", () => {
+    const view = room({ turnId: "a" });
+
+    expect({
+      dealing: seat(tablePrompt(view, "a", playback({ dealing: true })), "a")
+        ?.waitingOn,
+      settled: seat(tablePrompt(view, "a", playback()), "a")?.waitingOn,
+      settling: seat(
+        tablePrompt(
+          view,
+          "a",
+          playback({ dealing: true, moment: { kind: "bust", playerId: "b" } })
+        ),
+        "a"
+      )?.waitingOn,
+    }).toStrictEqual({ dealing: true, settled: true, settling: false });
+  });
+
+  it("offers picks to the chooser only once cards stop dealing", () => {
+    const view = room({
+      choice: { card: FREEZE, chooserId: "a", options: ["b"] },
+    });
+
+    const shown = (play: ReturnType<typeof playback>) => {
+      const prompt = tablePrompt(view, "a", play);
+
+      return {
+        a: seat(prompt, "a"),
+        b: seat(prompt, "b"),
+      };
+    };
+
+    expect(shown(playback({ dealing: true }))).toStrictEqual({
+      a: { pick: null, unpickable: false, waitingOn: true, winner: false },
+      b: { pick: null, unpickable: false, waitingOn: false, winner: false },
+    });
+    expect(shown(playback())).toStrictEqual({
+      a: { pick: null, unpickable: true, waitingOn: true, winner: false },
+      b: {
+        pick: { kind: "freeze" },
+        unpickable: false,
+        waitingOn: false,
+        winner: false,
+      },
+    });
+  });
+
+  it("offers the host picks for an offline chooser", () => {
+    const view = offline(
+      room({ choice: { card: FREEZE, chooserId: "b", options: ["a"] } }),
+      "b"
+    );
+
+    expect(seat(tablePrompt(view, "a", playback()), "a")?.pick).toStrictEqual({
+      forId: "b",
+      kind: "freeze",
+    });
+    expect(seat(tablePrompt(view, null, playback()), "a")?.pick).toBeNull();
+  });
+
+  it("holds back round results, game over and winners until playback ends", () => {
+    const roundOver = room({ phase: "roundOver" });
+
+    const gameOver = room({
+      phase: "gameOver",
+      turnId: null,
+      winnerIds: ["b"],
+    });
+
+    const during = playback({ dealing: true });
+
+    expect({
+      gameOver: tablePrompt(gameOver, "a", during).gameOver,
+      resultsRound: tablePrompt(roundOver, "a", during).resultsRound,
+      winner: seat(tablePrompt(gameOver, "a", during), "b")?.winner,
+    }).toStrictEqual({ gameOver: false, resultsRound: null, winner: false });
+
+    expect({
+      gameOver: tablePrompt(gameOver, "a", playback()).gameOver,
+      resultsRound: tablePrompt(roundOver, "a", playback()).resultsRound,
+      winner: seat(tablePrompt(gameOver, "a", playback()), "b")?.winner,
+    }).toStrictEqual({
+      gameOver: true,
+      resultsRound: roundOver.round,
+      winner: true,
+    });
   });
 });

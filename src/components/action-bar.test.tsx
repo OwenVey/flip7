@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RoomView } from "../game/protocol";
 import { roundPointsFor } from "../lib/deal-playback";
 import type { RoomConnection } from "../lib/room-connection";
+import { tablePrompt } from "../lib/table-prompt";
 import { chatControls } from "../test/chat";
 import { room } from "../test/room-view";
 import { Table } from "../test/table";
@@ -22,19 +23,25 @@ const Bar = (props: {
   send: RoomConnection["send"];
   actionsDisabled?: boolean;
   roundPoints?: ReadonlyMap<string, number>;
-}) => (
-  <ActionBar
-    room={props.room}
-    playerId={props.playerId}
-    send={props.send}
-    actionsDisabled={props.actionsDisabled}
-    playback={{
+}) => {
+  const prompt = () =>
+    tablePrompt(props.room, props.playerId, {
       dealing: false,
+      moment: null,
       roundPoints: props.roundPoints ?? roundPointsFor(props.room),
       step: null,
-    }}
-  />
-);
+    });
+
+  return (
+    <ActionBar
+      room={props.room}
+      send={props.send}
+      actionsDisabled={props.actionsDisabled}
+      prompt={prompt().bar}
+      gameOver={prompt().gameOver}
+    />
+  );
+};
 
 describe("<ActionBar />", () => {
   afterEach(cleanup);
@@ -49,14 +56,16 @@ describe("<ActionBar />", () => {
         send={vi.fn<RoomConnection["send"]>()}
         chat={chatControls()}
         typing={[]}
-        dealing
-        dealStep={{
-          card: { id: 2, kind: "number", value: 3 },
-          flip: null,
-          from: "deck",
-          hit: hit(),
-          partnerId: null,
-          to: { kind: "hand", playerId: "b" },
+        playback={{
+          dealing: true,
+          step: {
+            card: { id: 2, kind: "number", value: 3 },
+            flip: null,
+            from: "deck",
+            hit: hit(),
+            partnerId: null,
+            to: { kind: "hand", playerId: "b" },
+          },
         }}
       />
     ));
