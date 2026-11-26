@@ -255,6 +255,13 @@ button.room-code {
   }
 }
 
+/* Phones stack the roster in one column, so only the first open seat, "Waiting for players…", shows. The count beside the heading keeps the room's size. */
+@media not (--sm) {
+  .roster .open-seat ~ .open-seat {
+    display: none;
+  }
+}
+
 /* Phones drop the help line so the code and a short link button share one row. */
 @media (--compact) {
   .invite {
