@@ -443,6 +443,48 @@ describe(tablePrompt, () => {
     expect(barPrompt(view, "b", playback()).headline).toBe(expected);
   });
 
+  it.each([
+    {
+      expected: "You banked 6 points",
+      name: "the points you banked",
+      players: { a: { lastRound: scored(6), status: "stayed" } },
+    },
+    {
+      expected: "You banked 1 point",
+      name: "a single banked point",
+      players: { a: { lastRound: scored(1), status: "frozen" } },
+    },
+    {
+      expected: "You busted — no points",
+      name: "that you busted",
+      players: { a: { lastRound: scored(0), status: "busted" } },
+    },
+    {
+      expected: undefined,
+      name: "nothing when you sat the round out",
+      players: { a: { lastRound: null, status: "out" } },
+    },
+  ] satisfies {
+    expected: string | undefined;
+    name: string;
+    players: Record<string, Partial<Player>>;
+  }[])("notes $name at the end of a round", ({ expected, players }) => {
+    const view = withPlayers(
+      room({ phase: "roundOver", turnId: null }),
+      players
+    );
+
+    expect(barPrompt(view, "a", playback()).note).toBe(expected);
+  });
+
+  it("notes nothing of your own for a spectator", () => {
+    const view = withPlayers(room({ phase: "roundOver", turnId: null }), {
+      a: { lastRound: scored(6), status: "stayed" },
+    });
+
+    expect(barPrompt(view, null, playback()).note).toBeUndefined();
+  });
+
   it("shows the tied score on a tie-break roundOver prompt", () => {
     const view = room({
       log: [
