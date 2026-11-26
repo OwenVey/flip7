@@ -356,38 +356,6 @@ button.room-code {
   }
 }
 
-/*
- * Remove is a square ✕ in the roster and at the table; its tooltip and
- * accessible name carry the label. It stays small on touch screens too, and an
- * invisible margin keeps the tap area finger sized.
- */
-:is(.roster, .seat) .remove-player {
-  --button-height: var(--control-height-sm);
-  position: relative;
-  flex: none;
-  inline-size: var(--button-height);
-  padding-inline: 0;
-
-  & .button-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  &::after {
-    position: absolute;
-    inset: -0.5rem -0.375rem;
-    content: "";
-  }
-}
-
-:is(.roster, .seat) [data-slot="tooltip-content"][data-compact-only] {
-  visibility: visible;
-}
-
 .start-game,
 .add-bot {
   display: grid;

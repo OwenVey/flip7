@@ -6,6 +6,7 @@ import { createEffect, createMemo, For, Show } from "solid-js";
 
 import type { Card } from "../game/cards";
 import type { ActionCardChoice, Player, RoundStatus } from "../game/engine";
+import type { AvailableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
@@ -20,8 +21,8 @@ import FlipTracker, {
 } from "./flip-tracker";
 import OfflineBadge from "./offline-badge";
 import PlayerAvatar from "./player-avatar";
+import PlayerMenu from "./player-menu";
 import PlayingCard from "./playing-card";
-import RemovePlayer from "./remove-player";
 import { ROUND_COUNT_MS } from "./table-common";
 import Tooltip from "./tooltip";
 
@@ -81,13 +82,14 @@ interface RoundPlayerProps {
   player: Player;
   playerId: string | null;
   prompt: PlayerPrompt;
-  canRemove: boolean;
+  host: Pick<AvailableMoves["host"], "kick" | "makeHost">;
   dealStep: DealStep | null;
   roundPoints: number;
   actionsDisabled?: boolean;
-  removeDisabled?: boolean;
+  hostActionsDisabled?: boolean;
   onPick: (targetId: string) => void;
   onRemove: (playerId: string) => void;
+  onMakeHost: (playerId: string) => void;
 }
 
 const RoundPlayer = (props: RoundPlayerProps) => {
@@ -206,7 +208,18 @@ const RoundPlayer = (props: RoundPlayerProps) => {
       <header class="seat-header">
         <div class="seat-name">
           <span class="seat-avatar">
-            <PlayerAvatar player={props.player} />
+            <Show
+              when={!props.prompt.pick}
+              fallback={<PlayerAvatar player={props.player} />}
+            >
+              <PlayerMenu
+                player={props.player}
+                host={props.host}
+                disabled={props.hostActionsDisabled}
+                onRemove={props.onRemove}
+                onMakeHost={props.onMakeHost}
+              />
+            </Show>
             <Show when={isMe()}>
               <span class="avatar-tag">You</span>
             </Show>
@@ -289,16 +302,6 @@ const RoundPlayer = (props: RoundPlayerProps) => {
             {(card) => <PlayingCard card={card()} size="mini" />}
           </For>
         </ul>
-        <Show when={props.canRemove}>
-          <RemovePlayer
-            bot={props.player.bot}
-            disabled={props.removeDisabled}
-            name={props.player.name}
-            onRemove={() => {
-              props.onRemove(props.player.id);
-            }}
-          />
-        </Show>
       </header>
       <div class="hand-area">
         <ul class="hand" aria-label={`${props.player.name}'s cards`}>

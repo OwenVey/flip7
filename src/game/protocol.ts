@@ -290,7 +290,17 @@ const GameEventSchema = v.variant("type", [
     how: v.picklist(["kicked", "left", "leftToWatch"]),
     player: LogPlayerSchema,
   }),
-  eventOf("hostChanged", { player: LogPlayerSchema }),
+  v.variant("how", [
+    eventOf("hostChanged", {
+      how: v.literal("auto"),
+      player: LogPlayerSchema,
+    }),
+    eventOf("hostChanged", {
+      by: LogPlayerSchema,
+      how: v.literal("given"),
+      player: LogPlayerSchema,
+    }),
+  ]),
   eventOf("targetScoreSet", { targetScore: v.picklist(TARGET_SCORES) }),
   eventOf("botSpeedSet", { botSpeed: v.picklist(BOT_SPEEDS) }),
   eventOf("lockSet", { locked: v.boolean() }),

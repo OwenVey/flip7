@@ -480,12 +480,6 @@
   &:has(.seat-pick:disabled) {
     cursor: default;
   }
-
-  /* The host's Remove button stays clickable above the pick target. */
-  & [data-slot="alert-dialog-trigger"] {
-    position: relative;
-    z-index: 2;
-  }
 }
 
 .seat-pick {
@@ -711,12 +705,6 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-
-  .seat-header:has(> .seat-extras > *):has(.remove-player)
-    .seat-meta
-    > [data-tone="turn"] {
-    display: none;
   }
 }
 

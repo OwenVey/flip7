@@ -55,7 +55,7 @@ On mobile browsers that support vibration, haptics are on by default. Feel taps 
 
 The browser remembers your display name and room identity. Refreshing or reopening the link in the same browser profile returns you to the same player while that player is still in the room. Use **Leave** to give up your place at any time, even mid-deal.
 
-The host can remove players, from the player list in the lobby or the Scores list during a game, and move for an offline player the game is waiting on. While someone else is online, the host role passes to a connected player after 20 seconds away. After a 30-second stall, the game makes the missing move automatically. Bots only play while at least one human player is online, and a room is deleted when the last person leaves a table of bots. A room expires after 24 hours of inactivity once all connections are closed.
+The host can tap another player's avatar, in the lobby's player list or at their seat during a game, to **remove** them or **make them host**. Only an online player can be made host. The host can also move for an offline player the game is waiting on. While someone else is online, the host role passes to a connected player after 20 seconds away. After a 30-second stall, the game makes the missing move automatically. Bots only play while at least one human player is online, and a room is deleted when the last person leaves a table of bots. A room expires after 24 hours of inactivity once all connections are closed.
 
 ## Local development
 

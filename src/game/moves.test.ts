@@ -12,7 +12,7 @@ import {
 } from "./engine";
 import type { GameState } from "./engine";
 import { availableMoves, rejectMove, waitingOn } from "./moves";
-import type { Move, MovesView } from "./moves";
+import type { AvailableMoves, Move, MovesView, PlayMove } from "./moves";
 
 const random = () => 0.5;
 
@@ -149,6 +149,7 @@ describe(availableMoves, () => {
       configure: true,
       kick: ["b"],
       lobby: false,
+      makeHost: ["b"],
       nextRound: false,
       setTargetScore: true,
       start: true,
@@ -158,6 +159,7 @@ describe(availableMoves, () => {
       configure: false,
       kick: [],
       lobby: false,
+      makeHost: [],
       nextRound: false,
       setTargetScore: false,
       start: false,
@@ -181,6 +183,71 @@ describe(rejectMove, () => {
     );
     expect(rejectMove(state, "a", { playerId: "a", type: "kick" })).toBe(
       "Use Leave to leave the room."
+    );
+  });
+});
+
+describe("handing over hosting", () => {
+  it("lets the host make any online human the host, in any phase", () => {
+    const playing = round(
+      ["a", "b", "c", "d"],
+      [num(5), num(3), num(8), num(1)]
+    );
+
+    makeBot(playing, "c");
+    goOffline(playing, "d");
+
+    const between = round(["a", "b"], [num(5), num(3)]);
+    stay(between, "a", random);
+    stay(between, "b", random);
+
+    const finished = round(["a", "b"], [num(5), num(3)]);
+    const [leader] = finished.players;
+
+    if (leader) {
+      leader.score = 200;
+    }
+
+    stay(finished, "a", random);
+    stay(finished, "b", random);
+
+    const phases = [lobby(["a", "b"]), playing, between, finished];
+
+    expect(
+      phases.map((state) => [
+        state.phase,
+        availableMoves(state, "a").host.makeHost,
+      ])
+    ).toStrictEqual([
+      ["lobby", ["b"]],
+      ["playing", ["b"]],
+      ["roundOver", ["b"]],
+      ["gameOver", ["b"]],
+    ]);
+    expect(
+      rejectMove(playing, "a", { playerId: "b", type: "makeHost" })
+    ).toBeNull();
+  });
+
+  it("explains why someone can't be made the host", () => {
+    const state = lobby(["a", "b", "c", "d"]);
+    makeBot(state, "c");
+    goOffline(state, "d");
+
+    expect(rejectMove(state, "b", { playerId: "b", type: "makeHost" })).toBe(
+      "Only the host can hand over hosting."
+    );
+    expect(rejectMove(state, "a", { playerId: "a", type: "makeHost" })).toBe(
+      "You're already the host."
+    );
+    expect(rejectMove(state, "a", { playerId: "c", type: "makeHost" })).toBe(
+      "Bots can't be the host."
+    );
+    expect(rejectMove(state, "a", { playerId: "d", type: "makeHost" })).toBe(
+      "d is offline. Only an online player can be the host."
+    );
+    expect(rejectMove(state, "a", { playerId: "z", type: "makeHost" })).toBe(
+      "That player already left."
     );
   });
 });
@@ -264,6 +331,7 @@ const candidateMoves = (state: MovesView) => {
     { type: "configure" },
     { targetScore: 100, type: "configure" },
     ...ids.map((playerId) => ({ playerId, type: "kick" }) satisfies Move),
+    ...ids.map((playerId) => ({ playerId, type: "makeHost" }) satisfies Move),
   ];
 
   for (const forId of forIds) {
@@ -277,33 +345,43 @@ const candidateMoves = (state: MovesView) => {
   return moves;
 };
 
+const offersPlay = (
+  moves: AvailableMoves,
+  viewerId: string,
+  move: PlayMove & { forId?: string }
+) => {
+  if (move.type === "choose") {
+    const { choice } = moves;
+
+    return (
+      choice !== null &&
+      (choice.forId ?? viewerId) === (move.forId ?? viewerId) &&
+      choice.targets.includes(move.targetId)
+    );
+  }
+
+  const { turn } = moves;
+
+  return (
+    turn !== null &&
+    (turn.forId ?? viewerId) === (move.forId ?? viewerId) &&
+    (move.type === "hit" || turn.canStay)
+  );
+};
+
 const offers = (state: MovesView, viewerId: string, move: Move) => {
   const moves = availableMoves(state, viewerId);
 
   switch (move.type) {
     case "hit":
-    case "stay": {
-      const { turn } = moves;
-
-      return (
-        turn !== null &&
-        (turn.forId ?? viewerId) === (move.forId ?? viewerId) &&
-        (move.type === "hit" || turn.canStay)
-      );
-    }
-
+    case "stay":
     case "choose": {
-      const { choice } = moves;
-
-      return (
-        choice !== null &&
-        (choice.forId ?? viewerId) === (move.forId ?? viewerId) &&
-        choice.targets.includes(move.targetId)
-      );
+      return offersPlay(moves, viewerId, move);
     }
 
-    case "kick": {
-      return moves.host.kick.includes(move.playerId);
+    case "kick":
+    case "makeHost": {
+      return moves.host[move.type].includes(move.playerId);
     }
 
     case "start":

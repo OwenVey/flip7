@@ -1026,7 +1026,32 @@ export const backToLobby = (state: GameState, playerId: string) => {
   clearRoundTable(state, "out");
 };
 
-export const transferHost = (state: GameState) => {
+/** The host hands hosting to another connected human. */
+export const makeHost = (
+  state: GameState,
+  hostId: string,
+  playerId: string
+) => {
+  assertMove(state, hostId, { playerId, type: "makeHost" });
+
+  const host = findPlayer(state, hostId);
+  const next = findPlayer(state, playerId);
+
+  if (!host || !next) {
+    throw new GameError("That player already left.");
+  }
+
+  state.hostId = next.id;
+  say(state, {
+    by: named(host),
+    how: "given",
+    player: named(next),
+    type: "hostChanged",
+  });
+};
+
+/** Hands hosting to the first connected human once the host has been offline too long. */
+export const handOffHost = (state: GameState) => {
   const host =
     state.hostId === null ? undefined : findPlayer(state, state.hostId);
 
@@ -1041,7 +1066,7 @@ export const transferHost = (state: GameState) => {
   }
 
   state.hostId = next.id;
-  say(state, { player: named(next), type: "hostChanged" });
+  say(state, { how: "auto", player: named(next), type: "hostChanged" });
 
   return true;
 };
