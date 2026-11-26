@@ -43,8 +43,15 @@ export type GameEvent =
   | {
       type: "hostChanged";
       player: LogPlayer;
-      /** Whether the host handed it over or the room did after the host went offline. */
-      how: "auto" | "given";
+      /** The room handed hosting over after the host went offline. */
+      how: "auto";
+    }
+  | {
+      type: "hostChanged";
+      player: LogPlayer;
+      /** The former host who handed hosting over. */
+      by: LogPlayer;
+      how: "given";
     }
   | { type: "targetScoreSet"; targetScore: TargetScore }
   | { type: "botSpeedSet"; botSpeed: BotSpeed }

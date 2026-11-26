@@ -189,17 +189,44 @@ describe(rejectMove, () => {
 
 describe("handing over hosting", () => {
   it("lets the host make any online human the host, in any phase", () => {
-    const state = round(["a", "b", "c", "d"], [num(5), num(3), num(8), num(1)]);
-    makeBot(state, "c");
-    goOffline(state, "d");
+    const playing = round(
+      ["a", "b", "c", "d"],
+      [num(5), num(3), num(8), num(1)]
+    );
 
-    expect(availableMoves(state, "a").host.makeHost).toStrictEqual(["b"]);
+    makeBot(playing, "c");
+    goOffline(playing, "d");
+
+    const between = round(["a", "b"], [num(5), num(3)]);
+    stay(between, "a", random);
+    stay(between, "b", random);
+
+    const finished = round(["a", "b"], [num(5), num(3)]);
+    const [leader] = finished.players;
+
+    if (leader) {
+      leader.score = 200;
+    }
+
+    stay(finished, "a", random);
+    stay(finished, "b", random);
+
+    const phases = [lobby(["a", "b"]), playing, between, finished];
+
     expect(
-      rejectMove(state, "a", { playerId: "b", type: "makeHost" })
-    ).toBeNull();
-    expect(availableMoves(lobby(["a", "b"]), "a").host.makeHost).toStrictEqual([
-      "b",
+      phases.map((state) => [
+        state.phase,
+        availableMoves(state, "a").host.makeHost,
+      ])
+    ).toStrictEqual([
+      ["lobby", ["b"]],
+      ["playing", ["b"]],
+      ["roundOver", ["b"]],
+      ["gameOver", ["b"]],
     ]);
+    expect(
+      rejectMove(playing, "a", { playerId: "b", type: "makeHost" })
+    ).toBeNull();
   });
 
   it("explains why someone can't be made the host", () => {

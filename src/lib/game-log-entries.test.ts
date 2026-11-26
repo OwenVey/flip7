@@ -319,8 +319,8 @@ describe(eventCopy, () => {
     ],
     [
       "a new host the host chose",
-      { how: "given", player: bo, type: "hostChanged" },
-      happening("The host made [Bo] the host."),
+      { by: ada, how: "given", player: bo, type: "hostChanged" },
+      happening("[Ada] made [Bo] the host."),
     ],
     [
       "a winning score",

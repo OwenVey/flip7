@@ -331,7 +331,7 @@ export const eventCopy = (entry: EventEntry, hasRoundHeading: boolean) => {
     case "hostChanged": {
       return happened(
         event.how === "given"
-          ? phrase`The host made ${event.player} the host.`
+          ? phrase`${event.by} made ${event.player} the host.`
           : phrase`${event.player} is now the host.`
       );
     }

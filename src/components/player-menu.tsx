@@ -93,6 +93,8 @@ export default function PlayerMenu(props: {
   onMakeHost: (playerId: string) => void;
 }) {
   const confirmRemove = createAlertDialogController();
+  const canKick = () => props.host.kick.includes(props.player.id);
+  const canMakeHost = () => props.host.makeHost.includes(props.player.id);
 
   const remove = () => {
     if (props.player.bot) {
@@ -104,7 +106,7 @@ export default function PlayerMenu(props: {
 
   return (
     <Show
-      when={props.host.kick.includes(props.player.id)}
+      when={canKick() || canMakeHost()}
       fallback={<PlayerAvatar player={props.player} />}
     >
       <Menu>
@@ -120,10 +122,7 @@ export default function PlayerMenu(props: {
         <MenuContent side="bottom" align="start">
           <Show when={!props.player.bot}>
             <MenuItem
-              disabled={
-                props.disabled === true ||
-                !props.host.makeHost.includes(props.player.id)
-              }
+              disabled={props.disabled === true || !canMakeHost()}
               onSelect={() => {
                 props.onMakeHost(props.player.id);
               }}
@@ -132,26 +131,23 @@ export default function PlayerMenu(props: {
                 <Crown size={16} />
               </MenuItemIcon>
               Make host
-              <Show
-                when={
-                  props.disabled !== true &&
-                  !props.host.makeHost.includes(props.player.id)
-                }
-              >
+              <Show when={props.disabled !== true && !canMakeHost()}>
                 <span class="menu-item-note">Offline</span>
               </Show>
             </MenuItem>
           </Show>
-          <MenuItem
-            data-tone="danger"
-            disabled={props.disabled}
-            onSelect={remove}
-          >
-            <MenuItemIcon>
-              <UserX size={16} />
-            </MenuItemIcon>
-            Remove from room
-          </MenuItem>
+          <Show when={canKick()}>
+            <MenuItem
+              data-tone="danger"
+              disabled={props.disabled}
+              onSelect={remove}
+            >
+              <MenuItemIcon>
+                <UserX size={16} />
+              </MenuItemIcon>
+              Remove from room
+            </MenuItem>
+          </Show>
         </MenuContent>
       </Menu>
       <Show when={!props.player.bot}>

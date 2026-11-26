@@ -196,7 +196,7 @@ export default function Table(
                           room={props.room}
                           playerId={props.playerId}
                           actionsDisabled={props.actionsDisabled}
-                          removeDisabled={props.offline}
+                          hostActionsDisabled={props.offline}
                           roundPoints={pointsOf(props.playback.roundPoints, id)}
                           prompt={playerPrompt()}
                           host={moves().host}

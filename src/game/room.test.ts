@@ -488,24 +488,6 @@ describe("evicting a player", () => {
     expect(closes(outcome)).toHaveLength(0);
   });
 
-  it("lets the host hand hosting to another player without closing anyone's seat", () => {
-    const h = harness();
-    joinAs(h, "ana-tab", "Ana");
-    const ben = joinAs(h, "ben-tab", "Ben");
-
-    const outcome = h.room.command("ana-tab", {
-      playerId: ben.playerId,
-      requestId: "host-1",
-      type: "makeHost",
-    });
-
-    expect(replies(outcome)).toStrictEqual([
-      { requestId: "host-1", type: "accepted" },
-    ]);
-    expect(closes(outcome)).toHaveLength(0);
-    expect(h.stored.game.hostId).toBe(ben.playerId);
-  });
-
   it("forgets a player who leaves, without recording the leave", () => {
     const h = harness();
     joinAs(h, "ana-tab", "Ana");
@@ -526,6 +508,26 @@ describe("evicting a player", () => {
     ]);
     expect(Object.hasOwn(h.stored.lastRequests, ben.playerId)).toBeFalsy();
     expect(Object.hasOwn(h.stored.tokens, ben.playerId)).toBeFalsy();
+  });
+});
+
+describe("handing over hosting", () => {
+  it("lets the host hand hosting to another player without closing anyone's seat", () => {
+    const h = harness();
+    joinAs(h, "ana-tab", "Ana");
+    const ben = joinAs(h, "ben-tab", "Ben");
+
+    const outcome = h.room.command("ana-tab", {
+      playerId: ben.playerId,
+      requestId: "host-1",
+      type: "makeHost",
+    });
+
+    expect(replies(outcome)).toStrictEqual([
+      { requestId: "host-1", type: "accepted" },
+    ]);
+    expect(closes(outcome)).toHaveLength(0);
+    expect(h.stored.game.hostId).toBe(ben.playerId);
   });
 });
 

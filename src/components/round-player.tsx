@@ -86,7 +86,7 @@ interface RoundPlayerProps {
   dealStep: DealStep | null;
   roundPoints: number;
   actionsDisabled?: boolean;
-  removeDisabled?: boolean;
+  hostActionsDisabled?: boolean;
   onPick: (targetId: string) => void;
   onRemove: (playerId: string) => void;
   onMakeHost: (playerId: string) => void;
@@ -215,7 +215,7 @@ const RoundPlayer = (props: RoundPlayerProps) => {
               <PlayerMenu
                 player={props.player}
                 host={props.host}
-                disabled={props.removeDisabled}
+                disabled={props.hostActionsDisabled}
                 onRemove={props.onRemove}
                 onMakeHost={props.onMakeHost}
               />

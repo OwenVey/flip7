@@ -1034,14 +1034,20 @@ export const makeHost = (
 ) => {
   assertMove(state, hostId, { playerId, type: "makeHost" });
 
+  const host = findPlayer(state, hostId);
   const next = findPlayer(state, playerId);
 
-  if (!next) {
+  if (!host || !next) {
     throw new GameError("That player already left.");
   }
 
   state.hostId = next.id;
-  say(state, { how: "given", player: named(next), type: "hostChanged" });
+  say(state, {
+    by: named(host),
+    how: "given",
+    player: named(next),
+    type: "hostChanged",
+  });
 };
 
 /** Hands hosting to the first connected human once the host has been offline too long. */

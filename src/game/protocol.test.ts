@@ -200,7 +200,7 @@ describe(parseServerMessage, () => {
       { player: ben, type: "botAdded" },
       { how: "leftToWatch", player: ben, type: "evicted" },
       { how: "auto", player: ben, type: "hostChanged" },
-      { how: "given", player: ben, type: "hostChanged" },
+      { by: ana, how: "given", player: ben, type: "hostChanged" },
       { targetScore: 300, type: "targetScoreSet" },
       { botSpeed: "fast", type: "botSpeedSet" },
       { locked: true, type: "lockSet" },
