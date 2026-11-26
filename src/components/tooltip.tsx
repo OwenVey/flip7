@@ -15,10 +15,12 @@ export default function Tooltip(props: {
   type?: "description" | "label";
   side?: "top" | "right" | "bottom" | "left";
   compactOnly?: boolean;
+  /** Pressing the trigger opens and closes it, so touch screens can show it. */
+  toggleable?: boolean;
   children?: JSX.Element;
 }) {
   return (
-    <TooltipRoot type={props.type} delay={0}>
+    <TooltipRoot type={props.type} delay={0} toggleable={props.toggleable}>
       <TooltipTrigger render={props.trigger}>{props.children}</TooltipTrigger>
       <TooltipContent
         data-agent-hidden=""

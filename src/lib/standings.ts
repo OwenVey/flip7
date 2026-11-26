@@ -20,7 +20,7 @@ export const rankPlayers = <T extends Pick<Player, "score">>(
 /** A player in the final standings, who may have left since the game ended. */
 export type FinalPlayer = Pick<
   Player,
-  "avatar" | "bot" | "id" | "lastRound" | "name" | "score" | "status"
+  "avatar" | "bot" | "hand" | "id" | "lastRound" | "name" | "score" | "status"
 > & { left: boolean };
 
 /**
@@ -39,6 +39,7 @@ export const finalStandings = (room: Pick<RoomView, "players" | "winner">) => {
     players.push({
       avatar: null,
       bot: false,
+      hand: [],
       id: winner.id,
       lastRound: null,
       left: true,
