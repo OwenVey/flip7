@@ -5,12 +5,12 @@ import type { Player } from "../game/engine";
 import { availableMoves } from "../game/moves";
 import type { AvailableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
+import type { PlaybackMoment } from "./deal-beats";
 import { stepPlayerId } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
 import { pointsOf } from "./deal-playback";
 import type { DealPlaybackView } from "./deal-playback";
 import { hostName } from "./host";
-import type { PlaybackMoment } from "./playback-moments";
 import { nameOf } from "./player-name";
 import { rankPlayers, winnerNames, winnersHeadline } from "./standings";
 
