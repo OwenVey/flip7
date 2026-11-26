@@ -11,8 +11,8 @@ import type { ServerMessage } from "../src/game/protocol";
 import { createRoom, deliver, newStoredRoom } from "../src/game/room";
 import type {
   Admission,
-  RoomEffect,
   RoomOutcome,
+  RoomPassing,
   RoomTransport,
   Seats,
   StoredRoom,
@@ -153,38 +153,15 @@ export class GameRoom extends Server<Env> {
       return;
     }
 
-    if (message.type === "join") {
-      await this.carryOut(
-        room.join(ws.id, message.name, message.token, message.avatar),
-        ws
-      );
-    } else if (message.type === "chat") {
-      await this.carryOut(room.chat(ws.id, message.text), ws);
-    } else if (message.type === "typing") {
-      this.relay(room.typing(ws.id, message.active));
-    } else if (message.type === "sync") {
-      send(ws, room.viewFor(ws.id));
-    } else if (message.type === "watch") {
-      await this.carryOut(room.watch(ws.id), ws);
-    } else if (message.type === "watchInstead") {
-      await this.carryOut(room.watchInstead(ws.id), ws);
-    } else if (message.type === "stopWatching") {
-      await this.carryOut(room.stopWatching(ws.id), ws);
-    } else {
-      await this.carryOut(room.command(ws.id, message), ws);
-    }
+    await this.carryOut(room.receive(ws.id, message), ws.id);
   }
 
   override async onClose(ws: Connection<Admission>) {
-    const admission = ws.state ?? null;
-    ws.setState(null);
-    await this.carryOut(this.room()?.disconnect(admission));
+    await this.disconnect(ws);
   }
 
   override async onError(ws: Connection<Admission>) {
-    const admission = ws.state ?? null;
-    ws.setState(null);
-    await this.carryOut(this.room()?.disconnect(admission));
+    await this.disconnect(ws);
   }
 
   override async onAlarm() {
@@ -196,25 +173,38 @@ export class GameRoom extends Server<Env> {
     return this.stored ? createRoom(this.stored, this.seats, deps) : null;
   }
 
-  private async carryOut(outcome: RoomOutcome | undefined, sender?: WebSocket) {
+  private async disconnect(ws: Connection<Admission>) {
+    const admission = ws.state ?? null;
+    ws.setState(null);
+    await this.carryOut(this.room()?.disconnect(admission));
+  }
+
+  private async carryOut(
+    result: RoomOutcome | RoomPassing | undefined,
+    sender?: string
+  ) {
     const { stored } = this;
 
-    if (!outcome || !stored) {
+    if (!result || !stored) {
       return;
     }
 
-    const frameOf = framesOf(outcome);
+    const frameOf = framesOf(result);
 
-    if (outcome.expired) {
+    if (result.save && result.expired) {
       this.stored = null;
       await this.store.clear();
-    } else {
-      await this.store.save(stored, outcome.alarmAt);
+    } else if (result.save) {
+      await this.store.save(stored, result.alarmAt);
     }
 
-    deliver(outcome, this.transport(frameOf, outcome.expired, sender));
+    deliver(result, {
+      seats: this.seats,
+      sender,
+      transport: this.transport(frameOf),
+    });
 
-    if (outcome.expired) {
+    if (result.save && result.expired) {
       this.closeRoomConnections();
     }
   }
@@ -227,46 +217,18 @@ export class GameRoom extends Server<Env> {
     }
   }
 
-  private relay(effects: RoomEffect[]) {
-    const outcome = { effects };
-
-    deliver(outcome, this.transport(framesOf(outcome), false));
-  }
-
-  private transport(
-    frameOf: (message: ServerMessage) => string,
-    expired: boolean,
-    sender?: WebSocket
-  ) {
-    const transport: RoomTransport = {
-      broadcast: (message, preview) => {
-        if (expired) {
-          return;
-        }
-
-        for (const connection of this.getConnections<Admission>()) {
-          sendFrame(connection, frameOf(connection.state ? message : preview));
-        }
-      },
-      relay: (message, except) => {
-        const skipped = new Set(except);
-
-        for (const connection of this.getConnections<Admission>()) {
-          if (connection.state && !skipped.has(connection.id)) {
-            sendFrame(connection, frameOf(message));
-          }
-        }
-      },
+  private transport(frameOf: (message: ServerMessage) => string) {
+    return {
       close: (connectionId, code, reason) => {
         this.getConnection(connectionId)?.close(code, reason);
       },
-      reply: (message) => {
-        if (sender) {
-          sendFrame(sender, frameOf(message));
+      send: (connectionId, message) => {
+        const connection = this.getConnection(connectionId);
+
+        if (connection) {
+          sendFrame(connection, frameOf(message));
         }
       },
-    };
-
-    return transport;
+    } satisfies RoomTransport;
   }
 }

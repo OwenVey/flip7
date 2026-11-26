@@ -15,6 +15,7 @@ import { createRoom, deliver, newStoredRoom } from "../game/room";
 import type {
   Admission,
   RoomOutcome,
+  RoomPassing,
   RoomTransport,
   Seats,
 } from "../game/room";
@@ -80,42 +81,22 @@ const network = () => {
     random: () => 0.5,
   });
 
-  const transport = (sender: Link | null) => {
-    const delivery: RoomTransport = {
-      broadcast: (message, preview) => {
-        for (const link of links.values()) {
-          if (link.open) {
-            link.toClient.push(
-              connections.get(link.id)?.admission ? message : preview
-            );
-          }
-        }
-      },
-      close: (connectionId, code) => {
-        connections.delete(connectionId);
-        links.get(connectionId)?.toClient.push({ closeCode: code });
-      },
-      relay: (message, except) => {
-        for (const link of links.values()) {
-          if (
-            link.open &&
-            !except.includes(link.id) &&
-            connections.get(link.id)?.admission
-          ) {
-            link.toClient.push(message);
-          }
-        }
-      },
-      reply: (message) => {
-        sender?.toClient.push(message);
-      },
-    };
+  const transport: RoomTransport = {
+    close: (connectionId, code) => {
+      connections.delete(connectionId);
+      links.get(connectionId)?.toClient.push({ closeCode: code });
+    },
+    send: (connectionId, message) => {
+      const link = links.get(connectionId);
 
-    return delivery;
+      if (link?.open === true) {
+        link.toClient.push(message);
+      }
+    },
   };
 
-  const carryOut = (outcome: RoomOutcome, sender: Link | null) => {
-    deliver(outcome, transport(sender));
+  const carryOut = (result: RoomOutcome | RoomPassing, sender?: string) => {
+    deliver(result, { seats, sender, transport });
   };
 
   const handleFrame = (link: Link, frame: string) => {
@@ -125,30 +106,11 @@ const network = () => {
       throw new Error(`Unparseable frame ${frame}`);
     }
 
-    if (message.type === "join") {
-      carryOut(
-        room.join(link.id, message.name, message.token, message.avatar),
-        link
-      );
-    } else if (message.type === "chat") {
-      carryOut(room.chat(link.id, message.text), link);
-    } else if (message.type === "typing") {
-      deliver(
-        { effects: room.typing(link.id, message.active) },
-        transport(link)
-      );
-    } else if (message.type === "sync") {
+    if (message.type === "sync") {
       syncs.push(link.id);
-      link.toClient.push(room.viewFor(link.id));
-    } else if (message.type === "watch") {
-      carryOut(room.watch(link.id), link);
-    } else if (message.type === "watchInstead") {
-      carryOut(room.watchInstead(link.id), link);
-    } else if (message.type === "stopWatching") {
-      carryOut(room.stopWatching(link.id), link);
-    } else {
-      carryOut(room.command(link.id, message), link);
     }
+
+    carryOut(room.receive(link.id, message), link.id);
   };
 
   const flushToServer = () => {
@@ -217,7 +179,7 @@ const network = () => {
     player.link = null;
     const seat = connections.get(link.id)?.admission ?? null;
     connections.delete(link.id);
-    carryOut(room.disconnect(seat), null);
+    carryOut(room.disconnect(seat));
     player.client.closed(DROPPED_CLOSE_CODE, retryCount);
   };
 
