@@ -20,7 +20,7 @@ export const rankPlayers = <T extends Pick<Player, "score">>(
 /** A player in the final standings, who may have left since the game ended. */
 export type FinalPlayer = Pick<
   Player,
-  "avatar" | "bot" | "id" | "lastRound" | "name" | "score"
+  "avatar" | "bot" | "id" | "lastRound" | "name" | "score" | "status"
 > & { left: boolean };
 
 /**
@@ -52,6 +52,7 @@ export const finalStandings = (
         left: true,
         name: player.name,
         score: points,
+        status: "out",
       });
     }
   }
@@ -74,3 +75,9 @@ export const winnerNames = (
 
   return names;
 };
+
+/** Headline naming the winners: "Ana wins!" or "Ana and Ben win!". */
+export const winnersHeadline = (names: readonly string[]) =>
+  names.length > 1
+    ? `${names.join(" and ")} win!`
+    : `${names[0] ?? "Someone"} wins!`;

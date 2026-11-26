@@ -274,4 +274,28 @@ describe("<JoinForm />", () => {
     screen.getByRole("button", { name: "Join room" }).click();
     expect(onJoin).toHaveBeenCalledWith("Ben", avatar);
   });
+
+  it("caps the name box by whole characters so emoji are not cut short or split", () => {
+    const onJoin = vi.fn<(name: string, avatar: number) => void>();
+
+    render(() => (
+      <JoinForm
+        room={roomWith([])}
+        savedName=""
+        savedAvatar={1}
+        onJoin={onJoin}
+      />
+    ));
+
+    const input = screen.getByRole("textbox", { name: "Your name" });
+    const full = `Kasia ${"🏳️\u200D🌈".repeat(14)}`;
+
+    fireEvent.input(input, { target: { value: `${full}🏳️\u200D🌈` } });
+    flush();
+
+    expect(input).toHaveValue(full);
+
+    screen.getByRole("button", { name: "Join room" }).click();
+    expect(onJoin).toHaveBeenCalledWith(full, 1);
+  });
 });

@@ -44,6 +44,8 @@ describe(cleanName, () => {
   it("keeps the joiners that hold emoji sequences and non-Latin words together", () => {
     expect(cleanName("👩🏽\u200D💻 Priya")).toBe("👩🏽\u200D💻 Priya");
     expect(cleanName("می\u200Cخواهم")).toBe("می\u200Cخواهم");
+    expect(cleanName("क\u094D\u200Dष")).toBe("क\u094D\u200Dष");
+    expect(cleanName("An\u200Da")).toBe("Ana");
   });
 
   it("cuts a long name between characters, never inside one", () => {

@@ -22,7 +22,7 @@ import {
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import { hostName } from "../lib/host";
-import { finalStandings } from "../lib/standings";
+import { finalStandings, winnersHeadline } from "../lib/standings";
 import PlayerAvatar from "./player-avatar";
 import ScrollFade from "./scroll-fade";
 import Tooltip from "./tooltip";
@@ -118,11 +118,7 @@ export default function GameOverDialog(props: {
       return winners().length > 1 ? "You share the win!" : "You win!";
     }
 
-    const names = winners().map((entry) => entry.player.name);
-
-    return names.length > 1
-      ? `${names.join(" and ")} win!`
-      : `${names[0] ?? "Someone"} wins!`;
+    return winnersHeadline(winners().map((entry) => entry.player.name));
   };
 
   const summary = () => {

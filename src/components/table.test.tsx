@@ -352,9 +352,12 @@ describe("<Table />", () => {
   it.each([
     { layout: "beside the table", sheet: false },
     { layout: "in the sheet", sheet: true },
+    { layout: "when matchMedia is absent", sheet: undefined },
   ])("renders the Chat & Log once when it shows $layout", ({ sheet }) => {
-    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
-    vi.stubGlobal("matchMedia", () => ({ matches: sheet }));
+    if (sheet !== undefined) {
+      // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+      vi.stubGlobal("matchMedia", () => ({ matches: sheet }));
+    }
 
     try {
       render(() => (
@@ -1493,41 +1496,52 @@ describe("<Table />", () => {
   });
 
   it("keeps the chat draft after dismissing the sheet with Escape", async () => {
-    render(() => (
-      <Table
-        room={room()}
-        playerId="a"
-        send={vi.fn<RoomConnection["send"]>()}
-        chat={chatControls()}
-        typing={[]}
-      />
-    ));
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
 
-    const toggle = screen.getByRole("button", { name: "Chat & Log" });
-    toggle.focus();
-    toggle.click();
+    try {
+      render(() => (
+        <Table
+          room={room()}
+          playerId="a"
+          send={vi.fn<RoomConnection["send"]>()}
+          chat={chatControls()}
+          typing={[]}
+        />
+      ));
+      flush();
 
-    const sheet = await screen.findByRole("dialog", {
-      name: "Chat & Log",
-    });
+      const toggle = screen.getByRole("button", { name: "Chat & Log" });
+      toggle.focus();
+      toggle.click();
 
-    const input = within(sheet).getByRole("textbox", { name: "Chat message" });
-    fireEvent.input(input, { target: { value: "See you next round" } });
-    flush();
+      const sheet = await screen.findByRole("dialog", {
+        name: "Chat & Log",
+      });
 
-    fireEvent.keyDown(input, { key: "Escape" });
-    flush();
-    expect(toggle).toHaveFocus();
+      const input = within(sheet).getByRole("textbox", {
+        name: "Chat message",
+      });
 
-    toggle.click();
+      fireEvent.input(input, { target: { value: "See you next round" } });
+      flush();
 
-    const reopened = await screen.findByRole("dialog", {
-      name: "Chat & Log",
-    });
+      fireEvent.keyDown(input, { key: "Escape" });
+      flush();
+      expect(toggle).toHaveFocus();
 
-    expect(
-      within(reopened).getByRole("textbox", { name: "Chat message" })
-    ).toHaveValue("See you next round");
+      toggle.click();
+
+      const reopened = await screen.findByRole("dialog", {
+        name: "Chat & Log",
+      });
+
+      expect(
+        within(reopened).getByRole("textbox", { name: "Chat message" })
+      ).toHaveValue("See you next round");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("other players see whose turn it is, not the Hit button", () => {

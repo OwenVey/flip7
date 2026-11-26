@@ -26,14 +26,14 @@ export type StressPhase = (typeof PHASES)[number];
 
 export type Viewer = (typeof VIEWERS)[number];
 
-interface Seat {
+interface FixturePlayer {
   name: string;
   bot?: true;
   offline?: true;
 }
 
 interface Spec {
-  seats: Seat[];
+  players: FixturePlayer[];
   viewer: number;
   spectators: number;
   targetScore: TargetScore;
@@ -60,7 +60,7 @@ const WORST_CHATS = [
 const SPECS: Record<Dataset, Spec> = {
   demo: {
     chats: ["good luck!", "nice one"],
-    seats: [
+    players: [
       { name: "Ana" },
       { name: "Ben" },
       { name: "Cleo" },
@@ -74,7 +74,7 @@ const SPECS: Record<Dataset, Spec> = {
   full: {
     chats: WORST_CHATS,
     fillLog: true,
-    seats: [
+    players: [
       { name: "BARTHOLOMEW MCMILLAN" },
       { name: "Aleksandra Wiśniewska-Kowalczyk" },
       { name: "Jo", offline: true },
@@ -100,7 +100,7 @@ const SPECS: Record<Dataset, Spec> = {
   minimum: {
     chats: ["k"],
     winnerLeaves: true,
-    seats: [{ name: "Jo" }, { name: "J" }],
+    players: [{ name: "Jo" }, { name: "J" }],
     spectators: 1,
     targetScore: 100,
     typing: [1],
@@ -108,7 +108,7 @@ const SPECS: Record<Dataset, Spec> = {
   },
   worst: {
     chats: WORST_CHATS,
-    seats: [
+    players: [
       { name: "BARTHOLOMEW MCMILLAN" },
       { name: "Aleksandra Wiśniewska-Kowalczyk" },
       { name: "Konstantin Oberhauser", offline: true },
@@ -139,8 +139,8 @@ const seeded = (seed: number) => {
 
 const idOf = (index: number) => `p${index}`;
 
-const seat = (state: GameState, spec: Spec, random: () => number) => {
-  for (const [index, { name, bot }] of spec.seats.entries()) {
+const addPlayers = (state: GameState, spec: Spec, random: () => number) => {
+  for (const [index, { name, bot }] of spec.players.entries()) {
     if (bot === true) {
       addBot(state, idOf(0), idOf(index), random);
     } else {
@@ -237,7 +237,7 @@ export const stressRoom = (
   const state = createGame();
   const viewerId = idOf(spec.viewer);
 
-  seat(state, spec, random);
+  addPlayers(state, spec, random);
   configure(state, idOf(0), { targetScore: spec.targetScore });
 
   let unsent = spec.chats;
@@ -280,7 +280,7 @@ export const stressRoom = (
     }
   }
 
-  for (const [index, { offline }] of spec.seats.entries()) {
+  for (const [index, { offline }] of spec.players.entries()) {
     const player = state.players.find(({ id }) => id === idOf(index));
 
     if (player && offline === true) {

@@ -1,14 +1,7 @@
 import Trophy from "@lucide/solid/icons/trophy";
 import { createAlertDialogController } from "@ui-sdk/solid/alert-dialog";
 import { createPopoverController } from "@ui-sdk/solid/popover";
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  onSettled,
-  Show,
-} from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 
 import { availableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
@@ -30,7 +23,7 @@ import RoundPlayer from "./round-player";
 import ScrollFade from "./scroll-fade";
 import { SpectatorActions, WatcherCount } from "./spectator-controls";
 import type { Spectator } from "./spectator-controls";
-import { samePlayerIds, SCORES_TITLE } from "./table-common";
+import { createSheetTable, samePlayerIds, SCORES_TITLE } from "./table-common";
 import type {
   DealProps,
   RoundPointsByPlayer,
@@ -38,8 +31,6 @@ import type {
 } from "./table-common";
 import TableMoreMenu from "./table-more-menu";
 import TableSheet from "./table-sheet";
-
-const SHEET_TABLE_QUERY = "(width < 64rem), (height <= 30rem)";
 
 export default function Table(
   props: TableProps &
@@ -99,22 +90,7 @@ export default function Table(
     }
   );
 
-  const [sheetTable, setSheetTable] = createSignal(false);
-
-  onSettled(() => {
-    const query = globalThis.matchMedia?.(SHEET_TABLE_QUERY);
-
-    const sync = () => {
-      setSheetTable(query?.matches);
-    };
-
-    sync();
-    query?.addEventListener?.("change", sync);
-
-    return () => {
-      query?.removeEventListener?.("change", sync);
-    };
-  });
+  const sheetTable = createSheetTable();
 
   const [scoresOpen, setScoresOpen] = createSignal(false);
   const [logOpenedAt, setLogOpenedAt] = createSignal<number | null>();
@@ -128,9 +104,7 @@ export default function Table(
   const sheetResultsRound = createMemo(() => {
     const round = resultsRound();
 
-    return round !== null && globalThis.matchMedia?.(SHEET_TABLE_QUERY).matches
-      ? round
-      : null;
+    return round !== null && sheetTable() ? round : null;
   });
 
   const logOpen = () => {
@@ -140,8 +114,8 @@ export default function Table(
     return openedAt !== undefined && (round === null || openedAt === round);
   };
 
-  createEffect(resultsRound, (round, previous) => {
-    if (round !== null && sheetResultsRound() === round) {
+  createEffect(sheetResultsRound, (round, previous) => {
+    if (round !== null) {
       setLogOpenedAt(undefined);
       setScoresOpen(true);
     } else if (previous !== null && previous !== undefined) {

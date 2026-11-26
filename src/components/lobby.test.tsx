@@ -81,6 +81,31 @@ describe("<Lobby />", () => {
     expect(within(roster).getByText(name)).toHaveAttribute("title", name);
   });
 
+  it.each([
+    { layout: "beside the roster", sheet: false },
+    { layout: "in the sheet", sheet: true },
+  ])("renders the Chat & Log once when it shows $layout", ({ sheet }) => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+    vi.stubGlobal("matchMedia", () => ({ matches: sheet }));
+
+    try {
+      render(() => (
+        <Lobby
+          chat={chatControls()}
+          typing={[]}
+          room={roomOf(2)}
+          playerId="p0"
+          send={vi.fn<RoomConnection["send"]>()}
+        />
+      ));
+      flush();
+
+      expect(document.querySelectorAll(".log-scroll")).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("keeps the host's Add bot button mounted and focusable once the room fills", () => {
     const send = vi.fn<RoomConnection["send"]>();
     const [room, setRoom] = createSignal<RoomView>(roomOf(MAX_PLAYERS - 1));
@@ -263,7 +288,7 @@ describe("<Lobby />", () => {
       1
     );
     expect(screen.queryByRole("button", { name: "Watch instead" })).toBeNull();
-    expect(screen.getAllByText("Join as a player to chat.")).toHaveLength(2);
+    expect(screen.getAllByText("Join as a player to chat.")).toHaveLength(1);
     expect(
       screen.getByRole("button", { name: "Chat & Log" })
     ).toBeInTheDocument();

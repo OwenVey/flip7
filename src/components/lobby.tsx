@@ -34,6 +34,7 @@ import {
   WatcherCount,
 } from "./spectator-controls";
 import type { Spectator } from "./spectator-controls";
+import { createSheetTable } from "./table-common";
 
 const RoomCode = (props: { code: string }) => {
   const { copied, copy } = createCopy();
@@ -115,6 +116,7 @@ export default function Lobby(props: {
   );
 
   const count = () => `${props.room.players.length} / ${MAX_PLAYERS}`;
+  const sheetTable = createSheetTable();
 
   return (
     <div class="lobby-page">
@@ -131,6 +133,7 @@ export default function Lobby(props: {
             chat={chat()}
             players={props.room.players}
             typing={props.typing}
+            logInSheet={sheetTable()}
           />
           <Show
             when={props.playerId !== null}
@@ -308,13 +311,15 @@ export default function Lobby(props: {
           </ul>
         </section>
 
-        <GameLog
-          log={props.room.log}
-          playerId={props.playerId}
-          chat={chat()}
-          players={props.room.players}
-          typing={props.typing}
-        />
+        <Show when={!sheetTable()}>
+          <GameLog
+            log={props.room.log}
+            playerId={props.playerId}
+            chat={chat()}
+            players={props.room.players}
+            typing={props.typing}
+          />
+        </Show>
       </div>
     </div>
   );

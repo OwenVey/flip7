@@ -6,7 +6,8 @@ import type { Player, RoundStatus } from "../game/engine";
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import { pointsOf } from "../lib/deal-playback";
-import { rankPlayers } from "../lib/standings";
+import { finalStandings, rankPlayers } from "../lib/standings";
+import type { FinalPlayer } from "../lib/standings";
 import { slideRows } from "../lib/table-motion";
 import { ROUND_COUNT_MS, samePlayerIds, SCORES_TITLE } from "./table-common";
 import type { RoundPointsByPlayer, TableProps } from "./table-common";
@@ -33,7 +34,7 @@ const roundPointsLabels = {
 };
 
 const LeaderboardRound = (props: {
-  player: Player;
+  player: Pick<Player, "status">;
   phase: RoomView["phase"];
   points: number;
   index: number;
@@ -72,10 +73,17 @@ const LeaderboardRound = (props: {
   );
 };
 
+const isLeft = (player: Player | FinalPlayer) =>
+  "left" in player && player.left;
+
 const Leaderboard = (
   props: Pick<TableProps, "room" | "playerId"> & RoundPointsByPlayer
 ) => {
-  const ranked = createMemo(() => rankPlayers(props.room.players));
+  const ranked = createMemo(() =>
+    props.room.phase === "gameOver"
+      ? finalStandings(props.room)
+      : rankPlayers(props.room.players)
+  );
 
   const rankedIds = createMemo(() => ranked().map(({ player }) => player.id), {
     equals: samePlayerIds,
@@ -110,6 +118,7 @@ const Leaderboard = (
             <Show when={ranked()[index()]}>
               {(entry) => {
                 const won = () => props.room.winnerIds.includes(id);
+                const left = () => isLeft(entry().player);
 
                 const medal = () =>
                   props.room.phase === "gameOver" &&
@@ -126,24 +135,42 @@ const Leaderboard = (
                     data-winner={won() ? "" : undefined}
                   >
                     <td>{entry().rank}</td>
-                    <th scope="row">
-                      <span
-                        class="leaderboard-name"
-                        dir="auto"
-                        title={entry().player.name}
-                      >
-                        {entry().player.name}
+                    <th
+                      scope="row"
+                      aria-label={`${entry().player.name}${left() ? " (Left)" : ""}${id === props.playerId ? " (You)" : ""}`}
+                    >
+                      <span class="leaderboard-player">
+                        <span
+                          class="leaderboard-name"
+                          dir="auto"
+                          title={entry().player.name}
+                        >
+                          {entry().player.name}
+                        </span>
+                        <Show when={left()}>
+                          {" "}
+                          <span class="badge">Left</span>
+                        </Show>
                       </span>
                       <Show when={id === props.playerId}>
                         <span class="sr-only"> (You)</span>
                       </Show>
                     </th>
-                    <LeaderboardRound
-                      player={entry().player}
-                      phase={props.room.phase}
-                      points={pointsOf(props.roundPoints, id)}
-                      index={entry().index}
-                    />
+                    <Show
+                      when={!left()}
+                      fallback={
+                        <td class="leaderboard-round" aria-label="Left">
+                          —
+                        </td>
+                      }
+                    >
+                      <LeaderboardRound
+                        player={entry().player}
+                        phase={props.room.phase}
+                        points={pointsOf(props.roundPoints, id)}
+                        index={entry().index}
+                      />
+                    </Show>
                     <td
                       class="leaderboard-total"
                       aria-label={`${entry().player.score}`}

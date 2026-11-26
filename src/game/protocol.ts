@@ -47,13 +47,15 @@ export const normalizeCode = (raw: string) => {
 };
 
 const INVISIBLE_CHARACTERS = /\p{Cf}|(?!\s)\p{Cc}/u;
+const EXTENDED_PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
 const JOINS_EMOJI = /[\p{Extended_Pictographic}\p{Emoji_Modifier}\uFE0F]/u;
 const NON_LATIN_LETTER = /(?!\p{Script=Latin})[\p{L}\p{M}]/u;
 
 const keepsJoiner = (joiner: string, before: string, after: string) =>
-  joiner === "\u200D"
-    ? JOINS_EMOJI.test(before) && /\p{Extended_Pictographic}/u.test(after)
-    : NON_LATIN_LETTER.test(before) && NON_LATIN_LETTER.test(after);
+  (NON_LATIN_LETTER.test(before) && NON_LATIN_LETTER.test(after)) ||
+  (joiner === "\u200D" &&
+    JOINS_EMOJI.test(before) &&
+    EXTENDED_PICTOGRAPHIC.test(after));
 
 const visibleCharacters = (raw: string) => {
   const characters = raw.match(/./gsu) ?? [];

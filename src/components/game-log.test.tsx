@@ -664,6 +664,26 @@ describe("<GameLog />", () => {
     expect(charCount()).toHaveTextContent("170/200");
   });
 
+  it("counts and caps chat drafts by whole characters so emoji are not cut short", () => {
+    render(() => (
+      <GameLog
+        log={[]}
+        playerId="a"
+        players={players}
+        typing={[]}
+        chat={chatControls()}
+      />
+    ));
+
+    const draft = screen.getByRole("textbox", { name: "Chat message" });
+
+    fireEvent.input(draft, { target: { value: "👍🏽".repeat(201) } });
+    flush();
+
+    expect(draft).toHaveValue("👍🏽".repeat(200));
+    expect(charCount()).toHaveTextContent("200/200");
+  });
+
   it("keeps existing events quiet when a new snapshot repeats them", async () => {
     const [log, setLog] = createSignal(entries(2));
 

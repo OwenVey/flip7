@@ -1,4 +1,6 @@
 import { useSearchParams } from "@solidjs/router";
+import type { RouteDefinition } from "@solidjs/router";
+import { httpStatus } from "@solidjs/web";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 
 import Lobby from "../../components/lobby";
@@ -75,13 +77,14 @@ const Segments = <T extends keyof typeof LABELS>(props: {
             props.onPick(option);
           }}
           style={{
-            all: "unset",
             background: props.value === option ? "#fff" : "transparent",
+            border: "none",
             "border-radius": "999px",
             "box-shadow":
               props.value === option ? "0 1px 2px rgb(0 0 0 / 0.2)" : "none",
             color: "#111",
             cursor: "pointer",
+            font: "inherit",
             padding: "4px 10px",
             "white-space": "nowrap",
           }}
@@ -208,6 +211,14 @@ const StressPage = () => {
     </>
   );
 };
+
+export const route = {
+  preload: () => {
+    if (!import.meta.env.DEV) {
+      httpStatus(404);
+    }
+  },
+} satisfies RouteDefinition;
 
 export default function Stress() {
   return import.meta.env.DEV ? <StressPage /> : <NotFound />;

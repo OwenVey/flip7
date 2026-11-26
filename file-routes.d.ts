@@ -44,7 +44,7 @@ declare module "virtual:file-routes" {
       path: "/dev/stress";
       page: true;
       $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dev/stress"), Extract<"default", keyof typeof import("./src/routes/dev/stress")>>>;
-      $$route?: undefined;
+      $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dev/stress"), Extract<"route", keyof typeof import("./src/routes/dev/stress")>>>;
     },
     {
       path: "/";
@@ -84,7 +84,7 @@ declare module "virtual:file-routes" {
       id: "/dev/stress";
       page: true;
       $component: FileRouteLazyRef<Pick<typeof import("./src/routes/dev/stress"), Extract<"default", keyof typeof import("./src/routes/dev/stress")>>>;
-      $$route?: undefined;
+      $$route: FileRouteEagerRef<Pick<typeof import("./src/routes/dev/stress"), Extract<"route", keyof typeof import("./src/routes/dev/stress")>>>;
       children?: undefined;
     },
     {

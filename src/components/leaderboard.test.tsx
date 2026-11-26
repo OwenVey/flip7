@@ -161,4 +161,48 @@ describe("<Leaderboard />", () => {
       rows.slice(1).map((row) => Object.hasOwn(row.dataset, "me"))
     ).toStrictEqual([true, false, false]);
   });
+
+  it("keeps a winner who has left at rank 1 in the scores at game over", () => {
+    const base = room({ phase: "gameOver", winnerIds: ["b"] });
+
+    const view: RoomView = {
+      ...base,
+      log: [
+        {
+          at: 0,
+          event: {
+            player: { id: "b", name: "Ben" },
+            points: 212,
+            scores: [],
+            type: "gameWon",
+          },
+          game: 1,
+          id: 1,
+          round: 6,
+        },
+      ],
+      players: base.players.filter(({ id }) => id !== "b"),
+    };
+
+    render(() => <Scores room={view} playerId="a" />);
+
+    const leaderboard = within(screen.getByRole("table", { name: "Scores" }));
+
+    const rows = leaderboard
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => Array.from(row.children, (cell) => cell.textContent));
+
+    expect(rows).toStrictEqual([
+      ["1", "Ben Left", "—", "212"],
+      ["2", "Ana (You)", "+0", "40"],
+    ]);
+    expect(leaderboard.getByRole("row", { name: /Ben/u })).toHaveAttribute(
+      "data-winner"
+    );
+    expect(leaderboard.getByRole("row", { name: /Ana/u })).toHaveAttribute(
+      "data-medal",
+      "2"
+    );
+  });
 });

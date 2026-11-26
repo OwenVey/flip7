@@ -12,7 +12,7 @@ import type { DealPlaybackView } from "./deal-playback";
 import { hostName } from "./host";
 import type { PlaybackMoment } from "./playback-moments";
 import { nameOf } from "./player-name";
-import { rankPlayers, winnerNames } from "./standings";
+import { rankPlayers, winnerNames, winnersHeadline } from "./standings";
 
 /**
  * Which controls the action bar offers alongside the Table prompt: Hit and
@@ -164,11 +164,6 @@ const roundEndHeadline = (room: RoomView) => {
 type Prompt = Omit<TablePrompt, "yours">;
 
 type PromptLines = Pick<TablePrompt, "headline" | "note">;
-
-const winnersHeadline = (names: string[]) =>
-  names.length > 1
-    ? `${names.join(" and ")} win!`
-    : `${names[0] ?? "Someone"} wins!`;
 
 const gameOverPrompt = (room: RoomView, moves: AvailableMoves) =>
   ({

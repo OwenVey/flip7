@@ -16,6 +16,7 @@ import { MAX_SPECTATORS } from "../game/moves";
 import { sameName } from "../game/names";
 import { NAME_MAX_LENGTH } from "../game/protocol";
 import type { RoomPreview } from "../game/protocol";
+import { clipText } from "../game/text";
 import { paths } from "../router";
 import AvatarPicker from "./avatar-picker";
 
@@ -188,12 +189,11 @@ export default function JoinForm(props: {
                 }}
                 value={name()}
                 onValueChange={(value) => {
-                  setTyped(value);
+                  setTyped(clipText(value, NAME_MAX_LENGTH));
                   setEmptyName(false);
                   props.onEdit?.();
                 }}
                 readonly={props.joining === true}
-                maxlength={NAME_MAX_LENGTH}
                 autocomplete="nickname"
                 enterkeyhint="go"
                 placeholder="What should we call you?"

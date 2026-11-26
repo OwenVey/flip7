@@ -59,6 +59,7 @@ import type {
   LogPlayer,
 } from "../game/engine";
 import { settlesRound } from "../game/game-events";
+import { clipText, textLength } from "../game/text";
 import { createChatLogReads, LOG_FILTERS } from "../lib/chat-log-reads";
 import type { ChatLogReads } from "../lib/chat-log-reads";
 import {
@@ -321,6 +322,7 @@ const ChatForm = (props: { chat: ChatControls; onSent: () => void }) => {
   const [text, setText] = createSignal("");
   const [failed, setFailed] = createSignal(false);
   const message = createMemo(() => text().trim());
+  const length = createMemo(() => textLength(text()));
   const countId = createUniqueId();
 
   const submit = () => {
@@ -353,10 +355,10 @@ const ChatForm = (props: { chat: ChatControls; onSent: () => void }) => {
         placeholder="Say something…"
         value={text()}
         onValueChange={(value) => {
-          setText(value);
-          props.chat.typing(value.trim() !== "");
+          const next = clipText(value, CHAT_MAX_LENGTH);
+          setText(next);
+          props.chat.typing(next.trim() !== "");
         }}
-        maxlength={CHAT_MAX_LENGTH}
         aria-describedby={countId}
         autocomplete="off"
         enterkeyhint="send"
@@ -382,10 +384,10 @@ const ChatForm = (props: { chat: ChatControls; onSent: () => void }) => {
       <span
         id={countId}
         class="chat-count"
-        hidden={text().length < CHAT_COUNT_FROM}
-        data-full={text().length >= CHAT_MAX_LENGTH ? "" : undefined}
+        hidden={length() < CHAT_COUNT_FROM}
+        data-full={length() >= CHAT_MAX_LENGTH ? "" : undefined}
       >
-        {text().length}/{CHAT_MAX_LENGTH}
+        {length()}/{CHAT_MAX_LENGTH}
       </span>
       <output class="chat-send-status form-error">
         {failed() ? "Message not sent. Try again when reconnected." : ""}
