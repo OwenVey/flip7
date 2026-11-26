@@ -1,16 +1,21 @@
 import CircleX from "@lucide/solid/icons/circle-x";
+import Flame from "@lucide/solid/icons/flame";
 import LockKeyhole from "@lucide/solid/icons/lock-keyhole";
 import { createEffect, createMemo, For, Show } from "solid-js";
 
+import { cardLabel } from "../game/cards";
+import type { Card, RoundScore } from "../game/cards";
 import type { Player, RoundStatus } from "../game/engine";
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import { pointsOf } from "../lib/deal-playback";
+import { roundScoreRows } from "../lib/round-score-breakdown";
 import { finalStandings, rankPlayers } from "../lib/standings";
 import type { FinalPlayer } from "../lib/standings";
 import { slideRows } from "../lib/table-motion";
 import { ROUND_COUNT_MS, samePlayerIds, SCORES_TITLE } from "./table-common";
 import type { RoundPointsByPlayer, TableProps } from "./table-common";
+import Tooltip from "./tooltip";
 
 const CountUp = (props: { value: number }) => {
   const shown = createCountUp(() => props.value);
@@ -40,8 +45,53 @@ const roundPointsLabels = {
   out: "sitting out",
 };
 
+const ScoreChip = (props: { card: Card }) => (
+  <span
+    class="score-chip"
+    style={{
+      "--chip-color":
+        props.card.kind === "number"
+          ? `var(--number-${props.card.value})`
+          : "var(--score-modifier)",
+    }}
+  >
+    {cardLabel(props.card)}
+  </span>
+);
+
+const RoundScoreBreakdown = (props: {
+  score: RoundScore;
+  hand: readonly Card[];
+}) => {
+  const rows = createMemo(() => roundScoreRows(props.score, props.hand));
+
+  return (
+    <dl class="round-breakdown">
+      <For each={rows()}>
+        {(row, index) => (
+          <div>
+            <dt>{row.label}</dt>{" "}
+            <dd class="round-breakdown-cards" aria-hidden="true">
+              <For each={row.cards}>{(card) => <ScoreChip card={card} />}</For>
+              <Show when={row.flipSeven}>
+                <Flame size={14} />
+              </Show>
+            </dd>
+            <dd>
+              {row.value}
+              <Show when={index() < rows().length - 1}>
+                <span class="sr-only">,</span>
+              </Show>
+            </dd>
+          </div>
+        )}
+      </For>
+    </dl>
+  );
+};
+
 const LeaderboardRound = (props: {
-  player: Pick<Player, "status">;
+  player: Pick<Player, "hand" | "lastRound" | "status">;
   phase: RoomView["phase"];
   points: number;
   index: number;
@@ -57,25 +107,64 @@ const LeaderboardRound = (props: {
     durationMs: ROUND_COUNT_MS,
   });
 
+  const label = () =>
+    `${props.points} ${props.points === 1 ? "point" : "points"}, ${roundPointsLabels[state()]}`;
+
+  const breakdown = createMemo(() => {
+    const score = props.player.lastRound;
+
+    return scored() &&
+      state() === "banked" &&
+      score !== null &&
+      shownPoints() === score.total
+      ? score
+      : null;
+  });
+
   return (
     <td
       class="leaderboard-round"
       data-round-state={state()}
       data-scored={scored() ? "" : undefined}
-      aria-label={`${props.points} ${props.points === 1 ? "point" : "points"}, ${roundPointsLabels[state()]}`}
+      aria-label={breakdown() === null ? label() : undefined}
       style={{ "--row-index": props.index }}
     >
-      <span>
-        <Show when={state() === "banked" && !scored()}>
-          <LockKeyhole size={12} aria-hidden="true" />
-        </Show>
-        <Show when={state() === "busted"}>
-          <CircleX size={12} aria-hidden="true" />
-        </Show>
-        {state() === "busted" || state() === "out"
-          ? shownPoints()
-          : `+${shownPoints()}`}
-      </span>
+      <Show
+        when={breakdown()}
+        fallback={
+          <span>
+            <Show when={state() === "banked" && !scored()}>
+              <LockKeyhole size={12} aria-hidden="true" />
+            </Show>
+            <Show when={state() === "busted"}>
+              <CircleX size={12} aria-hidden="true" />
+            </Show>
+            {state() === "busted" || state() === "out"
+              ? shownPoints()
+              : `+${shownPoints()}`}
+          </span>
+        }
+      >
+        {(score) => (
+          <Tooltip
+            content={
+              <RoundScoreBreakdown score={score()} hand={props.player.hand} />
+            }
+            type="description"
+            toggleable
+            trigger={(hint) => (
+              <button
+                {...hint}
+                type="button"
+                class="round-breakdown-trigger"
+                aria-label={label()}
+              />
+            )}
+          >
+            +{score().total}
+          </Tooltip>
+        )}
+      </Show>
     </td>
   );
 };

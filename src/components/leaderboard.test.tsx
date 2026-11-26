@@ -1,9 +1,10 @@
 import { expectNoDiagnostics } from "@solidjs/diagnostics";
 import { cleanup, render, screen, within } from "@solidjs/testing-library";
 import { createSignal, flush } from "solid-js";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { calculateRoundScore } from "../game/cards";
+import type { Card } from "../game/cards";
 import type { RoomView } from "../game/protocol";
 import { roundPointsFor } from "../lib/deal-playback";
 import { captureScenario } from "../test/diagnostics";
@@ -18,6 +19,40 @@ const Scores = (props: { room: RoomView; playerId: string | null }) => (
     roundPoints={roundPointsFor(props.room)}
   />
 );
+
+const SCORED_HAND: Card[] = [
+  { id: 1, kind: "number", value: 12 },
+  { id: 2, kind: "number", value: 11 },
+  { id: 3, kind: "double" },
+  { id: 4, kind: "modifier", value: 6 },
+];
+
+const BUSTED_ROUND = calculateRoundScore([]);
+
+const scoredRoom = (phase: RoomView["phase"]) => {
+  const { players } = room();
+  const [ana, ben] = [itemAt(players, 0), itemAt(players, 1)];
+
+  return room({
+    phase,
+    players: [
+      {
+        ...ana,
+        hand: SCORED_HAND,
+        lastRound: calculateRoundScore(SCORED_HAND),
+        status: "stayed",
+      },
+      { ...ben, lastRound: BUSTED_ROUND, status: "busted" },
+      { ...ben, id: "c", lastRound: null, name: "Cara", status: "out" },
+    ],
+  });
+};
+
+const shownText = (cell: Element) => {
+  const tooltip = cell.querySelector('[role="tooltip"]')?.textContent ?? "";
+
+  return cell.textContent.replace(tooltip, "");
+};
 
 const ranks = () =>
   screen
@@ -86,7 +121,7 @@ describe("<Leaderboard />", () => {
       leaderboard
         .getAllByRole("row")
         .slice(1)
-        .map((row) => Array.from(row.children, (cell) => cell.textContent));
+        .map((row) => Array.from(row.children, shownText));
 
     expect(
       leaderboard.getAllByRole("columnheader").map((cell) => cell.textContent)
@@ -214,7 +249,7 @@ describe("<Leaderboard />", () => {
     const rows = leaderboard
       .getAllByRole("row")
       .slice(1)
-      .map((row) => Array.from(row.children, (cell) => cell.textContent));
+      .map((row) => Array.from(row.children, shownText));
 
     expect(rows).toStrictEqual([
       ["1", "Ben Left", "—", "212"],
@@ -227,5 +262,84 @@ describe("<Leaderboard />", () => {
       "data-medal",
       "2"
     );
+  });
+
+  it("shows how each scored round adds up, except a bust or a round sat out", () => {
+    render(() => <Scores room={scoredRoom("roundOver")} playerId="a" />);
+
+    const leaderboard = within(screen.getByRole("table", { name: "Scores" }));
+
+    const breakdown = leaderboard.getByRole("button", {
+      name: "52 points, banked",
+    });
+
+    expect(breakdown).toHaveTextContent(/^\+52$/u);
+    expect(breakdown).toHaveAccessibleDescription(
+      "Number cards 23, ×2 46, Score Modifiers +6, Total 52"
+    );
+    expect(leaderboard.getAllByRole("button")).toHaveLength(1);
+    expect(
+      leaderboard.getByRole("cell", { name: "0 points, busted" })
+    ).toBeInTheDocument();
+    expect(
+      leaderboard.getByRole("cell", { name: "0 points, sitting out" })
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the breakdown, with a chip for each scored card, at game over", () => {
+    render(() => <Scores room={scoredRoom("gameOver")} playerId="a" />);
+
+    expect(
+      screen.getByRole("button", { name: "52 points, banked" })
+    ).toBeInTheDocument();
+    expect(
+      Array.from(
+        document.querySelectorAll(".score-chip"),
+        (chip) => chip.textContent
+      )
+    ).toStrictEqual(["12", "11", "×2", "+6"]);
+  });
+
+  it("has no breakdown while the round is in play", () => {
+    const { players } = room();
+    const [ana, ben] = [itemAt(players, 0), itemAt(players, 1)];
+
+    render(() => (
+      <Scores
+        room={room({ players: [ana, { ...ben, status: "stayed" }] })}
+        playerId="a"
+      />
+    ));
+
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("waits for the round points to count up before offering the breakdown", () => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    vi.useFakeTimers({
+      toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
+    });
+
+    try {
+      const [view, setView] = createSignal(room());
+
+      render(() => <Scores room={view()} playerId="a" />);
+
+      setView(scoredRoom("roundOver"));
+      flush();
+
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+
+      vi.advanceTimersByTime(400);
+      flush();
+
+      expect(
+        screen.getByRole("button", { name: "52 points, banked" })
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
   });
 });
