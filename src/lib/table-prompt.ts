@@ -53,9 +53,9 @@ export type PromptPlayback = Pick<
   "dealing" | "moment" | "step" | "roundPoints"
 >;
 
-/** What one player's seat offers and shows this viewer. */
-export interface SeatPrompt {
-  /** The seat is the one the game is waiting on, once no moment is settling. */
+/** What one player's panel offers and shows this viewer. */
+export interface PlayerPrompt {
+  /** The game is waiting on this player, shown once no moment is settling. */
   waitingOn: boolean;
   /** The viewer can give this player the action card, choosing for `forId` when set. */
   pick: { kind: ActionCardKind; forId?: string } | null;
@@ -67,11 +67,12 @@ export interface SeatPrompt {
 
 /**
  * Everything the table offers this viewer right now: the action bar, each
- * seat, and which results Deal playback lets them see. See GLOSSARY.md.
+ * player, and which results Deal playback lets them see. See GLOSSARY.md.
  */
 export interface TablePrompt {
   bar: BarPrompt;
-  seats: ReadonlyMap<string, SeatPrompt>;
+  /** Each player's prompt, by player ID. */
+  players: ReadonlyMap<string, PlayerPrompt>;
   /** The round whose results may show, or null while play or playback goes on. */
   resultsRound: number | null;
   /** The game is over and Deal playback has finished, so the result may show. */
@@ -445,7 +446,7 @@ export const resultsRound = (
   playback: Pick<PromptPlayback, "dealing">
 ) => (room.phase === "roundOver" && !playback.dealing ? room.round : null);
 
-const seatPrompt = (
+const playerPrompt = (
   room: RoomView,
   moves: AvailableMoves,
   playback: PromptPlayback,
@@ -468,13 +469,13 @@ const seatPrompt = (
     unpickable: choosing && pick === null,
     waitingOn: playback.moment === null && moves.waitingOn?.playerId === id,
     winner: gameOver && room.winnerIds.includes(id),
-  } satisfies SeatPrompt;
+  } satisfies PlayerPrompt;
 };
 
 /**
  * What the table offers `playerId` (null for a Spectator): one action bar
  * prompt, chosen from the phase, the Move being waited on and Deal playback,
- * plus what each seat offers and whether results may show yet.
+ * plus what each player panel offers and whether results may show yet.
  */
 export const tablePrompt = (
   room: RoomView,
@@ -495,10 +496,10 @@ export const tablePrompt = (
     },
     gameOver,
     resultsRound: resultsRound(room, playback),
-    seats: new Map(
+    players: new Map(
       room.players.map(({ id }) => [
         id,
-        seatPrompt(room, moves, playback, gameOver, id),
+        playerPrompt(room, moves, playback, gameOver, id),
       ])
     ),
   };

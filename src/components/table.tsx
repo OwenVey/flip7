@@ -62,7 +62,7 @@ export default function Table(
   };
 
   const chooseTarget = (targetId: string) => {
-    const pick = prompt().seats.get(targetId)?.pick;
+    const pick = prompt().players.get(targetId)?.pick;
 
     if (props.actionsDisabled === true || pick === null || pick === undefined) {
       return;
@@ -184,8 +184,8 @@ export default function Table(
               {(id, index) => (
                 <Show when={props.room.players[index()]}>
                   {(player) => (
-                    <Show when={prompt().seats.get(id)}>
-                      {(seat) => (
+                    <Show when={prompt().players.get(id)}>
+                      {(playerPrompt) => (
                         <RoundPlayer
                           player={player()}
                           room={props.room}
@@ -193,7 +193,7 @@ export default function Table(
                           actionsDisabled={props.actionsDisabled}
                           removeDisabled={props.offline}
                           roundPoints={pointsOf(props.playback.roundPoints, id)}
-                          seat={seat()}
+                          prompt={playerPrompt()}
                           canRemove={moves().host.kick.includes(id)}
                           dealStep={props.playback.step}
                           onPick={chooseTarget}

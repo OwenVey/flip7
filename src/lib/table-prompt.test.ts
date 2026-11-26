@@ -596,18 +596,21 @@ describe(samePrompt, () => {
   });
 });
 
-const seat = (prompt: ReturnType<typeof tablePrompt>, id: string) =>
-  prompt.seats.get(id);
+const playerPromptOf = (prompt: ReturnType<typeof tablePrompt>, id: string) =>
+  prompt.players.get(id);
 
-describe("tablePrompt seats and results", () => {
-  it("rings the seat being waited on, except while a moment settles", () => {
+describe("tablePrompt players and results", () => {
+  it("rings the player being waited on, except while a moment settles", () => {
     const view = room({ turnId: "a" });
 
     expect({
-      dealing: seat(tablePrompt(view, "a", playback({ dealing: true })), "a")
+      dealing: playerPromptOf(
+        tablePrompt(view, "a", playback({ dealing: true })),
+        "a"
+      )?.waitingOn,
+      settled: playerPromptOf(tablePrompt(view, "a", playback()), "a")
         ?.waitingOn,
-      settled: seat(tablePrompt(view, "a", playback()), "a")?.waitingOn,
-      settling: seat(
+      settling: playerPromptOf(
         tablePrompt(
           view,
           "a",
@@ -627,8 +630,8 @@ describe("tablePrompt seats and results", () => {
       const prompt = tablePrompt(view, "a", play);
 
       return {
-        a: seat(prompt, "a"),
-        b: seat(prompt, "b"),
+        a: playerPromptOf(prompt, "a"),
+        b: playerPromptOf(prompt, "b"),
       };
     };
 
@@ -653,11 +656,15 @@ describe("tablePrompt seats and results", () => {
       "b"
     );
 
-    expect(seat(tablePrompt(view, "a", playback()), "a")?.pick).toStrictEqual({
+    expect(
+      playerPromptOf(tablePrompt(view, "a", playback()), "a")?.pick
+    ).toStrictEqual({
       forId: "b",
       kind: "freeze",
     });
-    expect(seat(tablePrompt(view, null, playback()), "a")?.pick).toBeNull();
+    expect(
+      playerPromptOf(tablePrompt(view, null, playback()), "a")?.pick
+    ).toBeNull();
   });
 
   it("holds back round results, game over and winners until playback ends", () => {
@@ -674,13 +681,14 @@ describe("tablePrompt seats and results", () => {
     expect({
       gameOver: tablePrompt(gameOver, "a", during).gameOver,
       resultsRound: tablePrompt(roundOver, "a", during).resultsRound,
-      winner: seat(tablePrompt(gameOver, "a", during), "b")?.winner,
+      winner: playerPromptOf(tablePrompt(gameOver, "a", during), "b")?.winner,
     }).toStrictEqual({ gameOver: false, resultsRound: null, winner: false });
 
     expect({
       gameOver: tablePrompt(gameOver, "a", playback()).gameOver,
       resultsRound: tablePrompt(roundOver, "a", playback()).resultsRound,
-      winner: seat(tablePrompt(gameOver, "a", playback()), "b")?.winner,
+      winner: playerPromptOf(tablePrompt(gameOver, "a", playback()), "b")
+        ?.winner,
     }).toStrictEqual({
       gameOver: true,
       resultsRound: roundOver.round,

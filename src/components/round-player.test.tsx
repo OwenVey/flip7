@@ -22,7 +22,7 @@ import { room } from "../test/room-view";
 import { agent, agentApproval, Table } from "../test/table";
 import RoundPlayer from "./round-player";
 
-const seatOf = (view: RoomView, playerId: string | null, seat: number) => {
+const promptOf = (view: RoomView, playerId: string | null, seat: number) => {
   const prompt = tablePrompt(view, playerId, {
     dealing: false,
     moment: null,
@@ -31,10 +31,10 @@ const seatOf = (view: RoomView, playerId: string | null, seat: number) => {
   });
 
   const { id } = itemAt(view.players, seat);
-  const shown = prompt.seats.get(id);
+  const shown = prompt.players.get(id);
 
   if (shown === undefined) {
-    throw new Error(`Expected a seat for ${id}`);
+    throw new Error(`Expected a prompt for ${id}`);
   }
 
   return shown;
@@ -53,7 +53,7 @@ const Seat = (props: {
       roundPointsFor(props.room),
       itemAt(props.room.players, props.seat).id
     )}
-    seat={seatOf(props.room, props.playerId, props.seat)}
+    prompt={promptOf(props.room, props.playerId, props.seat)}
     canRemove={availableMoves(props.room, props.playerId).host.kick.includes(
       itemAt(props.room.players, props.seat).id
     )}

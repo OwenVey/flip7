@@ -12,7 +12,7 @@ import type { DealStep } from "../lib/deal-plan";
 import { nameOf } from "../lib/player-name";
 import { scoreMeter } from "../lib/score-meter";
 import { pop } from "../lib/table-motion";
-import type { SeatPrompt } from "../lib/table-prompt";
+import type { PlayerPrompt } from "../lib/table-prompt";
 import FlipTracker, {
   createShownFlip,
   flipProgress,
@@ -80,7 +80,7 @@ interface RoundPlayerProps {
   room: RoomView;
   player: Player;
   playerId: string | null;
-  seat: SeatPrompt;
+  prompt: PlayerPrompt;
   canRemove: boolean;
   dealStep: DealStep | null;
   roundPoints: number;
@@ -175,15 +175,15 @@ const RoundPlayer = (props: RoundPlayerProps) => {
       data-status={props.player.status}
       data-seat={props.player.id}
       data-flipping={flip()?.waiting === false ? "" : undefined}
-      data-turn={props.seat.waitingOn ? "" : undefined}
+      data-turn={props.prompt.waitingOn ? "" : undefined}
       data-me={isMe() ? "" : undefined}
-      data-winner={props.seat.winner ? "" : undefined}
+      data-winner={props.prompt.winner ? "" : undefined}
       data-offline={props.player.connected ? undefined : ""}
-      data-pickable={props.seat.pick?.kind}
-      data-unpickable={props.seat.unpickable ? "" : undefined}
+      data-pickable={props.prompt.pick?.kind}
+      data-unpickable={props.prompt.unpickable ? "" : undefined}
       aria-label={`${props.player.name}, ${props.player.score} points`}
     >
-      <Show when={props.seat.pick}>
+      <Show when={props.prompt.pick}>
         {(pick) => (
           <button
             type="button"
@@ -235,14 +235,14 @@ const RoundPlayer = (props: RoundPlayerProps) => {
           <strong dir="auto" title={props.player.name}>
             {props.player.name}
           </strong>
-          <Show when={props.seat.winner}>
+          <Show when={props.prompt.winner}>
             <span class="badge" data-tone="winner" title="Winner">
               <Trophy size={12} aria-hidden="true" />
               <span class="badge-label">Winner</span>
             </span>
           </Show>
           <Show when={!props.player.connected}>
-            <OfflineBadge compact={props.seat.winner} />
+            <OfflineBadge compact={props.prompt.winner} />
           </Show>
         </div>
         <div class="seat-meta">
@@ -255,7 +255,7 @@ const RoundPlayer = (props: RoundPlayerProps) => {
               />
             )}
           </Show>
-          <Show when={props.seat.waitingOn && !isMe()}>
+          <Show when={props.prompt.waitingOn && !isMe()}>
             <span class="badge" data-tone="turn">
               {props.room.choice ? "Choosing…" : "Thinking…"}
             </span>
