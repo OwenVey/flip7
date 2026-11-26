@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#0e3a2c" />
+    <title>Offline · Flip 7</title>
+    <style>
+      :root {
+        --felt-light: #22704f;
+        --felt: #17543f;
+        --felt-deep: #0e3a2c;
+        --paper: #fff6df;
+        --ink: #262451;
+        --on-felt-soft: #cfe3d4;
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        -webkit-tap-highlight-color: transparent;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        background-color: var(--felt-deep);
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        margin: 0;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right)
+          env(safe-area-inset-bottom) env(safe-area-inset-left);
+        min-height: 100dvh;
+        background-image: linear-gradient(
+          var(--felt-deep),
+          var(--felt) 12%,
+          var(--felt-light) 35%,
+          var(--felt) 65%,
+          var(--felt-deep)
+        );
+        color: var(--paper);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        text-align: center;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      main {
+        display: grid;
+        justify-items: center;
+        gap: 1rem;
+        padding: 1.5rem;
+        max-width: 22rem;
+      }
+
+      svg {
+        width: 6rem;
+        height: 6rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.75rem;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+      }
+
+      p {
+        margin: 0;
+        color: var(--on-felt-soft);
+        line-height: 1.5;
+      }
+
+      button {
+        margin-top: 0.5rem;
+        border: 2px solid var(--ink);
+        border-radius: 0.75rem;
+        padding: 0.75rem 1.5rem;
+        background: var(--paper);
+        box-shadow: 3px 3px 0 var(--ink);
+        color: var(--ink);
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        -webkit-touch-callout: none;
+      }
+
+      button:active {
+        translate: 2px 2px;
+        box-shadow: 1px 1px 0 var(--ink);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <rect
+          x="15"
+          y="8"
+          width="42"
+          height="53"
+          rx="7"
+          fill="#ffd45f"
+          stroke="#2b2350"
+          stroke-width="4"
+        />
+        <rect
+          x="7"
+          y="3"
+          width="42"
+          height="53"
+          rx="7"
+          fill="#fcf5e8"
+          stroke="#2b2350"
+          stroke-width="4"
+        />
+        <path d="M16 15h24v7L28 45h-9l12-22H16z" fill="#2b2350" />
+      </svg>
+      <h1>You're offline</h1>
+      <p>
+        Flip 7 needs a connection to play. We'll try again as soon as you're
+        back online.
+      </p>
+      <button type="button" onclick="location.reload()">Retry</button>
+    </main>
+    <script>
+      addEventListener("online", () => location.reload());
+    </script>
+  </body>
+</html>

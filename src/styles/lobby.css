@@ -288,7 +288,7 @@ button.room-code {
 
   .lobby-side {
     position: sticky;
-    inset-block-start: 0.5rem;
+    inset-block-start: calc(0.5rem + env(safe-area-inset-top));
   }
 
   .lobby > .players {
@@ -346,9 +346,9 @@ button.room-code {
 @media (--lg) and (not (--short)) {
   .lobby > .log {
     position: sticky;
-    inset-block-start: 0.5rem;
+    inset-block-start: calc(0.5rem + env(safe-area-inset-top));
     grid-template-rows: auto auto minmax(0, 1fr) auto;
-    block-size: calc(100dvh - 11.5rem);
+    block-size: calc(100dvh - 11.5rem - env(safe-area-inset-top));
 
     & .log-scroll {
       max-block-size: none;

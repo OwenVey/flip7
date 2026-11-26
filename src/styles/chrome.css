@@ -449,7 +449,7 @@ main {
 
 .connection-banner:not(:empty) {
   position: sticky;
-  top: 0.5rem;
+  top: calc(0.5rem + env(safe-area-inset-top));
   z-index: 3;
   display: block;
   margin-bottom: 1rem;
