@@ -54,7 +54,7 @@ const ordinal = (rank: number) =>
 const points = (score: number) => (score === 1 ? "1 point" : `${score} points`);
 
 const FinalScore = (props: { score: number; roundPoints: number }) => {
-  const shown = createCountUp(() => props.score, {
+  const { shown } = createCountUp(() => props.score, {
     initial: () => props.score - props.roundPoints,
   });
 

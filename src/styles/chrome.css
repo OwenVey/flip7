@@ -3,6 +3,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem max(1rem, calc((100% - 70rem) / 2));
+  /* Installed on iOS, the rail runs up under the status bar and its blur band, so the blur shows only wood and the controls start below it. */
+  margin-block-start: calc(-1 * var(--safe-top));
+  padding-block-start: calc(0.75rem + var(--safe-top));
   border-bottom: 2px solid var(--rail-edge);
   background:
     repeating-linear-gradient(
@@ -449,7 +452,7 @@ main {
 
 .connection-banner:not(:empty) {
   position: sticky;
-  top: 0.5rem;
+  top: var(--sticky-top);
   z-index: 3;
   display: block;
   margin-bottom: 1rem;

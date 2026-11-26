@@ -1,7 +1,7 @@
 import ArrowRight from "@lucide/solid/icons/arrow-right";
 import Plus from "@lucide/solid/icons/plus";
 import { Title } from "@solidjs/meta";
-import { useNavigate } from "@solidjs/router";
+import { useNavigate, useSearchParams } from "@solidjs/router";
 import { Button } from "@ui-sdk/solid/button";
 import { Field, FieldError, FieldLabel } from "@ui-sdk/solid/field";
 import {
@@ -10,9 +10,10 @@ import {
   OTPInputGroup,
   OTPInputSlot,
 } from "@ui-sdk/solid/otp-input";
-import { createSignal, For, Repeat } from "solid-js";
+import { createSignal, For, onSettled, Repeat } from "solid-js";
 
 import HomeGuide from "../components/home-guide";
+import InstallApp from "../components/install-app";
 import PageMeta, {
   SITE_DESCRIPTION,
   SITE_NAME,
@@ -22,6 +23,7 @@ import PlayingCard from "../components/playing-card";
 import RecentRooms from "../components/recent-rooms";
 import type { Card } from "../game/cards";
 import { CODE_ALPHABET, CODE_LENGTH, normalizeCode } from "../game/protocol";
+import { SHORTCUT_ACTIONS } from "../lib/home-shortcuts";
 import { createRoom, roomExists } from "../lib/room-functions";
 import { codeFromRoomLink } from "../lib/room-link";
 import { paths } from "../router";
@@ -117,6 +119,30 @@ export default function Home() {
       setPending(null);
     }
   };
+
+  const [searchParams, setSearchParams] = useSearchParams<{
+    action?: string;
+  }>();
+
+  // WARNING: the home screen shortcuts open /?action=create or /?action=join; act once, then drop it so a reload doesn't repeat it.
+  onSettled(() => {
+    const { action } = searchParams;
+
+    if (action === undefined) {
+      return;
+    }
+
+    if (action === SHORTCUT_ACTIONS.create) {
+      void handleCreateRoom();
+    } else if (action === SHORTCUT_ACTIONS.join) {
+      // WARNING: the code input binds to its controller after this page settles, so wait a frame to focus it.
+      requestAnimationFrame(() => {
+        codeInput.focus();
+      });
+    }
+
+    setSearchParams({ action: undefined }, { replace: true });
+  });
 
   const handleCodePaste = (event: ClipboardEvent) => {
     if (pending() !== null) {
@@ -224,6 +250,7 @@ export default function Home() {
             </Button>
           </form>
           <RecentRooms />
+          <InstallApp />
         </section>
         <HomeGuide />
       </div>

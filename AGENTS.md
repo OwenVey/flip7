@@ -16,6 +16,7 @@ Use the [README](README.md) for setup, game rules, and deployment. Before explor
 | Lobby, table, and deal playback | `src/routes/room/[code].tsx`, `src/components/table.tsx`, `src/lib/room-table.ts` (feeds confirmed Room updates to Deal playback and the Move alert; its tests cover them together), `src/lib/deal-playback.ts` (pacing), `src/lib/deal-beats.ts` (what each Room update shows, sounds and vibrates), `src/lib/deal-plan.ts` |
 | Move alert and Chat & Log | `src/lib/move-alert.ts`, `src/lib/room-chat-log.ts` |
 | What the action bar says and offers (Table prompt) | `src/lib/table-prompt.ts`, `src/components/action-bar.tsx` |
+| Installable app (PWA): service worker, manifest, icons, offline page | `pwa.config.ts` (vite-plugin-pwa; icons and iOS startup images are generated from `src/assets/favicon.svg`), `public/offline.html` (self-contained; `src/styles/theme-color.test.ts` keeps its colors in step with the tokens), `src/document.tsx` (renders the generated links from `virtual:pwa-assets/head`, since there is no `index.html`), `src/lib/install-prompt.ts`, `src/lib/wake-lock.ts`, `src/lib/app-badge.ts`, `src/lib/home-shortcuts.ts` |
 | Styles | `src/styles/index.css` imports the area files in cascade order. `src/styles/tokens.css` defines the shared tokens; a variable one area reads stays in that file. `src/app.css` holds only `@layer ui-sdk;` |
 
 ## Room and game changes

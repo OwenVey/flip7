@@ -1,8 +1,15 @@
 import { HydrationScript } from "@solidjs/web";
 import { preloads } from "fontless/runtime";
+import { For } from "solid-js";
 import type { ParentProps } from "solid-js";
+import { pwaAssetsHead } from "virtual:pwa-assets/head";
 
 import faviconUrl from "./assets/favicon.svg?url";
+
+// WARNING: the generator links a /favicon.svg that is never emitted; faviconUrl is the real one.
+const GENERATED_LINKS = pwaAssetsHead.links.filter(
+  (link) => link.type !== "image/svg+xml"
+);
 
 export default function Document(props: ParentProps) {
   return (
@@ -15,9 +22,24 @@ export default function Document(props: ParentProps) {
         />
         <meta name="color-scheme" content="light" />
         <meta name="theme-color" content="#0e3a2c" />
-        <link rel="icon" href="/favicon.ico" sizes="32x32" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Flip 7" />
+        <meta
+          name="apple-mobile-web-app-status-bar-style"
+          content="black-translucent"
+        />
+        <For each={GENERATED_LINKS}>
+          {(link) => (
+            <link
+              rel={link.rel}
+              href={link.href}
+              media={link.media}
+              sizes={link.sizes}
+              type={link.type}
+            />
+          )}
+        </For>
         <link rel="icon" type="image/svg+xml" href={faviconUrl} />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/site.webmanifest" />
         {preloads.map((attributes) => (
           <link

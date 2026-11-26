@@ -12,13 +12,14 @@ import { flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import Home from ".";
+import { INSTALL_DISMISSED_KEY } from "../lib/install-prompt";
 import { rememberRoom, tokenKey } from "../lib/recent-rooms";
 
 const rpcResponse = (value: boolean | string) =>
   Response.json(value, { headers: { "X-Server-Function-Format": "8" } });
 
-const renderHome = () => {
-  const history = memoryHistory("/");
+const renderHome = (path = "/") => {
+  const history = memoryHistory(path);
 
   const Router = createRouter({
     history,
@@ -40,6 +41,7 @@ describe(Home, () => {
     cleanup();
     localStorage.clear();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     configureServerFunctionsClient({ fetch: null });
   });
 
@@ -211,5 +213,55 @@ describe(Home, () => {
     await waitFor(() => {
       expect(history.get()).toBe("/room/ABCDE");
     });
+  });
+
+  it("focuses the room code from the Join room home screen shortcut", async () => {
+    const history = renderHome("/?action=join");
+    const code = screen.getByRole("textbox", { name: "Room code" });
+
+    await waitFor(() => {
+      expect(code).toHaveFocus();
+    });
+    expect(history.get()).toBe("/");
+  });
+
+  it("creates a room from the New room home screen shortcut", async () => {
+    configureServerFunctionsClient({ fetch: () => rpcResponse("ABCDE") });
+    const history = renderHome("/?action=create");
+
+    await waitFor(() => {
+      expect(history.get()).toBe("/room/ABCDE");
+    });
+  });
+
+  it("shows iOS install steps until they are dismissed", async () => {
+    // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom reports a desktop user agent; the iOS steps need an iPhone.
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1"
+    );
+    renderHome();
+
+    const offer = await screen.findByRole("complementary", {
+      name: "Install Flip 7",
+    });
+
+    expect(offer).toHaveTextContent("Add to Home Screen");
+
+    screen.getByRole("button", { name: "Don't show again" }).click();
+    flush();
+
+    expect(
+      screen.queryByRole("complementary", { name: "Install Flip 7" })
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem(INSTALL_DISMISSED_KEY)).toBe("true");
+  });
+
+  it("offers no install steps on a desktop browser without a prompt", () => {
+    renderHome();
+    flush();
+
+    expect(
+      screen.queryByRole("complementary", { name: "Install Flip 7" })
+    ).not.toBeInTheDocument();
   });
 });

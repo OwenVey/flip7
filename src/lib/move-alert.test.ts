@@ -223,6 +223,32 @@ describe(createMoveAlert, () => {
     expect(icon()).toBe(siteIcon);
   });
 
+  it("badges the installed app's icon only while the move waits in a hidden app", async () => {
+    const badge: string[] = [];
+
+    const record = (entry: string) => async () => {
+      badge.push(entry);
+      await Promise.resolve();
+    };
+
+    Object.assign(navigator, {
+      clearAppBadge: record("clear"),
+      setAppBadge: record("set"),
+    });
+    const alert = setup(true);
+
+    alert.setHidden(true);
+    alert.setHidden(false);
+    alert.setHidden(true);
+    alert.setAlerting(false);
+    alert.dispose();
+    await Promise.resolve();
+
+    expect(badge).toStrictEqual(["set", "clear", "set", "clear"]);
+    Reflect.deleteProperty(navigator, "setAppBadge");
+    Reflect.deleteProperty(navigator, "clearAppBadge");
+  });
+
   it("does nothing to a page without an SVG icon", () => {
     document.head.innerHTML = "";
 

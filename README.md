@@ -55,6 +55,10 @@ Use **Add reaction** or tap an existing emoji count on a message in **Chat & Log
 
 On mobile browsers that support vibration, haptics are on by default. Feel taps on game controls, move alerts, and outcomes at your seat such as a bust, a Second Chance save, or a Flip 7. Open **Audio and haptics** to turn them off independently of sound. Your browser remembers the setting across rooms.
 
+### Install as an app
+
+Flip 7 installs to your home screen or desktop. On Android and desktop Chrome or Edge, choose **Install** under Play on the home page, or use the browser's install button. On iPhone and iPad, tap **Share**, then **Add to Home Screen**. The installed app opens full screen, keeps the screen awake during a game, and puts a dot on its icon when it's your move while you're in another app (where the system supports badges). Long-press the icon for **New room** and **Join room** shortcuts. Without a connection, it opens to an offline screen that reloads when you're back online.
+
 ### Rejoining and offline players
 
 The browser remembers your display name and room identity. Refreshing or reopening the link in the same browser profile returns you to the same player while that player is still in the room. Use **Leave** to give up your place at any time, even mid-deal.
@@ -99,7 +103,7 @@ pnpm exec cf auth login
 pnpm deploy
 ```
 
-[cloudflare.config.ts](cloudflare.config.ts) defines the Worker and its `GAME_ROOM` binding. The deployment script builds to `.cloudflare/output/v1` and deploys that prebuilt output.
+[cloudflare.config.ts](cloudflare.config.ts) defines the Worker and its `GAME_ROOM` binding. [pwa.config.ts](pwa.config.ts) configures the service worker, web app manifest, and the icons and iOS startup images generated from `src/assets/favicon.svg` at build time. The deployment script builds to `.cloudflare/output/v1` and deploys that prebuilt output.
 
 ## Contributing
 
