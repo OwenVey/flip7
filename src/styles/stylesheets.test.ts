@@ -16,7 +16,7 @@ const stylesIndex = path.resolve(import.meta.dirname, "index.css");
 const tokensCss = path.resolve(import.meta.dirname, "tokens.css");
 
 const weightsSetPerFamily = {
-  "Big Shoulders Display Variable": [400, 900],
+  "Big Shoulders Display Variable": [400, 600, 900],
   Bungee: [400],
   "Inter Variable": [400, 600, 700, 800],
 };
@@ -129,5 +129,24 @@ describe("font faces", () => {
     for (const family of Object.keys(weightsSetPerFamily)) {
       expect(code).toContain(`"${family}", "${family} Fallback: `);
     }
+  });
+
+  it("omits local() fallbacks on primary faces and Bungee as a numeral fallback", async () => {
+    const code = (await transform(tokensCss)) ?? "";
+    const blocks = code.match(/@font-face\s*\{[^}]*\}/gu) ?? [];
+
+    const primaryBlocks = blocks.filter(
+      (block) => !block.includes(" Fallback: ")
+    );
+
+    expect(primaryBlocks.length).toBeGreaterThan(0);
+
+    for (const block of primaryBlocks) {
+      expect(block).not.toContain("local(");
+    }
+
+    expect(code).not.toContain(
+      "Big Shoulders Display Variable Fallback: Bungee"
+    );
   });
 });
