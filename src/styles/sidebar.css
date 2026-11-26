@@ -442,11 +442,11 @@
     display: flex;
     flex-direction: column;
     position: sticky;
-    inset-block-start: 0.5rem;
+    inset-block-start: var(--sticky-top);
     align-self: start;
     /* Let the table rows set the available height without the sidebar growing them. */
     contain: size;
-    block-size: min(100%, calc(100dvh - 9rem));
+    block-size: min(100%, calc(100dvh - 9rem - var(--safe-top)));
 
     & > .panel {
       gap: 0.625rem;

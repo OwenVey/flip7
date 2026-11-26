@@ -33,6 +33,7 @@ import { createRoomHaptics } from "../../lib/room-haptics";
 import { createRoomSounds } from "../../lib/room-sounds";
 import { createRoomTable, createRoomTablePage } from "../../lib/room-table";
 import { resultsRound } from "../../lib/table-prompt";
+import { createWakeLock } from "../../lib/wake-lock";
 import { paths } from "../../router";
 
 const Room = (props: { code: string }) => {
@@ -58,6 +59,13 @@ const Room = (props: { code: string }) => {
   });
 
   const { view: table } = roomTable;
+
+  createWakeLock(() => {
+    const phase = connection.room()?.phase;
+    const atTable = connection.playerId() !== null || connection.watching();
+
+    return atTable && (phase === "playing" || phase === "roundOver");
+  });
 
   const toast = createToaster();
 

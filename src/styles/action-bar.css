@@ -1,7 +1,7 @@
 .action-bar {
   position: sticky;
   container: action-bar / inline-size;
-  top: 0.5rem;
+  top: var(--sticky-top);
   z-index: 1;
   display: grid;
   /* One fixed height for every phase: two headline lines or one row of 2.75rem buttons. */

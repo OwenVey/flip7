@@ -2,9 +2,11 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import solid from "@solidjs/vite-plugin";
 import { fileRoutes } from "filesystem-routing/vite";
 import { fontless } from "fontless";
+import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vitest/config";
 
 import { fontlessOptions } from "./fonts.config.ts";
+import { pwaOptions } from "./pwa.config.ts";
 
 export default defineConfig({
   plugins: [
@@ -18,6 +20,7 @@ export default defineConfig({
     }),
     fileRoutes({ types: true }),
     fontless(fontlessOptions),
+    VitePWA(pwaOptions),
   ],
   css: {
     transformer: "lightningcss",

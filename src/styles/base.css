@@ -39,7 +39,8 @@ body {
   position: relative;
   isolation: isolate;
   margin: 0;
-  /* The page runs edge to edge under Safari's bars (viewport-fit=cover), so keep content clear of the notch when sideways. */
+  /* The page runs edge to edge under Safari's bars (viewport-fit=cover) and, installed on iOS, under the translucent status bar, so keep content clear of the notch and the clock. */
+  padding-block-start: var(--safe-top);
   padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
   min-height: 100dvh;
   background-color: var(--felt-deep);

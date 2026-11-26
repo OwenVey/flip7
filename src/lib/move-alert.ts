@@ -9,6 +9,7 @@ import {
 import plainSvg from "../assets/favicon.svg?raw";
 import siteIcon from "../assets/favicon.svg?url";
 import type { RoomView } from "../game/protocol";
+import { clearAppBadge, showAppBadge } from "./app-badge";
 import { yourMove } from "./table-prompt";
 
 const MOVE_ALERT_TITLE = "⚡ Your move!";
@@ -40,6 +41,12 @@ const setSvgIcon = (href: string) => {
   if (icon && icon.getAttribute("href") !== href) {
     icon.setAttribute("href", href);
   }
+};
+
+const showBadge = () => {
+  showAppBadge();
+
+  return clearAppBadge;
 };
 
 const createTabAlert = (
@@ -79,6 +86,8 @@ const createTabAlert = (
   });
 
   createEffect(() => ICONS[blink()], setSvgIcon);
+
+  createEffect(blinking, (on) => (on ? showBadge() : undefined));
 
   onSettled(() => () => {
     setSvgIcon(SITE_ICON);
@@ -143,7 +152,8 @@ const carriesOn = (previous: MoveSeen, next: MoveSeen) =>
  * right after your own hit carries the same Move on), vibrates only for a Move
  * that arrived live in a visible tab, and nudges the action bar. On the
  * browser tab, the icon gets a dot, and in a hidden tab the title and dot
- * blink so the tab stands out. Returns whether the alert is on and the page
+ * blink so the tab stands out; an installed app also gets a dot on its icon
+ * while hidden. Returns whether the alert is on and the page
  * title to use.
  */
 export const createMoveAlert = (options: MoveAlertOptions) => {
