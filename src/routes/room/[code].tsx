@@ -74,16 +74,7 @@ const Room = (props: { code: string }) => {
       flush();
       openTable(view.room?.phase ?? null);
     },
-    (cue, audible = true) => {
-      if (audible) {
-        sounds.play(cue);
-      }
-
-      if (cue === "turn") {
-        nudge(roomPage?.querySelector("[data-action-bar]") ?? null);
-        revealOwnSeat(roomPage);
-      }
-    },
+    sounds.play,
     haptics.play
   );
 
@@ -124,18 +115,33 @@ const Room = (props: { code: string }) => {
   const unavailable = () =>
     !connection.online() || connection.status() !== "open";
 
-  const titlePrefix = () => {
-    if (table().myMove) {
-      return "Your move · ";
-    }
+  const moveAlert = createMoveAlert({
+    play: {
+      haptic: () => {
+        haptics.play("turn");
+      },
+      nudge: () => {
+        nudge(roomPage?.querySelector("[data-action-bar]") ?? null);
+        revealOwnSeat(roomPage);
+      },
+      sound: () => {
+        sounds.play("turn");
+      },
+    },
+    playerId: connection.playerId,
+    room: connection.room,
+    syncId: connection.syncId,
+    title: () => {
+      let prefix = connection.watching() ? "Watching · " : "";
 
-    return connection.watching() ? "Watching · " : "";
-  };
+      if (moveAlert.alerting()) {
+        prefix = "Your move · ";
+      }
 
-  const pageTitle = createMoveAlert(
-    () => table().myMove,
-    () => `${titlePrefix()}Room ${props.code} · Flip 7`
-  );
+      return `${prefix}Room ${props.code} · Flip 7`;
+    },
+    view: table,
+  });
 
   const spectator = () => ({
     join: {
@@ -184,7 +190,7 @@ const Room = (props: { code: string }) => {
   );
 
   const syncVisibility = () => {
-    playback.syncMotion(document.visibilityState === "visible");
+    playback.syncMotion();
   };
 
   onSettled(() => {
@@ -233,7 +239,7 @@ const Room = (props: { code: string }) => {
 
   return (
     <>
-      <Title>{pageTitle()}</Title>
+      <Title>{moveAlert.title()}</Title>
       <PageMeta
         title={`Join room ${props.code} · Flip 7`}
         description={`You're invited to a game of Flip 7. Open the link to join room ${props.code}, pick a name and play. No accounts needed.`}

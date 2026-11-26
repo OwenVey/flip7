@@ -1,5 +1,6 @@
 /* oxlint-disable eslint/no-await-in-loop -- Room updates reach playback one at a time, in order. */
 
+import { createRoot, createSignal, flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -25,8 +26,10 @@ import type { ListSeqs, RoomView, StateMessage } from "../game/protocol";
 import type { DealStep } from "./deal-plan";
 import { createDealPlayback, initialDealPlayback } from "./deal-playback";
 import type { DealMotion } from "./deal-playback";
+import { createMoveAlert } from "./move-alert";
 import type { RoomCue } from "./room-cues";
-import type { HapticOutcome } from "./room-haptic-cues";
+import { turnYieldsToOutcome } from "./room-haptics";
+import type { RoomHapticCue } from "./room-haptics";
 
 const random = () => 0.5;
 const freeze = { id: 1003, kind: "freeze" } as const;
@@ -74,11 +77,11 @@ const playback = (
   playerId = "a",
   delays: { landMs?: number; reshuffleMs?: number } = {}
 ) => {
-  let shown = initialDealPlayback;
+  let shown = { ...initialDealPlayback, myMove: false };
   let motionEnabled = animate;
   let reshuffles = 0;
   const cues: RoomCue[] = [];
-  const haptics: (HapticOutcome | "turn")[] = [];
+  const haptics: RoomHapticCue[] = [];
   const readinessAtTurnCue: boolean[] = [];
   const flights: { cardId: number; duration: number }[] = [];
   const lands: number[] = [];
@@ -102,23 +105,53 @@ const playback = (
     sweep: async () => {},
   };
 
+  const [table, setTable] = createSignal(initialDealPlayback);
+
+  const [confirmed, setConfirmed] = createSignal<{
+    room: RoomView | null;
+    syncId: number;
+  }>({ room: null, syncId: 0 });
+
+  const [tabHidden, setTabHidden] = createSignal(false);
+
+  const playHaptic = turnYieldsToOutcome((cue) => {
+    haptics.push(cue);
+  });
+
+  const alert = createRoot(() =>
+    createMoveAlert({
+      play: {
+        haptic: () => {
+          playHaptic("turn");
+        },
+        nudge: () => {
+          readinessAtTurnCue.push(alert.alerting() && !shown.actionsDisabled);
+        },
+        sound: () => {
+          cues.push("turn");
+        },
+      },
+      playerId: () => playerId,
+      room: () => confirmed().room,
+      syncId: () => confirmed().syncId,
+      tabHidden,
+      title: () => "",
+      view: table,
+    })
+  );
+
   const instance = createDealPlayback(
     motion,
     (frame) => {
-      shown = frame;
-    },
-    (cue, audible = true) => {
-      if (audible) {
-        cues.push(cue);
-      }
-
-      if (cue === "turn") {
-        readinessAtTurnCue.push(shown.myMove && !shown.actionsDisabled);
-      }
+      shown = { ...frame, myMove: false };
+      setTable(frame);
+      flush();
+      shown = { ...frame, myMove: alert.alerting() };
     },
     (cue) => {
-      haptics.push(cue);
-    }
+      cues.push(cue);
+    },
+    playHaptic
   );
 
   return {
@@ -133,7 +166,7 @@ const playback = (
     },
     setMotion: (enabled: boolean) => {
       motionEnabled = enabled;
-      instance.syncMotion(true);
+      instance.syncMotion();
     },
     show: (
       room: RoomView,
@@ -141,6 +174,9 @@ const playback = (
       syncId = 1,
       hapticsVisible = true
     ) => {
+      setConfirmed({ room, syncId });
+      setTabHidden(!hapticsVisible);
+      flush();
       instance.update({ canAct, hapticsVisible, playerId, room, syncId });
     },
     steps,
@@ -777,7 +813,10 @@ describe(createDealPlayback, () => {
     table.update(null);
     await vi.runAllTimersAsync();
 
-    expect(table.shown).toStrictEqual(initialDealPlayback);
+    expect(table.shown).toStrictEqual({
+      ...initialDealPlayback,
+      myMove: false,
+    });
     expect(table.flights).toStrictEqual([]);
     expect(table.cues).toStrictEqual([]);
   });
