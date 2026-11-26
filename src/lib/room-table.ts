@@ -4,7 +4,6 @@ import {
   createSignal,
   flush,
   onSettled,
-  untrack,
 } from "solid-js";
 
 import type { RoomView } from "../game/protocol";
@@ -35,6 +34,7 @@ export interface RoomTablePage {
   motion: DealMotion;
   /** True while the browser tab is hidden. Reactive. */
   tabHidden: () => boolean;
+  isVisibleNow: () => boolean;
   /** Calls `listener` whenever `motion.allowed()` may have changed. Returns an unsubscribe. */
   onMotionChange: (listener: () => void) => () => void;
   /** Runs right after each frame renders, before the deal measures where its cards fly. */
@@ -73,6 +73,7 @@ const createTabHidden = () => {
 /** The Room table's page in the browser: the room page element and its tab. */
 export const createRoomTablePage = (root: () => HTMLElement | undefined) =>
   ({
+    isVisibleNow: () => document.visibilityState === "visible",
     motion: createDealMotion(root),
     nudge: () => {
       const page = root();
@@ -99,9 +100,8 @@ export const createRoomTablePage = (root: () => HTMLElement | undefined) =>
  * to Deal playback once the viewer is seated or watching, renders each frame
  * before the next card measures its flight, and catches playback up when the
  * tab hides or the viewer asks for less motion. The Move alert follows the
- * confirmed room and fires once playback shows the Move. Both read the same
- * tab visibility, so only a Move or outcome that arrived live in a visible tab
- * vibrates.
+ * confirmed room and fires once playback shows the Move. Deal playback samples
+ * visibility directly so a pending visibilitychange cannot misclassify an outcome.
  *
  * Returns the playback `view`, the `shown` room and seat (null while there's
  * no table to show), whether the Move alert is on, and the page title.
@@ -143,7 +143,7 @@ export const createRoomTable = (options: RoomTableOptions) => {
       queueMicrotask(() => {
         if (!disposed) {
           playback.update(
-            next && { ...next, hapticsVisible: !untrack(page.tabHidden) }
+            next && { ...next, hapticsVisible: page.isVisibleNow() }
           );
         }
       });

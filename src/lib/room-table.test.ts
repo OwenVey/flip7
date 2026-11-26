@@ -92,6 +92,7 @@ const playback = (
   }>({ canAct: false, room: null, syncId: 0 });
 
   const [tabHidden, setTabHidden] = createSignal(false);
+  let visibleNow = true;
   let motionChanged: (() => void) | null = null;
 
   const playHaptic = turnYieldsToOutcome((cue) => {
@@ -99,6 +100,7 @@ const playback = (
   });
 
   const page: RoomTablePage = {
+    isVisibleNow: () => visibleNow,
     motion,
     nudge: () => {
       readinessAtTurnCue.push(
@@ -162,9 +164,11 @@ const playback = (
       room: RoomView,
       canAct = true,
       syncId = 1,
-      hapticsVisible = true
+      hapticsVisible = true,
+      reportedVisible = hapticsVisible
     ) => {
-      setTabHidden(!hapticsVisible);
+      visibleNow = hapticsVisible;
+      setTabHidden(!reportedVisible);
       setConfirmed({ canAct, room, syncId });
       flush();
       await Promise.resolve();
@@ -280,7 +284,7 @@ describe(createRoomTable, () => {
     });
   });
 
-  it("celebrates once when the same Flip 7 also wins the game", async () => {
+  it("celebrates a winning Flip 7 once even when reported visibility lags", async () => {
     const game = gameAtFirstTurn();
     const [player] = game.players;
 
@@ -301,7 +305,7 @@ describe(createRoomTable, () => {
     await otherTable.show(view(game));
     game.deck = [number];
     hit(game, "a", random);
-    await table.show(view(game));
+    await table.show(view(game), true, 1, true, false);
     await otherTable.show(view(game));
 
     expect(table.shown.room?.winnerIds).toStrictEqual(["a"]);
