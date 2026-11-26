@@ -52,6 +52,19 @@ export interface CardBeat {
   settle: MomentSettle | null;
 }
 
+/** The sounds played and the vibration felt as one beat shows. */
+export interface BeatFeedback {
+  cues: RoomCue[];
+  /** For the viewer; playback drops it when the update didn't arrive live. */
+  haptic: HapticOutcome | null;
+}
+
+/** The moment held after the last card, before the room settles. */
+export interface SettleBeat extends BeatFeedback {
+  moment: PlaybackMoment;
+  duration: number;
+}
+
 /** Everything Deal playback shows for one Room update, in order. */
 export interface DealBeats {
   newRound: boolean;
@@ -59,17 +72,9 @@ export interface DealBeats {
   reshuffle: boolean;
   cards: CardBeat[];
   /** The moment held after the last card, or null to go straight to the room. */
-  settle: MomentSettle | null;
-  /** Played with the trailing moment. */
-  settleCues: RoomCue[];
-  /** Played as the room settles, when no moment holds. */
-  cues: RoomCue[];
-  /** Played as the room settles after a trailing moment: the game's win or loss. */
-  finale: "win" | "lose" | null;
-  /** Felt as the room settles, for the viewer. */
-  outcome: HapticOutcome | null;
-  /** Felt with the trailing moment instead, unless the viewer's Flip 7 already won it. */
-  outcomeWithSettle: boolean;
+  settle: SettleBeat | null;
+  /** As the room settles: after the trailing moment, or straight after the cards. */
+  end: BeatFeedback;
   /** Someone else is choosing who gets a dealt action card, so the table holds on it. */
   holdsOtherChoice: boolean;
 }
@@ -392,6 +397,39 @@ const cardBeat = (
   } satisfies CardBeat;
 };
 
+const celebratesAtEnd = (
+  settle: MomentSettle,
+  finale: "win" | "lose" | null,
+  outcome: HapticOutcome | null,
+  viewerId: string | null
+) =>
+  finale !== null &&
+  outcome === "celebrate" &&
+  !(settle.moment.kind === "flipSeven" && settle.moment.playerId === viewerId);
+
+const endFeedback = ({
+  cues,
+  finale,
+  outcome,
+  settle,
+  viewerId,
+}: {
+  cues: RoomCue[];
+  finale: "win" | "lose" | null;
+  outcome: HapticOutcome | null;
+  settle: MomentSettle | null;
+  viewerId: string | null;
+}) => {
+  if (settle === null) {
+    return { cues, haptic: outcome } satisfies BeatFeedback;
+  }
+
+  return {
+    cues: finale ? [finale] : [],
+    haptic: celebratesAtEnd(settle, finale, outcome, viewerId) ? outcome : null,
+  } satisfies BeatFeedback;
+};
+
 /**
  * Reads one Room update into what Deal playback shows the viewer, in order:
  * each dealt card with its sounds, vibrations and any moment it settles, then
@@ -400,6 +438,8 @@ const cardBeat = (
  * card plays it as it lands or the room plays it at the end. With `animate`
  * off no cards fly, so the room's sounds all play as it settles. Vibrations
  * are for `viewerId`; playback drops them when the update didn't arrive live.
+ * A game the viewer wins celebrates as the room settles, unless the trailing
+ * moment is their own Flip 7, which celebrates it there.
  */
 export const readTransition = (
   previous: RoomView,
@@ -435,33 +475,32 @@ export const readTransition = (
       ? null
       : settledHaptic(previous, current, viewerId, steps);
 
-  const viewerFlippedSeven =
-    settle?.moment.kind === "flipSeven" && settle.moment.playerId === viewerId;
-
   const beats: DealBeats = {
     cards,
-    cues:
-      settle === null
-        ? roomCues(previous, current, viewerId).filter(
-            (sound) => !cueAlreadyPlayed(sound, tally, hasSteps)
-          )
-        : [],
-    finale: settle === null ? null : finale,
+    end: endFeedback({
+      cues: roomCues(previous, current, viewerId).filter(
+        (sound) => !cueAlreadyPlayed(sound, tally, hasSteps)
+      ),
+      finale,
+      outcome,
+      settle,
+      viewerId,
+    }),
     holdsOtherChoice:
       animate &&
       current.choice !== null &&
       steps.some((step) => step.to.kind === "choice") &&
       availableMoves(current, viewerId).choice === null,
     newRound: roundStarted(previous, current),
-    outcome,
-    outcomeWithSettle: !(
-      finale !== null &&
-      outcome === "celebrate" &&
-      !viewerFlippedSeven
-    ),
     reshuffle,
-    settle,
-    settleCues: [...(settle?.cue ? [settle.cue] : []), ...(chat ? [chat] : [])],
+    settle: settle && {
+      cues: [...(settle.cue ? [settle.cue] : []), ...(chat ? [chat] : [])],
+      duration: settle.duration,
+      haptic: celebratesAtEnd(settle, finale, outcome, viewerId)
+        ? null
+        : outcome,
+      moment: settle.moment,
+    },
   };
 
   return beats;

@@ -495,28 +495,21 @@ export const createDealPlayback = (
           return;
         }
 
-        outcome = felt(item, beats.outcome);
-        sounds = beats.cues;
+        const { end, settle } = beats;
+        outcome = felt(item, end.haptic);
+        sounds = end.cues;
 
-        if (beats.settle) {
+        if (settle) {
           show(
-            {
-              dealing: true,
-              moment: beats.settle.moment,
-              room: current,
-              step: null,
-            },
-            beats.settleCues,
-            beats.outcomeWithSettle ? outcome : null
+            { dealing: true, moment: settle.moment, room: current, step: null },
+            settle.cues,
+            felt(item, settle.haptic)
           );
-          await waitForPause(beats.settle.duration, signal, "effect");
+          await waitForPause(settle.duration, signal, "effect");
 
           if (signal.aborted) {
             return;
           }
-
-          outcome = beats.outcomeWithSettle ? null : outcome;
-          sounds = beats.finale ? [beats.finale] : [];
         }
 
         if (beats.holdsOtherChoice) {

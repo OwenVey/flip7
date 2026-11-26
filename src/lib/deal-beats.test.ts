@@ -19,7 +19,8 @@ const cardsOf = (beats: ReturnType<typeof readTransition>) =>
 
 const felt = (beats: ReturnType<typeof readTransition>) => [
   ...beats.cards.map(({ landHaptic }) => landHaptic),
-  beats.outcome,
+  beats.settle?.haptic ?? null,
+  beats.end.haptic,
 ];
 
 describe(readTransition, () => {
@@ -34,10 +35,10 @@ describe(readTransition, () => {
 
     expect({
       cards: cardsOf(beats),
-      cues: beats.cues,
+      end: beats.end,
       flipHaptic: beats.cards[1]?.flipHaptic,
       settle: beats.settle?.moment,
-      settleCues: beats.settleCues,
+      settleCues: beats.settle?.cues,
     }).toStrictEqual({
       cards: [
         {
@@ -62,7 +63,7 @@ describe(readTransition, () => {
           settle: null,
         },
       ],
-      cues: [],
+      end: { cues: [], haptic: null },
       flipHaptic: "flipThree",
       settle: { kind: "bust", playerId: "a" },
       settleCues: ["bust"],
@@ -80,13 +81,11 @@ describe(readTransition, () => {
 
     expect({
       cards: beats.cards,
-      cues: beats.cues,
-      outcome: beats.outcome,
+      end: beats.end,
       settle: beats.settle,
     }).toStrictEqual({
       cards: [],
-      cues: ["bust"],
-      outcome: "bust",
+      end: { cues: ["bust"], haptic: "bust" },
       settle: null,
     });
   });
@@ -103,8 +102,8 @@ describe(readTransition, () => {
     const ada = readTransition(before, after, "a", true);
 
     expect({ ada: felt(ada), ben: felt(ben) }).toStrictEqual({
-      ada: [null, null],
-      ben: ["freeze", null],
+      ada: [null, null, null],
+      ben: ["freeze", null, null],
     });
     expect(ben.settle?.moment).toStrictEqual({
       byId: "a",
@@ -171,16 +170,15 @@ describe(readTransition, () => {
     const watcher = readTransition(before, after, null, true);
 
     expect({
-      watcher: [watcher.outcome, watcher.finale],
-      winner: [
-        winner.settle?.moment,
-        winner.outcome,
-        winner.outcomeWithSettle,
-        winner.finale,
-      ],
+      watcher: [watcher.settle?.haptic, watcher.end],
+      winner: [winner.settle?.moment, winner.settle?.haptic, winner.end],
     }).toStrictEqual({
-      watcher: [null, "win"],
-      winner: [{ kind: "flipSeven", playerId: "a" }, "celebrate", true, "win"],
+      watcher: [null, { cues: ["win"], haptic: null }],
+      winner: [
+        { kind: "flipSeven", playerId: "a" },
+        "celebrate",
+        { cues: ["win"], haptic: null },
+      ],
     });
   });
 
@@ -194,7 +192,7 @@ describe(readTransition, () => {
     expect({
       cards: beats.cards,
       settle: beats.settle?.moment,
-      settleCues: beats.settleCues,
+      settleCues: beats.settle?.cues,
     }).toStrictEqual({
       cards: [],
       settle: { kind: "stay", playerId: "a", points: 5 },
