@@ -92,8 +92,7 @@
   /* ── Type ──────────────────────────────────────────────────────────── */
 
   --font-display: "Bungee", ui-sans-serif, system-ui, sans-serif;
-  --font-numeral:
-    "Big Shoulders Display Variable", "Bungee", ui-sans-serif, sans-serif;
+  --font-numeral: "Big Shoulders Display Variable", ui-sans-serif, sans-serif;
   --font-body: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
 
   /*
