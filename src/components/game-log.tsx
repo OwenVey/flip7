@@ -419,7 +419,8 @@ const LogRound = (props: {
   now: number;
   onUnfold: () => void;
   chatLog: RoomChatLog;
-  picker: Signal<number | null>;
+  openPicker: number | null;
+  setOpenPicker: (messageId: number | null) => void;
 }) => {
   const spotlight = useContext(SpotlightContext);
   const [chosen, setChosen] = createSignal<boolean>();
@@ -496,30 +497,12 @@ const LogRound = (props: {
                         now={props.now}
                       />
                       <ChatReactions
-                        counts={
-                          props.chatLog.reactions().reactionCounts[chat().id]
-                        }
-                        mine={props.chatLog.reactions().myReactions[chat().id]}
-                        send={
-                          props.chatLog.chat() &&
-                          (async (emoji) =>
-                            await (props.chatLog
-                              .chat()
-                              ?.react(chat().id, emoji) ??
-                              Promise.resolve(false)))
-                        }
-                        open={props.picker[0]() === chat().id}
-                        setOpen={(open) => {
-                          const { id } = chat();
-
-                          props.picker[1]((current) => {
-                            if (open) {
-                              return id;
-                            }
-
-                            return current === id ? null : current;
-                          });
-                        }}
+                        messageId={chat().id}
+                        reactions={props.chatLog.reactions()[chat().id]}
+                        playerId={props.playerId}
+                        chat={props.chatLog.chat()}
+                        openPicker={props.openPicker}
+                        setOpenPicker={props.setOpenPicker}
                       />
                     </>
                   )}
@@ -612,7 +595,7 @@ const typingLabel = (names: readonly string[]) => {
 export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
   const now = createPolled(Date.now, SECOND_MS);
   const reads = () => props.chatLog.reads;
-  const picker = createSignal<number | null>(null);
+  const [openPicker, setOpenPicker] = createSignal<number | null>(null);
 
   createEffect(
     () =>
@@ -620,7 +603,7 @@ export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
       (props.inSheet !== true || props.chatLog.sheetOpen()),
     (visible) => {
       if (!visible) {
-        picker[1](null);
+        setOpenPicker(null);
       }
     }
   );
@@ -793,7 +776,10 @@ export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
                           <LogRound
                             group={group()}
                             chatLog={props.chatLog}
-                            picker={picker}
+                            openPicker={openPicker()}
+                            setOpenPicker={(messageId) => {
+                              setOpenPicker(messageId);
+                            }}
                             continuations={continuations()}
                             collapsible={
                               reads().filter() !== "Chat" &&

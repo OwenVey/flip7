@@ -786,6 +786,30 @@ describe("playing again", () => {
   });
 });
 
+describe(reactToChat, () => {
+  it("keeps one reaction per player, replacing or removing it", () => {
+    const state = createGame();
+    addPlayer(state, "a", "Ana", 1);
+    addPlayer(state, "b", "Ben", 2);
+    chat(state, "a", "hello");
+    const messageId = state.logSeq;
+
+    const reactions = () =>
+      Object.fromEntries(state.chatReactions.get(messageId) ?? []);
+
+    reactToChat(state, "a", messageId, "👍");
+    reactToChat(state, "b", messageId, "👍");
+    reactToChat(state, "a", messageId, "🎉");
+
+    expect(reactions()).toStrictEqual({ a: "🎉", b: "👍" });
+
+    reactToChat(state, "a", messageId, null);
+    reactToChat(state, "b", messageId, null);
+
+    expect(state.chatReactions.has(messageId)).toBeFalsy();
+  });
+});
+
 describe(chat, () => {
   it("adds a player's message to the log with their name and avatar", () => {
     const state = createGame();

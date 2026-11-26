@@ -447,7 +447,7 @@ describe("the log through the room client", () => {
     vi.useRealTimers();
   });
 
-  it("updates totals in place and shares a player's selection with their other Seats", async () => {
+  it("updates reactions in place and treats a player's Seats as one reactor", async () => {
     const net = network();
     const ana = net.join("Ana");
     const ben = net.join("Ben");
@@ -468,12 +468,14 @@ describe("the log through the room client", () => {
     net.flush();
     await expect(first).resolves.toBeTruthy();
     expect(ben.client.state.room?.log).toBe(before);
+    const anaId = ana.client.state.playerId ?? "";
     expect(
-      [ben, spectator].map(({ client }) => client.state.room?.myReactions)
-    ).toStrictEqual([{}, {}]);
-    expect(otherSeat.client.state.room?.myReactions).toStrictEqual({
-      [messageId]: "👍",
-    });
+      [ben, spectator, otherSeat].map(
+        ({ client }) => client.state.room?.reactions
+      )
+    ).toStrictEqual(
+      Array.from({ length: 3 }, () => ({ [messageId]: { [anaId]: "👍" } }))
+    );
 
     const replacement = otherSeat.client.send({
       emoji: "❤️",
@@ -483,8 +485,8 @@ describe("the log through the room client", () => {
 
     net.flush();
     await replacement;
-    expect(spectator.client.state.room).toMatchObject({
-      reactionCounts: { [messageId]: { "❤️": 1 } },
+    expect(spectator.client.state.room?.reactions).toStrictEqual({
+      [messageId]: { [anaId]: "❤️" },
     });
   });
 
@@ -501,19 +503,24 @@ describe("the log through the room client", () => {
 
     net.drop(ana);
     await expect(
-      ana.client.send({ emoji: "🎉", messageId, type: "react" })
+      ana.client.send(
+        { emoji: "🎉", messageId, type: "react" },
+        { quiet: true }
+      )
     ).resolves.toBeFalsy();
     net.connect(ana);
     net.flush();
     expect(ana.client.state).toMatchObject({
       notice: null,
-      room: { myReactions: { [messageId]: "❤️" } },
+      room: {
+        reactions: { [messageId]: { [ana.client.state.playerId ?? ""]: "❤️" } },
+      },
     });
 
     const removal = ana.client.send({ emoji: null, messageId, type: "react" });
     net.flush();
     await expect(removal).resolves.toBeTruthy();
-    expect(ben.client.state.room?.reactionCounts).toStrictEqual({});
+    expect(ben.client.state.room?.reactions).toStrictEqual({});
   });
 
   it("adds each broadcast's new entries to the log it has", () => {

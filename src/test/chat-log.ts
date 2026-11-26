@@ -18,7 +18,7 @@ export const chatLogFor = (props: ChatLogTestProps) =>
     chat: props.chat,
     inSheet: createSheetTable(),
     log: () => props.room.log,
-    reactions: () => props.room,
+    reactions: () => props.room.reactions,
     playerId: () => props.playerId,
     players: () => props.room.players,
     resultsRound: () =>

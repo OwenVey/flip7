@@ -107,7 +107,7 @@ const StressPage = () => {
               chat,
               inSheet: createSheetTable(),
               log: () => current.room.log,
-              reactions: () => current.room,
+              reactions: () => current.room.reactions,
               playerId: () => current.playerId,
               players: () => current.room.players,
               resultsRound: () =>

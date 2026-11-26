@@ -7,7 +7,7 @@ import type { ChatControls } from "./room-connection";
 
 interface RoomChatLogSource {
   log: () => LogEntry[];
-  reactions: () => Pick<RoomView, "myReactions" | "reactionCounts">;
+  reactions: () => RoomView["reactions"];
   players: () => readonly LogPlayer[];
   playerId: () => string | null;
   chat: ChatControls;

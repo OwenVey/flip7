@@ -25,14 +25,14 @@ const GameLog = (props: {
   players: readonly LogPlayer[];
   typing: readonly string[];
   chat?: ChatControls;
-  reactions?: Pick<RoomView, "myReactions" | "reactionCounts">;
+  reactions?: RoomView["reactions"];
   round?: number;
 }) => {
   const chatLog = createRoomChatLog({
     chat: props.chat ?? chatControls(),
     inSheet: () => false,
     log: () => props.log,
-    reactions: () => props.reactions ?? { myReactions: {}, reactionCounts: {} },
+    reactions: () => props.reactions ?? {},
     playerId: () => props.playerId,
     players: () => props.players,
     resultsRound: () => null,
@@ -157,18 +157,13 @@ describe("<GameLog />", () => {
       text: "Nice!",
     } satisfies ChatEntry;
 
-    const counts = {
-      myReactions: { 2: "👍" },
-      reactionCounts: { 2: { "👍": 1 } },
-    } satisfies NonNullable<Parameters<typeof GameLog>[0]["reactions"]>;
-
     render(() => (
       <GameLog
         chat={chat}
         log={[...entries(1), message]}
         playerId="a"
         players={players}
-        reactions={counts}
+        reactions={{ 2: { a: "👍" } }}
         typing={[]}
       />
     ));
@@ -204,7 +199,7 @@ describe("<GameLog />", () => {
         log={[message]}
         playerId={null}
         players={players}
-        reactions={{ myReactions: {}, reactionCounts: { 2: { "🎉": 2 } } }}
+        reactions={{ 2: { a: "🎉", b: "🎉" } }}
         typing={[]}
       />
     ));
@@ -637,7 +632,7 @@ describe("<GameLog />", () => {
           chat: chatControls(),
           inSheet: () => false,
           log,
-          reactions: () => ({ myReactions: {}, reactionCounts: {} }),
+          reactions: () => ({}),
           playerId: () => "a",
           players: () => players,
           resultsRound: () => null,

@@ -26,7 +26,6 @@ export const room = (overrides: Partial<RoomView> = {}) => {
         round: 1,
       },
     ],
-    myReactions: {},
     phase: "playing",
     players: [
       {
@@ -54,7 +53,7 @@ export const room = (overrides: Partial<RoomView> = {}) => {
         status: "active",
       },
     ],
-    reactionCounts: {},
+    reactions: {},
     round: 1,
     settings: { botSpeed: "normal", locked: false, targetScore: 200 },
     spectatorCount: 0,

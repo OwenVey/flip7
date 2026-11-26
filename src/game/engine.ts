@@ -257,9 +257,7 @@ export const reactToChat = (
   messageId: number,
   emoji: ReactionEmoji | null
 ) => {
-  if (getPlayer(state, playerId).bot) {
-    throw new GameError("Only players can react to chat messages.");
-  }
+  getPlayer(state, playerId);
 
   const message = state.log.find((entry) => entry.id === messageId);
 
@@ -267,23 +265,18 @@ export const reactToChat = (
     throw new GameError("That chat message is no longer available.");
   }
 
-  const entries = state.chatReactions.get(messageId) ?? [];
-  const existing = entries.findIndex((entry) => entry.playerId === playerId);
+  const byPlayer = state.chatReactions.get(messageId) ?? new Map();
 
   if (emoji === null) {
-    if (existing !== -1) {
-      entries.splice(existing, 1);
-    }
-  } else if (existing === -1) {
-    entries.push({ emoji, playerId });
+    byPlayer.delete(playerId);
   } else {
-    entries[existing] = { emoji, playerId };
+    byPlayer.set(playerId, emoji);
   }
 
-  if (entries.length === 0) {
+  if (byPlayer.size === 0) {
     state.chatReactions.delete(messageId);
   } else {
-    state.chatReactions.set(messageId, entries);
+    state.chatReactions.set(messageId, byPlayer);
   }
 };
 

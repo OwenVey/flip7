@@ -703,9 +703,8 @@ export const createRoomClient = (deps: RoomClientDeps) => {
       }
     },
 
-    send: async (command: GameCommand) => {
+    send: async (command: GameCommand, { quiet = false } = {}) => {
       const roomCommand = isRoomCommand(command);
-      const quiet = command.type === "react";
 
       if (stopped || (pendingMove && !roomCommand)) {
         return false;

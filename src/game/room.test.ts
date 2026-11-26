@@ -832,8 +832,8 @@ describe("sending the log", () => {
       type: "kick",
     });
 
-    expect(broadcastOf(kicked).room.reactionCounts).toStrictEqual({
-      [messageId]: { "🎉": 1 },
+    expect(broadcastOf(kicked).room.reactions).toStrictEqual({
+      [messageId]: { [ben.playerId]: "🎉" },
     });
   });
 

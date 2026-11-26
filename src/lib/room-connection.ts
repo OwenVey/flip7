@@ -225,7 +225,7 @@ export const createRoomConnection = (code: string) => {
     canAct: createMemo(() => state().canAct),
     chat: {
       react: async (messageId, emoji) =>
-        await client.send({ emoji, messageId, type: "react" }),
+        await client.send({ emoji, messageId, type: "react" }, { quiet: true }),
       send: client.chat,
       typing: client.typing,
     } satisfies ChatControls,

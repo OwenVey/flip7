@@ -1,44 +1,35 @@
+import * as v from "valibot";
+
 export const REACTION_EMOJI = ["👍", "❤️", "😂", "😮", "🎉", "😬"] as const;
 
 export type ReactionEmoji = (typeof REACTION_EMOJI)[number];
 
-export interface ChatReaction {
-  playerId: string;
-  emoji: ReactionEmoji;
-}
+export const ReactionEmojiSchema = v.picklist(REACTION_EMOJI);
 
-export type ChatReactions = Map<number, ChatReaction[]>;
+/** Each Player's reaction to one chat message, by player ID. */
+export type MessageReactions = Record<string, ReactionEmoji>;
 
-export type ReactionSelections = Partial<Record<number, ReactionEmoji>>;
+/** The reactions to each chat message, by message ID, then player ID. */
+export type ChatReactions = Map<number, Map<string, ReactionEmoji>>;
 
 export type ReactionCounts = Partial<Record<ReactionEmoji, number>>;
 
-export const countReactions = (reactions: ChatReactions) => {
-  const counts: Partial<Record<number, ReactionCounts>> = {};
+export const toReactionsView = (reactions: ChatReactions) => {
+  const view: Record<number, MessageReactions> = {};
 
-  for (const [id, entries] of reactions) {
-    const totals: ReactionCounts = {};
+  for (const [id, byPlayer] of reactions) {
+    view[id] = Object.fromEntries(byPlayer);
+  }
 
-    for (const { emoji } of entries) {
-      totals[emoji] = (totals[emoji] ?? 0) + 1;
-    }
+  return view;
+};
 
-    counts[id] = totals;
+export const countReactions = (reactions: MessageReactions = {}) => {
+  const counts: ReactionCounts = {};
+
+  for (const emoji of Object.values(reactions)) {
+    counts[emoji] = (counts[emoji] ?? 0) + 1;
   }
 
   return counts;
-};
-
-export const reactionSelections = (reactions: ChatReactions) => {
-  const selections = new Map<string, ReactionSelections>();
-
-  for (const [id, entries] of reactions) {
-    for (const { emoji, playerId } of entries) {
-      const mine = selections.get(playerId) ?? {};
-      mine[id] = emoji;
-      selections.set(playerId, mine);
-    }
-  }
-
-  return selections;
 };
