@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["cloudflare.config.ts", "worker/index.ts"],
+  "ignore": [".agents/**"],
+  "ignoreDependencies": [
+    "@fontsource-variable/big-shoulders-display",
+    "@fontsource-variable/inter",
+    "@fontsource/bungee",
+    "tsrs"
+  ],
+  "ignoreExportsUsedInFile": true
+}

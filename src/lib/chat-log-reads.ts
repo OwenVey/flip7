@@ -213,5 +213,3 @@ export const createChatLogReads = (source: ReadSource) => {
     visible,
   };
 };
-
-export type ChatLogReads = ReturnType<typeof createChatLogReads>;

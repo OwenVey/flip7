@@ -22,8 +22,6 @@ import {
 import { createRoomClient } from "./room-client";
 import { roomExists } from "./room-functions";
 
-export type { ConnectionStatus, Notice } from "./room-client";
-
 const RETRY_DELAY_MS = 1500;
 
 const HEARTBEAT = {

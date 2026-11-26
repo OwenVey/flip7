@@ -809,5 +809,3 @@ export const createRoomClient = (deps: RoomClientDeps) => {
     },
   };
 };
-
-export type RoomClient = ReturnType<typeof createRoomClient>;
