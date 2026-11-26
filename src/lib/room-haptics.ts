@@ -2,7 +2,7 @@ import { createLocalStorage, createPreference } from "@ui-sdk/core";
 import { usePreference } from "@ui-sdk/solid/preferences";
 import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
 
-import type { HapticOutcome } from "./room-haptic-cues";
+import type { HapticOutcome } from "./deal-beats";
 
 /** Outcomes at the local seat, plus alerts and feedback the room emits itself. */
 export type RoomHapticCue = HapticOutcome | "error" | "tap" | "turn";

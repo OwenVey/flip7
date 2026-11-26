@@ -19,10 +19,10 @@ import {
   NO_LISTS,
   parseServerMessage,
   receiveState,
-  toRoomView,
   toStateMessage,
 } from "../game/protocol";
 import type { ListSeqs, RoomView, StateMessage } from "../game/protocol";
+import { gameAtFirstTurn, random, view } from "../test/deal-game";
 import type { DealStep } from "./deal-plan";
 import { createDealPlayback, initialDealPlayback } from "./deal-playback";
 import type { DealMotion } from "./deal-playback";
@@ -31,28 +31,8 @@ import type { RoomCue } from "./room-cues";
 import { turnYieldsToOutcome } from "./room-haptics";
 import type { RoomHapticCue } from "./room-haptics";
 
-const random = () => 0.5;
 const freeze = { id: 1003, kind: "freeze" } as const;
 const number = { id: 1004, kind: "number", value: 7 } as const;
-const view = (game: GameState) => structuredClone(toRoomView("ABCDE", game));
-
-const gameAtFirstTurn = () => {
-  const game = createGame();
-  addPlayer(game, "a", "Ada", 1);
-  addPlayer(game, "b", "Ben", 1);
-  startGame(game, "a", random);
-  game.phase = "roundOver";
-  game.round = 0;
-  game.dealerIndex = 0;
-  game.discard = [];
-  game.deck = [
-    { id: 1002, kind: "number", value: 3 },
-    { id: 1001, kind: "number", value: 5 },
-  ];
-  nextRound(game, "a", random);
-
-  return game;
-};
 
 const wait = async (ms: number, signal: AbortSignal) => {
   if (ms <= 0) {
@@ -245,21 +225,6 @@ describe(createDealPlayback, () => {
 
     expect(table.shown.myMove).toBeTruthy();
     expect(table.haptics).toStrictEqual(["saved"]);
-  });
-
-  it("cues Freeze once when the chosen target is the local player", async () => {
-    const game = gameAtFirstTurn();
-    game.deck = [freeze];
-    hit(game, "a", random);
-    const table = playback(true, "b");
-    table.show(view(game));
-
-    choose(game, "a", "b", random);
-    table.show(view(game));
-    expect(table.haptics).toStrictEqual([]);
-
-    await vi.runAllTimersAsync();
-    expect(table.haptics).toStrictEqual(["freeze"]);
   });
 
   it("lets Freeze settle before alerting the next player in a two-player game", async () => {

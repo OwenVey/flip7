@@ -1,35 +1,19 @@
 /* oxlint-disable eslint/no-await-in-loop, react-doctor/async-await-in-loop -- Card flights and Room updates must play in order. */
 
 import { calculateRoundScore, isActionCard } from "../game/cards";
-import { isChat } from "../game/engine";
 import type { Player } from "../game/engine";
-import type { GameEvent } from "../game/game-events";
-import { availableMoves } from "../game/moves";
-import { roundStarted } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
-import { dealFrame, planDeal } from "./deal-plan";
-import type { DealStep } from "./deal-plan";
-import {
-  bustSettle,
-  cueAlreadyPlayed,
-  freezeSettle,
-  SAVE_SETTLE_MS,
-  trackTransition,
-  trailingSettle,
-} from "./playback-moments";
+import { readTransition, SAVE_SETTLE_MS } from "./deal-beats";
 import type {
+  CardBeat,
+  DealBeats,
+  HapticOutcome,
   MomentSettle,
   PlaybackMoment,
-  TransitionTracker,
-} from "./playback-moments";
-import { chatCue, gameOverCue, newLogEntries, roomCues } from "./room-cues";
+} from "./deal-beats";
+import { dealFrame, planDeal } from "./deal-plan";
+import type { DealStep } from "./deal-plan";
 import type { RoomCue } from "./room-cues";
-import {
-  flipThreeHaptic,
-  landedHaptic,
-  settledHaptic,
-} from "./room-haptic-cues";
-import type { HapticOutcome } from "./room-haptic-cues";
 
 interface QueuedRoom {
   room: RoomView;
@@ -154,84 +138,28 @@ const isDeckToHand = (step: DealStep) =>
 const isOrdinaryDealCard = (step: DealStep) =>
   isDeckToHand(step) && !step.flip && !isActionCard(step.card);
 
-const reshuffled = (previous: RoomView, current: RoomView) =>
-  current.round === previous.round &&
-  current.deckCount > previous.deckCount &&
-  current.discardCount < previous.discardCount;
-
-const didReshuffle = (
-  previous: RoomView,
-  current: RoomView,
-  events: readonly GameEvent[]
-) =>
-  events.some((event) => event.type === "deckReshuffled") ||
-  reshuffled(previous, current);
-
-const isOtherChoice = (
-  animate: boolean,
-  current: RoomView,
-  steps: DealStep[],
-  viewerId: string | null
-) =>
-  animate &&
-  current.choice !== null &&
-  steps.some((step) => step.to.kind === "choice") &&
-  availableMoves(current, viewerId).choice === null;
-
-const needsLeadIn = (
-  step: DealStep,
-  previousStep: DealStep | undefined,
-  isBehind: boolean
-) => step.flip?.index === 1 && !isBehind && previousStep?.to.kind !== "played";
-
-const isMidBatchOutcome = (step: DealStep, index: number, total: number) =>
-  index < total - 1 &&
-  (step.to.kind === "bust" ||
-    (step.to.kind === "hand" && step.card.kind === "freeze"));
-
 const isBulkDeal = (steps: DealStep[], newRound: boolean) =>
   newRound && steps.filter(isDeckToHand).length >= BULK_DEAL_MIN_CARDS;
 
+const holdsBeforeDiscard = (step: DealStep) =>
+  step.partnerId !== null || step.card.kind === "secondChance";
+
 interface Transition {
+  beats: DealBeats;
   current: RoomView;
   item: QueuedRoom;
   previous: RoomView;
   signal: AbortSignal;
   steps: DealStep[];
-  tracker: TransitionTracker;
 }
 
-interface StepContext extends Transition {
+interface CardContext extends Transition {
+  beat: CardBeat;
   bulkCard: boolean;
   index: number;
-  step: DealStep;
 }
 
 type PauseKind = "deal" | "effect";
-
-const holdsBeforeDiscard = (step: DealStep) =>
-  step.partnerId !== null || step.card.kind === "secondChance";
-
-const midBatchSettle = ({ step, tracker }: StepContext) => {
-  if (step.to.kind === "bust") {
-    tracker.played.bust += 1;
-
-    return bustSettle(step.to.playerId);
-  }
-
-  if (step.to.kind !== "hand") {
-    return null;
-  }
-
-  const frozenEvents = tracker.events.filter(
-    (event) => event.type === "frozen"
-  );
-
-  const byId = frozenEvents[tracker.played.freeze]?.by?.id ?? null;
-  tracker.played.freeze += 1;
-
-  return freezeSettle(step.to.playerId, byId);
-};
 
 export const createDealPlayback = (
   motion: DealMotion,
@@ -246,8 +174,8 @@ export const createDealPlayback = (
   let pause: { controller: AbortController; kind: PauseKind } | null = null;
   let frame = emptyFrame;
 
-  const hapticPlayer = (item: QueuedRoom) =>
-    latest && item.hapticSyncId === latest.syncId ? latest.playerId : null;
+  const felt = (item: QueuedRoom, outcome: HapticOutcome | null) =>
+    latest && item.hapticSyncId === latest.syncId ? outcome : null;
 
   const behind = () => queue.some((queued) => queued.deals);
   const backlogged = () => queue.length >= SETTLE_BACKLOG;
@@ -309,7 +237,7 @@ export const createDealPlayback = (
   const landDiscard = async (
     step: DealStep,
     discardMs: number,
-    { signal, tracker }: Transition
+    signal: AbortSignal
   ) => {
     const saved = step.partnerId !== null;
 
@@ -327,7 +255,6 @@ export const createDealPlayback = (
 
     if (saved) {
       cue("secondChance");
-      tracker.played.secondChance += 1;
     }
 
     await motion.land(step, discardMs, signal);
@@ -341,17 +268,13 @@ export const createDealPlayback = (
     }
   };
 
-  const settleMidBatch = async (context: StepContext) => {
-    const { current, index, previous, signal, steps } = context;
+  const settleMidBatch = async (
+    { current, index, previous, signal, steps }: CardContext,
+    settle: MomentSettle
+  ) => {
     await waitForPause(PAUSE_MS, signal);
 
     if (signal.aborted) {
-      return;
-    }
-
-    const settle = midBatchSettle(context);
-
-    if (settle === null) {
       return;
     }
 
@@ -366,14 +289,14 @@ export const createDealPlayback = (
     await waitForPause(settle.duration, signal, "effect");
   };
 
-  const landStep = async (context: StepContext) => {
-    const { bulkCard, index, item, signal, step, steps, tracker } = context;
+  const landStep = async (context: CardContext) => {
+    const { beat, bulkCard, item, signal } = context;
+    const { step } = beat;
     const discardMs = behind() ? HURRIED_DISCARD_MS : DISCARD_MS;
-    show({ incomingCardId: null }, [], landedHaptic(step, hapticPlayer(item)));
+    show({ incomingCardId: null }, [], felt(item, beat.landHaptic));
+    cue(beat.landCue);
 
     if (step.to.kind === "played") {
-      cue("flipThree");
-      tracker.played.flipThree += 1;
       await motion.land(step, discardMs, signal);
 
       if (!signal.aborted) {
@@ -383,10 +306,8 @@ export const createDealPlayback = (
       return;
     }
 
-    cue("reveal");
-
     if (step.to.kind === "discard") {
-      await landDiscard(step, discardMs, context);
+      await landDiscard(step, discardMs, signal);
 
       return;
     }
@@ -397,8 +318,8 @@ export const createDealPlayback = (
       return;
     }
 
-    if (isMidBatchOutcome(step, index, steps.length)) {
-      await settleMidBatch(context);
+    if (beat.settle) {
+      await settleMidBatch(context, beat.settle);
 
       return;
     }
@@ -408,72 +329,71 @@ export const createDealPlayback = (
     }
   };
 
-  const playLeadIn = async (step: DealStep, transition: Transition) => {
-    const { current, item, signal, tracker } = transition;
-    const firstFlip = step.flip;
+  const playLeadIn = async (beat: CardBeat, { item, signal }: Transition) => {
+    const { flip } = beat.step;
 
-    if (!firstFlip) {
+    if (!flip) {
       return;
     }
 
-    const sounds: RoomCue[] = [];
-
-    if (tracker.counts.flipThree > tracker.played.flipThree) {
-      tracker.played.flipThree += 1;
-      sounds.push("flipThree");
-    }
-
     show(
-      {
-        moment: null,
-        step: { ...step, flip: { ...firstFlip, index: 0 } },
-      },
-      sounds,
-      flipThreeHaptic(step, current, hapticPlayer(item))
+      { moment: null, step: { ...beat.step, flip: { ...flip, index: 0 } } },
+      beat.leadIn?.cue ? [beat.leadIn.cue] : [],
+      felt(item, beat.flipHaptic)
     );
     await waitForPause(FLIP_LEAD_IN_MS, signal, "effect");
   };
 
-  const playSteps = async (transition: Transition, newRound: boolean) => {
-    const { current, item, previous, signal, steps } = transition;
-    const bulkDeal = isBulkDeal(steps, newRound);
+  const flyCard = async (context: CardContext, leadIn: boolean, ms: number) => {
+    const { beat, current, index, item, previous, signal, steps } = context;
+    const { step } = beat;
+    const fly = motion.captureFlight(step, ms);
 
-    for (const [index, step] of steps.entries()) {
+    show(
+      {
+        incomingCardId: step.card.id,
+        moment: null,
+        room: dealFrame(previous, current, steps, index + 1),
+        step,
+      },
+      !leadIn && beat.leadIn?.cue ? [beat.leadIn.cue] : [],
+      leadIn ? undefined : felt(item, beat.flipHaptic)
+    );
+    await fly?.(signal);
+  };
+
+  const playCards = async (transition: Transition) => {
+    const { beats, signal, steps } = transition;
+    const bulkDeal = isBulkDeal(steps, beats.newRound);
+
+    for (const [index, beat] of beats.cards.entries()) {
       if (signal.aborted) {
         return;
       }
 
-      const leadIn = needsLeadIn(step, steps[index - 1], behind());
+      const leadIn = beat.leadIn !== null && !behind();
 
       if (leadIn) {
-        await playLeadIn(step, transition);
+        await playLeadIn(beat, transition);
 
         if (signal.aborted) {
           return;
         }
       }
 
-      const bulkCard = bulkDeal && isOrdinaryDealCard(step);
-      const ms = bulkCard || behind() ? HURRIED_FLIGHT_MS : FLIGHT_MS;
-      const fly = motion.captureFlight(step, ms);
-
-      show(
-        {
-          incomingCardId: step.card.id,
-          moment: null,
-          room: dealFrame(previous, current, steps, index + 1),
-          step,
-        },
-        [],
-        leadIn ? undefined : flipThreeHaptic(step, current, hapticPlayer(item))
+      const bulkCard = bulkDeal && isOrdinaryDealCard(beat.step);
+      const context = { ...transition, beat, bulkCard, index };
+      await flyCard(
+        context,
+        leadIn,
+        bulkCard || behind() ? HURRIED_FLIGHT_MS : FLIGHT_MS
       );
-      await fly?.(signal);
 
       if (signal.aborted) {
         return;
       }
 
-      await landStep({ ...transition, bulkCard, index, step });
+      await landStep(context);
     }
 
     const lastStep = steps.at(-1);
@@ -488,16 +408,15 @@ export const createDealPlayback = (
     }
   };
 
-  const playTransition = async (transition: Transition, reshuffle: boolean) => {
-    const { current, previous, signal, steps, tracker } = transition;
+  const playTransition = async (transition: Transition) => {
+    const { beats, previous, signal, steps } = transition;
     show({ dealing: true, moment: null });
-    const newRound = roundStarted(previous, current);
 
-    if (newRound) {
+    if (beats.newRound) {
       cue("deal");
     }
 
-    if (newRound && previous.phase !== "lobby" && !behind()) {
+    if (beats.newRound && previous.phase !== "lobby" && !behind()) {
       await motion.sweep(signal);
 
       if (signal.aborted) {
@@ -505,11 +424,10 @@ export const createDealPlayback = (
       }
     }
 
-    if (reshuffle) {
+    if (beats.reshuffle) {
       show({ dealing: true, moment: { kind: "reshuffle" }, step: null }, [
         "shuffle",
       ]);
-      tracker.reshuffled = true;
       await motion.reshuffle(signal);
 
       if (signal.aborted) {
@@ -518,112 +436,11 @@ export const createDealPlayback = (
     }
 
     if (steps.length > 0) {
-      await playSteps(transition, newRound);
+      await playCards(transition);
     }
   };
 
-  const prepareTurn = (previous: RoomView, current: RoomView) => {
-    const animate = motion.allowed();
-    const steps = animate ? planDeal(previous, current) : [];
-    const events = newLogEntries(previous, current);
-
-    const gameEvents = events.flatMap((entry) =>
-      isChat(entry) ? [] : [entry.event]
-    );
-
-    return {
-      animate,
-      events,
-      reshuffle: didReshuffle(previous, current, gameEvents),
-      steps,
-      tracker: trackTransition(gameEvents),
-    };
-  };
-
-  const resolveTurn = (
-    previous: RoomView,
-    current: RoomView,
-    viewerId: string | null,
-    item: QueuedRoom,
-    setup: ReturnType<typeof prepareTurn>
-  ) => {
-    const { animate, events, steps, tracker } = setup;
-    const playerId = hapticPlayer(item);
-
-    const outcome: HapticOutcome | null =
-      playerId === null
-        ? null
-        : settledHaptic(previous, current, playerId, steps);
-
-    const settle = animate
-      ? trailingSettle(tracker, current, steps.length > 0)
-      : null;
-
-    const sounds =
-      settle === null
-        ? roomCues(previous, current, viewerId).filter(
-            (sound) => !cueAlreadyPlayed(sound, tracker, steps.length > 0)
-          )
-        : ([] satisfies RoomCue[]);
-
-    return {
-      chat: chatCue(events, viewerId),
-      finale: gameOverCue(previous, current, viewerId),
-      outcome,
-      playerId,
-      settle,
-      sounds,
-    };
-  };
-
-  const settleTrailing = async ({
-    chat,
-    current,
-    finale,
-    outcome,
-    playerId,
-    settle,
-    signal,
-  }: {
-    chat: RoomCue | null;
-    current: RoomView;
-    finale: "win" | "lose" | null;
-    outcome: HapticOutcome | null;
-    playerId: string | null;
-    settle: MomentSettle;
-    signal: AbortSignal;
-  }) => {
-    const momentSounds: RoomCue[] = [
-      ...(settle.cue ? [settle.cue] : []),
-      ...(chat ? [chat] : []),
-    ];
-
-    const winnerCelebrates =
-      finale !== null &&
-      outcome === "celebrate" &&
-      !(
-        settle.moment.kind === "flipSeven" &&
-        settle.moment.playerId === playerId
-      );
-
-    show(
-      { dealing: true, moment: settle.moment, room: current, step: null },
-      momentSounds,
-      winnerCelebrates ? null : outcome
-    );
-    await waitForPause(settle.duration, signal, "effect");
-
-    if (signal.aborted) {
-      return null;
-    }
-
-    return {
-      outcome: winnerCelebrates ? outcome : null,
-      sounds: finale ? [finale] : [],
-    };
-  };
-
-  const holdChoiceIfOther = async ({
+  const holdOtherChoice = async ({
     current,
     outcome,
     signal,
@@ -652,50 +469,58 @@ export const createDealPlayback = (
       let outcome: HapticOutcome | null = null;
 
       if (previous && latest) {
-        const viewerId = latest.playerId;
-        const setup = prepareTurn(previous, current);
+        const animate = motion.allowed();
 
-        if (setup.animate && (setup.steps.length > 0 || setup.reshuffle)) {
-          await playTransition(
-            {
-              current,
-              item,
-              previous,
-              signal,
-              steps: setup.steps,
-              tracker: setup.tracker,
-            },
-            setup.reshuffle
-          );
+        const beats = readTransition(
+          previous,
+          current,
+          latest.playerId,
+          animate
+        );
+
+        const steps = beats.cards.map(({ step }) => step);
+
+        if (animate && (steps.length > 0 || beats.reshuffle)) {
+          await playTransition({
+            beats,
+            current,
+            item,
+            previous,
+            signal,
+            steps,
+          });
         }
 
         if (signal.aborted) {
           return;
         }
 
-        const resolved = resolveTurn(previous, current, viewerId, item, setup);
-        ({ outcome, sounds } = resolved);
+        outcome = felt(item, beats.outcome);
+        sounds = beats.cues;
 
-        if (resolved.settle !== null) {
-          const afterSettle = await settleTrailing({
-            chat: resolved.chat,
-            current,
-            finale: resolved.finale,
-            outcome,
-            playerId: resolved.playerId,
-            settle: resolved.settle,
-            signal,
-          });
+        if (beats.settle) {
+          show(
+            {
+              dealing: true,
+              moment: beats.settle.moment,
+              room: current,
+              step: null,
+            },
+            beats.settleCues,
+            beats.outcomeWithSettle ? outcome : null
+          );
+          await waitForPause(beats.settle.duration, signal, "effect");
 
-          if (!afterSettle) {
+          if (signal.aborted) {
             return;
           }
 
-          ({ outcome, sounds } = afterSettle);
+          outcome = beats.outcomeWithSettle ? null : outcome;
+          sounds = beats.finale ? [beats.finale] : [];
         }
 
-        if (isOtherChoice(setup.animate, current, setup.steps, viewerId)) {
-          await holdChoiceIfOther({ current, outcome, signal, sounds });
+        if (beats.holdsOtherChoice) {
+          await holdOtherChoice({ current, outcome, signal, sounds });
 
           if (signal.aborted) {
             return;
