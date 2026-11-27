@@ -198,7 +198,6 @@ export const createChatLogReads = (source: ReadSource) => {
       setNewFrom(undefined);
     },
     filter,
-    log: source.log,
     newEntries,
     newFrom,
     playerId: source.playerId,

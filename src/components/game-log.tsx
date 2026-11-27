@@ -59,14 +59,12 @@ import type {
   LogEntry,
   LogPlayer,
 } from "../game/engine";
-import { settlesRound } from "../game/game-events";
 import { CHAT_TEXT_LIMIT, clipText, textLength } from "../game/text";
+import type { ChatLogRound } from "../lib/chat-log-projection";
 import { LOG_FILTERS } from "../lib/chat-log-reads";
 import {
-  continuesChat,
   detailText,
   eventCopy,
-  groupLog,
   HOUR_MS,
   involvedIds,
   involves,
@@ -74,13 +72,11 @@ import {
   MINUTE_MS,
   sameCopy,
   SECOND_MS,
-  shownTimes,
   timeLabel,
 } from "../lib/game-log-entries";
 import type {
   EventDetail,
   EventIconKey,
-  LogGroup,
   NamePart,
 } from "../lib/game-log-entries";
 import type { RoomChatLog } from "../lib/room-chat-log";
@@ -416,12 +412,8 @@ const ChatForm = (props: {
 };
 
 const LogRound = (props: {
-  group: LogGroup;
-  continuations: ReadonlySet<number>;
-  collapsible: boolean;
-  current: boolean;
+  round: ChatLogRound;
   playerId: string | null;
-  newFrom: number | undefined;
   now: number;
   onUnfold: () => void;
   chatLog: RoomChatLog;
@@ -429,29 +421,12 @@ const LogRound = (props: {
 }) => {
   const spotlight = useContext(SpotlightContext);
   const [chosen, setChosen] = createSignal<boolean>();
-  const collapsed = () => props.collapsible && !(chosen() ?? props.current);
-
-  const shown = createMemo(() =>
-    collapsed()
-      ? props.group.entries.filter((entry) => isChat(entry))
-      : props.group.entries
-  );
-
-  const times = createMemo(() => shownTimes(shown()));
-
-  const newInSummary = () =>
-    collapsed() &&
-    props.newFrom !== undefined &&
-    props.group.entries.some(
-      (entry) => entry.id === props.newFrom && !isChat(entry)
-    );
+  const view = createMemo(() => props.round.view(chosen()));
 
   const rows = () => (
-    <For each={shown()} keyed={(entry) => entry.id}>
-      {(entry, index) => {
-        const previous = () => shown()[index() - 1];
-
-        const continuation = () => props.continuations.has(entry().id);
+    <For each={view().rows} keyed={(row) => row.entry.id}>
+      {(row) => {
+        const entry = () => row().entry;
 
         const message = () => {
           const current = entry();
@@ -479,13 +454,13 @@ const LogRound = (props: {
 
         return (
           <>
-            <Show when={entry().id === props.newFrom}>
+            <Show when={entry().id === view().newBeforeRow}>
               <li class="log-new">
                 <span>New</span>
               </li>
             </Show>
             <li
-              data-continuation={continuation() ? "" : undefined}
+              data-continuation={row().continuation ? "" : undefined}
               data-cue={eventCue(happened()?.event) ?? undefined}
               data-kind={message() ? "chat" : "game"}
               data-mine={mine() ? "" : undefined}
@@ -508,7 +483,7 @@ const LogRound = (props: {
                           <div class="chat-bubble">
                             <ChatMessage
                               entry={chat()}
-                              continuation={continuation()}
+                              continuation={row().continuation}
                               now={props.now}
                             />
                           </div>
@@ -542,9 +517,9 @@ const LogRound = (props: {
                   {(event) => (
                     <GameEvent
                       entry={event()}
-                      hasRoundHeading={props.group.heading !== ""}
-                      previous={previous()}
-                      showTime={times().has(entry().id)}
+                      hasRoundHeading={props.round.heading !== ""}
+                      previous={row().previous}
+                      showTime={row().showTime}
                       now={props.now}
                     />
                   )}
@@ -560,7 +535,7 @@ const LogRound = (props: {
   return (
     <Collapsible
       class="log-group"
-      open={!collapsed()}
+      open={!view().collapsed}
       onOpenChange={(next) => {
         if (next) {
           props.onUnfold();
@@ -569,15 +544,18 @@ const LogRound = (props: {
         setChosen(next);
       }}
     >
-      <Show when={newInSummary()}>
+      <Show when={view().newAboveHeading}>
         <div class="log-new">
           <span>New</span>
         </div>
       </Show>
-      <Show when={props.group.heading}>
+      <Show when={props.round.heading}>
         {(heading) => (
           <div class="log-round-heading">
-            <Show when={props.collapsible} fallback={<h3>{heading()}</h3>}>
+            <Show
+              when={props.round.collapsible}
+              fallback={<h3>{heading()}</h3>}
+            >
               <h3>
                 <CollapsibleTrigger
                   class="log-round-toggle"
@@ -589,18 +567,16 @@ const LogRound = (props: {
                 </CollapsibleTrigger>
               </h3>
             </Show>
-            <ClockMinute
-              at={oldGameMinute(props.group.entries[0], props.now)}
-            />
+            <ClockMinute at={oldGameMinute(props.round.first, props.now)} />
           </div>
         )}
       </Show>
-      <CollapsiblePanel keepMounted={props.collapsible}>
-        <Show when={!collapsed() && shown().length > 0}>
+      <CollapsiblePanel keepMounted={props.round.collapsible}>
+        <Show when={!view().collapsed && view().rows.length > 0}>
           <ol>{rows()}</ol>
         </Show>
       </CollapsiblePanel>
-      <Show when={collapsed() && shown().length > 0}>
+      <Show when={view().collapsed && view().rows.length > 0}>
         <ol>{rows()}</ol>
       </Show>
     </Collapsible>
@@ -639,20 +615,7 @@ export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
     }
   );
 
-  const continuations = createMemo(() => {
-    const log = reads().log();
-    const ids = new Set<number>();
-
-    for (const [index, entry] of log.entries()) {
-      if (continuesChat(entry, log[index - 1])) {
-        ids.add(entry.id);
-      }
-    }
-
-    return ids;
-  });
-
-  const groups = createMemo(() => groupLog(reads().visible()));
+  const rounds = () => props.chatLog.rounds();
 
   const filterChats = () =>
     props.inSheet === true || reads().filter() === "Game"
@@ -795,34 +758,20 @@ export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
                 >
                   <ScrollAreaContent class="log-entries">
                     <Show
-                      when={groups().length > 0}
+                      when={rounds().length > 0}
                       fallback={
                         <p class="log-empty">
                           {EMPTY_MESSAGE[reads().filter()]}
                         </p>
                       }
                     >
-                      <For each={groups()} keyed={(group) => group.id}>
-                        {(group) => (
+                      <For each={rounds()} keyed={(round) => round.id}>
+                        {(round) => (
                           <LogRound
-                            group={group()}
+                            round={round()}
                             chatLog={props.chatLog}
                             picker={picker}
-                            continuations={continuations()}
-                            collapsible={
-                              reads().filter() !== "Chat" &&
-                              group().entries.some(
-                                (entry) =>
-                                  !isChat(entry) && settlesRound(entry.event)
-                              )
-                            }
-                            current={
-                              group().id === groups().at(-1)?.id &&
-                              group().entries[0]?.round ===
-                                props.chatLog.round()
-                            }
                             playerId={reads().playerId()}
-                            newFrom={reads().newFrom()}
                             now={now()}
                             onUnfold={stayAboveUnfoldedRound}
                           />

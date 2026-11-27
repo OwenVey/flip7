@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal } from "solid-js";
 import type { MessageReactions, ReactionEmoji } from "../game/chat-reactions";
 import type { LogEntry, LogPlayer } from "../game/engine";
 import type { RoomView } from "../game/protocol";
+import { createChatLogRounds } from "./chat-log-projection";
 import { createChatLogReads } from "./chat-log-reads";
 import type { ChatControls } from "./room-connection";
 
@@ -122,7 +123,7 @@ export const createRoomChatLog = (source: RoomChatLogSource) => {
     }
   );
 
-  const reads = createChatLogReads({
+  const { visible, newFrom, ...reads } = createChatLogReads({
     log: source.log,
     playerId: source.playerId,
     shown: () => !source.inSheet() || sheetOpen(),
@@ -135,7 +136,12 @@ export const createRoomChatLog = (source: RoomChatLogSource) => {
     players: source.players,
     reads,
     reactions: createReactions(source),
-    round: source.round,
+    rounds: createChatLogRounds({
+      log: source.log,
+      newFrom,
+      round: source.round,
+      visible,
+    }),
     setSheetOpen: (next: boolean) => {
       setOpenedAt(next && source.inSheet() ? sheetResultsRound() : undefined);
     },
