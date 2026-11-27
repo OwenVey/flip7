@@ -108,14 +108,17 @@ const rejectTurn = (view: MovesView, playerId: string) => {
 
 const rejectPlay = (
   view: MovesView,
-  playerId: string,
-  move: PlayMove,
-  offlinePlayer?: Pick<Player, "hand" | "name">
+  actor:
+    | { forOffline: false; playerId: string }
+    | { forOffline: true; player: Pick<Player, "hand" | "id" | "name"> },
+  move: PlayMove
 ) => {
+  const playerId = actor.forOffline ? actor.player.id : actor.playerId;
+
   if (move.type === "choose") {
     const { choice } = view;
 
-    if (!offlinePlayer && choice?.chooserId !== playerId) {
+    if (!actor.forOffline && choice?.chooserId !== playerId) {
       return "There's nothing for you to choose.";
     }
 
@@ -130,14 +133,14 @@ const rejectPlay = (
     return turn;
   }
 
-  const player = offlinePlayer ?? findPlayer(view, playerId);
+  const player = actor.forOffline ? actor.player : findPlayer(view, playerId);
 
   if (player && canStay(player)) {
     return null;
   }
 
-  return offlinePlayer
-    ? `${offlinePlayer.name} needs a card in front of them before they can stay.`
+  return actor.forOffline
+    ? `${actor.player.name} needs a card in front of them before they can stay.`
     : "You need a card in front of you before you can stay.";
 };
 
@@ -169,7 +172,7 @@ const rejectMoveFor = (
     return `The game isn't waiting on ${player.name}.`;
   }
 
-  return rejectPlay(view, player.id, move, player);
+  return rejectPlay(view, { forOffline: true, player }, move);
 };
 
 const rejectKick = (view: MovesView, viewerId: string, playerId: string) => {
@@ -275,7 +278,7 @@ export const rejectMove = (view: MovesView, viewerId: string, move: Move) => {
     case "stay":
     case "choose": {
       return move.forId === undefined || move.forId === viewerId
-        ? rejectPlay(view, viewerId, move)
+        ? rejectPlay(view, { forOffline: false, playerId: viewerId }, move)
         : rejectMoveFor(view, viewerId, move.forId, move);
     }
 

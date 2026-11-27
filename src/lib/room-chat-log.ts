@@ -5,12 +5,12 @@ import type { LogEntry, LogPlayer } from "../game/engine";
 import type { RoomView } from "../game/protocol";
 import { createChatLogRounds } from "./chat-log-projection";
 import { createChatLogReads } from "./chat-log-reads";
-import type { RoomReaders } from "./room-client";
 import type { ChatControls } from "./room-connection";
 
-interface RoomChatLogSource extends RoomReaders<"playerId"> {
+interface RoomChatLogSource {
   chat: ChatControls;
   log: () => LogEntry[];
+  playerId: () => string | null;
   reactions: () => RoomView["reactions"];
   players: () => readonly LogPlayer[];
   /** Other players typing a chat message, by player ID. */

@@ -9,8 +9,11 @@ Scanned all 185 tracked TypeScript and TSX files, including app and Worker entry
 | Area | Source of truth |
 | --- | --- |
 | WebSocket game commands | [Client message validators](../../src/game/client-message.ts) define the commands once. Both the full client-message validator and the `GameCommand` type reuse that group. |
+| Room settings, scores, and list updates | [Room settings](../../src/game/settings.ts) define `RoomSettingsSchema` for both wire (`looseObject`) and stored (`object`) validation. [Protocol](../../src/game/protocol.ts) shares `LoggedScoreSchema`, `HeldActionCard`, and `listUpdateSchema`, while [stored room schema](../../worker/stored-room-schema.ts) reuses `GameStateSchema`. |
+| Action card kinds | [Cards](../../src/game/cards.ts) define `ActionCard["kind"]`, reused by [game events](../../src/game/game-events.ts) and [protocol](../../src/game/protocol.ts). |
 | Joining from the lobby or as a Spectator | [Join form props](../../src/components/join-form.tsx) define the shared inputs. Spectator controls pick the fields they forward and require them. |
 | Host actions on a player | The [player menu](../../src/components/player-menu.tsx) defines its permissions and callbacks. The round player uses that contract when it forwards them. |
+| Room client readers and chat controls | [Room client](../../src/lib/room-client.ts) exports `RoomReaders` for [room table](../../src/lib/room-table.ts), and [room connection](../../src/lib/room-connection.ts) derives `ChatControls` directly from `RoomConnection["chat"]`. |
 | Deal playback and the Move alert | The [Move alert](../../src/lib/move-alert.ts) picks the three playback fields it reads. Its tests use that same narrow view. |
 | Test adapters | The [room](../../src/game/room.test.ts) and [room client](../../src/lib/room-client.test.ts) test adapters reuse the production connection shape, with the map holding the ID. The [count-up test](../../src/lib/count-up.test.ts) reuses the production function's parameters. |
 
