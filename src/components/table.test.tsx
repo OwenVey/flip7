@@ -893,8 +893,8 @@ describe("<Table />", () => {
       flush();
       expect(labels()).toStrictEqual(["1m", "1m"]);
 
-      vi.setSystemTime(at + 3_599_000);
-      vi.advanceTimersByTime(1000);
+      vi.setSystemTime(at + 3_540_000);
+      vi.advanceTimersByTime(60_000);
       flush();
 
       const clock = new Intl.DateTimeFormat(undefined, {

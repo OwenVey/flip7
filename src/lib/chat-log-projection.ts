@@ -42,6 +42,7 @@ const projectRound = (
     first: entries[0],
     heading,
     id,
+    last: entries.at(-1),
     view: (chosenOpen?: boolean) => {
       const collapsed = collapsible && !(chosenOpen ?? current);
       const markerId = newFrom();

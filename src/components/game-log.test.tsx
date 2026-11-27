@@ -143,6 +143,11 @@ const charCount = () => screen.queryByText(/^\d+\/200$/u);
 const stayed = (index: number) =>
   screen.getByRole("button", { name: `Player ${index}` }).closest("li");
 
+const clockSnapshot = () => ({
+  label: screen.queryByRole("time")?.textContent ?? null,
+  timers: vi.getTimerCount(),
+});
+
 describe("<GameLog />", () => {
   afterEach(cleanup);
 
@@ -1025,5 +1030,42 @@ describe("<GameLog />", () => {
     expectNoDiagnostics(artifact);
     expect(stayed(0)).toBe(first);
     expect(stayed(7)).toHaveTextContent("Player 7 stayed");
+  });
+
+  it("slows its relative-time clock as entries age and stops after an hour", () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+
+    try {
+      const start = new Date("2026-01-01T12:00:00Z").getTime();
+      vi.setSystemTime(start);
+
+      const [log, setLog] = createSignal<LogEntry[]>([]);
+
+      render(() => (
+        <GameLog log={log()} playerId="a" players={players} typing={[]} />
+      ));
+      flush();
+
+      expect(clockSnapshot()).toStrictEqual({ label: null, timers: 0 });
+
+      setLog([{ ...fields(1, start), from: ben, text: "hi" }]);
+      flush();
+      expect(clockSnapshot()).toStrictEqual({ label: "now", timers: 1 });
+
+      vi.advanceTimersByTime(5000);
+      flush();
+      expect(clockSnapshot()).toStrictEqual({ label: "5s", timers: 1 });
+
+      vi.advanceTimersByTime(55_000);
+      flush();
+      expect(clockSnapshot()).toStrictEqual({ label: "1m", timers: 1 });
+
+      vi.advanceTimersByTime(59 * 60_000);
+      flush();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
   });
 });

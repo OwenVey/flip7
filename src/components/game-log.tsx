@@ -14,7 +14,6 @@ import Shuffle from "@lucide/solid/icons/shuffle";
 import Snowflake from "@lucide/solid/icons/snowflake";
 import Trophy from "@lucide/solid/icons/trophy";
 import UserPlus from "@lucide/solid/icons/user-plus";
-import { createPolled } from "@solid-primitives/timer";
 import { dynamic } from "@solidjs/web";
 import { Button } from "@ui-sdk/solid/button";
 import {
@@ -46,6 +45,7 @@ import {
   createUniqueId,
   For,
   Match,
+  onSettled,
   Show,
   Switch,
   useContext,
@@ -599,9 +599,73 @@ const typingLabel = (names: readonly string[]) => {
     : "Several people are typing…";
 };
 
+const clockIntervalMs = (newestAt: number | undefined, now: number) => {
+  if (newestAt === undefined) {
+    return null;
+  }
+
+  const elapsed = Math.max(0, now - newestAt);
+
+  if (elapsed < MINUTE_MS) {
+    return SECOND_MS;
+  }
+
+  if (elapsed < HOUR_MS) {
+    return MINUTE_MS;
+  }
+
+  return null;
+};
+
+const createLogClock = (newestAt: () => number | undefined) => {
+  const [now, setNow] = createSignal(Date.now());
+
+  const [hidden, setHidden] = createSignal(
+    typeof document !== "undefined" && document.visibilityState === "hidden"
+  );
+
+  const intervalMs = createMemo(() =>
+    hidden() ? null : clockIntervalMs(newestAt(), now())
+  );
+
+  const syncVisibility = () => {
+    const isHidden = document.visibilityState === "hidden";
+    setHidden(isHidden);
+
+    if (!isHidden) {
+      setNow(Date.now());
+    }
+  };
+
+  onSettled(() => {
+    document.addEventListener("visibilitychange", syncVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", syncVisibility);
+    };
+  });
+
+  createEffect(intervalMs, (delay) => {
+    const id =
+      delay === null
+        ? null
+        : setInterval(() => {
+            setNow(Date.now());
+          }, delay);
+
+    return () => {
+      if (id !== null) {
+        clearInterval(id);
+      }
+    };
+  });
+
+  return now;
+};
+
 export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
-  const now = createPolled(Date.now, SECOND_MS);
   const reads = () => props.chatLog.reads;
+  const now = createLogClock(() => props.chatLog.rounds().at(-1)?.last?.at);
   const picker = createReactionPicker();
 
   createEffect(
