@@ -295,10 +295,17 @@
 }
 
 .table-sheet-body {
+  contain: layout;
+  user-select: text;
   padding: 0.75rem var(--dialog-inset) var(--dialog-inset);
 }
 
-/* Keep drag updates out of the log rows. Only the chat body inherits this offset. */
+/*
+ * The shell keeps one height. Only the chat body resizes as the drawer moves,
+ * keeping the newest messages and the composer above the viewport edge.
+ * Keep drag updates out of the log rows: --chat-sheet-hidden does not inherit
+ * by default, and .chat-sheet-body opts in once so descendants never see it.
+ */
 @property --chat-sheet-hidden {
   syntax: "<length>";
   inherits: false;
@@ -373,7 +380,7 @@
 }
 
 .chat-sheet-body {
-  /* Resolve the offset on the shell, where ui-sdk sets --drawer-expand. */
+  /* Resolve the offset on the shell, where ui-sdk sets --drawer-expand, and stop ui-sdk's drag user-select toggle from recalculating styles across log rows. */
   --chat-sheet-hidden: inherit;
   display: grid;
   contain: layout;
@@ -382,6 +389,7 @@
   padding: 0.75rem var(--dialog-inset) var(--dialog-inset);
 
   overflow-y: auto;
+  user-select: text;
 
   & > .stack {
     grid-template-rows: auto minmax(4rem, 1fr) auto;
