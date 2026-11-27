@@ -1,11 +1,20 @@
 import type { ChatControls } from "../lib/room-connection";
 
 /** Chat controls for a component test that record what was sent and each typing change. `accept` decides whether a send goes through. */
-export const chatControls = (accept: ChatControls["send"] = () => true) => {
+export const chatControls = (
+  accept: ChatControls["send"] = () => true,
+  acceptReaction = true
+) => {
   const sent: string[] = [];
   const typed: boolean[] = [];
+  const reactions: Parameters<ChatControls["react"]>[] = [];
 
   const controls: ChatControls = {
+    react: async (messageId, emoji) => {
+      reactions.push([messageId, emoji]);
+
+      return await Promise.resolve(acceptReaction);
+    },
     send: (text) => {
       const accepted = accept(text);
 
@@ -20,5 +29,5 @@ export const chatControls = (accept: ChatControls["send"] = () => true) => {
     },
   };
 
-  return { ...controls, sent, typed };
+  return { ...controls, reactions, sent, typed };
 };

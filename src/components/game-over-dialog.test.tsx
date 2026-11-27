@@ -44,6 +44,7 @@ const room = () => {
       player("b", "Ben", 212),
       player("c", "Cara", 90),
     ],
+    reactions: {},
     round: 6,
     settings: { botSpeed: "normal", locked: false, targetScore: 200 },
     spectatorCount: 0,

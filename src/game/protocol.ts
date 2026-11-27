@@ -3,6 +3,8 @@ import * as v from "valibot";
 import { projectActionCards } from "./action-card-resolution";
 import { isAvatar } from "./avatars";
 import { HELD_ACTION_KINDS, HIGHEST_NUMBER } from "./cards";
+import { ReactionEmojiSchema, toReactionsView } from "./chat-reactions";
+import type { MessageReactions } from "./chat-reactions";
 import { DEAL_HISTORY_LIMIT, DRAW_OUTCOMES, LOG_LIMIT, PHASES } from "./engine";
 import type { DealEvent, GameState, HeldCard, LogEntry } from "./engine";
 import { MAX_SPECTATORS } from "./moves";
@@ -109,6 +111,8 @@ export interface RoomView extends Pick<
   /** Flip Threes still under way, waiting on a choice. */
   flips: { targetId: string; remaining: number }[];
   held: HeldCard[];
+  /** The reactions to each chat message, by message ID. */
+  reactions: Partial<Record<number, MessageReactions>>;
   spectatorCount: number;
 }
 
@@ -386,6 +390,8 @@ const LogUpdateSchema = v.object({
   entries: v.array(LogEntrySchema),
 });
 
+const MessageKeySchema = v.pipe(v.string(), v.regex(/^[1-9]\d*$/u));
+
 const StateMessageSchema = v.looseObject({
   lists: v.looseObject({
     dealHistory: DealHistoryUpdateSchema,
@@ -409,6 +415,10 @@ const StateMessageSchema = v.looseObject({
       })
     ),
     round: v.pipe(v.number(), v.integer()),
+    reactions: v.record(
+      MessageKeySchema,
+      v.record(v.string(), ReactionEmojiSchema)
+    ),
     settings: v.looseObject({
       botSpeed: v.picklist(BOT_SPEEDS),
       locked: v.boolean(),
@@ -486,6 +496,7 @@ export const toRoomView = (
     log: state.log,
     phase: state.phase,
     players: state.players.map((player) => ({ ...player })),
+    reactions: toReactionsView(state.chatReactions),
     round: state.round,
     settings: state.settings,
     spectatorCount,

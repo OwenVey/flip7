@@ -1,5 +1,6 @@
 import * as v from "valibot";
 
+import { ReactionEmojiSchema } from "./chat-reactions";
 import { BOT_SPEEDS, TARGET_SCORES } from "./settings";
 import { CHAT_TEXT_LIMIT, NAME_TEXT_LIMIT } from "./text";
 
@@ -59,6 +60,12 @@ const ClientMessageSchema = v.variant("type", [
     type: v.literal("chat"),
   }),
   v.object({ active: v.boolean(), type: v.literal("typing") }),
+  v.object({
+    emoji: v.nullable(ReactionEmojiSchema),
+    messageId: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+    requestId: RequestIdSchema,
+    type: v.literal("react"),
+  }),
   v.object({ type: v.literal("sync") }),
   v.object({ type: v.literal("watch") }),
   v.object({ type: v.literal("watchInstead") }),
@@ -86,6 +93,7 @@ export const isRoomCommand = (command: GameCommand) =>
   command.type === "configure" ||
   command.type === "kick" ||
   command.type === "makeHost" ||
+  command.type === "react" ||
   command.type === "leave";
 
 const ClientMessageJsonSchema = v.pipe(

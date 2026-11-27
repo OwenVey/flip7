@@ -20,6 +20,7 @@ import {
   makeHost,
   nextRound,
   playFor,
+  reactToChat,
   startGame,
   stay,
 } from "./engine";
@@ -570,6 +571,12 @@ export const createRoom = (
 
       case "makeHost": {
         makeHost(game, playerId, command.playerId);
+
+        return none;
+      }
+
+      case "react": {
+        reactToChat(game, playerId, command.messageId, command.emoji);
 
         return none;
       }

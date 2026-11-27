@@ -86,6 +86,13 @@ import type {
 import type { RoomChatLog } from "../lib/room-chat-log";
 import type { ChatControls } from "../lib/room-connection";
 import { eventCue } from "../lib/room-cues";
+import {
+  ChatReactions,
+  createReactionPicker,
+  ReactionPicker,
+  ReactionTrigger,
+} from "./chat-reactions";
+import type { ReactionPickerController } from "./chat-reactions";
 import PlayerAvatar from "./player-avatar";
 import Tooltip from "./tooltip";
 
@@ -417,6 +424,8 @@ const LogRound = (props: {
   newFrom: number | undefined;
   now: number;
   onUnfold: () => void;
+  chatLog: RoomChatLog;
+  picker: ReactionPickerController;
 }) => {
   const spotlight = useContext(SpotlightContext);
   const [chosen, setChosen] = createSignal<boolean>();
@@ -485,13 +494,49 @@ const LogRound = (props: {
             >
               <Switch>
                 <Match when={message()}>
-                  {(chat) => (
-                    <ChatMessage
-                      entry={chat()}
-                      continuation={continuation()}
-                      now={props.now}
-                    />
-                  )}
+                  {(chat) => {
+                    let trigger: HTMLButtonElement | undefined;
+
+                    const picker = () =>
+                      props.chatLog.chat() === undefined
+                        ? undefined
+                        : props.picker;
+
+                    return (
+                      <>
+                        <div class="chat-bubble-row">
+                          <div class="chat-bubble">
+                            <ChatMessage
+                              entry={chat()}
+                              continuation={continuation()}
+                              now={props.now}
+                            />
+                          </div>
+                          <Show when={picker()}>
+                            {(controller) => (
+                              <ReactionTrigger
+                                messageId={chat().id}
+                                picker={controller()}
+                                triggerRef={(element) => {
+                                  trigger = element;
+                                }}
+                              />
+                            )}
+                          </Show>
+                        </div>
+                        <ChatReactions
+                          messageId={chat().id}
+                          reactions={props.chatLog.reactions.of(chat().id)}
+                          mine={props.chatLog.reactions.mine(chat().id)}
+                          interactive={picker() !== undefined}
+                          focusTrigger={() => {
+                            trigger?.focus({ preventScroll: true });
+                          }}
+                          toggle={props.chatLog.reactions.toggle}
+                        />
+                      </>
+                    );
+                  }}
                 </Match>
                 <Match when={happened()}>
                   {(event) => (
@@ -581,6 +626,18 @@ const typingLabel = (names: readonly string[]) => {
 export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
   const now = createPolled(Date.now, SECOND_MS);
   const reads = () => props.chatLog.reads;
+  const picker = createReactionPicker();
+
+  createEffect(
+    () =>
+      reads().filter() !== "Game" &&
+      (props.inSheet !== true || props.chatLog.sheetOpen()),
+    (visible) => {
+      if (!visible) {
+        picker.close();
+      }
+    }
+  );
 
   const continuations = createMemo(() => {
     const log = reads().log();
@@ -749,6 +806,8 @@ export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
                         {(group) => (
                           <LogRound
                             group={group()}
+                            chatLog={props.chatLog}
+                            picker={picker}
                             continuations={continuations()}
                             collapsible={
                               reads().filter() !== "Chat" &&
@@ -819,13 +878,20 @@ export const ChatLog = (props: { chatLog: RoomChatLog; inSheet?: boolean }) => {
             fallback={<p class="muted chat-hint">Join as a player to chat.</p>}
           >
             {(chat) => (
-              <ChatForm
-                chat={chat()}
-                draft={props.chatLog.draft}
-                onSent={() => {
-                  reads().clearNewFrom();
-                }}
-              />
+              <>
+                <ChatForm
+                  chat={chat()}
+                  draft={props.chatLog.draft}
+                  onSent={() => {
+                    reads().clearNewFrom();
+                  }}
+                />
+                <ReactionPicker
+                  controller={picker}
+                  mine={props.chatLog.reactions.mine}
+                  toggle={props.chatLog.reactions.toggle}
+                />
+              </>
             )}
           </Show>
         </div>

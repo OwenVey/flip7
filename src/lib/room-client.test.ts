@@ -447,6 +447,73 @@ describe("the log through the room client", () => {
     vi.useRealTimers();
   });
 
+  it("updates reactions in place and treats a player's Seats as one reactor", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    const otherSeat = net.testPlayer();
+    otherSeat.token = ana.token;
+    const spectator = net.testPlayer();
+    net.connect(otherSeat);
+    net.connect(spectator);
+    net.flush();
+    spectator.client.watch();
+    net.flush();
+    ana.client.chat("hello");
+    net.flush();
+    const { logSeq: messageId } = net.stored.game;
+    const before = ben.client.state.room?.log;
+
+    const first = ana.client.react(messageId, "👍");
+    net.flush();
+    await expect(first).resolves.toBeTruthy();
+    expect(ben.client.state.room?.log).toBe(before);
+    const anaId = ana.client.state.playerId ?? "";
+    expect(
+      [ben, spectator, otherSeat].map(
+        ({ client }) => client.state.room?.reactions
+      )
+    ).toStrictEqual(
+      Array.from({ length: 3 }, () => ({ [messageId]: { [anaId]: "👍" } }))
+    );
+
+    const replacement = otherSeat.client.react(messageId, "❤️");
+
+    net.flush();
+    await replacement;
+    expect(spectator.client.state.room?.reactions).toStrictEqual({
+      [messageId]: { [anaId]: "❤️" },
+    });
+  });
+
+  it("restores confirmed reactions after reconnecting without replaying offline taps", async () => {
+    const net = network();
+    const ana = net.join("Ana");
+    const ben = net.join("Ben");
+    ben.client.chat("hello");
+    net.flush();
+    const { logSeq: messageId } = net.stored.game;
+    const initial = ana.client.react(messageId, "❤️");
+    net.flush();
+    await initial;
+
+    net.drop(ana);
+    await expect(ana.client.react(messageId, "🎉")).resolves.toBeFalsy();
+    net.connect(ana);
+    net.flush();
+    expect(ana.client.state).toMatchObject({
+      notice: null,
+      room: {
+        reactions: { [messageId]: { [ana.client.state.playerId ?? ""]: "❤️" } },
+      },
+    });
+
+    const removal = ana.client.react(messageId, null);
+    net.flush();
+    await expect(removal).resolves.toBeTruthy();
+    expect(ben.client.state.room?.reactions).toStrictEqual({});
+  });
+
   it("adds each broadcast's new entries to the log it has", () => {
     const net = network();
     const ana = net.join("Ana");

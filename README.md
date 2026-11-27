@@ -43,9 +43,13 @@ When the deck runs out, the discard pile is shuffled into a new deck. Table card
 
 ### Watching a room
 
-Open a room link or enter its code and choose **Watch without joining**. You can follow the table and scores, and read the chat, without a display name. Only players can send chat messages. A room can have up to 32 Spectators even when all 16 player slots are filled.
+Open a room link or enter its code and choose **Watch without joining**. You can follow the table and scores, and read the chat, without a display name. Only players can send chat messages and react to them. A room can have up to 32 Spectators even when all 16 player slots are filled.
 
 From the header, choose **Join** to take an available place or **Leave** to stop watching and return to the join screen. Before the game starts, a player can choose **Watch instead** and confirm to give up their seat and keep watching. It's unavailable when that would leave only bots at the table or when the Spectator limit is reached. If the host switches, another player takes over hosting. Join is unavailable while the table is full or locked. A locked room lets current Spectators keep watching, but blocks new watch connections, including after a refresh or disconnect. If all players go offline, Spectators can keep the room open while play pauses.
+
+### Chat reactions
+
+Use **Add reaction** or tap an existing emoji count on a message in **Chat & Log**. You can add one reaction per message. Pick a different emoji to replace yours, or pick the same one to remove it. Reactions don’t add unread messages or notifications.
 
 ### Mobile haptics
 

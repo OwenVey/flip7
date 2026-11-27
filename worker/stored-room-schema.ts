@@ -1,6 +1,7 @@
 import * as v from "valibot";
 
 import { isAvatar } from "../src/game/avatars";
+import { ReactionEmojiSchema } from "../src/game/chat-reactions";
 import { PHASES } from "../src/game/engine";
 import type { GameState } from "../src/game/engine";
 import { ROUND_STATUSES } from "../src/game/player";
@@ -38,6 +39,10 @@ const GameStateSchema: v.GenericSchema<unknown, GameState> = v.object({
     })
   ),
   atOpeningSlot: v.boolean(),
+  chatReactions: v.map(
+    v.pipe(integer, v.minValue(1)),
+    v.map(v.string(), ReactionEmojiSchema)
+  ),
   choice: v.nullable(
     v.object({ card: ActionCardSchema, chooserId: v.string(), options: idList })
   ),

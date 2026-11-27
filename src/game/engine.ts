@@ -23,6 +23,7 @@ import {
   countUniqueNumberCards,
 } from "./cards";
 import type { ActionCard, Card, NumberCard, Random, RoundScore } from "./cards";
+import type { ChatReactions, ReactionEmoji } from "./chat-reactions";
 import type { GameEvent, LogPlayer, Mover, OfflineMover } from "./game-events";
 import { MAX_PLAYERS, MIN_PLAYERS, rejectMove, waitingOn } from "./moves";
 import type { Move, PlayMove } from "./moves";
@@ -129,6 +130,7 @@ export interface GameState extends ActionCardState {
   winner: (LogPlayer & { points: number }) | null;
   /** This game's log, oldest first. Cleared when a game starts. */
   log: LogEntry[];
+  chatReactions: ChatReactions;
   /** The id of the newest log entry. Never reset, so ids stay unique for the life of the room. */
   logSeq: number;
   /** `logSeq` when the log was last cleared. */
@@ -172,6 +174,7 @@ export const createGame = () => {
     games: 0,
     hostId: null,
     log: [],
+    chatReactions: new Map(),
     logClearedAt: 0,
     logSeq: 0,
     outOfCards: false,
@@ -202,7 +205,9 @@ const record = (
   });
 
   if (state.log.length > LOG_LIMIT) {
-    state.log.splice(0, state.log.length - LOG_LIMIT);
+    for (const removed of state.log.splice(0, state.log.length - LOG_LIMIT)) {
+      state.chatReactions.delete(removed.id);
+    }
   }
 };
 
@@ -244,6 +249,35 @@ export const chat = (state: GameState, playerId: string, raw: string) => {
     from: { avatar: player.avatar, id: player.id, name: player.name },
     text,
   });
+};
+
+export const reactToChat = (
+  state: GameState,
+  playerId: string,
+  messageId: number,
+  emoji: ReactionEmoji | null
+) => {
+  getPlayer(state, playerId);
+
+  const message = state.log.find((entry) => entry.id === messageId);
+
+  if (!message || !isChat(message)) {
+    throw new GameError("That chat message is no longer available.");
+  }
+
+  const byPlayer = state.chatReactions.get(messageId) ?? new Map();
+
+  if (emoji === null) {
+    byPlayer.delete(playerId);
+  } else {
+    byPlayer.set(playerId, emoji);
+  }
+
+  if (byPlayer.size === 0) {
+    state.chatReactions.delete(messageId);
+  } else {
+    state.chatReactions.set(messageId, byPlayer);
+  }
 };
 
 const isActive = (state: GameState, id: string) =>
@@ -813,6 +847,7 @@ export const startGame = (
   assertMove(state, playerId, { type: "start" });
 
   state.log = [];
+  state.chatReactions.clear();
   state.logClearedAt = state.logSeq;
 
   for (const player of state.players) {

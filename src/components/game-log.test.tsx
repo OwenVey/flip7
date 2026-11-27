@@ -10,12 +10,14 @@ import type {
   LogEntry,
   LogPlayer,
 } from "../game/engine";
+import type { RoomView } from "../game/protocol";
 import { CHAT_TEXT_LIMIT } from "../game/text";
 import { createRoomChatLog } from "../lib/room-chat-log";
 import type { ChatControls } from "../lib/room-connection";
 import { chatControls } from "../test/chat";
 import { captureScenario } from "../test/diagnostics";
 import { itemAt } from "../test/item-at";
+import ChatSheet from "./chat-sheet";
 import ChatLogPanel, { ChatLog } from "./game-log";
 
 const GameLog = (props: {
@@ -24,12 +26,14 @@ const GameLog = (props: {
   players: readonly LogPlayer[];
   typing: readonly string[];
   chat?: ChatControls;
+  reactions?: RoomView["reactions"];
   round?: number;
 }) => {
   const chatLog = createRoomChatLog({
     chat: props.chat ?? chatControls(),
     inSheet: () => false,
     log: () => props.log,
+    reactions: () => props.reactions ?? {},
     playerId: () => props.playerId,
     players: () => props.players,
     resultsRound: () => null,
@@ -141,6 +145,212 @@ const stayed = (index: number) =>
 
 describe("<GameLog />", () => {
   afterEach(cleanup);
+
+  it("returns focus to Add reaction when removing the only tally", () => {
+    const chat = chatControls();
+    const message = { ...fields(2, 0), from: ben, text: "Nice!" };
+
+    render(() => (
+      <GameLog
+        chat={chat}
+        log={[message]}
+        playerId="a"
+        players={players}
+        reactions={{ 2: { a: "👍" } }}
+        typing={[]}
+      />
+    ));
+
+    const chip = screen.getByRole("button", { name: "Thumbs up: 1" });
+    chip.focus();
+    fireEvent.click(chip);
+    flush();
+
+    expect(chat.reactions).toStrictEqual([[message.id, null]]);
+    expect(chip).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add reaction" })).toHaveFocus();
+  });
+
+  it("shows a reaction at once, returns focus, and drops it if the Room rejects it", async () => {
+    const chat = chatControls(() => true, false);
+
+    const message = {
+      at: 0,
+      from: ben,
+      game: 1,
+      id: 2,
+      round: 1,
+      text: "Nice!",
+    } satisfies ChatEntry;
+
+    render(() => (
+      <GameLog
+        chat={chat}
+        log={[...entries(1), message]}
+        playerId="a"
+        players={players}
+        reactions={{ 2: { a: "👍" } }}
+        typing={[]}
+      />
+    ));
+
+    const trigger = await screen.findByRole("button", {
+      expanded: false,
+      name: "Add reaction",
+    });
+
+    fireEvent.click(trigger);
+    const choice = await screen.findByRole("button", { name: "Thumbs up" });
+    choice.focus();
+    fireEvent.click(choice);
+    flush();
+
+    expect(chat.reactions).toStrictEqual([[message.id, null]]);
+    expect(screen.queryByRole("button", { name: "Thumbs up: 1" })).toBeNull();
+    await expect(
+      screen.findByRole("button", { name: "Thumbs up: 1", pressed: true })
+    ).resolves.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it("closes the reaction picker when its trigger is pressed again", async () => {
+    const message = {
+      at: 0,
+      from: ben,
+      game: 1,
+      id: 2,
+      round: 1,
+      text: "Nice!",
+    } satisfies ChatEntry;
+
+    render(() => (
+      <GameLog log={[message]} playerId="a" players={players} typing={[]} />
+    ));
+
+    const trigger = await screen.findByRole("button", {
+      expanded: false,
+      name: "Add reaction",
+    });
+
+    fireEvent.pointerDown(trigger, { button: 0, pointerType: "mouse" });
+    fireEvent.mouseDown(trigger);
+    fireEvent.click(trigger);
+    flush();
+
+    await expect(
+      screen.findByRole("button", { name: "Thumbs up" })
+    ).resolves.toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.pointerDown(trigger, { button: 0, pointerType: "mouse" });
+    fireEvent.mouseDown(trigger);
+    trigger.focus();
+    fireEvent.click(trigger);
+    flush();
+
+    expect(screen.queryByRole("button", { name: "Thumbs up" })).toBeNull();
+
+    const icon = trigger.querySelector("svg");
+
+    if (!icon) {
+      throw new Error("Expected reaction trigger icon");
+    }
+
+    fireEvent.pointerDown(icon, { pointerType: "touch" });
+    fireEvent.pointerUp(icon, { pointerType: "touch" });
+    fireEvent.click(icon);
+    flush();
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.pointerDown(icon, { pointerType: "touch" });
+    fireEvent.pointerUp(icon, { pointerType: "touch" });
+    fireEvent.click(icon);
+    flush();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("closes the reaction picker inside ChatSheet when its trigger is pressed again", async () => {
+    const message = {
+      at: 0,
+      from: ben,
+      game: 1,
+      id: 2,
+      round: 1,
+      text: "Nice!",
+    } satisfies ChatEntry;
+
+    render(() => {
+      const chatLog = createRoomChatLog({
+        chat: chatControls(),
+        inSheet: () => true,
+        log: () => [message],
+        reactions: () => ({}),
+        playerId: () => "a",
+        players: () => players,
+        resultsRound: () => null,
+        round: () => 1,
+        typing: () => [],
+      });
+
+      return <ChatSheet chatLog={chatLog} />;
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Chat & Log" }));
+    flush();
+
+    const trigger = await screen.findByRole("button", {
+      expanded: false,
+      name: "Add reaction",
+    });
+
+    fireEvent.pointerDown(trigger, { pointerType: "touch" });
+    fireEvent.pointerUp(trigger, { pointerType: "touch" });
+    fireEvent.click(trigger);
+    flush();
+
+    await expect(
+      screen.findByRole("button", { name: "Thumbs up" })
+    ).resolves.toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    const sheet = trigger.closest<HTMLElement>('[data-slot="drawer-content"]');
+    expect(sheet).not.toBeNull();
+    fireEvent.pointerDown(trigger, { pointerType: "touch" });
+    fireEvent.mouseDown(trigger);
+    sheet?.focus();
+    fireEvent.pointerUp(trigger, { pointerType: "touch" });
+    fireEvent.click(trigger);
+    flush();
+
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Thumbs up" })).toBeNull();
+  });
+
+  it("shows totals to spectators without offering interactive reactions", () => {
+    const message = {
+      at: 0,
+      from: ben,
+      game: 1,
+      id: 2,
+      round: 1,
+      text: "Nice!",
+    } satisfies ChatEntry;
+
+    render(() => (
+      <GameLog
+        log={[message]}
+        playerId={null}
+        players={players}
+        reactions={{ 2: { a: "🎉", b: "🎉" } }}
+        typing={[]}
+      />
+    ));
+
+    expect(screen.getByText("Celebrate: 2")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /add reaction|celebrate/iu })
+    ).toBeNull();
+  });
 
   it("tells spectators why they can't chat", () => {
     render(() => (
@@ -564,6 +774,7 @@ describe("<GameLog />", () => {
           chat: chatControls(),
           inSheet: () => false,
           log,
+          reactions: () => ({}),
           playerId: () => "a",
           players: () => players,
           resultsRound: () => null,

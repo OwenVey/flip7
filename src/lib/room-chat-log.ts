@@ -1,11 +1,14 @@
 import { createEffect, createMemo, createSignal } from "solid-js";
 
+import type { MessageReactions, ReactionEmoji } from "../game/chat-reactions";
 import type { LogEntry, LogPlayer } from "../game/engine";
+import type { RoomView } from "../game/protocol";
 import { createChatLogReads } from "./chat-log-reads";
 import type { ChatControls } from "./room-connection";
 
 interface RoomChatLogSource {
   log: () => LogEntry[];
+  reactions: () => RoomView["reactions"];
   players: () => readonly LogPlayer[];
   playerId: () => string | null;
   chat: ChatControls;
@@ -18,6 +21,74 @@ interface RoomChatLogSource {
   /** The room's current round, 0 in the lobby. Its log stays unfolded until the next round starts. */
   round: () => number;
 }
+
+interface Tap {
+  emoji: ReactionEmoji | null;
+  id: number;
+}
+
+const withReaction = (
+  reactions: MessageReactions | undefined,
+  playerId: string,
+  emoji: ReactionEmoji | null
+) => {
+  const others = Object.entries(reactions ?? {}).filter(
+    ([id]) => id !== playerId
+  );
+
+  const shown: MessageReactions = Object.fromEntries(
+    emoji === null ? others : [...others, [playerId, emoji]]
+  );
+
+  return shown;
+};
+
+const createReactions = (
+  source: Pick<RoomChatLogSource, "chat" | "playerId" | "reactions">
+) => {
+  const [taps, setTaps] = createSignal<ReadonlyMap<number, Tap>>(new Map());
+  let lastTap = 0;
+
+  const of = (messageId: number) => {
+    const confirmed = source.reactions()[messageId];
+    const tap = taps().get(messageId);
+    const playerId = source.playerId();
+
+    return tap === undefined || playerId === null
+      ? confirmed
+      : withReaction(confirmed, playerId, tap.emoji);
+  };
+
+  const mine = (messageId: number) => {
+    const playerId = source.playerId();
+
+    return playerId === null ? undefined : of(messageId)?.[playerId];
+  };
+
+  const toggle = async (messageId: number, emoji: ReactionEmoji) => {
+    lastTap += 1;
+
+    const tap = {
+      emoji: mine(messageId) === emoji ? null : emoji,
+      id: lastTap,
+    };
+
+    setTaps((current) => new Map(current).set(messageId, tap));
+    await source.chat.react(messageId, tap.emoji);
+    setTaps((current) => {
+      if (current.get(messageId)?.id !== tap.id) {
+        return current;
+      }
+
+      const next = new Map(current);
+      next.delete(messageId);
+
+      return next;
+    });
+  };
+
+  return { mine, of, toggle };
+};
 
 /**
  * The room's Chat & Log for one viewer: the draft, one read state, and
@@ -63,6 +134,7 @@ export const createRoomChatLog = (source: RoomChatLogSource) => {
     inSheet: source.inSheet,
     players: source.players,
     reads,
+    reactions: createReactions(source),
     round: source.round,
     setSheetOpen: (next: boolean) => {
       setOpenedAt(next && source.inSheet() ? sheetResultsRound() : undefined);
