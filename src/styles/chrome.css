@@ -132,8 +132,10 @@ main > :is(h1, p) {
   text-shadow: 0 2px 0 rgb(0 0 0 / 0.35);
 }
 
-main > p a {
-  color: var(--gold);
+@layer base {
+  main > p a {
+    color: var(--gold);
+  }
 }
 
 /* The wordmark in miniature: the card mark set down at a slant, and gold letters stamped over red and ink like the home page's title. */
@@ -180,10 +182,12 @@ main > p a {
   }
 }
 
-main {
-  width: min(72rem, 100%);
-  margin: 0 auto;
-  padding: 1rem 1rem 4rem;
+@layer base {
+  main {
+    width: min(72rem, 100%);
+    margin: 0 auto;
+    padding: 1rem 1rem 4rem;
+  }
 }
 
 @media (--lg) {
@@ -277,8 +281,10 @@ main {
 }
 
 /* An empty toast region still spans the bottom of the screen, and iOS Safari then paints solid bars instead of letting the page run under its toolbar. */
-[data-slot="toast-region"]:has([data-slot="toast-list"]:empty) {
-  visibility: hidden;
+@layer components {
+  [data-slot="toast-region"]:has([data-slot="toast-list"]:empty) {
+    visibility: hidden;
+  }
 }
 
 .chat-hint {

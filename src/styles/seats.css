@@ -614,6 +614,11 @@
   & > .avatar-tag[data-tone="bot"] {
     background: color-mix(in oklab, var(--bot) 25%, white);
   }
+
+  /* The tag covers the bottom corner, so the menu's chevron moves to the top. */
+  & .player-menu-badge {
+    inset-block: -0.25rem auto;
+  }
 }
 
 /* The host wears a crown: it sits on top of the avatar, its base over the head, tipped a little. */

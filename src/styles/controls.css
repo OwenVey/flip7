@@ -123,150 +123,11 @@
   }
 }
 
-/* One base for every button-like part, so neighbors always match. Change looks with data-variant, size with data-size. */
-:is(
-  [data-slot="button"],
-  [data-slot="collapsible-trigger"],
-  [data-slot="alert-dialog-trigger"],
-  [data-slot="alert-dialog-close"],
-  [data-slot="dialog-trigger"],
-  [data-slot="dialog-close"],
-  [data-slot="drawer-trigger"],
-  [data-slot="drawer-close"],
-  [data-slot="popover-trigger"],
-  [data-slot="menu-trigger"],
-  [data-slot="tooltip-trigger"][data-variant="disclosure"]
-) {
-  --button-height: var(--control-height);
-  height: auto;
-  min-height: var(--button-height);
-  --button-ink: var(--ink);
-  padding-inline: 1rem;
-  border: 1px solid var(--button-ink);
-  box-shadow: 2px 2px 0 var(--button-ink);
-  font-size: var(--ui-font-size);
-  font-weight: 700;
-  /* Rapid taps register as taps instead of a double-tap zoom. */
-  touch-action: manipulation;
-  transition:
-    transform var(--duration-instant) ease,
-    box-shadow var(--duration-instant) ease;
-
-  &:active:not([data-disabled], [aria-disabled="true"]) {
-    transform: translate(2px, 2px);
-    box-shadow: 0 0 0 var(--button-ink);
-  }
-
-  &[data-variant="disclosure"] {
-    padding: 0;
-    border: 0;
-    background: none;
-    box-shadow: none;
-    color: inherit;
-    font: inherit;
-
-    &:active:not([data-disabled], [aria-disabled="true"]) {
-      transform: none;
-      box-shadow: none;
-    }
-  }
-
-  /* A paper button whose red ink warns without competing with the main action. */
-  &[data-tone="danger"]:not([data-variant]) {
-    --button-ink: var(--danger-ink);
-    color: var(--danger);
-
-    @media (hover: hover) {
-      &:hover:not([data-disabled], [aria-disabled="true"]) {
-        color: color-mix(in oklab, var(--danger) 80%, black);
-      }
-    }
-  }
-
-  /* A solid printed red, so it reads as a warning on paper and on felt. */
-  &[data-variant="destructive"] {
-    --button-ink: var(--danger-ink);
-    background: var(--danger);
-    color: var(--paper);
-
-    @media (hover: hover) {
-      &:hover:not([data-disabled], [aria-disabled="true"]) {
-        background: color-mix(in oklab, var(--danger) 85%, black);
-      }
-    }
-  }
-
-  /* Disabled buttons stay opaque in a faded version of their own color, so nothing shows through when they float over the page. */
-  &:is([data-disabled], [aria-disabled="true"]) {
-    --button-ink: color-mix(in oklab, var(--ink) 35%, var(--paper-deep));
-    opacity: 1;
-    background: var(--paper-deep);
-    color: color-mix(in oklab, var(--ink-soft) 55%, var(--paper-deep));
-    cursor: not-allowed;
-
-    &[data-variant="solid"] {
-      border-color: var(--button-ink);
-      background: color-mix(in oklab, var(--accent) 40%, var(--paper-deep));
-      color: var(--paper);
-    }
-
-    &[data-variant="destructive"] {
-      --button-ink: color-mix(
-        in oklab,
-        var(--danger-ink) 40%,
-        var(--paper-deep)
-      );
-      border-color: var(--button-ink);
-      background: color-mix(in oklab, var(--danger) 40%, var(--paper-deep));
-      color: var(--paper);
-    }
-
-    &[data-tone="danger"]:not([data-variant]) {
-      --button-ink: color-mix(
-        in oklab,
-        var(--danger-ink) 35%,
-        var(--paper-deep)
-      );
-      color: color-mix(in oklab, var(--danger) 50%, var(--paper-deep));
-    }
-  }
-
-  &:where([data-size="sm"]) {
-    --button-height: var(--control-height-sm);
-    padding-inline: 0.75rem;
-    font-size: var(--text-sm);
-  }
-
-  &:where([data-size="lg"]) {
-    --button-height: var(--control-height-lg);
-  }
-
-  &[data-icon] {
-    inline-size: var(--button-height);
-    padding-inline: 0;
-  }
-
-  @media (pointer: coarse) {
-    --button-height: var(--control-height-lg);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-
-    &:active:not([data-disabled], [aria-disabled="true"]) {
-      transform: none;
-    }
-  }
-}
-
-/*
- * Touch screens keep :hover on the last thing tapped, so a button would stay
- * in its hover color. These undo ui-sdk's button hovers there; :where keeps
- * them at zero specificity so any button with its own background keeps it.
- */
-@media (hover: none) {
-  :where(
+@layer components {
+  /* One base for every button-like part, so neighbors always match. Change looks with data-variant, size with data-size. */
+  :is(
     [data-slot="button"],
+    [data-slot="collapsible-trigger"],
     [data-slot="alert-dialog-trigger"],
     [data-slot="alert-dialog-close"],
     [data-slot="dialog-trigger"],
@@ -274,84 +135,225 @@
     [data-slot="drawer-trigger"],
     [data-slot="drawer-close"],
     [data-slot="popover-trigger"],
-    [data-slot="menu-trigger"]
-  ):where(:hover) {
-    background: var(--ui-background);
-  }
+    [data-slot="menu-trigger"],
+    [data-slot="tooltip-trigger"][data-variant="disclosure"]
+  ) {
+    --button-height: var(--control-height);
+    height: auto;
+    min-height: var(--button-height);
+    --button-ink: var(--ink);
+    padding-inline: 1rem;
+    border: 1px solid var(--button-ink);
+    box-shadow: 2px 2px 0 var(--button-ink);
+    font-size: var(--ui-font-size);
+    font-weight: 700;
+    /* Rapid taps register as taps instead of a double-tap zoom. */
+    touch-action: manipulation;
+    transition:
+      transform var(--duration-instant) ease,
+      box-shadow var(--duration-instant) ease;
 
-  :where([data-variant="solid"]):where(:hover) {
-    background: var(--ui-primary);
-  }
-}
+    &:active:not([data-disabled], [aria-disabled="true"]) {
+      transform: translate(2px, 2px);
+      box-shadow: 0 0 0 var(--button-ink);
+    }
 
-[data-slot="segmented-control"] {
-  position: relative;
-  display: grid;
-  grid-auto-columns: 1fr;
-  grid-auto-flow: column;
-  padding: 0.25rem;
-  border: 1.5px solid var(--ink);
-  border-radius: var(--radius-md);
-  background: var(--paper-deep);
-  isolation: isolate;
-}
+    &[data-variant="disclosure"] {
+      padding: 0;
+      border: 0;
+      background: none;
+      box-shadow: none;
+      color: inherit;
+      font: inherit;
 
-[data-slot="segmented-control-item"] {
-  min-height: var(--control-height-sm);
-  padding-inline: 0.5rem;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--ink-soft);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  cursor: pointer;
-  touch-action: manipulation;
+      &:active:not([data-disabled], [aria-disabled="true"]) {
+        transform: none;
+        box-shadow: none;
+      }
+    }
 
-  &[data-checked] {
-    color: var(--ink);
-  }
+    /* A paper button whose red ink warns without competing with the main action. */
+    &[data-tone="danger"]:not([data-variant]) {
+      --button-ink: var(--danger-ink);
+      color: var(--danger);
 
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-  }
+      @media (hover: hover) {
+        &:hover:not([data-disabled], [aria-disabled="true"]) {
+          color: color-mix(in oklab, var(--danger) 80%, black);
+        }
+      }
+    }
 
-  &[data-readonly] {
-    cursor: default;
-  }
+    /* A solid printed red, so it reads as a warning on paper and on felt. */
+    &[data-variant="destructive"] {
+      --button-ink: var(--danger-ink);
+      background: var(--danger);
+      color: var(--paper);
 
-  @media (hover: hover) {
-    &:hover:not([data-checked], [data-readonly]) {
-      color: var(--ink);
+      @media (hover: hover) {
+        &:hover:not([data-disabled], [aria-disabled="true"]) {
+          background: color-mix(in oklab, var(--danger) 85%, black);
+        }
+      }
+    }
+
+    /* Disabled buttons stay opaque in a faded version of their own color, so nothing shows through when they float over the page. */
+    &:is([data-disabled], [aria-disabled="true"]) {
+      --button-ink: color-mix(in oklab, var(--ink) 35%, var(--paper-deep));
+      opacity: 1;
+      background: var(--paper-deep);
+      color: color-mix(in oklab, var(--ink-soft) 55%, var(--paper-deep));
+      cursor: not-allowed;
+
+      &[data-variant="solid"] {
+        border-color: var(--button-ink);
+        background: color-mix(in oklab, var(--accent) 40%, var(--paper-deep));
+        color: var(--paper);
+      }
+
+      &[data-variant="destructive"] {
+        --button-ink: color-mix(
+          in oklab,
+          var(--danger-ink) 40%,
+          var(--paper-deep)
+        );
+        border-color: var(--button-ink);
+        background: color-mix(in oklab, var(--danger) 40%, var(--paper-deep));
+        color: var(--paper);
+      }
+
+      &[data-tone="danger"]:not([data-variant]) {
+        --button-ink: color-mix(
+          in oklab,
+          var(--danger-ink) 35%,
+          var(--paper-deep)
+        );
+        color: color-mix(in oklab, var(--danger) 50%, var(--paper-deep));
+      }
+    }
+
+    &:where([data-size="sm"]) {
+      --button-height: var(--control-height-sm);
+      padding-inline: 0.75rem;
+      font-size: var(--text-sm);
+    }
+
+    &:where([data-size="lg"]) {
+      --button-height: var(--control-height-lg);
+    }
+
+    &[data-icon] {
+      inline-size: var(--button-height);
+      padding-inline: 0;
+    }
+
+    @media (pointer: coarse) {
+      --button-height: var(--control-height-lg);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+
+      &:active:not([data-disabled], [aria-disabled="true"]) {
+        transform: none;
+      }
     }
   }
-}
 
-[data-slot="segmented-control-indicator"] {
-  position: absolute;
-  z-index: -1;
-  /* Slides with translate, not top and left, so the browser can run it off the main thread while a deal keeps that thread busy. Every segment has the same width, so the size never needs to animate. */
-  top: 0;
-  left: 0;
-  width: var(--segmented-control-indicator-width);
-  height: var(--segmented-control-indicator-height);
-  border: 1px solid var(--ink);
-  border-radius: var(--radius-sm);
-  background: var(--gold);
-  box-shadow: 1px 1px 0 var(--ink);
-  translate: var(--segmented-control-indicator-left)
-    var(--segmented-control-indicator-top);
-  transition-property: translate;
-  transition-duration: var(--duration-base);
-  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  /*
+ * Touch screens keep :hover on the last thing tapped, so a button would stay
+ * in its hover color. These undo ui-sdk's button hovers there; :where keeps
+ * them at zero specificity so any button with its own background keeps it.
+ */
+  @media (hover: none) {
+    :where(
+      [data-slot="button"],
+      [data-slot="alert-dialog-trigger"],
+      [data-slot="alert-dialog-close"],
+      [data-slot="dialog-trigger"],
+      [data-slot="dialog-close"],
+      [data-slot="drawer-trigger"],
+      [data-slot="drawer-close"],
+      [data-slot="popover-trigger"],
+      [data-slot="menu-trigger"]
+    ):where(:hover) {
+      background: var(--ui-background);
+    }
 
-  &[data-activation-direction="none"] {
-    transition: none;
+    :where([data-variant="solid"]):where(:hover) {
+      background: var(--ui-primary);
+    }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
+  [data-slot="segmented-control"] {
+    position: relative;
+    display: grid;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    padding: 0.25rem;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius-md);
+    background: var(--paper-deep);
+    isolation: isolate;
+  }
+
+  [data-slot="segmented-control-item"] {
+    min-height: var(--control-height-sm);
+    padding-inline: 0.5rem;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+
+    &[data-checked] {
+      color: var(--ink);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    &[data-readonly] {
+      cursor: default;
+    }
+
+    @media (hover: hover) {
+      &:hover:not([data-checked], [data-readonly]) {
+        color: var(--ink);
+      }
+    }
+  }
+
+  [data-slot="segmented-control-indicator"] {
+    position: absolute;
+    z-index: -1;
+    /* Slides with translate, not top and left, so the browser can run it off the main thread while a deal keeps that thread busy. Every segment has the same width, so the size never needs to animate. */
+    top: 0;
+    left: 0;
+    width: var(--segmented-control-indicator-width);
+    height: var(--segmented-control-indicator-height);
+    border: 1px solid var(--ink);
+    border-radius: var(--radius-sm);
+    background: var(--gold);
+    box-shadow: 1px 1px 0 var(--ink);
+    translate: var(--segmented-control-indicator-left)
+      var(--segmented-control-indicator-top);
+    transition-property: translate;
+    transition-duration: var(--duration-base);
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+
+    &[data-activation-direction="none"] {
+      transition: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
   }
 }

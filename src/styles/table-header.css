@@ -50,7 +50,11 @@
         [data-slot="menu-trigger"]
       ) {
       --button-height: var(--control-height-sm);
-      padding-inline: 0.75rem;
+
+      /* Icon buttons stay square; :where keeps the narrow header's icon-only rules winning. */
+      &:where(:not([data-icon])) {
+        padding-inline: 0.75rem;
+      }
     }
   }
 }
