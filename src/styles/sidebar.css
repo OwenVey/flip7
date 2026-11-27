@@ -297,23 +297,14 @@
 }
 
 /*
- * The chat drawer keeps one height. At half height its foot pads by the part
- * below the screen's edge, so the newest messages and the message box stay in
- * view. The padding follows a drag between the two heights, a layout per frame
- * traded for never hiding the box.
+ * The chat drawer keeps one height. At the lower snap point its foot pads by
+ * the part below the screen's edge, so the newest messages and the message box
+ * stay in view without triggering layout on every drag frame.
  */
 [data-slot="drawer-content"].chat-sheet {
   --chat-sheet-height: min(
     85dvh,
     calc(var(--visual-viewport-height, 100dvh) - 1rem)
-  );
-  --chat-sheet-hidden: calc(
-    (1 - var(--drawer-expand, 1)) *
-      max(
-        0px,
-        var(--chat-sheet-height) - var(--visual-viewport-height, 100dvh) *
-          var(--chat-sheet-lower-snap)
-      )
   );
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -321,10 +312,21 @@
   max-width: none;
   height: var(--chat-sheet-height);
   max-height: none;
-  padding: 0 0 calc(env(safe-area-inset-bottom) + var(--chat-sheet-hidden));
+  padding: 0 0 env(safe-area-inset-bottom);
   border: 0;
   border-radius: 1.5rem 1.5rem 0 0;
   background: var(--paper);
+
+  &[data-snap-point="0.5"] {
+    padding-block-end: calc(
+      env(safe-area-inset-bottom) +
+        max(
+          0px,
+          var(--chat-sheet-height) - var(--visual-viewport-height, 100dvh) *
+            var(--chat-sheet-lower-snap)
+        )
+    );
+  }
 
   /* Paper continues below the sheet, so iOS's see-through toolbar and keyboard bar show the sheet, not the page. */
   &::after {

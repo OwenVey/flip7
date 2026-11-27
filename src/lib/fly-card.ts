@@ -379,32 +379,30 @@ const closeSlots = (
     [...seats].flatMap((seat) => [...measureHeader(seat)])
   );
 
-  const spots = leaving.map((card) => ({
-    card,
-    rect: card.getBoundingClientRect(),
-    width: card.offsetWidth,
-  }));
+  const spots = leaving.map((card) => {
+    const parent = card.offsetParent;
+    const parentRect = parent?.getBoundingClientRect();
 
-  for (const { card, width } of spots) {
+    return {
+      card,
+      originLeft:
+        parent && parentRect ? parentRect.left + parent.clientLeft : 0,
+      originTop: parent && parentRect ? parentRect.top + parent.clientTop : 0,
+      rect: card.getBoundingClientRect(),
+      width: card.offsetWidth,
+    };
+  });
+
+  for (const { card, originLeft, originTop, rect, width } of spots) {
     cancelSlotSlide(card);
     card.dataset.leaving = "";
     Object.assign(card.style, {
-      left: "0",
+      left: `${rect.left - originLeft}px`,
       margin: "0",
       position: "absolute",
-      top: "0",
+      top: `${rect.top - originTop}px`,
       width: `${width}px`,
     });
-  }
-
-  const placed = spots.map((spot) => ({
-    ...spot,
-    origin: spot.card.getBoundingClientRect(),
-  }));
-
-  for (const { card, origin, rect } of placed) {
-    card.style.left = `${rect.left - origin.left}px`;
-    card.style.top = `${rect.top - origin.top}px`;
   }
 
   return slideFrom(layout, {

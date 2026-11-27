@@ -256,7 +256,6 @@
   background: var(--paper);
   box-shadow: var(--shadow-print), var(--shadow-table);
   scroll-margin-block-start: 5.5rem;
-  transition: box-shadow var(--duration-fast) ease;
 
   &[data-me] {
     background: var(--gold-soft);
@@ -433,9 +432,6 @@
   outline-offset: 2px;
   --pick-color: var(--accent);
   cursor: pointer;
-  @media (prefers-reduced-motion: no-preference) {
-    transition: box-shadow var(--duration-fast) ease;
-  }
 
   &[data-pickable="freeze"] {
     --pick-color: var(--freeze);
@@ -471,9 +467,7 @@
     }
 
     @media (prefers-reduced-motion: no-preference) {
-      transition:
-        transform var(--duration-fast) ease,
-        box-shadow var(--duration-fast) ease;
+      transition: transform var(--duration-fast) ease;
     }
   }
 

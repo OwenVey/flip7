@@ -802,7 +802,7 @@
       opacity var(--duration-fast) ease-out,
       color var(--duration-fast) ease-out,
       border-color var(--duration-fast) ease-out,
-      background var(--duration-fast) ease-out,
+      background-color var(--duration-fast) ease-out,
       scale var(--duration-instant) ease;
 
     /* Expand touch hit target to ~44px without adding visual bulk. */
@@ -899,10 +899,9 @@
     animation: reaction-chip-in var(--reaction-chip-duration) var(--ease-pop)
       both;
     transition:
-      background var(--duration-fast) ease-out,
+      background-color var(--duration-fast) ease-out,
       color var(--duration-fast) ease-out,
-      transform var(--duration-instant) ease,
-      box-shadow var(--duration-instant) ease;
+      transform var(--duration-instant) ease;
 
     &[aria-pressed="true"] {
       border-color: var(--ink);
@@ -937,7 +936,7 @@
       animation-name: reaction-fade-in;
       animation-timing-function: linear;
       transition:
-        background var(--duration-fast) linear,
+        background-color var(--duration-fast) linear,
         color var(--duration-fast) linear;
 
       &:active:not([data-disabled], [aria-disabled="true"]) {
@@ -1019,7 +1018,7 @@
       var(--ease-pop)
       calc(var(--reaction-option-index, 0) * var(--reaction-option-step)) both;
     transition:
-      background var(--duration-fast) ease-out,
+      background-color var(--duration-fast) ease-out,
       scale var(--duration-instant) var(--ease-settle);
 
     &:nth-of-type(2) {
@@ -1072,7 +1071,7 @@
 
     @media (prefers-reduced-motion: reduce) {
       animation: none;
-      transition: background var(--duration-fast) linear;
+      transition: background-color var(--duration-fast) linear;
 
       &:hover,
       &:active:not([data-disabled], [aria-disabled="true"]) {
