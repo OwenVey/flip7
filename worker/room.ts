@@ -47,11 +47,18 @@ const send = (ws: WebSocket, message: ServerMessage) => {
 };
 
 // WARNING: messages share arrays with the live room, so serialize them now to match the broadcast position just saved.
-const framesOf = (outcome: Pick<RoomOutcome, "effects">) => {
+const framesOf = (
+  outcome: Pick<RoomOutcome, "effects">,
+  hasVisitors: boolean
+) => {
   const frames = new Map<ServerMessage, string>();
 
   for (const effect of outcome.effects) {
-    if (effect.type === "broadcast" && !frames.has(effect.preview)) {
+    if (
+      hasVisitors &&
+      effect.type === "broadcast" &&
+      !frames.has(effect.preview)
+    ) {
       frames.set(effect.preview, JSON.stringify(effect.preview));
     }
 
@@ -189,7 +196,11 @@ export class GameRoom extends Server<Env> {
       return;
     }
 
-    const frameOf = framesOf(result);
+    const hasVisitors = [...this.getConnections<Admission>()].some(
+      (connection) => (connection.state ?? null) === null
+    );
+
+    const frameOf = framesOf(result, hasVisitors);
 
     if (result.save && result.expired) {
       this.stored = null;
