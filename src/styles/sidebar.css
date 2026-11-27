@@ -297,9 +297,8 @@
 }
 
 /*
- * The chat drawer keeps one height. At the lower snap point its foot pads by
- * the part below the screen's edge, so the newest messages and the message box
- * stay in view without triggering layout on every drag frame.
+ * The shell keeps one height. Only the chat body resizes as the drawer moves,
+ * keeping the newest messages and the composer above the viewport edge.
  */
 [data-slot="drawer-content"].chat-sheet {
   --chat-sheet-height: min(
@@ -316,17 +315,6 @@
   border: 0;
   border-radius: 1.5rem 1.5rem 0 0;
   background: var(--paper);
-
-  &[data-snap-point="0.5"] {
-    padding-block-end: calc(
-      env(safe-area-inset-bottom) +
-        max(
-          0px,
-          var(--chat-sheet-height) - var(--visual-viewport-height, 100dvh) *
-            var(--chat-sheet-lower-snap)
-        )
-    );
-  }
 
   /* Paper continues below the sheet, so iOS's see-through toolbar and keyboard bar show the sheet, not the page. */
   &::after {
@@ -372,8 +360,18 @@
 }
 
 .chat-sheet-body {
+  --chat-sheet-hidden: calc(
+    (1 - var(--drawer-expand, 1)) *
+      max(
+        0px,
+        var(--chat-sheet-height) - var(--visual-viewport-height, 100dvh) *
+          var(--chat-sheet-lower-snap)
+      )
+  );
   display: grid;
+  contain: layout;
   min-block-size: 0;
+  max-block-size: calc(100% - var(--chat-sheet-hidden));
   padding: 0.75rem var(--dialog-inset) var(--dialog-inset);
 
   overflow-y: auto;

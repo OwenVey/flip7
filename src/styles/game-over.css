@@ -295,7 +295,7 @@
       );
       pointer-events: none;
       content: "";
-      animation: winner-shine 4500ms ease-in-out 800ms infinite;
+      animation: winner-shine 4500ms ease-in-out 800ms infinite backwards;
     }
   }
 
