@@ -2,7 +2,7 @@ import { createAudio } from "@nkzw/audio";
 import type { Audio, Sound as AudioSound } from "@nkzw/audio";
 import { createLocalStorage, createPreference } from "@ui-sdk/core";
 import { usePreference } from "@ui-sdk/solid/preferences";
-import { createEffect, createMemo, onSettled } from "solid-js";
+import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
 
 import { listenForButtonSounds } from "./button-sounds";
 
@@ -46,10 +46,10 @@ const filesOf = (name: Sound) => {
   const count = SOUND_VARIANTS[name];
 
   return count === undefined
-    ? [`/sounds/${name}.wav`]
+    ? [`/sounds/${name}.m4a`]
     : Array.from(
         { length: count },
-        (_, index) => `/sounds/${name}-${index + 1}.wav`
+        (_, index) => `/sounds/${name}-${index + 1}.m4a`
       );
 };
 
@@ -95,7 +95,9 @@ const savedVolume = (name: string, fallback: number) => {
   ] as const;
 };
 
-export const createRoomSounds = () => {
+export const createRoomSounds = (
+  createMixer: typeof createAudio = createAudio
+) => {
   const mutedPreference = createPreference({
     attribute: "data-sound-muted",
     defaultValue: "false",
@@ -115,6 +117,8 @@ export const createRoomSounds = () => {
     "music-volume",
     DEFAULT_MUSIC_VOLUME
   );
+
+  const [ready, setReady] = createSignal(false);
 
   let mixer: Audio | undefined;
   let track: AudioSound | undefined;
@@ -145,10 +149,33 @@ export const createRoomSounds = () => {
     }
   };
 
-  const preloadSounds = () => {
-    const audio = createAudio();
+  const ensureMixer = (silent: boolean) => {
+    if (mixer) {
+      return mixer;
+    }
+
+    const audio = createMixer();
     mixer = audio;
-    audio.mute(muted());
+    audio.mute(silent);
+    track = audio.sound({
+      loop: true,
+      preload: false,
+      src: ["/sounds/table-loop.m4a", "/sounds/table-loop.opus"],
+    });
+    track.once("unlock", () => {
+      unlocked = true;
+      syncMusic(musicVolume(), muted());
+    });
+
+    return audio;
+  };
+
+  const loadEffects = (silent: boolean, volume: number) => {
+    if (sounds.size > 0) {
+      return;
+    }
+
+    const audio = ensureMixer(silent);
 
     for (const [name, gain] of SOUND_VOLUMES) {
       sounds.set(
@@ -156,23 +183,27 @@ export const createRoomSounds = () => {
         filesOf(name).map((file) =>
           audio.sound({
             src: [file],
-            volume: (effectsVolume() / MAX_PERCENT) * gain,
+            volume: (volume / MAX_PERCENT) * gain,
           })
         )
       );
     }
-
-    track = audio.sound({
-      loop: true,
-      preload: false,
-      src: ["/sounds/table-loop.m4a", "/sounds/table-loop.opus"],
-    });
-
-    sounds.get("turn")?.[0]?.once("unlock", () => {
-      unlocked = true;
-      syncMusic(musicVolume(), muted());
-    });
   };
+
+  createEffect(
+    () => [ready(), muted(), effectsVolume(), musicVolume() > 0] as const,
+    ([canLoad, silent, volume, hasMusic]) => {
+      if (!canLoad || silent) {
+        return;
+      }
+
+      if (volume > 0) {
+        loadEffects(silent, volume);
+      } else if (hasMusic) {
+        ensureMixer(silent);
+      }
+    }
+  );
 
   createEffect(muted, (silent) => {
     mixer?.mute(silent);
@@ -193,7 +224,9 @@ export const createRoomSounds = () => {
   });
 
   onSettled(() => {
-    const preloadTimer = setTimeout(preloadSounds, 0);
+    const preloadTimer = setTimeout(() => {
+      setReady(true);
+    }, 0);
 
     const stopButtonSounds = listenForButtonSounds(document, (cue) => {
       play(cue);
@@ -201,10 +234,13 @@ export const createRoomSounds = () => {
 
     return () => {
       clearTimeout(preloadTimer);
+      setReady(false);
       stopButtonSounds();
       void mixer?.dispose();
       mixer = undefined;
       track = undefined;
+      unlocked = false;
+      musicPlaying = false;
       sounds.clear();
       lastVariant.clear();
     };
@@ -251,6 +287,7 @@ export const createRoomSounds = () => {
       mutedPreference.set(next ? "true" : "false");
 
       if (!next && effectsVolume() > 0) {
+        loadEffects(false, effectsVolume());
         mixer?.mute(false);
         sounds.get("turn")?.[0]?.play();
       }
