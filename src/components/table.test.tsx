@@ -339,6 +339,7 @@ describe("<Table />", () => {
 
     expect(result.error).toBeUndefined();
     const sheet = await screen.findByRole("dialog", { name: "Scores" });
+    expect(sheet).toHaveAttribute("data-driver", "pointer");
     const standings = within(sheet).getByRole("table", { name: "Scores" });
     expect(
       within(standings).getByRole("cell", { name: "7 points, in play" })

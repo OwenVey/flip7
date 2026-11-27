@@ -169,7 +169,8 @@
   line-height: var(--leading-none);
 }
 
-[data-slot="dialog-content"]:is(.table-sheet, .rules-dialog) {
+.table-sheet,
+[data-slot="dialog-content"].rules-dialog {
   gap: 0;
   max-height: min(85dvh, calc(var(--visual-viewport-height, 100dvh) - 1rem));
   padding: 0;
@@ -245,25 +246,26 @@
   }
 }
 
-[data-slot="dialog-content"]:is(
-  .table-sheet,
-  .rules-dialog[data-presentation="sheet"]
-) {
+[data-slot="dialog-content"].rules-dialog[data-presentation="sheet"] {
   --sheet-backdrop: var(--ui-overlay);
+}
+
+.table-sheet,
+[data-slot="dialog-content"].rules-dialog[data-presentation="sheet"] {
   width: 100%;
   padding-bottom: env(safe-area-inset-bottom);
   border: 0;
   border-radius: 1.5rem 1.5rem 0 0;
 }
 
-:is(
-  [data-slot="dialog-content"]:is(
-    .table-sheet,
-    .rules-dialog[data-presentation="sheet"]
-  ),
-  [data-slot="drawer-content"].chat-sheet
-) {
+.table-sheet,
+[data-slot="dialog-content"].rules-dialog[data-presentation="sheet"],
+[data-slot="drawer-content"].chat-sheet {
   box-shadow: var(--shadow-sheet);
+}
+
+.table-sheet {
+  max-width: none;
 }
 
 .table-sheet-header {
@@ -280,7 +282,7 @@
     padding-top: var(--dialog-inset);
   }
 
-  [data-presentation="sheet"] &::before {
+  :is(.table-sheet, [data-presentation="sheet"]) &::before {
     position: absolute;
     inset: 0.375rem auto auto 50%;
     width: 2rem;

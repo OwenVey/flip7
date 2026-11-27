@@ -1,12 +1,13 @@
 import X from "@lucide/solid/icons/x";
 import type { JSX } from "@solidjs/web";
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogTitle,
-  DialogTrigger,
-} from "@ui-sdk/solid/dialog";
+  Drawer,
+  DrawerBackdrop,
+  DrawerClose,
+  DrawerContent,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@ui-sdk/solid/drawer";
 import { Show } from "solid-js";
 import type { ParentProps } from "solid-js";
 
@@ -25,8 +26,8 @@ export default function TableSheet(
   }>
 ) {
   return (
-    <Dialog
-      presentation="sheet"
+    <Drawer
+      driver="pointer"
       open={props.open}
       onOpenChange={props.onOpenChange}
     >
@@ -36,7 +37,7 @@ export default function TableSheet(
         side="bottom"
         compactOnly={props.shortLabel !== undefined}
         trigger={(hint) => (
-          <DialogTrigger
+          <DrawerTrigger
             {...hint}
             data-table-sheet-trigger=""
             aria-label={props.triggerLabel}
@@ -50,14 +51,15 @@ export default function TableSheet(
           </span>
         </Show>
       </Tooltip>
-      <DialogContent class="table-sheet">
+      <DrawerBackdrop />
+      <DrawerContent class="table-sheet">
         <header class="table-sheet-header">
-          <DialogTitle>{props.title}</DialogTitle>
+          <DrawerTitle>{props.title}</DrawerTitle>
           <Tooltip
             content="Close"
             type="label"
             trigger={(hint) => (
-              <DialogClose
+              <DrawerClose
                 {...hint}
                 aria-label="Close"
                 data-size="sm"
@@ -75,7 +77,7 @@ export default function TableSheet(
         >
           {props.children}
         </ScrollFade>
-      </DialogContent>
-    </Dialog>
+      </DrawerContent>
+    </Drawer>
   );
 }

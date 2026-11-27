@@ -1,4 +1,8 @@
 @layer components {
+  [data-slot="dialog-viewport"] {
+    position: fixed;
+  }
+
   :is(
     [data-slot="alert-dialog-content"],
     [data-slot="dialog-content"][data-presentation="dialog"]
