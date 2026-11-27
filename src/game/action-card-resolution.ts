@@ -1,10 +1,8 @@
-import type { ActionCard, Card, HeldActionKind } from "./cards";
+import type { ActionCard, Card, HeldActionCard } from "./cards";
 import type { GameEvent, LogPlayer } from "./game-events";
 import type { RoundStatus } from "./player";
 
 export const FLIP_THREE_COUNT = 3;
-
-type HeldActionCard = Extract<ActionCard, { kind: HeldActionKind }>;
 
 export interface ActionCardChoice {
   chooserId: string;

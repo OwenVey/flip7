@@ -1,7 +1,7 @@
 import * as v from "valibot";
 
 import { ReactionEmojiSchema } from "./chat-reactions";
-import { BOT_SPEEDS, TARGET_SCORES } from "./settings";
+import { RoomSettingsSchema } from "./settings";
 import { CHAT_TEXT_LIMIT, NAME_TEXT_LIMIT } from "./text";
 
 const IdSchema = v.pipe(v.string(), v.maxLength(64));
@@ -10,13 +10,7 @@ const RequestIdSchema = v.optional(v.pipe(v.string(), v.uuid()));
 
 const ForIdSchema = v.optional(IdSchema);
 
-const ClientMessageSchema = v.variant("type", [
-  v.object({
-    avatar: v.optional(v.number()),
-    name: v.pipe(v.string(), v.maxLength(NAME_TEXT_LIMIT.units)),
-    token: v.nullable(IdSchema),
-    type: v.literal("join"),
-  }),
+const GameCommandSchema = v.variant("type", [
   v.object({ requestId: RequestIdSchema, type: v.literal("start") }),
   v.object({
     forId: ForIdSchema,
@@ -38,10 +32,8 @@ const ClientMessageSchema = v.variant("type", [
   v.object({ requestId: RequestIdSchema, type: v.literal("lobby") }),
   v.object({ requestId: RequestIdSchema, type: v.literal("addBot") }),
   v.object({
-    botSpeed: v.optional(v.picklist(BOT_SPEEDS)),
-    locked: v.optional(v.boolean()),
+    ...v.partial(RoomSettingsSchema).entries,
     requestId: RequestIdSchema,
-    targetScore: v.optional(v.picklist(TARGET_SCORES)),
     type: v.literal("configure"),
   }),
   v.object({
@@ -56,16 +48,26 @@ const ClientMessageSchema = v.variant("type", [
   }),
   v.object({ requestId: RequestIdSchema, type: v.literal("leave") }),
   v.object({
-    text: v.pipe(v.string(), v.maxLength(CHAT_TEXT_LIMIT.units)),
-    type: v.literal("chat"),
-  }),
-  v.object({ active: v.boolean(), type: v.literal("typing") }),
-  v.object({
     emoji: v.nullable(ReactionEmojiSchema),
     messageId: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
     requestId: RequestIdSchema,
     type: v.literal("react"),
   }),
+]);
+
+const ClientMessageSchema = v.variant("type", [
+  ...GameCommandSchema.options,
+  v.object({
+    avatar: v.optional(v.number()),
+    name: v.pipe(v.string(), v.maxLength(NAME_TEXT_LIMIT.units)),
+    token: v.nullable(IdSchema),
+    type: v.literal("join"),
+  }),
+  v.object({
+    text: v.pipe(v.string(), v.maxLength(CHAT_TEXT_LIMIT.units)),
+    type: v.literal("chat"),
+  }),
+  v.object({ active: v.boolean(), type: v.literal("typing") }),
   v.object({ type: v.literal("sync") }),
   v.object({ type: v.literal("watch") }),
   v.object({ type: v.literal("watchInstead") }),
@@ -74,19 +76,7 @@ const ClientMessageSchema = v.variant("type", [
 
 export type ClientMessage = v.InferOutput<typeof ClientMessageSchema>;
 
-export type GameCommand = Exclude<
-  ClientMessage,
-  {
-    type:
-      | "chat"
-      | "join"
-      | "stopWatching"
-      | "sync"
-      | "typing"
-      | "watch"
-      | "watchInstead";
-  }
->;
+export type GameCommand = v.InferOutput<typeof GameCommandSchema>;
 
 /** Commands that can run alongside a pending move and need no reconnect confirmation. */
 export const isRoomCommand = (command: GameCommand) =>

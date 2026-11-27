@@ -10,6 +10,7 @@ import plainSvg from "../assets/favicon.svg?raw";
 import siteIcon from "../assets/favicon.svg?url";
 import type { RoomView } from "../game/protocol";
 import { clearAppBadge, showAppBadge } from "./app-badge";
+import type { DealPlaybackView } from "./deal-playback";
 import { yourMove } from "./table-prompt";
 
 const MOVE_ALERT_TITLE = "⚡ Your move!";
@@ -96,11 +97,10 @@ const createTabAlert = (
   return () => (blink() === "lit" ? MOVE_ALERT_TITLE : title());
 };
 
-interface MoveAlertView {
-  room: RoomView | null;
-  dealing: boolean;
-  actionsDisabled: boolean;
-}
+export type MoveAlertView = Pick<
+  DealPlaybackView,
+  "actionsDisabled" | "dealing" | "room"
+>;
 
 interface MoveAlertOutputs {
   /** The turn sound, played once per new Move unless the same Move carries on. */

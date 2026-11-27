@@ -2,6 +2,7 @@ import {
   buildDeck,
   calculateRoundScore,
   countUniqueNumberCards,
+  uniqueNumberValues,
 } from "./cards";
 import type { Card } from "./cards";
 import type { ActionCardChoice, Player, RoundStatus } from "./engine";
@@ -22,19 +23,21 @@ export const BOT_LATE_GAME_SCORE = 150;
 
 const CATCH_UP_STATUSES = new Set<RoundStatus>(["active", "stayed"]);
 
-const NUMBER_COPIES = (() => {
+const countNumberCopies = (cards: readonly Card[]) => {
   const copies = new Map<number, number>();
 
-  for (const card of buildDeck()) {
+  for (const card of cards) {
     if (card.kind === "number") {
       copies.set(card.value, (copies.get(card.value) ?? 0) + 1);
     }
   }
 
   return copies;
-})();
+};
 
-const DECK_SIZE = buildDeck().length;
+const standardDeck = buildDeck();
+const NUMBER_COPIES = countNumberCopies(standardDeck);
+const DECK_SIZE = standardDeck.length;
 
 type BotPlayer = Pick<Player, "bustCard" | "hand" | "id" | "score" | "status">;
 
@@ -61,22 +64,12 @@ const roundPoints = (player: BotPlayer) =>
  * only the cards that aren't face up on the table.
  */
 export const bustChance = (view: BotView, hand: readonly Card[]) => {
-  const seen = new Map<number, number>();
   const visible = visibleCards(view);
-
-  for (const card of visible) {
-    if (card.kind === "number") {
-      seen.set(card.value, (seen.get(card.value) ?? 0) + 1);
-    }
-  }
-
-  const held = new Set(
-    hand.flatMap((card) => (card.kind === "number" ? [card.value] : []))
-  );
+  const seen = countNumberCopies(visible);
 
   let danger = 0;
 
-  for (const value of held) {
+  for (const value of uniqueNumberValues(hand)) {
     danger += Math.max(
       0,
       (NUMBER_COPIES.get(value) ?? 0) - (seen.get(value) ?? 0)

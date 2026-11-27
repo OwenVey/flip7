@@ -8,11 +8,11 @@ import { createChatLogReads } from "./chat-log-reads";
 import type { ChatControls } from "./room-connection";
 
 interface RoomChatLogSource {
+  chat: ChatControls;
   log: () => LogEntry[];
+  playerId: () => string | null;
   reactions: () => RoomView["reactions"];
   players: () => readonly LogPlayer[];
-  playerId: () => string | null;
-  chat: ChatControls;
   /** Other players typing a chat message, by player ID. */
   typing: () => readonly string[];
   /** The layout puts Chat & Log in a sheet instead of beside the page. */

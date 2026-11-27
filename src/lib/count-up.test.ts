@@ -18,13 +18,10 @@ const withMotion = (run: () => void) => {
   }
 };
 
-const mount = (
-  target: () => number,
-  options?: { durationMs?: number; initial?: () => number }
-) =>
+const mount = (...args: Parameters<typeof createCountUp>) =>
   createRoot((dispose) => ({
     dispose,
-    ...createCountUp(target, options),
+    ...createCountUp(...args),
   }));
 
 describe(createCountUp, () => {

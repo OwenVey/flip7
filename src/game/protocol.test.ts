@@ -260,6 +260,16 @@ describe(parseServerMessage, () => {
   it.each([
     ["without lists", { ...state(), lists: undefined }],
     [
+      "without a required setting",
+      {
+        ...state(),
+        room: {
+          ...state().room,
+          settings: { ...state().room.settings, locked: undefined },
+        },
+      },
+    ],
+    [
       "with a deal history update missing its entries",
       {
         ...state(),
@@ -282,5 +292,21 @@ describe(parseServerMessage, () => {
     ],
   ])("rejects a live room update %s", (_, message) => {
     expect(parseServerMessage(JSON.stringify(message))).toBeNull();
+  });
+
+  it("keeps extra fields in a live room's settings", () => {
+    const message = state();
+
+    const withExtra = {
+      ...message,
+      room: {
+        ...message.room,
+        settings: { ...message.room.settings, extra: true },
+      },
+    };
+
+    expect(parseServerMessage(JSON.stringify(withExtra))).toStrictEqual(
+      withExtra
+    );
   });
 });

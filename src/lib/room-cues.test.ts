@@ -4,7 +4,7 @@ import { addPlayer, createGame } from "../game/engine";
 import type { GameEvent } from "../game/game-events";
 import { toRoomView } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
-import { eventCue, roomCues } from "./room-cues";
+import { eventCue, readRoomFeedback } from "./room-cues";
 
 const LOGGED_AT = Date.now();
 
@@ -36,18 +36,28 @@ const before: RoomView = {
   turnId: "opponent",
 };
 
-describe(roomCues, () => {
+describe(readRoomFeedback, () => {
   it("reports a newly revealed card", () => {
     expect(
-      roomCues(before, { ...before, drawSeq: 11, turnId: "me" }, "me")
-    ).toStrictEqual(["reveal"]);
+      readRoomFeedback(before, { ...before, drawSeq: 11, turnId: "me" }, "me")
+        .table
+    ).toBe("reveal");
     expect(
-      roomCues(before, { ...before, drawSeq: 11, turnId: "me" }, "opponent")
-    ).toStrictEqual(["reveal"]);
+      readRoomFeedback(
+        before,
+        { ...before, drawSeq: 11, turnId: "me" },
+        "opponent"
+      ).table
+    ).toBe("reveal");
   });
 
   it("does not replay cues when the same room state is broadcast again", () => {
-    expect(roomCues(before, { ...before }, "me")).toStrictEqual([]);
+    expect(readRoomFeedback(before, { ...before }, "me")).toStrictEqual({
+      chat: null,
+      events: [],
+      finale: null,
+      table: null,
+    });
   });
 
   it("prioritizes a bust over a reveal and a win over a bust", () => {
@@ -70,10 +80,14 @@ describe(roomCues, () => {
       ],
     };
 
-    expect(roomCues(before, bust, "me")).toStrictEqual(["bust"]);
+    expect(readRoomFeedback(before, bust, "me").table).toBe("bust");
     expect(
-      roomCues(before, { ...bust, phase: "gameOver", winnerIds: ["me"] }, "me")
-    ).toStrictEqual(["win"]);
+      readRoomFeedback(
+        before,
+        { ...bust, phase: "gameOver", winnerIds: ["me"] },
+        "me"
+      )
+    ).toMatchObject({ finale: "win", table: null });
   });
 
   it.each([
@@ -100,7 +114,7 @@ describe(roomCues, () => {
         ],
       };
 
-      expect(roomCues(before, after, "me")).toStrictEqual(["reveal"]);
+      expect(readRoomFeedback(before, after, "me").table).toBe("reveal");
     }
   );
 
@@ -112,10 +126,10 @@ describe(roomCues, () => {
     };
 
     expect({
-      loser: roomCues(before, over, "me"),
-      spectator: roomCues(before, over, null),
-      winner: roomCues(before, over, "opponent"),
-    }).toStrictEqual({ loser: ["lose"], spectator: ["win"], winner: ["win"] });
+      loser: readRoomFeedback(before, over, "me").finale,
+      spectator: readRoomFeedback(before, over, null).finale,
+      winner: readRoomFeedback(before, over, "opponent").finale,
+    }).toStrictEqual({ loser: "lose", spectator: "win", winner: "win" });
   });
 
   it("plays a message sound for other players' chat, not your own", () => {
@@ -134,8 +148,8 @@ describe(roomCues, () => {
       ],
     };
 
-    expect(roomCues(before, chat, "me")).toStrictEqual(["message"]);
-    expect(roomCues(before, chat, "opponent")).toStrictEqual([]);
+    expect(readRoomFeedback(before, chat, "me").chat).toBe("message");
+    expect(readRoomFeedback(before, chat, "opponent").chat).toBeNull();
   });
 });
 

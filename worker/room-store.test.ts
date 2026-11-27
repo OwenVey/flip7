@@ -80,6 +80,22 @@ const loadedStore = async (room = newStoredRoom("ABCDE", NOW)) => {
 };
 
 describe(createRoomStore, () => {
+  it("drops unknown settings fields when loading a stored room", async () => {
+    const room = newStoredRoom("ABCDE", NOW);
+
+    const { storage } = fakeStorage({
+      room: {
+        ...room,
+        game: {
+          ...room.game,
+          settings: { ...room.game.settings, extra: true },
+        },
+      },
+    });
+
+    await expect(createRoomStore(storage).load()).resolves.toStrictEqual(room);
+  });
+
   it("deletes a room with invalid deal history and treats it as missing", async () => {
     using warn = vi.spyOn(console, "warn");
     const room = newStoredRoom("ABCDE", NOW);

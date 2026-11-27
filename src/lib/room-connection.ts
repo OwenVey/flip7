@@ -3,7 +3,6 @@ import { PartySocket } from "partysocket";
 import { createMemo, createSignal, onSettled, untrack } from "solid-js";
 
 import { parseSavedAvatar } from "../game/avatars";
-import type { ReactionEmoji } from "../game/chat-reactions";
 import {
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_PING,
@@ -227,7 +226,7 @@ export const createRoomConnection = (code: string) => {
       react: client.react,
       send: client.chat,
       typing: client.typing,
-    } satisfies ChatControls,
+    },
     clearJoinError: client.clearJoinError,
     join: (name: string, avatar: number) => {
       setSavedName(name);
@@ -261,8 +260,4 @@ export const createRoomConnection = (code: string) => {
 
 export type RoomConnection = ReturnType<typeof createRoomConnection>;
 
-export interface ChatControls {
-  react: (messageId: number, emoji: ReactionEmoji | null) => Promise<boolean>;
-  send: (text: string) => boolean;
-  typing: (active: boolean) => void;
-}
+export type ChatControls = RoomConnection["chat"];

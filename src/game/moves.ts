@@ -106,29 +106,41 @@ const rejectTurn = (view: MovesView, playerId: string) => {
   return null;
 };
 
-const rejectOwnMove = (view: MovesView, viewerId: string, move: PlayMove) => {
+const rejectPlay = (
+  view: MovesView,
+  actor:
+    | { forOffline: false; playerId: string }
+    | { forOffline: true; player: Pick<Player, "hand" | "id" | "name"> },
+  move: PlayMove
+) => {
+  const playerId = actor.forOffline ? actor.player.id : actor.playerId;
+
   if (move.type === "choose") {
     const { choice } = view;
 
-    if (!choice || choice.chooserId !== viewerId) {
+    if (!actor.forOffline && choice?.chooserId !== playerId) {
       return "There's nothing for you to choose.";
     }
 
-    return choice.options.includes(move.targetId)
+    return choice?.options.includes(move.targetId) === true
       ? null
       : "You can't choose that player.";
   }
 
-  const turn = rejectTurn(view, viewerId);
+  const turn = rejectTurn(view, playerId);
 
   if (turn !== null || move.type === "hit") {
     return turn;
   }
 
-  const player = findPlayer(view, viewerId);
+  const player = actor.forOffline ? actor.player : findPlayer(view, playerId);
 
-  return player && canStay(player)
-    ? null
+  if (player && canStay(player)) {
+    return null;
+  }
+
+  return actor.forOffline
+    ? `${actor.player.name} needs a card in front of them before they can stay.`
     : "You need a card in front of you before you can stay.";
 };
 
@@ -160,21 +172,7 @@ const rejectMoveFor = (
     return `The game isn't waiting on ${player.name}.`;
   }
 
-  if (move.type === "choose") {
-    return view.choice?.options.includes(move.targetId) === true
-      ? null
-      : "You can't choose that player.";
-  }
-
-  const turn = rejectTurn(view, player.id);
-
-  if (turn !== null || move.type === "hit") {
-    return turn;
-  }
-
-  return canStay(player)
-    ? null
-    : `${player.name} needs a card in front of them before they can stay.`;
+  return rejectPlay(view, { forOffline: true, player }, move);
 };
 
 const rejectKick = (view: MovesView, viewerId: string, playerId: string) => {
@@ -217,10 +215,12 @@ const rejectMakeHost = (
     : `${player.name} is offline. Only an online player can be the host.`;
 };
 
+type HostMove = Exclude<Move, { type: PlayMove["type"] }>;
+
 const rejectHostMove = (
   view: MovesView,
   viewerId: string | null,
-  move: Exclude<Move, { type: PlayMove["type"] }>
+  move: HostMove
 ) => {
   if (viewerId === null) {
     return "Join the room first.";
@@ -278,7 +278,7 @@ export const rejectMove = (view: MovesView, viewerId: string, move: Move) => {
     case "stay":
     case "choose": {
       return move.forId === undefined || move.forId === viewerId
-        ? rejectOwnMove(view, viewerId, move)
+        ? rejectPlay(view, { forOffline: false, playerId: viewerId }, move)
         : rejectMoveFor(view, viewerId, move.forId, move);
     }
 
@@ -316,30 +316,28 @@ export const availableMoves = (view: MovesView, viewerId: string | null) => {
   const choice =
     owed && view.choice ? { forId, targets: [...view.choice.options] } : null;
 
-  const host = {
-    addBot: rejectHostMove(view, viewerId, { type: "addBot" }) === null,
-    configure: rejectHostMove(view, viewerId, { type: "configure" }) === null,
-    setTargetScore:
-      rejectHostMove(view, viewerId, {
-        targetScore: DEFAULT_SETTINGS.targetScore,
-        type: "configure",
-      }) === null,
-    kick: isHost
-      ? view.players.flatMap((player) =>
-          player.id === viewerId ? [] : [player.id]
+  const allows = (move: HostMove) =>
+    rejectHostMove(view, viewerId, move) === null;
+
+  const targetsFor = (type: "kick" | "makeHost") =>
+    isHost
+      ? view.players.flatMap(({ id }) =>
+          allows({ playerId: id, type }) ? [id] : []
         )
-      : [],
-    lobby: rejectHostMove(view, viewerId, { type: "lobby" }) === null,
-    makeHost:
-      viewerId === null
-        ? []
-        : view.players.flatMap((player) =>
-            rejectMakeHost(view, viewerId, player.id) === null
-              ? [player.id]
-              : []
-          ),
-    nextRound: rejectHostMove(view, viewerId, { type: "nextRound" }) === null,
-    start: rejectHostMove(view, viewerId, { type: "start" }) === null,
+      : [];
+
+  const host = {
+    addBot: allows({ type: "addBot" }),
+    configure: allows({ type: "configure" }),
+    kick: targetsFor("kick"),
+    lobby: allows({ type: "lobby" }),
+    makeHost: targetsFor("makeHost"),
+    nextRound: allows({ type: "nextRound" }),
+    setTargetScore: allows({
+      targetScore: DEFAULT_SETTINGS.targetScore,
+      type: "configure",
+    }),
+    start: allows({ type: "start" }),
   };
 
   return { choice, host, turn, waitingOn: waiting };

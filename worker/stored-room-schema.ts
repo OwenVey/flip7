@@ -15,7 +15,7 @@ import {
   WinnerSchema,
 } from "../src/game/protocol";
 import type { StoredRoom } from "../src/game/room";
-import { BOT_SPEEDS, TARGET_SCORES } from "../src/game/settings";
+import { RoomSettingsSchema } from "../src/game/settings";
 
 const integer = v.pipe(v.number(), v.safeInteger());
 const nonNegativeInteger = v.pipe(integer, v.minValue(0));
@@ -93,11 +93,7 @@ const GameStateSchema: v.GenericSchema<unknown, GameState> = v.object({
     })
   ),
   round: nonNegativeInteger,
-  settings: v.object({
-    botSpeed: v.picklist(BOT_SPEEDS),
-    locked: v.boolean(),
-    targetScore: v.picklist(TARGET_SCORES),
-  }),
+  settings: RoomSettingsSchema,
   turnAnchor: integer,
   turnId: nullableId,
   winner: WinnerSchema,

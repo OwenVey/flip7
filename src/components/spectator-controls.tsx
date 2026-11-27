@@ -25,6 +25,7 @@ import { MAX_PLAYERS } from "../game/engine";
 import { rejectWatchInstead } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import JoinForm from "./join-form";
+import type { JoinFormProps } from "./join-form";
 import ScrollFade from "./scroll-fade";
 import Tooltip from "./tooltip";
 
@@ -143,15 +144,18 @@ export interface Spectator {
 }
 
 /** What a spectator's join form needs from the room connection. */
-export interface SpectatorJoin {
-  savedName: string;
-  savedAvatar: number | null;
-  onJoin: (name: string, avatar: number) => void;
-  error: string;
-  joining: boolean;
-  unavailable: boolean;
-  onEdit: () => void;
-}
+export type SpectatorJoin = Required<
+  Pick<
+    JoinFormProps,
+    | "error"
+    | "joining"
+    | "onEdit"
+    | "onJoin"
+    | "savedAvatar"
+    | "savedName"
+    | "unavailable"
+  >
+>;
 
 /** A spectator's header actions: take a seat in a dialog, or leave back to the room's join screen. */
 export const SpectatorActions = (props: {

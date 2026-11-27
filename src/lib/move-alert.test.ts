@@ -6,27 +6,22 @@ import siteIcon from "../assets/favicon.svg?url";
 import type { RoomView } from "../game/protocol";
 import { room } from "../test/room-view";
 import { createMoveAlert } from "./move-alert";
+import type { MoveAlertView } from "./move-alert";
 
 const ROOM_TITLE = "Your move · Room ABCDE · Flip 7";
 const ALERT_TITLE = "⚡ Your move!";
-
-interface Shown {
-  room: RoomView | null;
-  dealing: boolean;
-  actionsDisabled: boolean;
-}
 
 const settled = (shown: RoomView | null) =>
   ({
     actionsDisabled: false,
     dealing: false,
     room: shown,
-  }) satisfies Shown;
+  }) satisfies MoveAlertView;
 
 const ownTurn = room({ turnId: "a" });
 
 const createAlert = (
-  initial: Shown,
+  initial: MoveAlertView,
   options: { playerId?: string | null } = {}
 ) =>
   createRoot((dispose) => {
@@ -78,11 +73,11 @@ const createAlert = (
         setConfirmed(next);
         flush();
       },
-      replay: (next: Shown) => {
+      replay: (next: MoveAlertView) => {
         setView(next);
         flush();
       },
-      show: (next: Shown) => {
+      show: (next: MoveAlertView) => {
         if (next.room !== untrack(confirmed)) {
           setConfirmed(next.room);
           flush();

@@ -2,6 +2,7 @@ import type { Random } from "./cards";
 import { findPlayer, playForAbsent, playForBot, handOffHost } from "./engine";
 import type { GameState } from "./engine";
 import { waitingOn } from "./moves";
+import { isOnlineHuman } from "./player";
 import { HEARTBEAT_STALE_MS } from "./protocol";
 
 export const HOST_GRACE_MS = 20_000;
@@ -34,30 +35,17 @@ export interface RoomTimers {
   stall: Stall | null;
 }
 
-const offlineWhileOthersOnline = (game: GameState, id: string | null) => {
-  const player = id === null ? undefined : findPlayer(game, id);
-
-  if (!player || player.connected) {
-    return false;
-  }
-
-  return game.players.some(
-    (other) => other.connected && !other.bot && other.id !== id
-  );
-};
-
-const humanOnline = (game: GameState) =>
-  game.players.some((player) => player.connected && !player.bot);
-
 const syncBotTurn = (
   room: RoomTimers,
-  blockerId: string | null,
+  waitingOnId: string | undefined,
   now: number
 ) => {
   const { game } = room;
-  const bot = blockerId === null ? undefined : findPlayer(game, blockerId);
 
-  if (bot?.bot !== true || !humanOnline(game)) {
+  const bot =
+    waitingOnId === undefined ? undefined : findPlayer(game, waitingOnId);
+
+  if (bot?.bot !== true) {
     room.botTurn = null;
   } else if (room.botTurn?.playerId !== bot.id) {
     const delay =
@@ -73,22 +61,24 @@ const syncBotTurn = (
  */
 export const syncTimers = (room: RoomTimers, now: number) => {
   const { game } = room;
+  const hasOnlineHuman = game.players.some(isOnlineHuman);
+  const host = game.hostId === null ? undefined : findPlayer(game, game.hostId);
 
-  if (offlineWhileOthersOnline(game, game.hostId)) {
+  if (hasOnlineHuman && host?.connected === false) {
     room.hostLeftAt ??= now;
   } else {
     room.hostLeftAt = null;
   }
 
-  const blockerId = waitingOn(game)?.playerId ?? null;
+  const waiting = waitingOn(game);
 
-  if (blockerId === null || !offlineWhileOthersOnline(game, blockerId)) {
+  if (!hasOnlineHuman || waiting?.offline !== true) {
     room.stall = null;
-  } else if (room.stall?.playerId !== blockerId) {
-    room.stall = { playerId: blockerId, since: now };
+  } else if (room.stall?.playerId !== waiting.playerId) {
+    room.stall = { playerId: waiting.playerId, since: now };
   }
 
-  syncBotTurn(room, blockerId, now);
+  syncBotTurn(room, hasOnlineHuman ? waiting?.playerId : undefined, now);
 };
 
 export const heartbeatDeadline = (seatedAt: number, lastPing: Date | null) =>

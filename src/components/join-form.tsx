@@ -35,7 +35,7 @@ const Frame = (props: ParentProps<{ embedded: boolean }>) => (
 
 const FINE_POINTER_QUERY = "(pointer: fine)";
 
-export default function JoinForm(props: {
+export interface JoinFormProps {
   /** Leaves out the card and heading so a dialog can frame the form. */
   embedded?: boolean;
   room: Pick<RoomPreview, "phase" | "players" | "spectatorCount"> | null;
@@ -50,7 +50,9 @@ export default function JoinForm(props: {
   unavailable?: boolean;
   error?: string;
   onEdit?: () => void;
-}) {
+}
+
+export default function JoinForm(props: JoinFormProps) {
   const [typed, setTyped] = createSignal<string | null>(null);
   const [picked, setPicked] = createSignal<number | null>(null);
   const seed = Math.random();
