@@ -1,5 +1,7 @@
+import { createAudio } from "@nkzw/audio";
+import type { SoundOptions } from "@nkzw/audio";
 import { createRoot, flush } from "solid-js";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createRoomSounds, pickVariant } from "./room-sounds";
 
@@ -9,9 +11,34 @@ const KEYS = [
   "flip7:music-volume",
 ];
 
-const setup = () =>
+const recordAudio = () => {
+  let mixers = 0;
+  const loaded: SoundOptions[] = [];
+
+  const createMixer: typeof createAudio = (options) => {
+    mixers += 1;
+    const audio = createAudio(options);
+    const createSound = audio.sound.bind(audio);
+
+    audio.sound = (soundOptions) => {
+      loaded.push(soundOptions);
+
+      return createSound(soundOptions);
+    };
+
+    return audio;
+  };
+
+  return {
+    createMixer,
+    loaded,
+    mixers: () => mixers,
+  };
+};
+
+const setup = (createMixer?: typeof createAudio) =>
   createRoot((dispose) => {
-    const sounds = createRoomSounds();
+    const sounds = createRoomSounds(createMixer);
     flush();
 
     return { ...sounds, dispose };
@@ -19,6 +46,8 @@ const setup = () =>
 
 describe(createRoomSounds, () => {
   afterEach(() => {
+    vi.useRealTimers();
+
     for (const key of KEYS) {
       localStorage.removeItem(key);
     }
@@ -60,6 +89,50 @@ describe(createRoomSounds, () => {
     });
     first.dispose();
     second.dispose();
+  });
+
+  it("defers audio creation while muted and loads effects when unmuted", () => {
+    vi.useFakeTimers();
+    localStorage.setItem("flip7:sound-muted", "true");
+    const recorder = recordAudio();
+    const sounds = setup(recorder.createMixer);
+
+    vi.runAllTimers();
+    flush();
+
+    expect(recorder.mixers()).toBe(0);
+    expect(recorder.loaded).toHaveLength(0);
+
+    sounds.toggle();
+    flush();
+
+    expect(recorder.mixers()).toBe(1);
+    expect(recorder.loaded.flatMap(({ src }) => src)).toContain(
+      "/sounds/turn.m4a"
+    );
+
+    sounds.dispose();
+  });
+
+  it("skips effect preloads when effects volume is zero and music is enabled", () => {
+    vi.useFakeTimers();
+    localStorage.setItem("flip7:effects-volume", "0");
+    localStorage.setItem("flip7:music-volume", "25");
+    const recorder = recordAudio();
+    const sounds = setup(recorder.createMixer);
+
+    vi.runAllTimers();
+    flush();
+
+    expect(recorder.mixers()).toBe(1);
+    expect(recorder.loaded).toHaveLength(1);
+    expect(recorder.loaded[0]).toMatchObject({ loop: true, preload: false });
+
+    sounds.changeEffectsVolume(50);
+    flush();
+
+    expect(recorder.loaded.length).toBeGreaterThan(1);
+    sounds.dispose();
   });
 });
 
