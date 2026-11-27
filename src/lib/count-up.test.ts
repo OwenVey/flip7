@@ -121,4 +121,29 @@ describe(createCountUp, () => {
       expect(cancel).toHaveBeenCalledOnce();
     });
   });
+
+  it("shares a single animation frame loop across concurrent count-ups", () => {
+    withMotion(() => {
+      const raf = vi.spyOn(globalThis, "requestAnimationFrame");
+      const [firstTarget] = createSignal(50);
+      const [secondTarget] = createSignal(100);
+
+      const first = mount(firstTarget, { durationMs: 200, initial: () => 0 });
+      const second = mount(secondTarget, { durationMs: 200, initial: () => 0 });
+
+      try {
+        flush();
+        expect(raf).toHaveBeenCalledOnce();
+
+        vi.advanceTimersByTime(200);
+        flush();
+
+        expect(first.shown()).toBe(50);
+        expect(second.shown()).toBe(100);
+      } finally {
+        first.dispose();
+        second.dispose();
+      }
+    });
+  });
 });

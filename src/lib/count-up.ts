@@ -14,6 +14,39 @@ interface Count {
 
 const canAnimate = () => typeof document !== "undefined" && motionAllowed();
 
+const listeners = new Set<(time: number) => void>();
+let sharedFrame = 0;
+
+const scheduleFrame = () => {
+  if (sharedFrame !== 0 || listeners.size === 0) {
+    return;
+  }
+
+  sharedFrame = requestAnimationFrame((time) => {
+    sharedFrame = 0;
+
+    for (const listener of listeners) {
+      listener(time);
+    }
+
+    scheduleFrame();
+  });
+};
+
+const subscribeFrame = (listener: (time: number) => void) => {
+  listeners.add(listener);
+  scheduleFrame();
+
+  return () => {
+    listeners.delete(listener);
+
+    if (listeners.size === 0 && sharedFrame !== 0) {
+      cancelAnimationFrame(sharedFrame);
+      sharedFrame = 0;
+    }
+  };
+};
+
 /**
  * A number that counts toward `target` whenever it changes, instead of jumping.
  * The shown value is derived from the current count and a clock that only
@@ -59,22 +92,29 @@ export const createCountUp = (
   });
 
   createEffect(count, (current) => {
-    let frame = 0;
+    const initialTime = untrack(now);
+    let stop: (() => void) | null = null;
 
-    if (!isFinished(current, untrack(now))) {
-      const tick = (time: number) => {
-        setNow(time);
+    if (!isFinished(current, initialTime)) {
+      let lastShown = valueAt(current, initialTime);
 
-        if (!isFinished(current, time)) {
-          frame = requestAnimationFrame(tick);
+      stop = subscribeFrame((time) => {
+        const nextShown = valueAt(current, time);
+        const done = isFinished(current, time);
+
+        if (nextShown !== lastShown || done) {
+          lastShown = nextShown;
+          setNow(time);
         }
-      };
 
-      frame = requestAnimationFrame(tick);
+        if (done) {
+          stop?.();
+        }
+      });
     }
 
     return () => {
-      cancelAnimationFrame(frame);
+      stop?.();
     };
   });
 

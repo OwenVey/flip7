@@ -194,9 +194,7 @@
   }
 
   & .avatar {
-    transition:
-      transform var(--duration-instant) ease,
-      box-shadow var(--duration-instant) ease;
+    transition: transform var(--duration-instant) ease;
   }
 
   &:is([data-open], :focus-visible) .avatar {
@@ -293,9 +291,7 @@
   & .avatar-trigger .avatar {
     width: var(--avatar-size);
     height: var(--avatar-size);
-    transition:
-      transform var(--duration-instant) ease,
-      box-shadow var(--duration-instant) ease;
+    transition: transform var(--duration-instant) ease;
   }
 
   /* Lifts onto an ink shadow like the app's buttons, and stays up while the picker is open. */

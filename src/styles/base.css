@@ -202,9 +202,7 @@ button,
     font-family: var(--font-display);
     font-size: 1.75rem;
     line-height: var(--leading-none);
-    transition:
-      transform var(--duration-instant) ease,
-      box-shadow var(--duration-instant) ease;
+    transition: transform var(--duration-instant) ease;
 
     &[data-active] {
       transform: translate(-1px, -1px);

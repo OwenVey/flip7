@@ -41,6 +41,19 @@
 
   .hand:has(.card[data-bust]:not([data-incoming])) .card[data-dupe] {
     animation: dupe-shake 520ms ease-in-out 120ms both;
+
+    &::after {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      box-shadow:
+        0 0 0 3px var(--danger),
+        0 0 1rem color-mix(in oklab, var(--danger) 70%, transparent);
+      opacity: 0;
+      pointer-events: none;
+      content: "";
+      animation: dupe-glow 520ms ease-in-out 120ms both;
+    }
   }
 
   .seat[data-status="busted"] {
@@ -60,10 +73,6 @@
     pointer-events: none;
     content: "";
     animation: turn-ring 600ms cubic-bezier(0.25, 0.8, 0.3, 1);
-  }
-
-  .action-bar {
-    transition: box-shadow var(--duration-slow) ease;
   }
 
   /* Status changes pop in, and Stayed stamps like a banked chip. */
@@ -100,7 +109,13 @@
   }
 
   .seat-meter[data-round="locked"] {
-    & .meter-round {
+    & .meter-round::after {
+      position: absolute;
+      inset: 0;
+      background: rgb(255 255 255 / 0.55);
+      opacity: 0;
+      pointer-events: none;
+      content: "";
       animation: meter-lock 700ms ease-out;
     }
 
@@ -112,7 +127,20 @@
   /* Flip 7: the run hops in order with a shine, and the mat flares gold. */
   .seat[data-status="flipSeven"] {
     & .hand {
-      animation: flip-seven-flare 1400ms ease-out;
+      position: relative;
+
+      &::after {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        box-shadow:
+          0 0 0 3px var(--gold),
+          0 0 2.5rem 0.5rem color-mix(in oklab, var(--gold) 90%, transparent);
+        opacity: 0;
+        pointer-events: none;
+        content: "";
+        animation: flip-seven-flare 1400ms ease-out;
+      }
     }
 
     & .hand .card {
@@ -120,20 +148,24 @@
         calc(var(--card-index, 0) * 70ms) both;
     }
 
-    & .hand .card:not([data-bust])::after {
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      background: linear-gradient(
+    & .hand .card:not([data-bust]) {
+      overflow: hidden;
+
+      &::after {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: linear-gradient(
           115deg,
           transparent 35%,
           rgb(255 255 255 / 0.75) 50%,
           transparent 65%
-        )
-        0 0 / 250% 100% no-repeat;
-      content: "";
-      animation: card-shine 900ms ease-in-out
-        calc(var(--card-index, 0) * 70ms + 200ms) both;
+        );
+        pointer-events: none;
+        content: "";
+        animation: card-shine 900ms ease-in-out
+          calc(var(--card-index, 0) * 70ms + 200ms) both;
+      }
     }
   }
 
@@ -239,7 +271,9 @@
 
   .log-group li {
     animation: log-in 260ms ease-out both;
-    transition: background-color var(--duration-slow) ease;
+    transition:
+      opacity var(--duration-fast) ease-out,
+      background-color var(--duration-slow) ease;
 
     &[data-kind="chat"]:not([data-own]) {
       animation: pop-in 300ms var(--ease-pop) both;
@@ -270,22 +304,31 @@
   0%,
   100% {
     translate: 0 0;
-    box-shadow: var(--shadow-card-bevel), var(--shadow-card);
   }
 
   15%,
   45%,
   75% {
     translate: -3px 0;
-    box-shadow:
-      0 0 0 3px var(--danger),
-      0 0 1rem color-mix(in oklab, var(--danger) 70%, transparent);
   }
 
   30%,
   60%,
   90% {
     translate: 3px 0;
+  }
+}
+
+@keyframes dupe-glow {
+  0%,
+  100% {
+    opacity: 0;
+  }
+
+  15%,
+  45%,
+  75% {
+    opacity: 1;
   }
 }
 
@@ -347,7 +390,7 @@
 
 @keyframes meter-lock {
   30% {
-    filter: brightness(1.5) saturate(1.3);
+    opacity: 1;
   }
 }
 
@@ -360,10 +403,7 @@
 
 @keyframes flip-seven-flare {
   25% {
-    box-shadow:
-      var(--shadow-well),
-      0 0 0 3px var(--gold),
-      0 0 2.5rem 0.5rem color-mix(in oklab, var(--gold) 90%, transparent);
+    opacity: 1;
   }
 }
 
@@ -376,11 +416,11 @@
 
 @keyframes card-shine {
   from {
-    background-position: 150% 0;
+    transform: translateX(-120%);
   }
 
   to {
-    background-position: -50% 0;
+    transform: translateX(120%);
   }
 }
 

@@ -297,10 +297,9 @@
 }
 
 /*
- * The chat drawer keeps one height. At half height its foot pads by the part
- * below the screen's edge, so the newest messages and the message box stay in
- * view. The padding follows a drag between the two heights, a layout per frame
- * traded for never hiding the box.
+ * The shell keeps one height. Only the chat body resizes as the drawer moves,
+ * keeping the newest messages and the composer above the viewport edge.
+ * Resolve the offset on the shell because --drawer-expand does not inherit.
  */
 [data-slot="drawer-content"].chat-sheet {
   --chat-sheet-height: min(
@@ -321,7 +320,7 @@
   max-width: none;
   height: var(--chat-sheet-height);
   max-height: none;
-  padding: 0 0 calc(env(safe-area-inset-bottom) + var(--chat-sheet-hidden));
+  padding: 0 0 env(safe-area-inset-bottom);
   border: 0;
   border-radius: 1.5rem 1.5rem 0 0;
   background: var(--paper);
@@ -371,7 +370,9 @@
 
 .chat-sheet-body {
   display: grid;
+  contain: layout;
   min-block-size: 0;
+  max-block-size: calc(100% - var(--chat-sheet-hidden));
   padding: 0.75rem var(--dialog-inset) var(--dialog-inset);
 
   overflow-y: auto;

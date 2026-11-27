@@ -149,9 +149,7 @@
     font-weight: 700;
     /* Rapid taps register as taps instead of a double-tap zoom. */
     touch-action: manipulation;
-    transition:
-      transform var(--duration-instant) ease,
-      box-shadow var(--duration-instant) ease;
+    transition: transform var(--duration-instant) ease;
 
     &:active:not([data-disabled], [aria-disabled="true"]) {
       transform: translate(2px, 2px);
