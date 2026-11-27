@@ -189,7 +189,7 @@
   box-shadow: none;
 
   /* The base button rule would press the whole trigger; the avatar presses instead. */
-  &:active:not([data-disabled], [aria-disabled="true"]) {
+  &:active {
     transform: none;
   }
 
@@ -276,7 +276,7 @@
     box-shadow: none;
 
     /* The base button rule would press the whole trigger; the avatar presses instead. */
-    &:active:not([data-disabled], [aria-disabled="true"]) {
+    &:active {
       transform: none;
     }
 

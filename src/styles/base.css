@@ -2,20 +2,24 @@
   color-scheme: light;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 }
 
 /* The felt fades to --felt-deep at the top and bottom edges, the same color as theme-color, so Safari's status bar and toolbar tint meet it without a seam. */
-html {
-  /* iOS flashes a gray box over tapped controls; buttons have their own press feedback. */
-  -webkit-tap-highlight-color: transparent;
-  /* Keeps iOS from enlarging text when the phone turns to landscape. */
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-  background-color: var(--felt-deep);
+@layer base {
+  html {
+    /* iOS flashes a gray box over tapped controls; buttons have their own press feedback. */
+    -webkit-tap-highlight-color: transparent;
+    /* Keeps iOS from enlarging text when the phone turns to landscape. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    background-color: var(--felt-deep);
+  }
 }
 
 /* A pull at the top of the table would reload the page mid-game; the table has its own scrolling areas. */
@@ -34,70 +38,84 @@ button,
   user-select: none;
 }
 
-body {
-  /* Holds the texture layer below the content but above this background. */
-  position: relative;
-  isolation: isolate;
-  margin: 0;
-  /* The page runs edge to edge under Safari's bars (viewport-fit=cover) and, installed on iOS, under the translucent status bar, so keep content clear of the notch and the clock. */
-  padding-block-start: var(--safe-top);
-  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
-  min-height: 100dvh;
-  background-color: var(--felt-deep);
-  background-image: linear-gradient(
-    var(--felt-deep),
-    var(--felt) 12%,
-    var(--felt-light) 35%,
-    var(--felt) 65%,
-    var(--felt-deep)
-  );
-  background-attachment: fixed;
-  color: var(--ink);
-  font-family: var(--font-body);
-  line-height: var(--leading-relaxed);
+@layer base {
+  body {
+    /* Holds the texture layer below the content but above this background. */
+    position: relative;
+    isolation: isolate;
+    margin: 0;
+    /* The page runs edge to edge under Safari's bars (viewport-fit=cover) and, installed on iOS, under the translucent status bar, so keep content clear of the notch and the clock. */
+    padding-block-start: var(--safe-top);
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+    min-height: 100dvh;
+    background-color: var(--felt-deep);
+    background-image: linear-gradient(
+      var(--felt-deep),
+      var(--felt) 12%,
+      var(--felt-light) 35%,
+      var(--felt) 65%,
+      var(--felt-deep)
+    );
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: var(--leading-relaxed);
 
-  /* The felt's dot texture scrolls with the page: a full-screen fixed layer makes iOS Safari paint solid bars over the content instead of letting it run under its toolbar. */
-  &::before {
-    position: absolute;
-    z-index: -1;
-    inset: 0;
-    background-image:
-      radial-gradient(rgb(255 255 255 / 0.035) 0.6px, transparent 1px),
-      radial-gradient(rgb(0 0 0 / 0.08) 0.6px, transparent 1px);
-    background-position:
-      0 0,
-      2px 3px;
-    background-size:
-      4px 4px,
-      5px 5px;
-    mask-image: linear-gradient(transparent, black 12%, black 80%, transparent);
-    pointer-events: none;
-    content: "";
+    /* The felt's dot texture scrolls with the page: a full-screen fixed layer makes iOS Safari paint solid bars over the content instead of letting it run under its toolbar. */
+    &::before {
+      position: absolute;
+      z-index: -1;
+      inset: 0;
+      background-image:
+        radial-gradient(rgb(255 255 255 / 0.035) 0.6px, transparent 1px),
+        radial-gradient(rgb(0 0 0 / 0.08) 0.6px, transparent 1px);
+      background-position:
+        0 0,
+        2px 3px;
+      background-size:
+        4px 4px,
+        5px 5px;
+      mask-image: linear-gradient(
+        transparent,
+        black 12%,
+        black 80%,
+        transparent
+      );
+      pointer-events: none;
+      content: "";
+    }
   }
 }
 
-h1,
-h2,
+@layer base {
+  h1,
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    line-height: var(--leading-none);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+  }
+
+  h2 {
+    margin: 0;
+    font-size: var(--text-base);
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
 .wordmark,
 .room-code,
 .headline {
   font-family: var(--font-display);
   font-weight: 400;
   line-height: var(--leading-none);
-}
-
-h1 {
-  margin: 0;
-  font-size: clamp(1.5rem, 4vw, 2rem);
-}
-
-h2 {
-  margin: 0;
-  font-size: var(--text-base);
-}
-
-p {
-  margin: 0;
 }
 
 .sr-only {
@@ -122,39 +140,41 @@ p {
   }
 }
 
-[data-slot="input"] {
-  --field-ink: var(--ink);
-  height: var(--control-height);
-  padding-inline: 0.75rem;
-  border: 1px solid var(--field-ink);
-  border-radius: var(--ui-radius);
-  background: var(--paper-light);
-  box-shadow: 2px 2px 0 var(--field-ink);
-  caret-color: var(--accent);
-  font-weight: 600;
+@layer components {
+  [data-slot="input"] {
+    --field-ink: var(--ink);
+    height: var(--control-height);
+    padding-inline: 0.75rem;
+    border: 1px solid var(--field-ink);
+    border-radius: var(--ui-radius);
+    background: var(--paper-light);
+    box-shadow: 2px 2px 0 var(--field-ink);
+    caret-color: var(--accent);
+    font-weight: 600;
 
-  &:where([data-size="sm"]) {
-    height: var(--control-height-sm);
-  }
+    &:where([data-size="sm"]) {
+      height: var(--control-height-sm);
+    }
 
-  &::placeholder {
-    color: color-mix(in oklab, var(--ink-soft) 80%, var(--paper-light));
-    font-weight: 400;
-    opacity: 1;
-  }
+    &::placeholder {
+      color: color-mix(in oklab, var(--ink-soft) 80%, var(--paper-light));
+      font-weight: 400;
+      opacity: 1;
+    }
 
-  &:focus {
-    outline: 2px solid var(--field-ink);
-    outline-offset: -2px;
-  }
+    &:focus {
+      outline: 2px solid var(--field-ink);
+      outline-offset: -2px;
+    }
 
-  &:is([data-invalid], [aria-invalid="true"]) {
-    --field-ink: var(--danger);
-  }
+    &:is([data-invalid], [aria-invalid="true"]) {
+      --field-ink: var(--danger);
+    }
 
-  @media (pointer: coarse) {
-    height: var(--control-height-lg);
-    font-size: 1rem;
+    @media (pointer: coarse) {
+      height: var(--control-height-lg);
+      font-size: 1rem;
+    }
   }
 }
 

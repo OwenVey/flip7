@@ -73,9 +73,9 @@ const faces = (css: string) =>
   }));
 
 describe("stylesheet entry points", () => {
-  it("keeps only the ui-sdk layer in app.css", async () => {
+  it("keeps only the layer order in app.css", async () => {
     expect(statements(await readFile(appCss, "utf-8"))).toStrictEqual([
-      "@layer ui-sdk;",
+      "@layer ui-sdk, base, components;",
     ]);
   });
 
@@ -91,6 +91,105 @@ describe("stylesheet entry points", () => {
 
   it("adds no font faces among the style imports", async () => {
     await expect(transform(stylesIndex)).resolves.toBeNull();
+  });
+});
+
+interface OuterRule {
+  layers: string[];
+  selector: string;
+}
+
+const outerRules = (css: string) => {
+  const rules: OuterRule[] = [];
+  const open: string[] = [];
+  let prelude = "";
+
+  for (const char of css.replaceAll(/\/\*[\s\S]*?\*\//gu, "")) {
+    if (char === "{") {
+      const selector = prelude.trim();
+
+      const nested = open.some(
+        (block) => !block.startsWith("@") || block.startsWith("@keyframes")
+      );
+
+      if (!nested && !selector.startsWith("@")) {
+        const layers = open.flatMap((block) =>
+          block.startsWith("@layer ") ? [block.slice(7).trim()] : []
+        );
+
+        rules.push({ layers, selector });
+      }
+
+      open.push(selector);
+      prelude = "";
+    } else if (char === "}") {
+      open.pop();
+      prelude = "";
+    } else if (char === ";") {
+      prelude = "";
+    } else {
+      prelude += char;
+    }
+  }
+
+  return rules;
+};
+
+const isSharedPartDefault = (selector: string) =>
+  /\[data-(?:slot|variant)\b/u.test(selector) &&
+  selector
+    .replaceAll(/\[[^\]]*\]/gu, "")
+    .replaceAll(/::?[a-z-]+/gu, "")
+    .replaceAll(/[\s(),>+~*&]/gu, "") === "";
+
+const isElementDefault = (selector: string) =>
+  /^[a-z0-9*\s,>+~]+$/u.test(selector.replaceAll(/::[a-z-]+/gu, ""));
+
+const layerFor = (selector: string) => {
+  if (isElementDefault(selector)) {
+    return "base";
+  }
+
+  return isSharedPartDefault(selector) ? "components" : "none";
+};
+
+const areaRules = async () => {
+  const lines = statements(await readFile(stylesIndex, "utf-8"));
+
+  const files = await Promise.all(
+    lines.map(async (line) => {
+      const file = /"\.\/(?<file>[a-z-]+\.css)"/u.exec(line)?.groups?.file;
+
+      return outerRules(
+        await readFile(path.resolve(import.meta.dirname, file ?? ""), "utf-8")
+      );
+    })
+  );
+
+  return files.flat();
+};
+
+describe("cascade layers", () => {
+  it("puts each outer rule in the layer its selector calls for", async () => {
+    const rules = await areaRules();
+
+    const misplaced = rules.flatMap(({ layers, selector }) => {
+      const actual = layers.at(-1) ?? "none";
+      const expected = layerFor(selector);
+
+      return actual === expected
+        ? []
+        : [`${selector}: in ${actual}, belongs in ${expected}`];
+    });
+
+    expect(misplaced).toStrictEqual([]);
+  });
+
+  it("uses both layers", async () => {
+    const rules = await areaRules();
+    const used = new Set(rules.flatMap(({ layers }) => layers));
+
+    expect([...used].toSorted()).toStrictEqual(["base", "components"]);
   });
 });
 
