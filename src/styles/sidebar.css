@@ -299,11 +299,20 @@
 /*
  * The shell keeps one height. Only the chat body resizes as the drawer moves,
  * keeping the newest messages and the composer above the viewport edge.
+ * Resolve the offset on the shell because --drawer-expand does not inherit.
  */
 [data-slot="drawer-content"].chat-sheet {
   --chat-sheet-height: min(
     85dvh,
     calc(var(--visual-viewport-height, 100dvh) - 1rem)
+  );
+  --chat-sheet-hidden: calc(
+    (1 - var(--drawer-expand, 1)) *
+      max(
+        0px,
+        var(--chat-sheet-height) - var(--visual-viewport-height, 100dvh) *
+          var(--chat-sheet-lower-snap)
+      )
   );
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -360,14 +369,6 @@
 }
 
 .chat-sheet-body {
-  --chat-sheet-hidden: calc(
-    (1 - var(--drawer-expand, 1)) *
-      max(
-        0px,
-        var(--chat-sheet-height) - var(--visual-viewport-height, 100dvh) *
-          var(--chat-sheet-lower-snap)
-      )
-  );
   display: grid;
   contain: layout;
   min-block-size: 0;
