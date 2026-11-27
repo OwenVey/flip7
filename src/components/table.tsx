@@ -214,20 +214,22 @@ export default function Table(
           </div>
 
           <div class="stack table-sidebar">
-            <section class="panel leaderboard-panel">
-              <h2>{SCORES_TITLE}</h2>
-              <ScrollFade
-                class="leaderboard-body"
-                viewportClass="leaderboard-scroll"
-                label={SCORES_TITLE}
-              >
-                <Leaderboard
-                  room={props.room}
-                  playerId={props.playerId}
-                  roundPoints={props.playback.roundPoints}
-                />
-              </ScrollFade>
-            </section>
+            <Show when={!props.chatLog.inSheet()}>
+              <section class="panel leaderboard-panel">
+                <h2>{SCORES_TITLE}</h2>
+                <ScrollFade
+                  class="leaderboard-body"
+                  viewportClass="leaderboard-scroll"
+                  label={SCORES_TITLE}
+                >
+                  <Leaderboard
+                    room={props.room}
+                    playerId={props.playerId}
+                    roundPoints={props.playback.roundPoints}
+                  />
+                </ScrollFade>
+              </section>
+            </Show>
             <ChatLogPanel chatLog={props.chatLog} />
           </div>
         </div>

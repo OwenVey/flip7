@@ -373,6 +373,9 @@ describe("<Table />", () => {
       flush();
 
       expect(document.querySelectorAll(".log-scroll")).toHaveLength(1);
+      expect(document.querySelectorAll(".leaderboard")).toHaveLength(
+        sheet === true ? 0 : 1
+      );
     } finally {
       vi.unstubAllGlobals();
     }
@@ -463,7 +466,9 @@ describe("<Table />", () => {
 
   it("animates both round-score displays toward the points they receive", () => {
     // oxlint-disable-next-line landmines-testing/no-test-doubles -- jsdom lacks matchMedia.
-    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("prefers-reduced-motion"),
+    }));
     vi.useFakeTimers({
       toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
     });
