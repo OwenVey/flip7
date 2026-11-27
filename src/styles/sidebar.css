@@ -298,11 +298,13 @@
   padding: 0.75rem var(--dialog-inset) var(--dialog-inset);
 }
 
-/*
- * The shell keeps one height. Only the chat body resizes as the drawer moves,
- * keeping the newest messages and the composer above the viewport edge.
- * Resolve the offset on the shell because --drawer-expand does not inherit.
- */
+/* Keep drag updates out of the log rows. Only the chat body inherits this offset. */
+@property --chat-sheet-hidden {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
 [data-slot="drawer-content"].chat-sheet {
   --chat-sheet-height: min(
     85dvh,
@@ -371,6 +373,8 @@
 }
 
 .chat-sheet-body {
+  /* Resolve the offset on the shell, where ui-sdk sets --drawer-expand. */
+  --chat-sheet-hidden: inherit;
   display: grid;
   contain: layout;
   min-block-size: 0;
