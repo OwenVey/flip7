@@ -1,11 +1,10 @@
-import { isChat } from "../game/engine";
 import type { GameEvent } from "../game/game-events";
 import { availableMoves } from "../game/moves";
 import { roundStarted } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
 import { planDeal } from "./deal-plan";
 import type { DealStep } from "./deal-plan";
-import { chatCue, gameOverCue, newLogEntries, roomCues } from "./room-cues";
+import { readRoomFeedback } from "./room-cues";
 import type { RoomCue } from "./room-cues";
 
 /** A key result Deal playback holds on the table before play moves on. */
@@ -448,10 +447,11 @@ export const readTransition = (
   animate: boolean
 ) => {
   const steps = animate ? planDeal(previous, current) : [];
-  const entries = newLogEntries(previous, current);
 
-  const events = entries.flatMap((entry) =>
-    isChat(entry) ? [] : [entry.event]
+  const { chat, events, finale, table } = readRoomFeedback(
+    previous,
+    current,
+    viewerId
   );
 
   const hasSteps = steps.length > 0;
@@ -467,8 +467,12 @@ export const readTransition = (
   );
 
   const settle = animate ? trailingSettle(tally, current, hasSteps) : null;
-  const chat = chatCue(entries, viewerId);
-  const finale = gameOverCue(previous, current, viewerId);
+  const tableSound = finale ?? table;
+
+  const endCue =
+    tableSound !== null && !cueAlreadyPlayed(tableSound, tally, hasSteps)
+      ? tableSound
+      : null;
 
   const outcome =
     viewerId === null
@@ -478,9 +482,7 @@ export const readTransition = (
   const beats: DealBeats = {
     cards,
     end: endFeedback({
-      cues: roomCues(previous, current, viewerId).filter(
-        (sound) => !cueAlreadyPlayed(sound, tally, hasSteps)
-      ),
+      cues: [endCue, chat].filter((cue) => cue !== null),
       finale,
       outcome,
       settle,

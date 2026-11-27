@@ -3,14 +3,15 @@ import * as v from "valibot";
 import { projectActionCards } from "./action-card-resolution";
 import { isAvatar } from "./avatars";
 import { HELD_ACTION_KINDS, HIGHEST_NUMBER } from "./cards";
+import type { HeldActionCard } from "./cards";
 import { ReactionEmojiSchema, toReactionsView } from "./chat-reactions";
 import type { MessageReactions } from "./chat-reactions";
 import { DEAL_HISTORY_LIMIT, DRAW_OUTCOMES, LOG_LIMIT, PHASES } from "./engine";
-import type { DealEvent, GameState, HeldCard, LogEntry } from "./engine";
+import type { DealEvent, GameState, LogEntry } from "./engine";
 import { MAX_SPECTATORS } from "./moves";
 import { applyListUpdate, listUpdateSince } from "./sequenced-list";
 import type { ListSpec, ListUpdate, ReceivedList } from "./sequenced-list";
-import { BOT_SPEEDS, TARGET_SCORES } from "./settings";
+import { RoomSettingsSchema } from "./settings";
 import { clipText, NAME_TEXT_LIMIT } from "./text";
 
 export const NAME_MAX_LENGTH = NAME_TEXT_LIMIT.graphemes;
@@ -88,29 +89,28 @@ export const cleanName = (raw: string) =>
     NAME_TEXT_LIMIT
   ).trim();
 
-export interface RoomView extends Pick<
-  GameState,
-  | "choice"
-  | "dealHistory"
-  | "dealSeq"
-  | "drawSeq"
-  | "hostId"
-  | "log"
-  | "phase"
-  | "players"
-  | "round"
-  | "settings"
-  | "turnId"
-  | "winner"
-  | "winnerIds"
-> {
+export interface RoomView
+  extends
+    Pick<
+      GameState,
+      | "dealHistory"
+      | "dealSeq"
+      | "drawSeq"
+      | "hostId"
+      | "log"
+      | "phase"
+      | "players"
+      | "round"
+      | "settings"
+      | "turnId"
+      | "winner"
+      | "winnerIds"
+    >,
+    ReturnType<typeof projectActionCards> {
   code: string;
   dealerId: string | null;
   deckCount: number;
   discardCount: number;
-  /** Flip Threes still under way, waiting on a choice. */
-  flips: { targetId: string; remaining: number }[];
-  held: HeldCard[];
   /** The reactions to each chat message, by message ID. */
   reactions: Partial<Record<number, MessageReactions>>;
   spectatorCount: number;
@@ -174,11 +174,14 @@ const RoomPreviewSchema = v.object({
 
 export type RoomPreview = v.InferOutput<typeof RoomPreviewSchema>;
 
-const ListUpdateSchema = v.looseObject({
-  after: v.nullable(v.pipe(v.number(), v.integer())),
-  entries: v.array(v.unknown()),
-  seq: v.pipe(v.number(), v.integer()),
-});
+const listUpdateSchema = <EntrySchema extends v.GenericSchema>(
+  entry: EntrySchema
+) =>
+  v.object({
+    after: v.nullable(v.pipe(v.number(), v.integer())),
+    entries: v.array(entry),
+    seq: v.pipe(v.number(), v.integer()),
+  });
 
 const nonNegativeInteger = v.pipe(v.number(), v.integer(), v.minValue(0));
 
@@ -189,7 +192,7 @@ const HeldActionKindSchema = v.picklist(HELD_ACTION_KINDS);
 export const HeldActionCardSchema = v.object({
   ...cardFields,
   kind: HeldActionKindSchema,
-});
+}) satisfies v.GenericSchema<unknown, HeldActionCard>;
 
 const SecondChanceCardSchema = v.object({
   ...cardFields,
@@ -240,11 +243,6 @@ export const DealEventSchema: v.GenericSchema<unknown, DealEvent> = v.variant(
   ]
 );
 
-const DealHistoryUpdateSchema = v.object({
-  ...ListUpdateSchema.entries,
-  entries: v.array(DealEventSchema),
-});
-
 const LATEST_DATE_MS = 8_640_000_000_000_000;
 
 const logPlayerFields = {
@@ -254,15 +252,16 @@ const logPlayerFields = {
 
 const LogPlayerSchema = v.object(logPlayerFields);
 
-export const WinnerSchema = v.nullable(
-  v.object({ ...logPlayerFields, points: nonNegativeInteger })
-);
+const LoggedScoreSchema = v.object({
+  ...logPlayerFields,
+  points: nonNegativeInteger,
+});
+
+export const WinnerSchema = v.nullable(LoggedScoreSchema);
 
 const OptionalLogPlayerSchema = v.nullable(LogPlayerSchema);
 
-const LoggedScoresSchema = v.array(
-  v.object({ ...logPlayerFields, points: nonNegativeInteger })
-);
+const LoggedScoresSchema = v.array(LoggedScoreSchema);
 
 const NumberCardValueSchema = v.pipe(
   nonNegativeInteger,
@@ -305,9 +304,11 @@ const GameEventSchema = v.variant("type", [
       player: LogPlayerSchema,
     }),
   ]),
-  eventOf("targetScoreSet", { targetScore: v.picklist(TARGET_SCORES) }),
-  eventOf("botSpeedSet", { botSpeed: v.picklist(BOT_SPEEDS) }),
-  eventOf("lockSet", { locked: v.boolean() }),
+  eventOf("targetScoreSet", {
+    targetScore: RoomSettingsSchema.entries.targetScore,
+  }),
+  eventOf("botSpeedSet", { botSpeed: RoomSettingsSchema.entries.botSpeed }),
+  eventOf("lockSet", { locked: RoomSettingsSchema.entries.locked }),
   eventOf("gameAbandoned", {}),
   eventOf("roundStarted", { dealer: OptionalLogPlayerSchema }),
   eventOf("deckReshuffled", {}),
@@ -385,17 +386,14 @@ export const LogEntrySchema: v.GenericSchema<unknown, LogEntry> = v.union([
   v.object({ ...logEntryFields, event: GameEventSchema }),
 ]);
 
-const LogUpdateSchema = v.object({
-  ...ListUpdateSchema.entries,
-  entries: v.array(LogEntrySchema),
-});
-
 const MessageKeySchema = v.pipe(v.string(), v.regex(/^[1-9]\d*$/u));
 
 const StateMessageSchema = v.looseObject({
   lists: v.looseObject({
-    dealHistory: DealHistoryUpdateSchema,
-    log: LogUpdateSchema,
+    dealHistory: listUpdateSchema(DealEventSchema),
+    log: listUpdateSchema(LogEntrySchema),
+  } satisfies {
+    [Name in RoomListName]: v.GenericSchema<unknown, RoomListUpdates[Name]>;
   }),
   room: v.looseObject({
     winner: WinnerSchema,
@@ -419,11 +417,7 @@ const StateMessageSchema = v.looseObject({
       MessageKeySchema,
       v.record(v.string(), ReactionEmojiSchema)
     ),
-    settings: v.looseObject({
-      botSpeed: v.picklist(BOT_SPEEDS),
-      locked: v.boolean(),
-      targetScore: v.picklist(TARGET_SCORES),
-    }),
+    settings: v.looseObject(RoomSettingsSchema.entries),
     spectatorCount: SpectatorCountSchema,
   }),
 });

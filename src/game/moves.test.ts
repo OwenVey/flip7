@@ -185,6 +185,21 @@ describe(rejectMove, () => {
       "Use Leave to leave the room."
     );
   });
+
+  it("explains an empty hand to the player and to the host moving for them", () => {
+    const state = round(["a", "b"], [num(5), num(3)]);
+    stay(state, "a", random);
+    const player = state.players.find(({ id }) => id === "b");
+    player?.hand.splice(0);
+    goOffline(state, "b");
+
+    expect(rejectMove(state, "b", { type: "stay" })).toBe(
+      "You need a card in front of you before you can stay."
+    );
+    expect(rejectMove(state, "a", { forId: "b", type: "stay" })).toBe(
+      "b needs a card in front of them before they can stay."
+    );
+  });
 });
 
 describe("handing over hosting", () => {
@@ -432,12 +447,17 @@ const tables = () => {
   const noCards = round(["a", "b"], [num(5), num(3)]);
   noCards.players[0]?.hand.splice(0);
 
+  const mixedLobby = lobby(["a", "b", "c", "d"]);
+  makeBot(mixedLobby, "c");
+  goOffline(mixedLobby, "d");
+
   return {
     botTurn,
     choice,
     gameOver,
     lobby: lobby(["a", "b"]),
     lonelyLobby: lobby(["a"]),
+    mixedLobby,
     noCards,
     offlineChoice,
     offlineTurn,

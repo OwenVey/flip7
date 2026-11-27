@@ -27,6 +27,12 @@ import ScrollFade from "./scroll-fade";
 
 type MenuPlayer = Pick<Player, "avatar" | "bot" | "id" | "name">;
 
+export interface PlayerMenuActions {
+  host: Pick<AvailableMoves["host"], "kick" | "makeHost">;
+  onRemove: (playerId: string) => void;
+  onMakeHost: (playerId: string) => void;
+}
+
 const RemoveDialog = (props: {
   controller: AlertDialogController;
   disabled?: boolean;
@@ -85,13 +91,9 @@ const RemoveDialog = (props: {
  * A player's avatar. For the host it opens the actions they can take on that
  * player: hand over hosting, or remove them. Everyone else sees a plain avatar.
  */
-export default function PlayerMenu(props: {
-  player: MenuPlayer;
-  host: Pick<AvailableMoves["host"], "kick" | "makeHost">;
-  disabled?: boolean;
-  onRemove: (playerId: string) => void;
-  onMakeHost: (playerId: string) => void;
-}) {
+export default function PlayerMenu(
+  props: PlayerMenuActions & { player: MenuPlayer; disabled?: boolean }
+) {
   const confirmRemove = createAlertDialogController();
   const canKick = () => props.host.kick.includes(props.player.id);
   const canMakeHost = () => props.host.makeHost.includes(props.player.id);

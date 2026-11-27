@@ -19,7 +19,7 @@ import {
 import type { ServerMessage, StateMessage } from "./protocol";
 import { createRoom, deliver, newStoredRoom } from "./room";
 import type {
-  Admission,
+  OpenConnection,
   RoomOutcome,
   RoomPassing,
   RoomTransport,
@@ -33,15 +33,10 @@ const random = () => 0.5;
 const num = (id: number, value: number) =>
   ({ id, kind: "number", value }) satisfies Card;
 
-interface OpenConnection {
-  admission: Admission | null;
-  lastPing: Date | null;
-}
-
 const harness = () => {
   let clock = START;
   let ids = 0;
-  const open = new Map<string, OpenConnection>();
+  const open = new Map<string, Omit<OpenConnection, "id">>();
 
   const seats: Seats = {
     assign: (connectionId, seat) => {

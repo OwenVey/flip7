@@ -13,7 +13,7 @@ import {
 import type { ServerMessage } from "../game/protocol";
 import { createRoom, deliver, newStoredRoom } from "../game/room";
 import type {
-  Admission,
+  OpenConnection,
   RoomOutcome,
   RoomPassing,
   RoomTransport,
@@ -39,11 +39,6 @@ interface Link {
   toClient: Delivery[];
 }
 
-interface ServerConnection {
-  admission: Admission | null;
-  lastPing: Date | null;
-}
-
 const hasTraffic = (links: Map<string, Link>) =>
   [...links.values()].some(
     (link) => link.toServer.length > 0 || link.toClient.length > 0
@@ -52,7 +47,7 @@ const hasTraffic = (links: Map<string, Link>) =>
 const network = () => {
   let linkCount = 0;
   let idCount = 0;
-  const connections = new Map<string, ServerConnection>();
+  const connections = new Map<string, Omit<OpenConnection, "id">>();
   const links = new Map<string, Link>();
   const players: TestPlayer[] = [];
   const syncs: string[] = [];

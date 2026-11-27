@@ -54,6 +54,10 @@ export interface RoomClientState {
   typing: string[];
 }
 
+export type RoomReaders<Fields extends keyof RoomClientState> = {
+  [Field in Fields]: () => RoomClientState[Field];
+};
+
 /**
  * The socket the room client talks through. `send` returns false when the frame couldn't be sent.
  * `reconnect` retries the current socket. `replace` starts over with a fresh socket.

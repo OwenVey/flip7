@@ -6,7 +6,6 @@ import { createEffect, createMemo, For, Show } from "solid-js";
 
 import type { Card } from "../game/cards";
 import type { ActionCardChoice, Player, RoundStatus } from "../game/engine";
-import type { AvailableMoves } from "../game/moves";
 import type { RoomView } from "../game/protocol";
 import { createCountUp } from "../lib/count-up";
 import type { DealStep } from "../lib/deal-plan";
@@ -22,6 +21,7 @@ import FlipTracker, {
 import OfflineBadge from "./offline-badge";
 import PlayerAvatar from "./player-avatar";
 import PlayerMenu from "./player-menu";
+import type { PlayerMenuActions } from "./player-menu";
 import PlayingCard from "./playing-card";
 import { ROUND_COUNT_MS } from "./table-common";
 import Tooltip from "./tooltip";
@@ -77,19 +77,16 @@ const pickLabel = (
   return forId === undefined ? label : `${label} for ${nameOf(room, forId)}`;
 };
 
-interface RoundPlayerProps {
+interface RoundPlayerProps extends PlayerMenuActions {
   room: RoomView;
   player: Player;
   playerId: string | null;
   prompt: PlayerPrompt;
-  host: Pick<AvailableMoves["host"], "kick" | "makeHost">;
   dealStep: DealStep | null;
   roundPoints: number;
   actionsDisabled?: boolean;
   hostActionsDisabled?: boolean;
   onPick: (targetId: string) => void;
-  onRemove: (playerId: string) => void;
-  onMakeHost: (playerId: string) => void;
 }
 
 const RoundPlayer = (props: RoundPlayerProps) => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { bustChance, decideBotMove } from "./bot";
 import type { BotView } from "./bot";
+import { buildDeck } from "./cards";
 import type { ActionCard, Card } from "./cards";
 import type { Player } from "./engine";
 
@@ -41,6 +42,21 @@ describe(bustChance, () => {
     const view = table([seat("bot", [num(1)]), seat("ana", [])]);
 
     expect(bustChance(view, [num(1)])).toBe(0);
+  });
+
+  it("counts each held Number value once and ignores Score Modifiers", () => {
+    const hand = [
+      num(0),
+      num(4),
+      num(4),
+      { id: cardId(), kind: "modifier", value: 10 },
+    ] satisfies Card[];
+
+    const view = table([seat("bot", hand)]);
+
+    expect(bustChance(view, hand)).toBeCloseTo(
+      2 / (buildDeck().length - hand.length)
+    );
   });
 
   it("is higher with more high numbers in hand", () => {

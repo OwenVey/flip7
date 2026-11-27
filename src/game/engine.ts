@@ -24,10 +24,17 @@ import {
 } from "./cards";
 import type { ActionCard, Card, NumberCard, Random, RoundScore } from "./cards";
 import type { ChatReactions, ReactionEmoji } from "./chat-reactions";
-import type { GameEvent, LogPlayer, Mover, OfflineMover } from "./game-events";
+import type {
+  GameEvent,
+  LoggedScore,
+  LogPlayer,
+  Mover,
+  OfflineMover,
+} from "./game-events";
 import { MAX_PLAYERS, MIN_PLAYERS, rejectMove, waitingOn } from "./moves";
 import type { Move, PlayMove } from "./moves";
 import { nameKey, sameName } from "./names";
+import { isOnlineHuman } from "./player";
 import type { Player, RoundStatus } from "./player";
 import { DEFAULT_SETTINGS } from "./settings";
 import type { RoomSettings } from "./settings";
@@ -127,7 +134,7 @@ export interface GameState extends ActionCardState {
   /** Players still to be dealt an opening card this round, in deal order. */
   openingSlots: string[];
   winnerIds: string[];
-  winner: (LogPlayer & { points: number }) | null;
+  winner: LoggedScore | null;
   /** This game's log, oldest first. Cleared when a game starts. */
   log: LogEntry[];
   chatReactions: ChatReactions;
@@ -836,8 +843,6 @@ export const configure = (
 /** Whether anyone in the room is a person rather than a bot. */
 export const hasHumans = (state: GameState) =>
   state.players.some((player) => !player.bot);
-
-const isOnlineHuman = (player: Player) => player.connected && !player.bot;
 
 export const startGame = (
   state: GameState,

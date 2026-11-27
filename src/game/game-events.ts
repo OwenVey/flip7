@@ -7,7 +7,7 @@ export interface LogPlayer {
   name: string;
 }
 
-/** What one player scored in a round, as the event that ends the round records it. */
+/** A player's recorded score, at round end or when they win the game. */
 export interface LoggedScore extends LogPlayer {
   points: number;
 }

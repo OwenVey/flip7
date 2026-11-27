@@ -26,3 +26,6 @@ export interface Player {
   bustCard: Card | null;
   lastRound: RoundScore | null;
 }
+
+export const isOnlineHuman = (player: Pick<Player, "bot" | "connected">) =>
+  player.connected && !player.bot;

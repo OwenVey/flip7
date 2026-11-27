@@ -190,10 +190,13 @@ describe("room timers", () => {
     expect(timers.botTurn).toBeNull();
   });
 
-  it("pauses bots while no human is online", () => {
+  it("clears an already scheduled bot move when the last human goes offline", () => {
     const timers = humanAgainstBotWaitingOnBot();
-    goOffline(timers, "a");
     syncTimers(timers, START);
+    expect(timers.botTurn).not.toBeNull();
+
+    goOffline(timers, "a");
+    syncTimers(timers, START + 1);
     expect(timers.botTurn).toBeNull();
     expect(timers.stall).toBeNull();
     expect(nextAlarmAt(timers)).toBe(START + IDLE_EXPIRY_MS);

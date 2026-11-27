@@ -12,22 +12,15 @@ import { createDealPlayback, initialDealPlayback } from "./deal-playback";
 import type { DealMotion } from "./deal-playback";
 import { MOTION_PREFERENCE_QUERY } from "./motion";
 import { createMoveAlert } from "./move-alert";
-import type { RoomConnection } from "./room-connection";
+import type { RoomReaders } from "./room-client";
 import type { RoomCue } from "./room-cues";
 import type { RoomHapticCue } from "./room-haptics";
 import { createTableOpening, nudge, revealOwnSeat } from "./table-motion";
 
-/** What the Room table reads from the connection to the room. A `RoomConnection` fits. */
-export interface RoomTableSource {
-  /** The room as last confirmed. */
-  room: () => RoomView | null;
-  playerId: () => string | null;
-  watching: () => boolean;
-  status: () => ReturnType<RoomConnection["status"]>;
-  canAct: () => boolean;
-  /** Changes when the room resyncs. */
-  syncId: () => number;
-}
+/** What the Room table reads from the connection to the room. */
+export type RoomTableSource = RoomReaders<
+  "canAct" | "playerId" | "room" | "status" | "syncId" | "watching"
+>;
 
 /** The page the table plays on: where cards fly, and what the browser tab is doing. */
 export interface RoomTablePage {

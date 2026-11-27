@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { addPlayer, choose, hit, nextRound, stay } from "../game/engine";
+import { addPlayer, chat, choose, hit, nextRound, stay } from "../game/engine";
 import { gameAtFirstTurn, random, view } from "../test/deal-game";
 import { readTransition } from "./deal-beats";
 
@@ -88,6 +88,23 @@ describe(readTransition, () => {
       end: { cues: ["bust"], haptic: "bust" },
       settle: null,
     });
+  });
+
+  it("plays new chat once, alongside the bust whether or not cards fly", () => {
+    const game = gameAtFirstTurn();
+    game.deck = [{ ...number, id: 1006 }, number, flipThree];
+    hit(game, "a", random);
+    const before = view(game);
+    choose(game, "a", "a", random);
+    chat(game, "b", "Good luck!");
+    const after = view(game);
+
+    const animated = readTransition(before, after, "a", true);
+    const instant = readTransition(before, after, "a", false);
+
+    expect(animated.settle?.cues).toStrictEqual(["bust", "message"]);
+    expect(animated.end.cues).toStrictEqual([]);
+    expect(instant.end.cues).toStrictEqual(["bust", "message"]);
   });
 
   it("feels a Freeze only at the frozen player's seat, once", () => {

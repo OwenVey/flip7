@@ -1,9 +1,10 @@
 import { cardLabel } from "../game/cards";
-import type { Card } from "../game/cards";
+import type { ActionCard, Card } from "../game/cards";
 import { FLIP_THREE_COUNT, isChat } from "../game/engine";
 import type { Player } from "../game/engine";
 import { availableMoves } from "../game/moves";
 import type { AvailableMoves } from "../game/moves";
+import { isOnlineHuman } from "../game/player";
 import type { RoomView } from "../game/protocol";
 import type { PlaybackMoment } from "./deal-beats";
 import { stepPlayerId } from "./deal-plan";
@@ -58,7 +59,7 @@ export interface PlayerPrompt {
   /** The game is waiting on this player, shown once no moment is settling. */
   waitingOn: boolean;
   /** The viewer can give this player the action card, choosing for `forId` when set. */
-  pick: { kind: ActionCardKind; forId?: string } | null;
+  pick: { kind: ActionCard["kind"]; forId?: string } | null;
   /** The viewer is choosing and this player can't receive the card. */
   unpickable: boolean;
   /** The player won the game, shown once Deal playback has finished. */
@@ -79,13 +80,10 @@ export interface TablePrompt {
   gameOver: boolean;
 }
 
-type ActionCardKind = NonNullable<RoomView["choice"]>["card"]["kind"];
-
 const NONE: PromptControls = { kind: "none" };
 const RECONNECT_NOTE = "Play resumes when a player reconnects.";
 
-const playPaused = (room: RoomView) =>
-  !room.players.some((player) => player.connected && !player.bot);
+const playPaused = (room: RoomView) => !room.players.some(isOnlineHuman);
 
 const flipLabel = (
   flip: NonNullable<DealStep["flip"]>,

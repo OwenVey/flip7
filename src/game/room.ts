@@ -24,7 +24,6 @@ import {
   startGame,
   stay,
 } from "./engine";
-import type { GameState } from "./engine";
 import { MAX_SPECTATORS, rejectWatchInstead } from "./moves";
 import {
   cleanName,
@@ -48,7 +47,6 @@ const HEARTBEAT_CLOSE_CODE = 1001;
 
 export interface StoredRoom extends RoomTimers {
   code: string;
-  game: GameState;
   /** Each player's last accepted move. */
   lastRequests: Partial<Record<string, string>>;
   /** Each list's sequence number at the last broadcast, so the next one sends only newer entries. */

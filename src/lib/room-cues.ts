@@ -1,5 +1,4 @@
 import { isChat } from "../game/engine";
-import type { LogEntry } from "../game/engine";
 import type { GameEvent, GameEventType } from "../game/game-events";
 import { roundStarted } from "../game/protocol";
 import type { RoomView } from "../game/protocol";
@@ -63,16 +62,7 @@ export type RoomCue =
   | "turn"
   | "win";
 
-const isChatFromOthers = (entry: LogEntry, playerId: string | null) =>
-  isChat(entry) && entry.from.id !== playerId;
-
-export const newLogEntries = (previous: RoomView, current: RoomView) => {
-  const lastId = previous.log.at(-1)?.id ?? 0;
-
-  return current.log.filter((entry) => entry.id > lastId);
-};
-
-export const gameOverCue = (
+const gameOverCue = (
   previous: RoomView,
   current: RoomView,
   playerId: string | null
@@ -88,64 +78,61 @@ export const gameOverCue = (
     : ("win" as const);
 };
 
-export const chatCue = (events: readonly LogEntry[], playerId: string | null) =>
-  events.some((entry) => isChatFromOthers(entry, playerId))
-    ? ("message" as const)
-    : null;
-
 const tableCue = (
   previous: RoomView,
   current: RoomView,
-  events: LogEntry[],
-  playerId: string | null
+  events: readonly GameEvent[]
 ) => {
   const gameCue = GAME_CUE_PRIORITY.find((cue) =>
-    events.some((entry) => !isChat(entry) && eventCue(entry.event) === cue)
+    events.some((event) => eventCue(event) === cue)
   );
 
-  const finale = gameOverCue(previous, current, playerId);
-
-  if (finale) {
-    return finale;
-  }
-
   if (gameCue) {
-    return gameCue === "special" ? "reveal" : gameCue;
+    return gameCue === "special" ? ("reveal" as const) : gameCue;
   }
 
   if (current.phase === "roundOver" && previous.phase !== "roundOver") {
-    return "round";
+    return "round" as const;
   }
 
   if (roundStarted(previous, current)) {
-    return "deal";
+    return "deal" as const;
   }
 
   if (current.drawSeq > previous.drawSeq) {
-    return "reveal";
+    return "reveal" as const;
   }
 
   return null;
 };
 
-export const roomCues = (
+export const readRoomFeedback = (
   previous: RoomView,
   current: RoomView,
   playerId: string | null
 ) => {
-  const events = newLogEntries(previous, current);
-  const cues: RoomCue[] = [];
-  const cue = tableCue(previous, current, events, playerId);
+  const lastId = previous.log.at(-1)?.id ?? 0;
+  const events: GameEvent[] = [];
+  let chat: "message" | null = null;
 
-  if (cue) {
-    cues.push(cue);
+  for (const entry of current.log) {
+    if (entry.id <= lastId) {
+      continue;
+    }
+
+    if (!isChat(entry)) {
+      events.push(entry.event);
+    } else if (entry.from.id !== playerId) {
+      chat = "message";
+    }
   }
 
-  const chat = chatCue(events, playerId);
+  const finale = gameOverCue(previous, current, playerId);
 
-  if (chat) {
-    cues.push(chat);
-  }
-
-  return cues;
+  return {
+    chat,
+    events,
+    finale,
+    table: finale === null ? tableCue(previous, current, events) : null,
+  };
 };

@@ -8,19 +8,20 @@ export type ScoreModifierCard =
   | { id: number; kind: "modifier"; value: number }
   | { id: number; kind: "double" };
 
-export type ActionCard =
-  | { id: number; kind: "freeze" }
-  | { id: number; kind: "flipThree" }
-  | { id: number; kind: "secondChance" };
-
-export type Card = NumberCard | ScoreModifierCard | ActionCard;
-
-export type CardKind = Card["kind"];
-
 /** The action cards a Flip Three can set aside. */
 export const HELD_ACTION_KINDS = ["freeze", "flipThree"] as const;
 
 export type HeldActionKind = (typeof HELD_ACTION_KINDS)[number];
+
+export type HeldActionCard = {
+  [Kind in HeldActionKind]: { id: number; kind: Kind };
+}[HeldActionKind];
+
+export type ActionCard = HeldActionCard | { id: number; kind: "secondChance" };
+
+export type Card = NumberCard | ScoreModifierCard | ActionCard;
+
+export type CardKind = Card["kind"];
 
 type WithoutId<C> = C extends Card ? Omit<C, "id"> : never;
 
@@ -89,9 +90,20 @@ export const isActionCard = (card: Card): card is ActionCard =>
 export const isScoreModifierCard = (card: Card): card is ScoreModifierCard =>
   card.kind === "modifier" || card.kind === "double";
 
+export const uniqueNumberValues = (cards: readonly Card[]) => {
+  const values = new Set<number>();
+
+  for (const card of cards) {
+    if (card.kind === "number") {
+      values.add(card.value);
+    }
+  }
+
+  return values;
+};
+
 export const countUniqueNumberCards = (cards: readonly Card[]) =>
-  new Set(cards.flatMap((card) => (card.kind === "number" ? [card.value] : [])))
-    .size;
+  uniqueNumberValues(cards).size;
 
 export const calculateRoundScore = (cards: readonly Card[]) => {
   let numberCardPoints = 0;
