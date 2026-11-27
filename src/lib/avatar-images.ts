@@ -1,7 +1,7 @@
 const files = import.meta.glob<string>("../assets/avatars/*.svg", {
   eager: true,
   import: "default",
-  query: "?inline",
+  query: "?url",
 });
 
 const images = new Map(
@@ -11,5 +11,5 @@ const images = new Map(
   ])
 );
 
-/** The image for an avatar. Vite inlines each small SVG into the bundle. */
+/** The static asset URL for an avatar. */
 export const avatarImage = (avatar: number) => images.get(avatar) ?? "";
